@@ -316,7 +316,19 @@ export function similarRole(title: string, department: string | null | undefined
   return best !== null && best.similarity >= titleSimilarityThreshold ? best : null;
 }
 
-export function classifyTitle(title: string, department: string | null | undefined) {
+export interface TagRulesOptions {
+  /**
+   * Whether an unresolved title falls back to the O*NET similarity scan. The daily Stapply pass turns it off: it costs
+   * about 18 ms per distinct title, which is hours over a full snapshot, and the LLM pass covers what it leaves open.
+   */
+  readonly titleSimilarity?: boolean;
+}
+
+export function classifyTitle(
+  title: string,
+  department: string | null | undefined,
+  options: TagRulesOptions = {},
+) {
   const text = normalizePlaceName(`${title} ${department ?? ""}`);
   let role: string | null = null;
 
@@ -351,6 +363,10 @@ export function classifyTitle(title: string, department: string | null | undefin
 
   if (role !== null) {
     return { role, subrole, seniority, roleSource: "rules" as const };
+  }
+
+  if (options.titleSimilarity === false) {
+    return { role: null, subrole, seniority, roleSource: "unclassified" as const };
   }
 
   const similar = similarRole(title, department);
@@ -447,7 +463,7 @@ function normalizeEmploymentType(
   return "unknown";
 }
 
-export function tagPosting(input: PostingTagInput) {
+export function tagPosting(input: PostingTagInput, options: TagRulesOptions = {}) {
   const workplace = normalizeWorkplace(
     input.workplaceType,
     input.isRemote,
@@ -484,7 +500,7 @@ export function tagPosting(input: PostingTagInput) {
     detectLanguage(`${input.title} ${(input.descriptionText ?? "").slice(0, 500)}`) ??
     "en";
 
-  const classified = classifyTitle(input.title, input.department);
+  const classified = classifyTitle(input.title, input.department, options);
 
   const tags: PostingTags = {
     workplace,

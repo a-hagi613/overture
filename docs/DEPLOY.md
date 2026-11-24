@@ -22,6 +22,7 @@ to Fly), against names only.
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
 | `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
 | `.github/workflows/ops-admin-host.yml` | `workflow_dispatch` only, for the admin host: `status` (certificate table, Fly secret names only, app status), `add-cert` (idempotent certificate for `admin.tryoverture.com`, then the same report), `set-access-secrets` (pushes the Cloudflare Access values held as repository secrets to Fly, names only afterwards). Fails with a clear message while `FLY_API_TOKEN` is unset |
+| `.github/workflows/stapply-daily.yml` | Daily at 15:30 UTC (one hour after Stapply's 14:30 snapshot) and on `workflow_dispatch`; skips with a green notice until the R2 repository secrets or `CATALOG_REFRESH_SECRET` are configured. Builds `catalog.sqlite` with DuckDB from the 28 per-board `jobs.parquet` files, delta-syncs it against the previous R2 snapshot, tags it, vacuums and compresses it, then publishes `catalog/latest.sqlite.zst`, `catalog/latest.json` and `catalog/snapshots/YYYY-MM-DD.sqlite.zst` to R2 or relays the signed refresh to `overture-web` |
 | `.github/workflows/vacuum-db.yml` | Weekly (Sundays 05:00 UTC, also `workflow_dispatch` with `dry_run` and `force`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise dry-runs `/data/app.sqlite`, and only when its freelist exceeds 50 MB (or `force` is set) restarts the one machine in maintenance mode, vacuums it, restarts the server and polls `/api/health` |
 | `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
@@ -1097,6 +1098,80 @@ checksums and row delta, re-pin `PINNED_MANIFEST_SHA256` and `PINNED_COMPANIES_P
 `STAPPLY_MANIFEST_URL` and `STAPPLY_COMPANIES_URL` are optional repository variables; the defaults are the pinned
 `https://storage.stapply.ai/jobs/v1/…` URLs. `STAPPLY_ALERT_NTFY_URL` is optional and only pushes an aborted run to the
 owner's phone; without it the failing job and its step summary are the alert.
+
+## The daily Stapply catalog ETL (WS-3a)
+
+`.github/workflows/stapply-daily.yml` runs at **15:30 UTC** and on `workflow_dispatch`; it never runs on a pull request
+or a push. Its first step picks a publish target and skips with a green notice while neither is configured, so a fresh
+clone does not turn `main` red every day:
+
+- **R2 directly** when the four repository secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and
+  `R2_BUCKET_FILES` are set (`R2_ENDPOINT` is optional). The workflow then needs no Fly credential.
+- **Relay to `overture-web`** when `CATALOG_REFRESH_SECRET` and the existing `FLY_API_TOKEN` are set. The app archives
+  the snapshot to R2 with the R2 credentials it already holds, so no R2 secret is copied into the repository. The
+  shared secret exists because a Fly API token cannot sign a request the app can verify offline; set it once on both
+  sides with `fly secrets set CATALOG_REFRESH_SECRET=… -a overture-web` and
+  `gh secret set CATALOG_REFRESH_SECRET -R a-hagi613/overture`.
+
+`ANTHROPIC_API_KEY` is optional: with it, up to 500 newly inserted apply-supported postings whose role the rules could
+not classify go to Haiku 5.5 in batches of 25 (`CATALOG_LLM_MODEL` overrides the model, `--max-llm-rows` the ceiling);
+without it the pass is skipped and the run still publishes. `STAPPLY_ALERT_NTFY_URL` is optional and only pushes a
+failed run to the owner's phone. The run uploads `stapply-daily.json` (counters, per-board rows, tag sources, the
+manifest) as an artifact and writes it to the step summary.
+
+**What it does.** `scripts/stapply-daily-etl.ts` reads the 28 `<source_key>/jobs.parquet` files over HTTP with DuckDB,
+one board at a time (column projection; `description` and `raw` are never selected and `all.parquet` is never read),
+streams the mapped rows into a temporary SQLite staging table, filters non-empty
+titles, `https://` apply links, unexpired deadlines and — on the first run — a 30-day `posted_at` horizon, and collapses
+`(company_norm, requisition_id)` duplicates preferring a board with an apply adapter. It downloads
+`catalog/latest.sqlite.zst` and verifies it against `catalog/latest.json` first, so unchanged `content_hash` rows keep
+their `role`/`seniority`/`skills_json` tags; new rows are inserted, changed rows rewritten, missing listings closed at
+once, and closed rows older than 30 days deleted. It then runs `PRAGMA optimize`, `VACUUM` and
+`PRAGMA integrity_check`, zstd-compresses the file at level 12 (level 19 took over ten minutes on a 1.1 GB seed
+artifact for about 2 % smaller output), and computes the manifest's SHA-256 over the **uncompressed** SQLite bytes.
+
+**Published objects.** `catalog/snapshots/YYYY-MM-DD.sqlite.zst` first, then `catalog/latest.sqlite.zst`, then
+`catalog/latest.json` last so a reader never sees a manifest without its snapshot, then keeps the newest seven dated
+snapshots and deletes older ones (the daily artifact is hundreds of megabytes). The manifest is exactly
+`{version, sha256, builtAt, rowCount, supportedCount}`. In R2 mode the run then sends the signed
+`POST /internal/catalog/refresh` when `CATALOG_REFRESH_SECRET` is set, so the app hot-swaps without waiting for a cold
+boot (summary `publish: "r2+refresh"`); without the secret it only uploads (`"r2"`). A run whose `rowCount` is more
+than 20 % below the previous manifest is refused before anything is uploaded; re-run `workflow_dispatch` with
+`allow_row_drop` after checking upstream.
+
+**The relay contract (`WS-8`, issue #576).** Both requests sign `<timestamp>\n<body>` with
+`CATALOG_REFRESH_SECRET` and send `x-overture-catalog-timestamp` (epoch ms) plus
+`x-overture-catalog-signature` (lowercase hex HMAC-SHA256). The app accepts a timestamp within five minutes of its
+clock and rejects any timestamp it has already accepted, so a captured request cannot be replayed.
+
+1. `PUT /internal/catalog/snapshot` with `content-type: application/zstd`, the compressed bytes as the body, and
+   `x-overture-catalog-version` and `x-overture-catalog-sha256` (the uncompressed hash). The body to sign is the
+   SHA-256 of the compressed bytes, because the request is large. The compressed artifact was 277 MB on the seed run
+   and roughly doubles once the catalog holds every listed posting, so the relay is a fallback: prefer the R2
+   repository secrets for production, and `WS-8` must raise its request-body limit for this route.
+2. `POST /internal/catalog/refresh` with the manifest as the JSON body. The app archives the snapshot to R2, verifies
+   the SHA-256 and `PRAGMA integrity_check`, and hot-swaps `catalog.sqlite` read-only.
+
+A 404 or 501 on either endpoint is reported as `relay_endpoint_missing` and does not fail the run (the endpoint ships
+with `WS-8`); a real HTTP error or a rejected checksum fails the job and alerts. The R2 path sends only the signed
+`POST /internal/catalog/refresh`; the app pulls from R2 itself.
+
+**First run and rollback.** Run it once with
+`gh workflow run stapply-daily.yml -f allow_row_drop=false -f skip_llm=false -R a-hagi613/overture` and check the step
+summary: `seed: true`, `integrity: "ok"`, and `publish` set to `r2`, `r2+refresh`, or `relay`, not
+`relay_endpoint_missing`. The seed run keeps the last 30 days of postings (measured: 851,637 rows across the 28
+boards, 286,694 of them apply-supported, 277 MB compressed); from the second run on the catalog holds every posting
+the boards still list, about two million rows, so expect roughly twice that compressed size. Nothing in the app changes until `WS-8` consumes the manifest, so the only production effect
+of merging this workflow is the daily R2 object. To roll back, disable the workflow
+(`gh workflow disable stapply-daily.yml`); the last published snapshot stands, and the app's active catalog is never
+replaced by a snapshot that fails its checksum. There is no database migration to undo.
+
+Run it by hand with
+`gh workflow run stapply-daily.yml -f allow_row_drop=false -f skip_llm=false -R a-hagi613/overture`, or locally against
+a staged fixture directory with
+`bun run scripts/stapply-daily-etl.ts --source-base-url <dir> --out-dir <dir> --as-of <iso> --skip-llm` (it writes a
+local object store and never touches R2). The DuckDB binding is the MIT `@duckdb/node-api` dev dependency; it is not in
+the production image because only this off-box job uses it.
 
 ## The sentinel Worker (#283)
 

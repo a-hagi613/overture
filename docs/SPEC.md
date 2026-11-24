@@ -477,6 +477,43 @@ shipped boards are `apply_supported=1` until a later adapter wave ships. Every o
 exist in the catalog but never match a user (§8.1). The values are also in `company_boards.ats` so a later adapter
 needs no table rebuild.
 
+#### Daily Stapply Parquet ingest (issue #568, `WS-3a`)
+
+The 28 Stapply boards are also published as per-board Parquet snapshots under
+`https://storage.stapply.ai/jobs/v1/<source_key>/jobs.parquet` (Stapply refreshes them at 14:30 UTC). A GitHub Actions
+workflow (`.github/workflows/stapply-daily.yml`) runs at **15:30 UTC** and on `workflow_dispatch` and builds
+`catalog.sqlite` with DuckDB, off the serving machine; the app never downloads the snapshots. The combined
+`all.parquet` (about 4.2 GB) is never read.
+
+- **Read:** DuckDB reads one board at a time with column projection and streams the mapped rows into a temporary
+  staging table, so a 2-million-row run never holds the snapshot in memory and each board's progress is visible in the
+  job log. `description` and `raw` are never selected. The 28 URLs are the registry's source keys, so a board that is
+  added to `ATS_REGISTRY` joins the run without a second list.
+- **Filter:** a non-empty `title`; an `https://` apply link (`apply_url`, or the posting `url` when the feed has no
+  apply link, which is normal for Greenhouse and Personio); an `application_deadline` that is absent or not past; and on
+  the first run a 30-day `posted_at` horizon. Rows whose timestamp is missing stay in, because the feed cannot prove
+  they are old.
+- **Dedupe:** one row per `(company_norm, requisition_id)` across all 28 boards, preferring a board with an apply
+  adapter, then the newest source update, then the feed's job id; DuckDB applies it within a board and SQLite applies
+  it again across boards. Rows without a requisition id are never collapsed against each other.
+- **Delta sync:** the previous `catalog/latest.sqlite.zst` is downloaded and verified against its manifest first, so an
+  unchanged `content_hash` keeps its `role`, `seniority` and `skills_json` tags. New rows are inserted, changed rows
+  rewritten and re-tagged, and a posting the boards no longer list is marked `status='closed'` with `closed_at` on the
+  first missing snapshot (the serving-side two-poll rule of §6.2 item 5 stays for the per-board pollers). Closed rows
+  older than 30 days are deleted.
+- **Tagging:** the deterministic rules run at ingest (title, department, team, location, employment type, experience).
+  The rules path skips the O*NET title-similarity fallback in this pass: it costs about 18 ms per distinct title, which
+  is hours across a full snapshot. Only boards Overture can apply to are tag-written, because §8.1 never matches the
+  others. Newly inserted apply-supported rows whose role the rules leave unresolved go to `claude-haiku-5-5` in
+  batches of 25 (500 rows a run by default); a missing key or a failed batch ends the pass cleanly and the run still
+  publishes.
+- **Publish:** `VACUUM`, `PRAGMA optimize` and `PRAGMA integrity_check` run before the file leaves the runner. The
+  workflow publishes `catalog/snapshots/YYYY-MM-DD.sqlite.zst`, `catalog/latest.sqlite.zst` and `catalog/latest.json`
+  (`{version, sha256, builtAt, rowCount, supportedCount}`, SHA-256 of the **uncompressed** SQLite) to R2, or relays the
+  compressed file with an HMAC-signed `POST /internal/catalog/refresh` when the repository has no R2 credentials
+  (docs/DEPLOY.md, the daily catalog ETL; `WS-8`, issue #576). A snapshot more than 20 % smaller than the previous manifest is refused unless `allow_row_drop` is
+  set on a manual run. This path adds no database migration: `drizzle-catalog/0002` already carries the columns.
+
 SmartRecruiters and Recruitee are not built as per-board clients: the SAP API Policy forbids systematic extraction by
 AI agents, and Recruitee's Careers API needs a per-company token from 2027-02-10 (ADR 0028). Their Stapply rows are
 still ingested as catalog data; no client, sender list or probe exists for them. Pinpoint and Gem are the deferred
@@ -520,7 +557,9 @@ straight to tagging; Ashby's `isRemote` is ignored because Ashby sets it on hybr
    its row running; the claim takes the row over once its lease expires, and only one process polls its boards
    because the board claim has not lapsed.
 5. **Closed**: a posting absent from two consecutive successful polls gets `closed_at`; its `ready` and `approved`
-   Applications are skipped with `status_reason='posting_closed'` and appear on Home as Couldn't apply. The liveness
+   Applications are skipped with `status_reason='posting_closed'` and appear on Home as Couldn't apply. The daily
+   Stapply snapshot is a full board list, so that pass closes a missing posting at once and hard-deletes closed rows
+   older than 30 days. The liveness
    re-check at dispatch (§9.3) does the same for a Posting it finds closed.
 6. **Dedupe**: `dedupe_key = company_id + title_norm + country_code + city`; duplicates across boards keep the
    earliest posting; users never see two cards for one role.
@@ -1705,7 +1744,7 @@ publishing version 2 leaves version 1 and an already sent Snapshot on version 1 
 
 Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038). The landing's live supply preview is walked end to end with seeded catalog Postings: the count follows a role, location and remote change, the fallback paragraph replaces it when the API answers 503, and the page stays axe clean at 390 and 1280 in both themes (#567).
 
-### 16.2 Unit tests (eighty-two files, `bun:test`, beside their code)
+### 16.2 Unit tests (`bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1729,6 +1768,10 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/catalog/answer-derivations.test.ts` | answer derivations |
 | `src/server/catalog/companies-parquet.test.ts` | the pinned `companies.parquet` and manifest sha256 pairs are verified before a seed loads, and a tampered file or manifest is refused |
 | `src/server/catalog/question-normalize.test.ts` | question normalisation |
+| `src/server/catalog/stapply-daily.test.ts` | the 28-board DuckDB query projects only catalog columns and never `all.parquet`, applies the https/title/deadline/freshness filters, dedupes by `(company_norm, requisition_id)` preferring an apply-supported board, and maps the feed's salary and employment spellings |
+| `src/server/catalog/stapply-delta.test.ts` | a rerun with the same `content_hash` inserts nothing and keeps its tags (including an import tag), a changed hash rewrites and re-tags, a missing posting closes at once, a closed row older than 30 days is pruned, a returned posting reopens, and an ingest-only posting is not tag-written |
+| `src/server/catalog/stapply-refresh.test.ts` | the zstd round trip, the manifest SHA-256 over the uncompressed file, the HMAC timestamp+body signature, tamper/stale/replay rejection, the publish keys with seven-snapshot retention, and the two signed relay requests |
+| `src/server/catalog/stapply-tagging.test.ts` | only leftovers the rules could not classify reach the LLM, the batched request carries the taxonomy prompt, and an answer outside the taxonomy is dropped |
 | `src/server/catalog/supply.test.ts` | the public supply count reads only open, apply-supported Postings, splits by ATS, filters by role (role or subrole tag), location and remote, caches per catalog revision, stays bounded, and plans through `postings_apply_supported_status` rather than scanning `postings` or `posting_tags` (#567) |
 | `src/server/catalog/tag-rules.test.ts` | tag rules |
 | `src/server/dispatch/browser/kernel.test.ts` | Kernel opens headless by default and escalates to headful stealth only after a block or CAPTCHA, and every session is deleted through the control API even when its usage read fails |

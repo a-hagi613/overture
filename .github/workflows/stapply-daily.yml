@@ -1,0 +1,139 @@
+name: Stapply daily catalog
+
+on:
+  schedule:
+    - cron: "30 15 * * *"
+  workflow_dispatch:
+    inputs:
+      allow_row_drop:
+        description: "Publish a snapshot whose row count dropped more than 20%"
+        type: boolean
+        default: false
+      skip_llm:
+        description: "Skip the Haiku pass over newly inserted unresolved postings"
+        type: boolean
+        default: false
+
+concurrency:
+  group: stapply-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Skip until a publish target is configured (docs/DEPLOY.md, the daily catalog ETL)
+        id: guard
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_FILES: ${{ secrets.R2_BUCKET_FILES }}
+          CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -n "$R2_ACCOUNT_ID" ] && [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ] && [ -n "$R2_BUCKET_FILES" ]; then
+            echo "mode=r2" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ -n "$CATALOG_REFRESH_SECRET" ] && [ -n "$FLY_API_TOKEN" ]; then
+            echo "mode=relay" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Stapply daily catalog skipped"
+              echo ""
+              echo "There is no publish target yet: set the R2 repository secrets (the Workable feed pass lists them)"
+              echo "or \`CATALOG_REFRESH_SECRET\` beside the existing \`FLY_API_TOKEN\` (docs/DEPLOY.md, the daily catalog ETL)."
+              echo ""
+              echo "Nothing was fetched and no snapshot was published, so the owner was not alerted."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.guard.outputs.skip != 'true'
+      - name: Set up Bun (oven-sh/setup-bun v2 @ 0c5077e)
+        if: steps.guard.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.5
+      - name: Cache Bun dependencies
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
+        run: bun install --frozen-lockfile
+      - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
+        if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.mode == 'relay'
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+      - name: Check the app is up before the relay
+        if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.mode == 'relay'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl status -a overture-web
+      - name: Build the catalog from the 28 Stapply boards and publish it
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          ALLOW_ROW_DROP: ${{ inputs.allow_row_drop == true && '1' || '' }}
+          SKIP_LLM: ${{ inputs.skip_llm == true && '1' || '' }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_FILES: ${{ secrets.R2_BUCKET_FILES }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CATALOG_LLM_MODEL: ${{ vars.CATALOG_LLM_MODEL || '' }}
+        run: |
+          set -o pipefail
+          flags=()
+          if [ "$ALLOW_ROW_DROP" = "1" ]; then
+            flags+=(--allow-row-drop)
+          fi
+          if [ "$SKIP_LLM" = "1" ]; then
+            flags+=(--skip-llm)
+          fi
+          bun run scripts/stapply-daily-etl.ts "${flags[@]}" | tee stapply-daily.json
+      - name: Report the run outcome
+        if: always()
+        run: |
+          {
+            echo "### Stapply daily catalog"
+            echo ""
+            if [ -f stapply-daily.json ]; then
+              echo '```json'
+              cat stapply-daily.json
+              echo '```'
+            else
+              echo "The run produced no summary; the step log has the error."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the run summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: stapply-daily-${{ github.run_id }}
+          path: stapply-daily.json
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Tell the owner the run failed
+        if: failure() && steps.guard.outputs.skip != 'true'
+        env:
+          NTFY_URL: ${{ secrets.STAPPLY_ALERT_NTFY_URL }}
+        run: |
+          if [ -z "$NTFY_URL" ]; then
+            exit 0
+          fi
+          curl -fsS -X POST -H "Title: Stapply daily catalog failed" \
+            --data-binary "The 15:30 UTC catalog build did not finish. The last published snapshot stands." \
+            "$NTFY_URL"
