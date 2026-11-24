@@ -11,11 +11,27 @@ import { readAshbyQuestions } from "../dispatch/ats/ashby.ts";
 import { readWorkableQuestions } from "../dispatch/ats/workable.ts";
 import { readLeverQuestions } from "../dispatch/ats/lever.ts";
 import { readPersonioQuestions } from "../dispatch/ats/personio.ts";
+import { readBreezyQuestions } from "../dispatch/ats/breezy.ts";
+import { readSoftgardenQuestions } from "../dispatch/ats/softgarden.ts";
+import { readClearCompanyQuestions } from "../dispatch/ats/clearcompany.ts";
+import { readJoinComQuestions } from "../dispatch/ats/join-com.ts";
+import { readPinpointQuestions } from "../dispatch/ats/pinpoint.ts";
 import type { LoginWallEvidence } from "../pipeline/login-wall.ts";
 import { detectLoginWall } from "../pipeline/login-wall.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
 
-export const ATS_NAMES = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
+export const ATS_NAMES = [
+  "greenhouse",
+  "lever",
+  "ashby",
+  "workable",
+  "personio",
+  "breezy",
+  "softgarden",
+  "clearcompany",
+  "join_com",
+  "pinpoint",
+] as const;
 
 export type FixtureAts = (typeof ATS_NAMES)[number];
 
@@ -26,6 +42,16 @@ export const FORM_FIELD_SELECTORS = {
   workable:
     "form.application-form input:not([type='hidden']), form#application-form input:not([type='hidden']), input[name='firstname'], input[type='file']",
   personio: "form:has(button[type='submit']) input:not([type='hidden'])",
+  breezy:
+    "form#application-form input:not([type='hidden']), form.application-form input:not([type='hidden'])",
+  softgarden:
+    "form#application-form input:not([type='hidden']), form#apply-form input:not([type='hidden'])",
+  clearcompany:
+    "form#application-form input:not([type='hidden']), form#apply-form input:not([type='hidden'])",
+  join_com:
+    "form#application-form input:not([type='hidden']), form#apply-form input:not([type='hidden'])",
+  pinpoint:
+    "form#application-form input:not([type='hidden']), form#new_application input:not([type='hidden'])",
 } as const satisfies Record<FixtureAts, string>;
 
 export const FORM_RENDER_TIMEOUT_MS = 20_000;
@@ -235,6 +261,26 @@ async function questionsFor(ats: FixtureAts, page: Page) {
 
   if (ats === "personio") {
     return readPersonioQuestions(page);
+  }
+
+  if (ats === "breezy") {
+    return readBreezyQuestions(page);
+  }
+
+  if (ats === "softgarden") {
+    return readSoftgardenQuestions(page);
+  }
+
+  if (ats === "clearcompany") {
+    return readClearCompanyQuestions(page);
+  }
+
+  if (ats === "join_com") {
+    return readJoinComQuestions(page);
+  }
+
+  if (ats === "pinpoint") {
+    return readPinpointQuestions(page);
   }
 
   return readAshbyQuestions(page);

@@ -4,28 +4,47 @@ import { z } from "zod";
 
 import type { FormQuestion } from "./send-plan.ts";
 import type { QuestionFieldType } from "../../shared/questions.ts";
+import type { BatchThreeAts } from "../../shared/ats.ts";
 
 import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
 import { LEVER_FIELD_TYPES, LEVER_SKIP_NAMES } from "../dispatch/ats/lever.ts";
 import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbound-guard.ts";
 import type { LoginWallFormRead } from "./login-wall.ts";
 import { detectLoginWall } from "./login-wall.ts";
+import { readBreezyFormHtml } from "./breezy-form.ts";
 import { personioApplyUrl, readPersonioFormHtml } from "./personio-form.ts";
+import {
+  breezyApplyUrl,
+  joinComApplyUrl,
+  pinpointApplyUrl,
+  readClearCompanyFormHtml,
+  readJoinComFormHtml,
+  readPinpointFormHtml,
+  readSoftgardenFormHtml,
+  softgardenApplyUrl,
+} from "./wave1a-forms.ts";
 
 export const FORM_READ_PATHS = [
   "lever_html",
   "ashby_graphql",
   "workable_form",
   "personio_html",
+  "breezy_json",
+  "softgarden_html",
+  "clearcompany_html",
+  "join_com_html",
+  "pinpoint_html",
   "browser",
 ] as const;
 
 export type FormReadPath = (typeof FORM_READ_PATHS)[number];
 
+export type PlainFormReadPath = Exclude<FormReadPath, "browser">;
+
 export interface PlainFormReadResult {
   questions: FormQuestion[];
   formSignature: string;
-  path: "lever_html" | "ashby_graphql" | "workable_form" | "personio_html";
+  path: PlainFormReadPath;
   unhandled?: string[];
 }
 
@@ -42,8 +61,10 @@ export function isLoginWallRead(read: FormReadResult | null): read is LoginWallF
   return read !== null && "loginWall" in read;
 }
 
+export type FormReadAts = "lever" | "ashby" | "workable" | "personio" | BatchThreeAts;
+
 export interface FormReadTarget {
-  ats: "lever" | "ashby" | "workable" | "personio";
+  ats: FormReadAts;
   region: "us" | "eu";
   boardToken: string;
   atsJobId: string;
@@ -779,6 +800,18 @@ export function createPlainFormReader(
     "",
   );
 
+  async function fetchFormPage(
+    url: string,
+    parse: (html: string) => PlainFormReadResult | Promise<PlainFormReadResult>,
+  ) {
+    const response = await guardedFetch(url, {
+      headers: { "user-agent": USER_AGENT },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    return htmlPageRead(url, response, parse);
+  }
+
   async function lever(input: FormReadTarget) {
     const base = input.region === "eu" ? leverEuBase : leverBase;
     const url = `${base}/${encodeURIComponent(input.boardToken)}/${encodeURIComponent(input.atsJobId)}/apply`;
@@ -837,16 +870,45 @@ export function createPlainFormReader(
   async function personio(input: FormReadTarget) {
     const url = personioApplyUrl(input.applyUrl ?? input.url);
 
-    if (url === null) {
-      return null;
-    }
+    return url === null ? null : await fetchFormPage(url, readPersonioFormHtml);
+  }
 
-    const response = await guardedFetch(url, {
-      headers: { "user-agent": USER_AGENT },
-      signal: AbortSignal.timeout(timeoutMs),
+  async function breezy(input: FormReadTarget) {
+    const url = breezyApplyUrl(input.applyUrl ?? input.url) ?? input.applyUrl ?? input.url;
+
+    return await fetchFormPage(url, (html) => {
+      const read = readBreezyFormHtml(html);
+
+      return (
+        read ?? {
+          questions: [],
+          formSignature: "",
+          path: "breezy_json" as const,
+        }
+      );
     });
+  }
 
-    return htmlPageRead(url, response, readPersonioFormHtml);
+  async function softgarden(input: FormReadTarget) {
+    const url = softgardenApplyUrl(input.applyUrl ?? input.url) ?? input.applyUrl ?? input.url;
+
+    return await fetchFormPage(url, readSoftgardenFormHtml);
+  }
+
+  async function clearcompany(input: FormReadTarget) {
+    return await fetchFormPage(input.applyUrl ?? input.url, readClearCompanyFormHtml);
+  }
+
+  async function joinCom(input: FormReadTarget) {
+    const url = joinComApplyUrl(input.applyUrl ?? input.url) ?? input.applyUrl ?? input.url;
+
+    return await fetchFormPage(url, readJoinComFormHtml);
+  }
+
+  async function pinpoint(input: FormReadTarget) {
+    const url = pinpointApplyUrl(input.applyUrl ?? input.url) ?? input.applyUrl ?? input.url;
+
+    return await fetchFormPage(url, readPinpointFormHtml);
   }
 
   return {
@@ -864,7 +926,27 @@ export function createPlainFormReader(
           return await workable(input);
         }
 
-        return await personio(input);
+        if (input.ats === "personio") {
+          return await personio(input);
+        }
+
+        if (input.ats === "breezy") {
+          return await breezy(input);
+        }
+
+        if (input.ats === "softgarden") {
+          return await softgarden(input);
+        }
+
+        if (input.ats === "clearcompany") {
+          return await clearcompany(input);
+        }
+
+        if (input.ats === "join_com") {
+          return await joinCom(input);
+        }
+
+        return await pinpoint(input);
       } catch (error) {
         if (error instanceof LiveServiceRequestError) {
           throw error;

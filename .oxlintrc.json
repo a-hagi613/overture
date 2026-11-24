@@ -230,6 +230,7 @@
           "src/server/pipeline/email-notes.test.ts",
           "src/server/pipeline/login-wall.test.ts",
           "src/server/pipeline/personio-form.test.ts",
+          "src/server/pipeline/wave1a-forms.test.ts",
           "src/server/pipeline/prepare-status.test.ts",
           "src/server/pipeline/reviews.test.ts",
           "src/server/pipeline/send-queue.test.ts",

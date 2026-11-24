@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { ANSWER_KINDS, QUESTION_FIELD_TYPES } from "../../shared/questions.ts";
+import { APPLY_SUPPORTED_ATS } from "../../shared/ats.ts";
+import type { ApplySupportedAts } from "../../shared/ats.ts";
 import { ANSWER_SOURCES, BLOCK_REASONS } from "./answer-plan.ts";
 import { ANSWER_PERIODS, FILE_FACTS } from "./answer-value.ts";
 
@@ -50,7 +52,7 @@ export interface FormQuestion {
 export interface SendPlan {
   applicationId: string;
   userId: string;
-  ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
+  ats: ApplySupportedAts;
   companyName: string;
   boardToken: string;
   atsJobId: string;
@@ -95,7 +97,7 @@ export const sendPlanFieldSchema = z.object({
 
 export const sendPlanSchema = z.object({
   applicationId: z.string(),
-  ats: z.enum(["greenhouse", "lever", "ashby", "workable", "personio"]),
+  ats: z.enum(APPLY_SUPPORTED_ATS),
   atsJobId: z.string(),
   boardToken: z.string(),
   companyName: z.string(),

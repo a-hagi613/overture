@@ -13,7 +13,7 @@ import {
 
 import { CALENDAR_CUSTOM_EVENT_KINDS } from "../../../shared/calendar-events.ts";
 import { CHECKIN_ANSWERS } from "../../../shared/checkins.ts";
-import { ATS_VALUES } from "../../../shared/ats.ts";
+import { APPLY_SUPPORTED_ATS, ATS_VALUES, PLAN_CACHE_ATS } from "../../../shared/ats.ts";
 import { SUPPORT_CATEGORIES, SUPPORT_TICKET_STATUSES } from "../../../shared/support.ts";
 
 const timestamp = (name: string) => integer(name, { mode: "timestamp" });
@@ -1139,7 +1139,7 @@ export const reviewAuditEvents = sqliteTable(
     }),
     reviewId: text("review_id").references(() => reviews.id, { onDelete: "cascade" }),
     questionId: text("question_id").references(() => questions.id, { onDelete: "cascade" }),
-    ats: text("ats", { enum: ["greenhouse", "lever", "ashby", "workable", "personio"] }),
+    ats: text("ats", { enum: APPLY_SUPPORTED_ATS }),
     source: text("source", {
       enum: ["fact", "target", "derived", "consent", "file", "open_text"],
     }),
@@ -1178,7 +1178,7 @@ export const planCache = sqliteTable(
   "plan_cache",
   {
     id: text("id").primaryKey(),
-    ats: text("ats", { enum: ["lever", "ashby", "workable", "personio"] }).notNull(),
+    ats: text("ats", { enum: PLAN_CACHE_ATS }).notNull(),
     formSignature: text("form_signature").notNull(),
     plan: text("plan").notNull(),
     hits: integer("hits").notNull().default(0),

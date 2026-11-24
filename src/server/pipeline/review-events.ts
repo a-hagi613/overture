@@ -3,13 +3,14 @@ import { and, eq } from "drizzle-orm";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ReviewReason } from "../../shared/questions.ts";
+import type { ApplySupportedAts } from "../../shared/ats.ts";
 import type { AnswerSource } from "./answer-plan.ts";
 
 import { reviewAuditEvents, reviews } from "../platform/db/schema.ts";
 
 export type ReviewAuditWriter = Pick<AppDatabase, "insert" | "select">;
 
-export type ReviewAuditAts = "greenhouse" | "lever" | "ashby" | "workable" | "personio";
+export type ReviewAuditAts = ApplySupportedAts;
 
 export type ReviewResolution = "answered" | "dismissed" | "auto_dismissed";
 

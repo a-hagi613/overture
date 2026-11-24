@@ -8,13 +8,14 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { isApplySupportedAts } from "../../shared/ats.ts";
+import type { ApplySupportedAts } from "../../shared/ats.ts";
 import type { AnswerKind, QuestionFieldType, ReviewReason } from "../../shared/questions.ts";
 import type { AnswerSource, BlockReason, PlanResolution } from "./answer-plan.ts";
 import type { AnswerUnit, FileFact } from "./answer-value.ts";
 import type { QuestionSource } from "../catalog/greenhouse-questions.ts";
 import type { GroundedAnswer } from "./open-text.ts";
 import type { PostingPlace } from "../catalog/answer-derivations.ts";
-import type { FormReadPath, PlainFormReader } from "./form-read.ts";
+import type { FormReadAts, FormReadPath, PlainFormReader } from "./form-read.ts";
 import type { LoginWallEvidence, LoginWallFormRead } from "./login-wall.ts";
 
 import {
@@ -261,7 +262,7 @@ export function createPreparationService(deps: {
   spendGate?: SpendGate | undefined;
   plainFormReader?: PlainFormReader;
   captureForm?: (input: {
-    ats: "lever" | "ashby" | "workable" | "personio";
+    ats: FormReadAts;
     region: "us" | "eu";
     boardToken: string;
     atsJobId: string;
@@ -391,7 +392,7 @@ export function createPreparationService(deps: {
 
   async function loadQuestions(posting: {
     postingId: string;
-    ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
+    ats: ApplySupportedAts;
     atsJobId: string;
     boardToken: string;
     boardRegion: "us" | "eu";
@@ -585,7 +586,7 @@ export function createPreparationService(deps: {
     userId: string;
     applicationId: string;
     attemptId?: string;
-    ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
+    ats: ApplySupportedAts;
     blocked: readonly {
       questionId: string;
       factKey: string | null;
