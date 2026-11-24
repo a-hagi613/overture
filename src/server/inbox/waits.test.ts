@@ -6,7 +6,7 @@ import { codeWaits, mailboxes, users } from "../platform/db/schema.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { masterKeyringFor } from "../platform/crypto.ts";
-import { waitForCode } from "./waits.ts";
+import { waitForCode, wakeCodeWaits } from "./waits.ts";
 
 const MASTER = new Uint8Array(32).fill(3);
 const USER_ID = "wait-user";
@@ -59,6 +59,7 @@ test("aborting a code wait clears the interval and resolves null", async () => {
   const pending = waitForCode(
     { clock, db, personal },
     {
+      askDelayMs: 60_000,
       onAskToPaste: () => {
         asked = true;
       },
@@ -86,7 +87,7 @@ test("a wait created with an already-aborted signal settles at once", async () =
 
   const pending = waitForCode(
     { clock, db, personal },
-    { onAskToPaste: () => undefined, waitId: WAIT_ID },
+    { askDelayMs: 0, onAskToPaste: () => undefined, waitId: WAIT_ID },
     { signal: controller.signal },
   );
 
@@ -94,6 +95,116 @@ test("a wait created with an already-aborted signal settles at once", async () =
 
   expect(settled).toBeNull();
   expect(performance.now() - startedAt).toBeLessThan(500);
+
+  sqlite.close();
+});
+
+async function tick() {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 20);
+  });
+}
+
+const askedWithin: (check: () => boolean, deadline?: number) => Promise<boolean> = async (
+  check,
+  deadline = performance.now() + 1000,
+) => {
+  if (check() || performance.now() >= deadline) {
+    return check();
+  }
+
+  await tick();
+
+  return askedWithin(check, deadline);
+};
+
+test("a personal-mode wait asks for a paste at once (#565)", async () => {
+  const { clock, db, sqlite } = seeded();
+  const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
+  const controller = new AbortController();
+  let asked = false;
+
+  const pending = waitForCode(
+    { clock, db, personal },
+    {
+      askDelayMs: 0,
+      onAskToPaste: () => {
+        asked = true;
+      },
+      waitId: WAIT_ID,
+    },
+    { signal: controller.signal },
+  );
+
+  expect(await askedWithin(() => asked)).toBe(true);
+
+  controller.abort();
+  expect(await pending).toBeNull();
+
+  sqlite.close();
+});
+
+test("an alias wait gives the Email Worker 45 seconds before asking (#565)", async () => {
+  const { clock, db, sqlite } = seeded();
+  const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
+  const controller = new AbortController();
+  let asked = false;
+
+  const pending = waitForCode(
+    { clock, db, personal },
+    {
+      askDelayMs: 45_000,
+      onAskToPaste: () => {
+        asked = true;
+      },
+      waitId: WAIT_ID,
+    },
+    { signal: controller.signal },
+  );
+
+  await tick();
+  expect(asked).toBe(false);
+
+  clock.setOffset(44_000);
+  wakeCodeWaits();
+  await tick();
+  expect(asked).toBe(false);
+
+  clock.setOffset(46_000);
+  wakeCodeWaits();
+  expect(await askedWithin(() => asked)).toBe(true);
+
+  controller.abort();
+  expect(await pending).toBeNull();
+
+  sqlite.close();
+});
+
+test("a broken alert never settles the wait or escapes the loop (#565)", async () => {
+  const { clock, db, sqlite } = seeded();
+  const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
+  const controller = new AbortController();
+  let attempts = 0;
+
+  const pending = waitForCode(
+    { clock, db, personal },
+    {
+      askDelayMs: 0,
+      onAskToPaste: () => {
+        attempts += 1;
+
+        throw new Error("mail is down");
+      },
+      waitId: WAIT_ID,
+    },
+    { signal: controller.signal },
+  );
+
+  expect(await askedWithin(() => attempts > 0)).toBe(true);
+
+  controller.abort();
+  expect(await pending).toBeNull();
+  expect(attempts).toBe(1);
 
   sqlite.close();
 });

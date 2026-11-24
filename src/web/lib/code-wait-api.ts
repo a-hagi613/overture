@@ -2,15 +2,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 
-import { CODE_WAIT_ASK_MS, CODE_WAIT_ERRORS } from "../../shared/code-wait.ts";
+import { CODE_WAIT_ERRORS } from "../../shared/code-wait.ts";
 
 const waitSchema = z.object({
   applicationId: z.string(),
   attemptId: z.string().nullable(),
   company: z.string(),
+  startedAt: z.number(),
+  askAt: z.number(),
   expiresAt: z.number(),
   id: z.string(),
-  startedAt: z.number(),
   title: z.string(),
 });
 
@@ -106,7 +107,7 @@ export function usePasteCode() {
 }
 
 export function isAtAskTime(wait: CodeWait, now: number) {
-  return now >= wait.startedAt + CODE_WAIT_ASK_MS;
+  return now >= wait.askAt;
 }
 
 export function remainingMs(wait: CodeWait, now: number) {

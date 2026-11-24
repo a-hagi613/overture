@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 
 import type { HomeRangeKey } from "../lib/home-api.ts";
 import type { CodeWait } from "../lib/code-wait-api.ts";
@@ -96,12 +97,32 @@ export function HomePage() {
   const paste = usePasteCode();
   const [rangeKey, setRangeKey] = useState<HomeRangeKey>("7D");
   const [sheet, setSheet] = useState<OpenSheet | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const range = home?.ranges[rangeKey] ?? null;
   const paused = home?.pauseReason !== null && home?.pauseReason !== undefined;
   const waits = codeWaits?.waits ?? [];
   const wait = waits[0] ?? null;
   const asked = wait !== null && isAtAskTime(wait, codeWaits?.now ?? 0);
+  const requestedWaitId = searchParams.get("codeWait");
+
+  const requestedWait =
+    requestedWaitId === null ? null : (waits.find((entry) => entry.id === requestedWaitId) ?? null);
+
+  const activeSheet: OpenSheet | null =
+    sheet ??
+    (requestedWait === null ? null : { error: null, mode: "waiting", wait: requestedWait });
+
+  const closeSheet = useCallback(() => {
+    setSheet(null);
+
+    if (searchParams.has("codeWait")) {
+      const next = new URLSearchParams(searchParams);
+
+      next.delete("codeWait");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   function liveMode(open: OpenSheet) {
     if (open.mode === "accepted" || open.mode === "expired") {
@@ -118,7 +139,7 @@ export function HomePage() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setSheet(null);
+        closeSheet();
       }
     };
 
@@ -127,10 +148,14 @@ export function HomePage() {
     return () => {
       globalThis.removeEventListener("keydown", onKey);
     };
-  }, []);
+  }, [closeSheet]);
 
   function updateSheet(patch: Partial<OpenSheet>) {
-    setSheet((current) => (current === null ? current : { ...current, ...patch }));
+    setSheet((current) => {
+      const base = current ?? activeSheet;
+
+      return base === null ? base : { ...base, ...patch };
+    });
   }
 
   function openSheet(entry: CodeWait, mode: CodePasteMode) {
@@ -138,14 +163,14 @@ export function HomePage() {
   }
 
   function submitCode(code: string) {
-    if (sheet === null) {
+    if (activeSheet === null) {
       return;
     }
 
-    updateSheet({ error: null });
+    setSheet({ ...activeSheet, error: null });
 
     paste.mutate(
-      { code, waitId: sheet.wait.id },
+      { code, waitId: activeSheet.wait.id },
       {
         onError: (failure) => {
           const outcome = failure instanceof CodePasteError ? failure.outcome : "failed";
@@ -296,20 +321,18 @@ export function HomePage() {
         </>
       )}
 
-      {sheet === null ? null : (
+      {activeSheet === null ? null : (
         <CodePasteSheet
-          error={sheet.error}
-          mode={liveMode(sheet)}
-          onClose={() => {
-            setSheet(null);
-          }}
+          error={activeSheet.error}
+          mode={liveMode(activeSheet)}
+          onClose={closeSheet}
           onNoCode={() => {
             updateSheet({ error: null, mode: "no_code" });
           }}
           onSubmit={submitCode}
           pending={paste.isPending}
           serverNow={codeWaits?.now}
-          wait={sheet.wait}
+          wait={activeSheet.wait}
         />
       )}
     </div>

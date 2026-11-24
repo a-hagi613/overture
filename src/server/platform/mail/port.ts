@@ -19,6 +19,13 @@ export interface OutboundCheckMail {
   body: string;
 }
 
+/** The fallback alert for a verification code when no push endpoint is left (#565). */
+export interface OutboundCodeWaitMail {
+  to: string;
+  subject: string;
+  body: string;
+}
+
 export interface OutboundReadyRecapMail {
   to: string;
   subject: string;
@@ -59,6 +66,7 @@ export interface OutboundSupportReplyMail {
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
   sendCheck: (mail: OutboundCheckMail) => Promise<void>;
+  sendCodeWait: (mail: OutboundCodeWaitMail) => Promise<void>;
   sendReadyRecap: (mail: OutboundReadyRecapMail) => Promise<void>;
   sendAccountDeleted: (mail: OutboundAccountDeletedMail) => Promise<void>;
   sendExportReady: (mail: OutboundExportReadyMail) => Promise<void>;

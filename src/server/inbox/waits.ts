@@ -4,11 +4,12 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
-import { CODE_WAIT_ASK_MS, CODE_WAIT_TIMEOUT_MS } from "../../shared/code-wait.ts";
+import { CODE_WAIT_TIMEOUT_MS } from "../../shared/code-wait.ts";
 import { codeWaits, messages } from "../platform/db/schema.ts";
+import { logError } from "../platform/log.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 
-export { CODE_WAIT_ASK_MS, CODE_WAIT_TIMEOUT_MS } from "../../shared/code-wait.ts";
+export { CODE_WAIT_TIMEOUT_MS } from "../../shared/code-wait.ts";
 
 const CODE_WAIT_POLL_MS = 5000;
 
@@ -61,7 +62,16 @@ interface CodeWaitResolution {
 
 export async function waitForCode(
   deps: { db: AppDatabase; clock: Clock; personal: PersonalCrypto },
-  input: { waitId: string; onAskToPaste: () => void },
+  input: {
+    waitId: string;
+    /**
+     * Milliseconds after the wait opened before asking for a paste: 0 when the
+     * dedicated address has never forwarded mail, 45 seconds when it has
+     * (#565).
+     */
+    askDelayMs: number;
+    onAskToPaste: () => void | Promise<void>;
+  },
   options: { signal?: AbortSignal } = {},
 ) {
   const { db, clock, personal } = deps;
@@ -74,7 +84,7 @@ export async function waitForCode(
   }
 
   const waitId = wait.id;
-  const askAt = wait.startedAt.getTime() + CODE_WAIT_ASK_MS;
+  const askAt = wait.startedAt.getTime() + input.askDelayMs;
   const expiresAt = wait.expiresAt.getTime();
 
   return new Promise<CodeWaitResolution | null>((resolve) => {
@@ -134,7 +144,12 @@ export async function waitForCode(
 
       if (!asked && now >= askAt) {
         asked = true;
-        input.onAskToPaste();
+
+        try {
+          await input.onAskToPaste();
+        } catch (error) {
+          logError("code_wait.ask", error);
+        }
       }
 
       if (now >= expiresAt) {

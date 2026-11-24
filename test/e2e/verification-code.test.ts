@@ -15,6 +15,7 @@ import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
 import { startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startTxtDnsServer } from "./dns.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
+import { subscriptionKeys, vapidKeyPair } from "./push.fixture.ts";
 import { INBOUND_HEADERS, forwardingIdFrom, signInbound } from "./inbound-mail.fixture.ts";
 import {
   approveApplication,
@@ -35,6 +36,10 @@ const mailDomain = "tryoverture.com";
 const code = "A1B2C3D4";
 
 const wrongCode = "Z9Y8X7W6";
+
+const vapid = vapidKeyPair();
+
+const pushKeys = subscriptionKeys();
 
 let dns: Awaited<ReturnType<typeof startTxtDnsServer>> | undefined;
 let privateKeyPem = "";
@@ -63,6 +68,8 @@ const test = appTest.extend<{ codes: CodeHarness }>({
         INBOUND_DNS_SERVER: dns.server,
         INBOUND_HMAC_SECRET: secret,
         MAIL_DOMAIN: mailDomain,
+        VAPID_PRIVATE_KEY: vapid.privateKey,
+        VAPID_PUBLIC_KEY: vapid.publicKey,
       });
 
       await provide({ fixture, server });
@@ -106,6 +113,7 @@ const openWaitSchema = z.object({
   company: z.string(),
   title: z.string(),
   startedAt: z.number(),
+  askAt: z.number(),
   expiresAt: z.number(),
 });
 
@@ -134,9 +142,19 @@ const notificationSchema = z.object({
   title: z.string(),
   body: z.string(),
   url: z.string(),
+  emailedAt: z.number().nullable(),
 });
 
 const notificationsSchema = z.object({ notifications: z.array(notificationSchema) });
+
+const sentMailSchema = z.object({
+  id: z.string(),
+  to: z.string(),
+  subject: z.string(),
+  body: z.string(),
+});
+
+const sentMailListSchema = z.object({ messages: z.array(sentMailSchema) });
 
 const mailboxSchema = z.object({ address: z.string() });
 
@@ -439,6 +457,16 @@ async function notificationsOf(owner: APIRequestContext, userId: string) {
   return notificationsSchema.parse(await response.json()).notifications;
 }
 
+async function sentMails(owner: APIRequestContext) {
+  const response = await owner.get("/__test__/mail");
+
+  return sentMailListSchema.parse(await response.json()).messages;
+}
+
+async function codeWaitMails(owner: APIRequestContext) {
+  return (await sentMails(owner)).filter((mail) => mail.subject.includes("verification code"));
+}
+
 async function fixtureState(fixture: GreenhouseFixture) {
   return fixtureStateSchema.parse(await (await fetch(`${fixture.url}/__fixture__/state`)).json());
 }
@@ -641,7 +669,7 @@ test("a code in unauthenticated mail is ignored, and the paste finishes the send
   expect(stored?.codeConsumedAt).toBeNull();
 });
 
-test("no code within the limit ends the try before Submit, asks for a paste at five minutes and charges nothing", async ({
+test("no code within the limit ends the try before Submit, asks at once and emails the fallback when push is off, and charges nothing", async ({
   codes,
 }) => {
   const { applicationId, owner, userId } = await readyApplication(codes);
@@ -649,16 +677,25 @@ test("no code within the limit ends the try before Submit, asks for a paste at f
   const sending = startSend(owner, applicationId);
   const wait = await waitForOpenWait(owner);
 
-  await setClockOffset(owner, 6 * 60_000);
+  expect(wait.askAt).toBe(wait.startedAt);
 
   await expect.poll(async () => (await notificationsOf(owner, userId)).length).toBe(1);
 
   const [notification] = await notificationsOf(owner, userId);
 
   expect(notification?.kind).toBe("code_wait");
-  expect(notification?.title).toContain("Blank Street");
+  expect(notification?.title).toBe("Needs a verification code");
+  expect(notification?.body).toContain("Blank Street");
   expect(notification?.body).toContain("ten minutes");
+  expect(notification?.url).toBe(`/home?codeWait=${wait.id}`);
+  expect(notification?.emailedAt).not.toBeNull();
   expect((await readWait(owner, wait.id)).resolvedAt).toBeNull();
+
+  const mails = await codeWaitMails(owner);
+
+  expect(mails).toHaveLength(1);
+  expect(mails[0]?.subject).toBe("Needs a verification code");
+  expect(mails[0]?.body).toContain(`/home?codeWait=${wait.id}`);
 
   await setClockOffset(owner, 11 * 60_000);
 
@@ -689,43 +726,147 @@ test("no code within the limit ends the try before Submit, asks for a paste at f
   expect(expired.status()).toBe(409);
   expect(await openWaits(owner)).toHaveLength(0);
   expect((await homeFor(owner)).applicationsLeft).toBe(3);
+  expect((await codeWaitMails(owner)).length).toBe(1);
 });
 
-async function openHome(
-  browser: Browser,
-  codes: CodeHarness,
-  storageState: Awaited<ReturnType<APIRequestContext["storageState"]>>,
-) {
-  const context = await browser.newContext({ baseURL: codes.server.url, storageState });
-  const page = await context.newPage();
-
-  await page.goto(`${codes.server.url}/home`);
-
-  return { context, page };
-}
-
-test("Home asks for the code at five minutes and the sheet's paste resumes the same attempt", async ({
-  browser,
+test("a confirmed forwarding address gives the Email Worker 45 seconds before asking", async ({
   codes,
 }) => {
   const { applicationId, owner, userId } = await readyApplication(codes);
-  const storageState = await owner.storageState();
+
+  const forwarded = await owner.post("/__test__/mailboxes/first-forwarded", { data: { userId } });
+
+  expect(forwarded.ok()).toBe(true);
+
   const sending = startSend(owner, applicationId);
+  const wait = await waitForOpenWait(owner);
 
-  await waitForOpenWait(owner);
+  expect(wait.askAt - wait.startedAt).toBe(45_000);
 
-  const early = await openHome(browser, codes, storageState);
+  const realNow = await clockNow(codes.server);
+  const base = realNow.now - realNow.offsetMs;
 
-  await expect(early.page.getByTestId("home-code-wait")).toHaveCount(0);
-  await early.context.close();
+  await setClockOffset(owner, wait.startedAt + 40_000 - base);
+  expect(await notificationsOf(owner, userId)).toHaveLength(0);
 
-  await setClockOffset(owner, 6 * 60_000);
+  await setClockOffset(owner, wait.startedAt + 50_000 - base);
+  await expect.poll(async () => (await notificationsOf(owner, userId)).length).toBe(1);
+
+  await setClockOffset(owner, 11 * 60_000);
+
+  const response = await sending;
+
+  expect(response.ok()).toBe(true);
+
+  const attempts = await attemptsOf(owner, applicationId);
+
+  expect(attempts[0]?.outcome).toBe("code_timeout");
+});
+
+test("a live push endpoint keeps the fallback email quiet", async ({ codes }) => {
+  const { applicationId, owner, userId } = await readyApplication(codes);
+
+  const subscribed = await owner.post("/__test__/push/subscriptions", {
+    data: {
+      endpoint: "https://push.example.test/overture",
+      keys: { auth: pushKeys.auth, p256dh: pushKeys.p256dh },
+      userId,
+    },
+  });
+
+  expect(subscribed.ok()).toBe(true);
+
+  const sending = startSend(owner, applicationId);
+  const wait = await waitForOpenWait(owner);
 
   await expect.poll(async () => (await notificationsOf(owner, userId)).length).toBe(1);
 
   const [notification] = await notificationsOf(owner, userId);
 
   expect(notification?.kind).toBe("code_wait");
+  expect(notification?.emailedAt).toBeNull();
+  expect(await codeWaitMails(owner)).toHaveLength(0);
+
+  const pasted = await owner.post(`/api/mail/code-waits/${wait.id}`, { data: { code } });
+
+  expect(pasted.ok()).toBe(true);
+  expect((await sending).ok()).toBe(true);
+});
+
+test("a gone push endpoint is pruned at delivery and the fallback email takes over", async ({
+  codes,
+}) => {
+  const { applicationId, owner, userId } = await readyApplication(codes);
+
+  const subscribed = await owner.post("/__test__/push/subscriptions", {
+    data: {
+      endpoint: "https://push.example.test/send/codewait/gone",
+      keys: { auth: pushKeys.auth, p256dh: pushKeys.p256dh },
+      userId,
+    },
+  });
+
+  expect(subscribed.ok()).toBe(true);
+
+  const sending = startSend(owner, applicationId);
+
+  await waitForOpenWait(owner);
+  await expect.poll(async () => (await notificationsOf(owner, userId)).length).toBe(1);
+
+  const [notification] = await notificationsOf(owner, userId);
+
+  await runDueJobs(owner);
+
+  await expect.poll(async () => (await codeWaitMails(owner)).length).toBe(1);
+
+  const [emailed] = await notificationsOf(owner, userId);
+
+  expect(emailed?.emailedAt).not.toBeNull();
+  expect((await codeWaitMails(owner))[0]?.body).toContain(notification?.url ?? "missing url");
+  expect(await codeWaitMails(owner)).toHaveLength(1);
+
+  await setClockOffset(owner, 11 * 60_000);
+
+  expect((await sending).ok()).toBe(true);
+});
+
+async function openHome(
+  browser: Browser,
+  codes: CodeHarness,
+  storageState: Awaited<ReturnType<APIRequestContext["storageState"]>>,
+  path = "/home",
+) {
+  const context = await browser.newContext({ baseURL: codes.server.url, storageState });
+  const page = await context.newPage();
+
+  await page.goto(`${codes.server.url}${path}`);
+
+  return { context, page };
+}
+
+test("Home asks for the code at once and the sheet's paste resumes the same attempt", async ({
+  browser,
+  codes,
+}) => {
+  const { applicationId, owner, userId } = await readyApplication(codes);
+  const storageState = await owner.storageState();
+  const sending = startSend(owner, applicationId);
+  const wait = await waitForOpenWait(owner);
+
+  await expect.poll(async () => (await notificationsOf(owner, userId)).length).toBe(1);
+
+  const [notification] = await notificationsOf(owner, userId);
+
+  expect(notification?.kind).toBe("code_wait");
+  expect(notification?.title).toBe("Needs a verification code");
+
+  const deepLink = await openHome(browser, codes, storageState, `/home?codeWait=${wait.id}`);
+  const deepSheet = deepLink.page.getByTestId("code-paste-sheet");
+
+  await expect(deepSheet.getByRole("heading", { name: "Paste the code." })).toBeVisible();
+  await deepLink.page.keyboard.press("Escape");
+  await expect(deepSheet).toHaveCount(0);
+  await deepLink.context.close();
 
   const { context, page } = await openHome(browser, codes, storageState);
 

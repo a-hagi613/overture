@@ -1131,7 +1131,9 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 6. Submit. If a verification-code prompt appears (on Greenhouse, a `#verification_code` step after a 428 answer to the
    application request, an 8-character code), open a `code_waits` row for the attempt and its mailbox (§11.1) and wait
    for it to resolve: mail with `auth='pass'` from an ATS sender domain received after `started_at` resolves it, woken
-   by ingest and checked every 5 s as a backstop. Five minutes without a code creates the owner's "paste it"
+   by ingest and checked every 5 s as a backstop. The ask is immediate when the mailbox has never forwarded mail
+   (the code went to the user's own inbox, so Overture cannot read it) and waits 45 seconds when forwarding is
+   confirmed, giving the Email Worker time to intercept the code (#565). Either way it creates the owner's "paste it"
    notification and the same ask on Home (a card with the countdown to expiry), and the paste endpoint (§14) resumes
    the same wait and the same browser session until the row's ten-minute expiry. Type the code, mark
    `code_consumed_at` and `attempts.code_used`, and Submit again. No code by the expiry → `code_timeout`. Whether a
@@ -1253,12 +1255,16 @@ stopping before Submit. The developer machine never drives a browser against a r
 8. Code waits: while a verification prompt is open, an attempt records a `code_waits` row with `started_at` and
    `expires_at = started_at + 10 min`. Ingest resolves the oldest open, unexpired wait for that mailbox when an
    `auth='pass'` message classified as a code arrives from an ATS domain at or after its start, storing the code
-   encrypted and publishing `code.wait_resolved`. Five minutes after the wait opened with no code, Overture creates a
-   `notifications` row for the owner and publishes the `notification` topic, asking for a paste; Home shows the same ask
-   as a card with the countdown to expiry. The wait stays open to its expiry. The owner may instead paste the code
+   encrypted and publishing `code.wait_resolved`. The ask for a paste comes at once when the mailbox has never
+   forwarded mail and 45 seconds after the wait opened when forwarding is confirmed, so the Email Worker can resolve
+   it without the user (#565). Overture then creates a `notifications` row for the owner and publishes the
+   `notification` topic; Home shows the same ask as a card with the countdown to expiry. If the user holds no push
+   subscription (rows are pruned when a push service answers 404/410), the same alert also sends one transactional
+   email with the `?codeWait=<id>` deep link that opens the paste sheet, marked on the notification's `emailed_at` so
+   a wait is emailed once. The wait stays open to its expiry. The owner may instead paste the code
    through `POST /api/mail/code-waits/:id` while the wait is unexpired; an expired or already-resolved wait is refused
    with a message saying so. `GET /api/mail/code-waits` lists the signed-in owner's open waits with the Application
-   they belong to and the server's `now` for the countdown; `GET /internal/mail/code-waits` lists the open waits for
+   they belong to and the server's `now` for the countdown and its `askAt` (the moment the card appears); `GET /internal/mail/code-waits` lists the open waits for
    a forwarding address, authenticated with the same HMAC-SHA256 headers as inbound mail. A forwarded code that
    arrives first resolves the wait and Home stops asking.
 
@@ -1269,7 +1275,7 @@ employer never saw, and a user's direct replies belong in their own mailbox. The
 attachments of forwarded ATS mail. The reply composer, `limits.reply_per_day`, the 10 MB reply attachment limit, the
 suppression list and delivery-event webhooks of the old design are not built; a later decision reopens them.
 
-Overture's own mail (magic links, verification, the daily recap email, receipts) leaves `no-reply@tryoverture.com` through
+Overture's own mail (magic links, verification, the code-wait fallback, the daily recap email, receipts) leaves `no-reply@tryoverture.com` through
 Cloudflare Email Sending (ADR 0028, `docs/research/cloudflare-email-sending.md`); SES and Resend are no longer used.
 The inbound Worker sends its forwarding copies from `notify@notify.tryoverture.com` through the same service.
 Sending to anyone but the owner needs Workers Paid ($5 a month) and `tryoverture.com` and `notify.tryoverture.com`
@@ -1580,7 +1586,7 @@ Visual design: Ember v0.2 palette, typography, and component primitives governed
 
 | Surface | Content | Key states |
 |---|---|---|
-| Home | The control band: whether Overture is working or paused, Pause, and Resume only for a pause the user made (any other pause shows its fix instead), with today's sends against the daily limit; the pause banner with the reason's fix; the invite grant running out (its Applications left and end date, Choose a plan) and out of applications; the sent chart for 7D/30D/90D; the Ready card ("3 ready to send", opens Ready); Needs you (open Reviews by jobs unlocked); the "needs a code" card five minutes into a verification-code wait (countdown to expiry, Paste the code, No code yet, opens the paste sheet); queue position + ETA; activity incl. "Couldn't apply" with reason; check-ins; strengthen-profile prompt; recent Inbox; the coming schedule from the Calendar. Up next is gone from Home (#526), though `GET /api/matching/up-next` stays served | paused (each reason has its own copy and fix), nothing matching, waiting for Review, out of applications, a code wait to paste |
+| Home | The control band: whether Overture is working or paused, Pause, and Resume only for a pause the user made (any other pause shows its fix instead), with today's sends against the daily limit; the pause banner with the reason's fix; the invite grant running out (its Applications left and end date, Choose a plan) and out of applications; the sent chart for 7D/30D/90D; the Ready card ("3 ready to send", opens Ready); Needs you (open Reviews by jobs unlocked); the "needs a code" card from the moment a verification-code wait opens (45 seconds in when forwarding is confirmed, countdown to expiry, Paste the code, No code yet, opens the paste sheet); queue position + ETA; activity incl. "Couldn't apply" with reason; check-ins; strengthen-profile prompt; recent Inbox; the coming schedule from the Calendar. Up next is gone from Home (#526), though `GET /api/matching/up-next` stays served | paused (each reason has its own copy and fix), nothing matching, waiting for Review, out of applications, a code wait to paste |
 | Ready | Heading "Ready to send". Approval cards (§8.7): job, employer, resume file, every answer as it will be typed with its source, cover letter, what changed; Send, Skip, Edit an answer; approved cards show "Sends around 14:20" and Undo; "Send all" for everything listed. Never sends from a link | none ready, all approved, a card that came back with changes |
 | Board | Five lanes over the seven Stages (ADR 0037): Queued, Ready, Applied, **Waiting** (Screening, Interviewing and Offer) and Closed; lane names follow ADR 0020, so the Queued lane is never called "On hold" (Ready holds an Application from Ready until it is confirmed sent). Cards with company, title, score, Strong match badge, "why this match"; card sheet: timeline, proof (answers + source, letter, resume file), linked mail, the Move menu with every Stage, Archive; desktop dnd-kit + keyboard; phone one lane per tab. A card moves only when the server moved it: a refused move snaps back with its reason, and Archive on a Ready or Approved card is Skip | empty board, auto-move undo toast |
 | Review | Open questions grouped by jobs unlocked; answer input matches field type; dismiss | none open |
@@ -1609,7 +1615,10 @@ M2 adds **push** (PWA, Web Push with VAPID) and an in-app list that mirrors it. 
 Undo), a verification code to paste, paused (with reason), and "Couldn't apply" summaries batched hourly. A push opens
 the app (the recap and a Ready item open Ready); **nothing is approved by a push or a link**, so a user approves from the
 phone inside the app. The header bell opens the in-app Notifications list: unread rows carry a dot, Mark all as read
-clears them, and a push endpoint the service says is gone is deleted. There is no separate 08:00 digest: the one daily
+clears them, and a push endpoint the service says is gone (404 or 410) is deleted at once, which is also how the app
+learns a user has no push endpoint left: the code-wait alert then falls back to one transactional email with the
+paste-sheet deep link (#565). A malformed push payload still shows an "Overture update" notification, so a silent push
+never costs the user their subscription. There is no separate 08:00 digest: the one daily
 email is the recap, which also lists yesterday's sends and replies, and the user can turn the email and each kind of
 push off on Profile → Account. Each kind's switch is stored per user and read again when a push is dispatched and when a row is
 written, so turning a kind off stops both; the one exception is the Recap row itself, which is also the per-day marker
@@ -1682,6 +1691,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/inbox/threads.test.ts` | the Inbox Thread list reads its messages in one query rather than one per Thread, a page walks every Thread once even when timestamps tie, and the counts stay over every Thread rather than the page (#430, #506) |
 | `src/server/live-checks/alerts.test.ts` | the `llm.spend` soft alert fires at the configured share of the daily budget, a budget grown by paying subscribers no longer alerts at the old ceiling's share, and the admin sets the share (#564) |
 | `src/server/matching/applications.test.ts` | an Application copies the Posting's and Company's display fields onto its own row when it is created, keeps them after the catalog rows are deleted, and is not created for a Posting that has already left the catalog (#422) |
+| `src/server/notify/code-wait-email.test.ts` | a code-wait alert is emailed once per notification and only when the user holds no push endpoint, never for an unverified or demo user, and `emailed_at` makes a retry send nothing (#565) |
 | `src/server/pipeline/answer-plan.test.ts` | a salary Fact kept per currency is chosen only for the currency a question names |
 | `src/server/pipeline/approved-plan.test.ts` | the Ready cards open every approved plan in one query rather than one per card (#430) |
 | `src/server/pipeline/email-notes.test.ts` | a Board's email notes are read in one query rather than one per Application (#430) |

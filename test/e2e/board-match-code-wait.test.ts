@@ -191,7 +191,7 @@ for (const width of [390, 1280] as const) {
       await expect(page.getByRole("button", { name: "Paste the code" })).toBeVisible();
       await expect(page.getByRole("button", { name: "No code yet" })).toBeVisible();
       await expect(
-        page.getByText("Five minutes have passed with no forwarded mail."),
+        page.getByText("No forwarded mail yet. The form stays open until the timer ends."),
       ).toBeVisible();
 
       await page.evaluate(async () => {
