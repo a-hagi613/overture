@@ -805,7 +805,7 @@ dialog[data-sheet-backdrop="lift"]::backdrop {
   }
 }
 
-/* Onboarding "Your facts" step (w5-onb-questions, #128). Board order matters: breath first, then fields. */
+/* Onboarding "Saved answers" step (w5-onb-questions, #128). Board order matters: breath first, then fields. */
 .onb {
   background: var(--bg);
   color: var(--ink);

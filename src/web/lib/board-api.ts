@@ -106,6 +106,7 @@ export const applicationDetailSchema = z.object({
     createdAt: z.number(),
     id: z.string(),
     sentAt: z.number().nullable(),
+    statusReason: z.string().nullable(),
     stage: z.enum(STAGE_KEYS).nullable(),
     stageLocked: z.boolean(),
     status: z.string(),
@@ -120,6 +121,7 @@ export const applicationDetailSchema = z.object({
     .nullable(),
   note: noteSchema.nullable(),
   posting: z.object({
+    applyUrl: z.string().nullable(),
     ats: z.string().nullable(),
     id: z.string(),
     location: z.string().nullable(),

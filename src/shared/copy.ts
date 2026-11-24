@@ -57,6 +57,12 @@ function plural(count: number, one: string, many: string) {
   return count === 1 ? one : many;
 }
 
+function possessive(name: string) {
+  const trimmed = name.trim();
+
+  return trimmed.endsWith("s") || trimmed.endsWith("S") ? `${trimmed}’` : `${trimmed}’s`;
+}
+
 function ordinal(count: number) {
   const remainder = count % 100;
 
@@ -98,7 +104,7 @@ const FAILED_REASON_TEXT = new Map<string, string>([
   ["code_timeout", "The verification code never arrived, so nothing was sent."],
   ["crash", "The browser session stopped before anything was sent."],
   ["form_changed", "The form changed after we had filled it in, so we stopped before sending."],
-  ["posting_closed", "The role closed before Overture could send."],
+  ["posting_closed", "This posting closed before sending."],
   ["provider_error", "The browser session failed before anything was sent."],
   ["timeout", "The employer's site took too long to answer, so nothing was sent."],
   [
@@ -107,7 +113,7 @@ const FAILED_REASON_TEXT = new Map<string, string>([
   ],
   [
     "unsupported_login_required",
-    "This employer needs an account before anyone can apply, so Overture skipped it.",
+    "This employer requires creating an account to apply, so Overture skipped it.",
   ],
   ["upload_failed", "The resume upload failed, so nothing was sent."],
 ]);
@@ -123,11 +129,18 @@ const ADMIN_PROBE_OUTCOME_LABELS = new Map([
   ["unreadable", "Unreadable"],
 ]);
 
+const NOTHING_SENT = "Nothing was sent · 0 applications charged";
+
 export const copy = {
   app: {
     name: "Overture",
     description: "A job-search agent that applies to roles for you, and shows its work.",
     rootMissing: "The application root element is missing from the document.",
+  },
+  recovery: {
+    applyAria: (company: string) => `Apply on company site: ${company}`,
+    applyOnSite: "Apply on company site",
+    nothingSent: NOTHING_SENT,
   },
   demo: {
     locked:
@@ -154,7 +167,7 @@ export const copy = {
     profileMenu: {
       label: "Profile sections",
       resume: "Resume & Cover Letter",
-      details: "Personal Details",
+      details: "Saved answers",
       preferences: "Job Preferences",
       billing: "Billing",
       account: "Account",
@@ -175,10 +188,10 @@ export const copy = {
       resumeUploadPdf: "Upload PDF",
       resumePreviewEmptyHint: "Upload a PDF to preview your exact resume here.",
       resumeOpenPdf: "Open PDF",
-      detailsTitle: "Personal Details",
-      detailsTitlePlain: "Personal ",
-      detailsTitleItalic: "Details",
-      detailsLead: "Saved personal information and your dedicated job-search email address.",
+      detailsTitle: "Saved answers",
+      detailsTitlePlain: "Saved ",
+      detailsTitleItalic: "answers",
+      detailsLead: "Your saved answers and your dedicated job-search email address.",
       tier3EmptyTitle: "No Review answers saved yet",
       tier3EmptyBody:
         "Answers you save in Review appear here and are reused automatically on future applications.",
@@ -299,7 +312,7 @@ export const copy = {
       genericError: "Could not send your message right now. Please try again.",
     },
     readyCount: (count: number) => `Ready, ${String(count)} to send`,
-    reviewCount: (count: number) => `Review, ${String(count)} waiting`,
+    reviewCount: (count: number) => `Review, ${String(count)} to answer`,
     inboxCount: (count: number) => `Inbox, ${String(count)} unread`,
   },
   settingsMenu: {
@@ -427,10 +440,10 @@ export const copy = {
       scoreAria: "Sample Match score, 91 out of 100",
       score: "91",
       asksHeading: "The posting asks",
-      factsHeading: "Your resume & Facts",
+      factsHeading: "Your resume & saved answers",
       asks: ["5+ yrs FP&A & forecasting", "SQL & financial modeling", "Work authorization"],
-      facts: ["6 yrs SaaS FP&A · Resume", "SQL, Anaplan & Python", "Authorized · Saved Fact"],
-      receiptStamp: "10:42 · 11 answers from Facts · Resume unchanged",
+      facts: ["6 yrs SaaS FP&A · Resume", "SQL, Anaplan & Python", "Authorized · Saved answer"],
+      receiptStamp: "10:42 · 11 answers from saved answers · Resume unchanged",
       stamp: "Applied",
       pillar01: "01",
       pillar01Title: "Direct to employers",
@@ -714,9 +727,9 @@ export const copy = {
       seeBoard: "See Applications",
     },
     grantEnding: {
-      title: "Invite grant running out.",
+      title: "Free invite applications running out.",
       copy: (left: number, date: string) =>
-        `Your invite grant has ${left === 1 ? "1 Application" : `${String(left)} Applications`} left and ends on ${date}. Choose a plan to keep preparing Applications after the grant ends. Invite grants are not charged.`,
+        `You have ${left === 1 ? "1 free invite application" : `${String(left)} free invite applications`} left, ending on ${date}. Choose a plan to keep preparing Applications after that. Free invite applications are not charged.`,
       choosePlan: "Choose a plan",
     },
     pauseReasons: {
@@ -726,7 +739,7 @@ export const copy = {
         title: "Paused by you.",
       },
       onboarding: {
-        copy: "Sending starts once your facts, forwarding and consent are in.",
+        copy: "Sending starts once your saved answers, forwarding and consent are in.",
         fix: "Finish setup",
         title: "Setup isn't finished.",
       },
@@ -783,16 +796,15 @@ export const copy = {
       confirming: "Confirming",
       failedDefault: "Overture stopped before sending.",
       latest: "Latest first",
-      nothingCharged: "Nothing was charged.",
       sent: "Sent · confirmed",
       title: "Activity",
     },
     strengthen: {
-      action: "Add facts",
+      action: "Add saved answers",
       eyebrow: "Tier 2 · Strengthen your profile",
-      note: "Saved facts answer common questions, so each one means fewer Reviews for you.",
+      note: "Saved answers cover common questions, so each one means fewer Reviews for you.",
       title: (missing: number) =>
-        `Add ${countWord(missing)} ${plural(missing, "fact", "facts")} from your last role`,
+        `Add ${countWord(missing)} ${plural(missing, "saved answer", "saved answers")} from your last role`,
     },
     interviewsBooked: (count: number) =>
       `${String(count)} ${plural(count, "interview", "interviews")} booked`,
@@ -815,7 +827,7 @@ export const copy = {
     },
     needsYou: {
       title: "Needs review",
-      note: "Questions waiting for your answer before sending",
+      note: "Questions that need your answer before sending",
       openCount: (count: number) => `${String(count)} open`,
       askedBy: (companies: string) => `Asked by ${companies}`,
       blocksApps: (count: number) =>
@@ -1381,7 +1393,7 @@ export const copy = {
     magicLinkDetail: "Always available. We email a one-time link, good for 15 minutes.",
     exportRow: "Export your data",
     exportRowDetail:
-      "A zip of your profile, facts, Applications, messages, resume and attachments.",
+      "A zip of your profile, saved answers, Applications, messages, resume and attachments.",
     exportRowButton: "Export data",
     signOutThis: "Sign out of this device",
     signOutThisDetail: "Ends this session in this browser. Your other devices stay signed in.",
@@ -1400,7 +1412,7 @@ export const copy = {
       lead: "A copy of what Overture holds about you",
       requestHeading: "Request",
       requestBody:
-        "A zip of your profile, facts, Applications, messages, resume and attachments. The download link is valid for 24 hours.",
+        "A zip of your profile, saved answers, Applications, messages, resume and attachments. The download link is valid for 24 hours.",
       requestButton: "Request export",
       preparingHeading: "Preparing",
       preparingPill: "Preparing",
@@ -1431,7 +1443,7 @@ export const copy = {
           `Account: ${email}`,
           `Made: ${at}`,
           "",
-          "This zip holds your profile, facts, Applications, snapshots, messages,",
+          "This zip holds your profile, saved answers, Applications, snapshots, messages",
           "resume files and attachments. Files under files/ are the original",
           "documents; the JSON files describe them.",
           "",
@@ -1499,7 +1511,8 @@ export const copy = {
     calendarFeedLoadError: "We could not load your calendar feed settings.",
     dangerHeading: "Danger zone",
     deleteTitle: "Delete account",
-    deleteDetail: "Permanently deletes your facts, letters and applications. This can’t be undone.",
+    deleteDetail:
+      "Permanently deletes your saved answers, letters and applications. This can’t be undone.",
     deleteButton: "Delete account",
   },
   settingsBilling: {
@@ -1618,7 +1631,7 @@ export const copy = {
     cannotUndo: "Deleting your account can’t be undone.",
     erasedIntro: "These are erased:",
     erasedItems: [
-      "Your facts, resume and cover letters",
+      "Your saved answers, resume and cover letters",
       "Every Application, its history and its messages",
       "Stored files and attachments",
       "Your saved preferences and push subscriptions",
@@ -1666,12 +1679,12 @@ export const copy = {
   profile: {
     sectionsLabel: "Profile sections",
     saveFailed: "Could not save your changes right now. Try again.",
-    lead: "The facts Overture applies with",
+    lead: "The saved answers Overture applies with",
     titlePlain: "Your",
     titleItalic: "Profile",
     tabs: {
       resume: "Resume",
-      facts: "Your facts",
+      facts: "Saved answers",
       targets: "Targets",
       skipList: "Skip list",
       address: "Job-search address",
@@ -1687,7 +1700,7 @@ export const copy = {
       note: "Overture attaches this exact file. It never edits, restyles or rewrites it. Only the cover letter is written for each role, and it only says what your resume supports.",
       sentWith: "Sent with",
       sentWithValue: "22 applications",
-      factsRead: "Facts read from it",
+      factsRead: "Saved answers read from it",
       factsReadValue: "9, each confirmed by you",
       replace: "Replace resume",
       download: "Download PDF",
@@ -1698,13 +1711,13 @@ export const copy = {
       intro:
         "What Overture answers forms with, word for word. A question it cannot answer from these becomes a Review.",
       titlePlain: "Your",
-      titleItalic: "facts",
-      tiersLabel: "Facts by tier",
+      titleItalic: "saved answers",
+      tiersLabel: "Saved answers by tier",
       tier1: {
         label: "Tier 1 · Needed to start",
         count: "17 of 17",
-        note: "Confirmed before Overture began. Eight of seventeen are shown; open any fact to edit it.",
-        foot: "Nine more Tier 1 facts are confirmed: phone, city, country, LinkedIn, years of experience, degree, employment history, education history and languages.",
+        note: "Confirmed before Overture began. Eight of seventeen are shown; open any saved answer to edit it.",
+        foot: "Nine more Tier 1 saved answers are confirmed: phone, city, country, LinkedIn, years of experience, degree, employment history, education history and languages.",
         rows: [
           {
             kind: "serif",
@@ -1782,13 +1795,13 @@ export const copy = {
       },
       strengthen: {
         empty:
-          "Nothing to add right now. When a question cannot be answered from your facts, it appears here with the number of queued applications it unlocks.",
+          "Nothing to add right now. When a question cannot be answered from your saved answers, it appears here with the number of queued applications it unlocks.",
         unlocks: (count: number) =>
           `Unlocks ${String(count)} queued ${plural(count, "application", "applications")}`,
-        note: "Optional. Each fact answers common questions, so the queued applications waiting on them can go ahead.",
-        foot: "Facts you add here are used on every application that asks.",
-        save: "Save fact",
-        saveAria: (label: string) => `Save fact: ${label}`,
+        note: "Optional. Each saved answer covers common questions, so the queued applications waiting on them can go ahead.",
+        foot: "Saved answers you add here are used on every application that asks.",
+        save: "Save answer",
+        saveAria: (label: string) => `Save answer: ${label}`,
         saving: "Saving",
       },
       fromResume: "From your resume",
@@ -2116,7 +2129,7 @@ export const copy = {
       scored: (score: number) => `Scored ${String(score)}`,
       foundBody: (company: string) => `Posting found on the ${company} career board.`,
       prepared: "Prepared",
-      needsReview: "Waiting on a Review",
+      needsReview: "Needs your answer",
       checked: "Checked",
       submitted: "Submitted",
       confirming: "Checking with the employer",
@@ -2136,7 +2149,7 @@ export const copy = {
       noSnapshot: "This application has not been sent yet.",
       label: "Question",
       fromResume: "From your resume",
-      fromSaved: "From your saved facts",
+      fromSaved: "From your saved answers",
       typedHere: "Typed here",
     },
     cover: {
@@ -2144,7 +2157,8 @@ export const copy = {
     },
     dossier: {
       sentLabel: "How this was sent",
-      sentVia: (provider: string, time: string) => `Sent via ${provider} · ${time}`,
+      sentVia: (company: string, time: string) =>
+        `Sent directly to ${possessive(company)} careers page · ${time}`,
       sentOnce: "One submission. Nothing is sent after it.",
       sentConfirmedPage: "The employer's confirmation page was seen.",
       sentConfirmedEmail: "The employer's confirmation email was received.",
@@ -2157,14 +2171,14 @@ export const copy = {
         "The stored copy does not match the bytes that were sent. Check this before you rely on it.",
       fileSha: "SHA-256",
       fileKb: (kilobytes: number) => `${String(kilobytes)} KB`,
-      traceTitle: "What Overture wrote from your facts",
+      traceTitle: "What Overture wrote from your saved answers",
       traceBody:
         "Each sentence and answer names where it came from. Nothing was added to make the fit look better.",
       traceEmpty: "Nothing was written for this application.",
       traceLetter: "Cover letter",
       traceAnswers: "Answers",
       traceSource: {
-        fact: "From your facts",
+        fact: "From your saved answers",
         none: "No source recorded",
         resume: "From your resume",
         typed: "Typed here",
@@ -2177,8 +2191,8 @@ export const copy = {
           title: "The PDF was not restyled or regenerated",
         },
         nothing_invented: {
-          body: "Every line above traces to a fact, a resume line or your own words.",
-          title: "No fact was invented",
+          body: "Every line above traces to a saved answer, a resume line or your own words.",
+          title: "No saved answer was invented",
         },
       },
     },
@@ -2220,17 +2234,17 @@ export const copy = {
     questionOf: (position: number, total: number) =>
       `Question ${String(position)} of ${String(total)}`,
     detailNote: (count: number) =>
-      `${capitalize(countWord(count))} postings ask this. Nothing on your resume or in your saved facts says either way, so Overture will not guess.`,
+      `${capitalize(countWord(count))} postings ask this. Nothing on your resume or in your saved answers says either way, so Overture will not guess.`,
     unlocks: "Unlocks",
     jobs: "jobs",
     askedBy: "Asked by",
     companies: "companies",
     queued: "Queued, waiting on this answer",
-    closestFact: "Closest fact on file",
+    closestFact: "Closest saved answer on file",
     closestFactNote:
-      "Nothing in your resume or your saved facts answers this question. Answer it once and Overture reuses it for every application that asks.",
+      "Nothing in your resume or your saved answers answers this question. Answer it once and Overture reuses it for every application that asks.",
     closestFactKnown: (label: string) =>
-      `${label} is on file. Confirming it here updates the fact for every form that asks.`,
+      `${label} is on file. Confirming it here updates that saved answer for every form that asks.`,
     answerPlaceholder: "Type your answer",
     checkboxYes: "Yes",
     yourAnswer: "Your answer",
@@ -2242,7 +2256,7 @@ export const copy = {
       specificNote: "This answer looks specific to these applications, so it is off by default.",
       onNote: "Overture reuses this answer whenever another form asks the same thing.",
       offNote:
-        "Overture uses this answer only for these applications and never saves it to your facts.",
+        "Overture uses this answer only for these applications and never saves it to your saved answers.",
     },
     savedToReady: (count: number) =>
       count === 1
@@ -2265,7 +2279,7 @@ export const copy = {
     saveFailed: "Could not save your answer right now. Try again.",
     dismissFailed: "Could not skip this question right now. Try again.",
     emptyTitle: "Nothing is waiting for you",
-    emptyBody: "When a form asks something your Facts cannot answer, it waits here.",
+    emptyBody: "When a form asks something your saved answers cannot answer, it waits here.",
     categories: {
       availability: "Availability",
       experience: "Experience",
@@ -2283,14 +2297,8 @@ export const copy = {
     setupTitleItalic: "workspace",
     setupIntro:
       "Complete five quick steps to configure your job search. Progress saves automatically.",
-    steps: ["Welcome", "Resume", "Personal details", "Job preferences", "Mail forwarding"],
-    factsStepLabels: [
-      "Welcome",
-      "Resume",
-      "Personal details",
-      "Job preferences",
-      "Mail forwarding",
-    ],
+    steps: ["Welcome", "Resume", "Your info", "Job preferences", "Mail forwarding"],
+    factsStepLabels: ["Welcome", "Resume", "Your info", "Job preferences", "Mail forwarding"],
     stepPosition: (step: number, total: number) => `Step ${String(step)} of ${String(total)}`,
     stepSeparator: "·",
     welcomeTitlePlain: "Welcome to",
@@ -2334,8 +2342,8 @@ export const copy = {
     uploadedToday: "Uploaded today",
     uploadedYesterday: "Uploaded yesterday",
     uploadedOn: (date: string) => `Uploaded ${date}`,
-    cardTitlePlain: "Personal",
-    cardTitleItalic: "details",
+    cardTitlePlain: "Your",
+    cardTitleItalic: "info",
     cardIntro:
       "Provide the standard details employers request on application forms so Overture can complete them accurately.",
     note: "Your saved details are used verbatim when requested and are never guessed.",
@@ -2474,7 +2482,7 @@ export const copy = {
       agreeBetween: " and the ",
       privacy: "Privacy Policy",
       agreeAfter:
-        ". Overture prepares applications from my facts and sends only the ones I approve.",
+        ". Overture prepares applications from my saved answers and sends only the ones I approve.",
       firstRun:
         "Overture prepares your first applications tomorrow morning. Nothing is sent until you approve.",
       tickToStart: "Tick the box to start.",
@@ -2653,7 +2661,7 @@ export const copy = {
     inbox: "Inbox",
     inboxNote: "Replies from employers would land here.",
     profile: "Profile",
-    profileNote: "Your resume, facts and targets live here.",
+    profileNote: "Your resume, saved answers and targets live here.",
     emptyHeadingNote: "Overture will build this screen next.",
   },
   notFound: {

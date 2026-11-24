@@ -439,7 +439,7 @@ button carries `aria-expanded` and a label that changes between Open menu and Cl
 Sidebar items: active = card surface, hairline, a 2px `signal` marker on the left edge (top edge in
 the tab bar) — the active nav marker is one of the four sanctioned orange uses (§2). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the five
 primary destinations (Home, Ready, Review, Applications, Inbox), then Notifications, Support and the
-Profile menu (Resume & Cover Letter, Personal Details, Job Preferences, Billing, Account), then the theme
+Profile menu (Resume & Cover Letter, Saved answers, Job Preferences, Billing, Account), then the theme
 toggle and the usage card. Under 1280, or when collapsed on desktop (remembered per browser), the sidebar
 becomes a 76px icon rail; under 768 a slim top header carries the page title plus Search, Notifications and
 Profile, and a 64px tab bar carries the same five primary destinations. Profile opens the `/profile` hub

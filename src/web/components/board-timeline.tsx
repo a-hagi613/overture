@@ -1,7 +1,10 @@
-import { copy } from "../../shared/copy.ts";
+import { copy, failedReasonText } from "../../shared/copy.ts";
 import type { ApplicationDetail, TimelineEvent } from "../lib/board-api.ts";
 import { stageLabel, stamp } from "../lib/board-format.ts";
+import { ApplyRecovery } from "./apply-recovery.tsx";
 import { dsMono } from "./ui/ds.ts";
+
+const FAILED_STATUSES = new Set<string>(["failed", "skipped"]);
 
 function statusTitle(value: string) {
   switch (value) {
@@ -52,6 +55,7 @@ const ACCENT_TITLES = new Set<string>([copy.board.timeline.submitted, copy.board
 interface TimelineItem {
   at: number;
   body: string | null;
+  failed: boolean;
   key: string;
   short: string | null;
   title: string;
@@ -63,7 +67,16 @@ function eventItems(event: TimelineEvent) {
 
     return title === null
       ? []
-      : [{ at: event.at, body: event.detail, key: event.id, short: event.detail, title }];
+      : [
+          {
+            at: event.at,
+            body: event.detail,
+            failed: FAILED_STATUSES.has(event.toValue),
+            key: event.id,
+            short: event.detail,
+            title,
+          },
+        ];
   }
 
   if (event.kind === "stage" && event.toValue !== null) {
@@ -75,6 +88,7 @@ function eventItems(event: TimelineEvent) {
           {
             at: event.at,
             body: event.detail,
+            failed: false,
             key: event.id,
             short: event.detail,
             title: copy.board.timeline.moved(stage),
@@ -87,6 +101,7 @@ function eventItems(event: TimelineEvent) {
       {
         at: event.at,
         body: event.detail,
+        failed: false,
         key: event.id,
         short: event.detail,
         title: copy.board.timeline.email,
@@ -99,6 +114,7 @@ function eventItems(event: TimelineEvent) {
       {
         at: event.at,
         body: event.detail,
+        failed: false,
         key: event.id,
         short: event.detail,
         title: copy.board.timeline.checkin,
@@ -110,6 +126,7 @@ function eventItems(event: TimelineEvent) {
     {
       at: event.at,
       body: event.detail,
+      failed: false,
       key: event.id,
       short: event.detail,
       title: copy.board.timeline.note,
@@ -122,6 +139,7 @@ function itemsFor(detail: ApplicationDetail) {
     {
       at: detail.application.createdAt,
       body: copy.board.timeline.foundBody(detail.company),
+      failed: false,
       key: "found",
       short: null,
       title: copy.board.timeline.found,
@@ -134,6 +152,7 @@ function itemsFor(detail: ApplicationDetail) {
     items.push({
       at: detail.application.createdAt + 60_000,
       body: detail.match?.reason ?? null,
+      failed: false,
       key: "scored",
       short: (detail.match?.reason ?? "").split(". ").at(0) ?? null,
       title: copy.board.timeline.scored(score),
@@ -160,6 +179,15 @@ export function BoardTimeline({ detail }: { detail: ApplicationDetail }) {
         {items.map((item, index) => {
           const accent = ACCENT_TITLES.has(item.title);
           const last = index === items.length - 1;
+
+          const failure = item.failed
+            ? {
+                applyUrl: detail.posting.applyUrl,
+                reason:
+                  failedReasonText(detail.application.statusReason) ??
+                  copy.home.activity.failedDefault,
+              }
+            : null;
 
           return (
             <li className="flex gap-3.5" key={item.key}>
@@ -191,6 +219,12 @@ export function BoardTimeline({ detail }: { detail: ApplicationDetail }) {
                       <span className="hidden md:inline">{item.body}</span>
                     )}
                   </p>
+                )}
+                {failure === null ? null : (
+                  <div className="mt-2 rounded-lg border border-need bg-need-soft px-3.5 py-3">
+                    <p className="text-sm leading-relaxed text-foreground">{failure.reason}</p>
+                    <ApplyRecovery applyUrl={failure.applyUrl} company={detail.company} />
+                  </div>
                 )}
               </div>
             </li>

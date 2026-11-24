@@ -50,6 +50,7 @@ const homeResponseSchema = z.object({
   activity: z.object({
     failed: z.array(
       z.object({
+        applyUrl: z.string().nullable(),
         at: z.number(),
         company: z.string(),
         id: z.string(),

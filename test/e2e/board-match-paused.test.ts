@@ -38,7 +38,7 @@ const pauseReasons = [
   },
   {
     action: "Finish setup",
-    copy: "Sending starts once your facts, forwarding and consent are in.",
+    copy: "Sending starts once your saved answers, forwarding and consent are in.",
     href: "/onboarding",
     reason: "onboarding",
     title: "Setup isn't finished.",
@@ -168,9 +168,9 @@ async function expectPausedHomeMatchesBoard(
   await expect(
     page.getByText("The form changed after we had filled it in, so we stopped before sending."),
   ).toBeVisible();
-  await expect(page.getByText("Nothing was charged.")).toBeVisible();
+  await expect(page.getByText("Nothing was sent · 0 applications charged")).toBeVisible();
   await expect(page.getByText("Tier 2 · Strengthen your profile")).toBeVisible();
-  await expect(page.getByText("Add two facts from your last role")).toBeVisible();
+  await expect(page.getByText("Add two saved answers from your last role")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent in your Inbox" })).toBeVisible();
 
   await page.evaluate(async () => {

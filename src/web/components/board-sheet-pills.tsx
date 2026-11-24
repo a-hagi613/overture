@@ -30,7 +30,7 @@ export function BoardSheetPills({ detail }: { detail: ApplicationDetail }) {
     detail.dossier === null
       ? undefined
       : copy.board.dossier.sentVia(
-          providerName(detail.dossier.sentVia.provider),
+          detail.company,
           stamp(detail.dossier.sentVia.submittedAt, detail.timeZone),
         );
 

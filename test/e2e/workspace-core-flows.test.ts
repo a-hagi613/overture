@@ -135,7 +135,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await expect(page.getByText("Excited to bring focused systems engineering")).toBeVisible();
 
       await page.goto(`${appServerUrl}/profile/details`);
-      await expect(page.getByRole("heading", { level: 1, name: "Personal Details" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Saved answers" })).toBeVisible();
 
       await inSequence(
         [
@@ -242,7 +242,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       const previewSteps = [
         { heading: /Welcome/u, path: "/onboarding?preview=1" },
         { heading: /Resume/u, path: "/onboarding/resume?preview=1" },
-        { heading: /Personal details/u, path: "/onboarding/facts?preview=1" },
+        { heading: /Your info/u, path: "/onboarding/facts?preview=1" },
         { heading: /Job preferences/u, path: "/onboarding/targets?preview=1" },
         { heading: /Mail forwarding/u, path: "/onboarding/forward?preview=1" },
       ] as const;

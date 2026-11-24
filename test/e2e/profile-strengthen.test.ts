@@ -256,7 +256,7 @@ test("answering a Tier 2 Fact saves it, resolves its Reviews and drops the unloc
   const security = page.getByTestId("strengthen-security_clearance");
 
   await security.getByRole("button", { name: "Yes" }).click();
-  await page.getByRole("button", { name: "Save fact: Security clearance" }).click();
+  await page.getByRole("button", { name: "Save answer: Security clearance" }).click();
 
   await expect(page.getByTestId("strengthen-security_clearance")).toHaveCount(0);
   await expect(page.getByTestId("strengthen-drivers_license")).toContainText(

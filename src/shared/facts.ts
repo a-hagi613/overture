@@ -63,7 +63,7 @@ export function isCountryScopedFactKey(key: string): key is CountryScopedFactKey
   return COUNTRY_SCOPED_FACT_KEYS.some((candidate) => candidate === key);
 }
 
-/** Facts kept once per currency, because a form asks for its own currency. */
+/** Answers kept once per currency, because a form asks for its own currency. */
 export const CURRENCY_SCOPED_FACT_KEYS = ["salary_expectation"] as const;
 
 export type CurrencyScopedFactKey = (typeof CURRENCY_SCOPED_FACT_KEYS)[number];

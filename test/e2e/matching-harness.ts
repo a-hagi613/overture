@@ -133,6 +133,7 @@ export async function seedPosting(
     companyId: string;
     atsJobId: string;
     url: string;
+    applyUrl?: string | null;
     title?: string;
     ats?: Ats;
     workplace?: "remote" | "hybrid" | "onsite" | "unknown";

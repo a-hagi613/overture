@@ -136,7 +136,11 @@ filter changes stay under 500ms p95 while catalog writes run, #426), the unit-te
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
 `scripts/` is named, so a deleted test cannot leave a stale entry), the apply-alias generator (`src/shared/apply-alias.test.ts`: a handle is the first and last name in
 lowercase ASCII, never a reserved system local part or its first dot-label, and a new plan uses the alias or the
-sign-in email rather than the editable email Fact, #566), the personal-email preference
+sign-in email rather than the editable email Fact, #566), the failure-recovery link and the plain-English sweep
+(`src/shared/http-url.test.ts` and `src/shared/plain-english.test.ts`: a link is kept only for an absolute
+`http:`/`https:` URL, so a stored `javascript:` or `data:` value never becomes a Couldn't apply button, and no
+user-facing copy outside the legal pages and the admin portal says Facts, Personal Details, Invite grant,
+Sent via … or Waiting on a Review, #592), the personal-email preference
 (`src/server/profile/apply-email.test.ts`: it defaults to the assigned alias, saves with a `profile.updated`
 announcement, and a read-only check provisions no mailbox, #566), the sending-domain zone lookup
 (`src/server/platform/mail/sending-domain.test.ts`: a notify subdomain resolves the zone that owns its parent, an

@@ -122,7 +122,7 @@ export function FactsSection() {
       <div className="mt-5">
         <SegmentedControl
           ariaLabel={facts.tiersLabel}
-          className="flex w-full flex-wrap gap-1"
+          className="flex w-full flex-wrap gap-1 max-md:flex-col max-md:items-stretch"
           onValueChange={(value) => {
             if (isTier(value)) {
               setTier(value);
@@ -130,13 +130,22 @@ export function FactsSection() {
           }}
           value={tier}
         >
-          <SegmentedControlItem className="flex-1 whitespace-nowrap" value="tier1">
+          <SegmentedControlItem
+            className="flex-1 whitespace-nowrap max-md:w-full max-md:flex-none"
+            value="tier1"
+          >
             {`${facts.tier1.label} (${facts.tier1.count})`}
           </SegmentedControlItem>
-          <SegmentedControlItem className="flex-1 whitespace-nowrap" value="tier2">
+          <SegmentedControlItem
+            className="flex-1 whitespace-nowrap max-md:w-full max-md:flex-none"
+            value="tier2"
+          >
             {`${facts.tier2.label} (${facts.tier2.count})`}
           </SegmentedControlItem>
-          <SegmentedControlItem className="flex-1 whitespace-nowrap" value="tier3">
+          <SegmentedControlItem
+            className="flex-1 whitespace-nowrap max-md:w-full max-md:flex-none"
+            value="tier3"
+          >
             {`${facts.tier3.label} (${String(learnedFacts.length)})`}
           </SegmentedControlItem>
         </SegmentedControl>

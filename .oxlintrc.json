@@ -305,6 +305,8 @@
           "src/shared/apply-alias.test.ts",
           "src/shared/dossier.test.ts",
           "src/shared/host-match.test.ts",
+          "src/shared/http-url.test.ts",
+          "src/shared/plain-english.test.ts",
           "src/shared/security-headers.test.ts",
           "src/shared/support.test.ts",
           "src/web/lib/admin-resource.test.ts",
