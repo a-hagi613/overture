@@ -622,7 +622,7 @@ test("a Posting closed since preparation is skipped, not sent", async ({ pacing 
     (event) => event.kind === "status" && event.toValue === "skipped",
   );
 
-  expect(reason?.detail).toBe("The role closed before Overture could send.");
+  expect(reason?.detail).toBe("This posting closed before sending.");
 });
 
 test("the clock moves sends only into the window, spaced at least twenty minutes apart", async ({

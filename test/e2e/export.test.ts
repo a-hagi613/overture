@@ -490,7 +490,7 @@ test("a plain-text event detail is exported as text without breaking the build",
   await seedOwner(owner);
   const { applicationId } = await seedSentApplication(owner, userId);
 
-  const plainDetail = "This posting closed before Overture could send.";
+  const plainDetail = "This posting closed before sending.";
 
   const seeded = await owner.post("/__test__/applications/events/seed", {
     data: {
