@@ -12,8 +12,8 @@ export function LandingHeroCopy() {
         <span className="block">{LANDING_COPY.hero.headlinePlain}</span>
         <span className="block italic text-signal">{LANDING_COPY.hero.headlineItalic}</span>
       </h1>
-      <p className={`${dsLead} mt-5 max-w-lg sm:mt-6`}>{LANDING_COPY.hero.lead}</p>
-      <div className="mt-7 grid grid-cols-2 gap-3 sm:mt-8 sm:flex sm:flex-wrap sm:items-center sm:gap-3.5">
+      <p className={`${dsLead} mt-5 max-w-xl sm:mt-6`}>{LANDING_COPY.hero.lead}</p>
+      <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
         <Button asChild size="lg" variant="primary">
           <a href="/signup">
             <span>{LANDING_COPY.hero.ctaPrimary}</span>

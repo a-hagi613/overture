@@ -20,7 +20,7 @@ import { dsContainer } from "../components/ui/ds.ts";
 export function LandingPage() {
   return (
     <div
-      className="relative overflow-x-clip overflow-y-clip bg-background font-sans text-foreground antialiased"
+      className="relative overflow-x-clip bg-background font-sans text-foreground antialiased"
       id="top"
     >
       <LandingHeader />
@@ -28,7 +28,7 @@ export function LandingPage() {
       <main id="main-content" tabIndex={-1}>
         <section className="relative">
           <LandingGrain variant="hero" />
-          <div className={`${dsContainer} relative z-10 pb-14 pt-6 sm:pb-20 sm:pt-12`}>
+          <div className={`${dsContainer} relative z-10 pb-16 pt-8 sm:pb-24 sm:pt-14`}>
             <div className="grid grid-cols-1 items-center gap-x-14 gap-y-10 lg:grid-cols-2">
               <LandingHeroCopy />
               <LandingHeroStack />
