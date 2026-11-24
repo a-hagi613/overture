@@ -1,13 +1,22 @@
-import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { afterEach, expect, test } from "bun:test";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
+import {
+  MARKETING_SYNC_FIXTURES,
+  marketingSyncSandbox,
+  marketingSyncScript,
+  marketingSyncToolsAvailable,
+  removeMarketingSyncSandboxes,
+  snapshotTree,
+} from "./fly-marketing-sync-sandbox.ts";
 import {
   findAdminHostWorkflowProblems,
   findBunVersionDrift,
   findRecoveryWorkflowProblems,
   findVacuumWorkflowProblems,
   findWorkersDeployProblems,
+  flyctlRemoteCommands,
   MARKETING_POST_DEPLOY_VERIFY_STEP,
   MARKETING_PRE_DEPLOY_VERIFY_STEP,
   MARKETING_SYNC_STEP,
@@ -686,6 +695,48 @@ test("a deploy workflow that pipes flyctl straight into tar is reported", () => 
   ).toBe(true);
 });
 
+test("a deploy workflow that passes the multi-statement extraction to flyctl without sh -c is reported", () => {
+  const deploy = workersDeployWorkflow();
+  const step = readWorkflowStep(deploy, MARKETING_SYNC_STEP) ?? "";
+  const [remote] = flyctlRemoteCommands(step);
+
+  expect(remote?.startsWith("sh -c '")).toBe(true);
+
+  const unwrapped = `printf '%s\\n' '\${begin_marker}'; tar -czf - -C /app dist-marketing | base64; printf '%s\\n' '\${end_marker}'`;
+
+  expect(
+    findWorkersDeployProblems({ deploy: deploy.replace(remote ?? "", unwrapped) }).some((problem) =>
+      problem.includes("wrap the remote command in sh -c"),
+    ),
+  ).toBe(true);
+
+  const stripped = (remote ?? "").slice("sh -c '".length, -1);
+
+  expect(stripped).toContain(";");
+  expect(
+    findWorkersDeployProblems({ deploy: deploy.replace(remote ?? "", stripped) }).some((problem) =>
+      problem.includes("wrap the remote command in sh -c"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that wraps the remote command in sh -c without set -e is reported", () => {
+  const deploy = workersDeployWorkflow();
+  const step = readWorkflowStep(deploy, MARKETING_SYNC_STEP) ?? "";
+  const [remote] = flyctlRemoteCommands(step);
+
+  expect(remote).toContain("set -e;");
+
+  const noFailFast = (remote ?? "").replace("set -e; ", "");
+
+  expect(noFailFast).not.toContain("set -e");
+  expect(
+    findWorkersDeployProblems({ deploy: deploy.replace(remote ?? "", noFailFast) }).some(
+      (problem) => problem.includes("without set -e"),
+    ),
+  ).toBe(true);
+});
+
 test("a deploy workflow that syncs the page after the marketing deploy is reported", () => {
   const deploy = workersDeployWorkflow();
   const sync = workersStepBlock(deploy, MARKETING_SYNC_STEP);
@@ -780,3 +831,69 @@ test("a deploy workflow that does not check out the CI run's head SHA is reporte
     findWorkersDeployProblems({ deploy }).some((problem) => problem.includes("head SHA")),
   ).toBe(true);
 });
+
+afterEach(removeMarketingSyncSandboxes);
+
+test.skipIf(!marketingSyncToolsAvailable)(
+  "the shipped marketing sync extracts dist-marketing byte-for-byte through a no-shell flyctl exec",
+  () => {
+    const sandbox = marketingSyncSandbox();
+
+    const { body, remote } = marketingSyncScript(
+      readFileSync(".github/workflows/deploy.yml", "utf8"),
+    );
+
+    expect(remote.startsWith("sh -c '")).toBe(true);
+    expect(body).toContain("flyctl ssh console");
+
+    const { output, status } = sandbox.run(body);
+
+    expect(output).not.toContain("::error::");
+    expect(status).toBe(0);
+    expect(output).toContain(`synced ${MARKETING_SYNC_FIXTURES.length} file(s) from overture-web`);
+
+    expect(snapshotTree(join(sandbox.workDirectory, "dist-marketing"))).toStrictEqual(
+      snapshotTree(join(sandbox.appDirectory, "dist-marketing")),
+    );
+  },
+);
+
+test.skipIf(!marketingSyncToolsAvailable)(
+  "the marketing sync fails the job when the machine has no dist-marketing to send",
+  () => {
+    const sandbox = marketingSyncSandbox();
+
+    const { body } = marketingSyncScript(readFileSync(".github/workflows/deploy.yml", "utf8"));
+
+    rmSync(join(sandbox.appDirectory, "dist-marketing"), { force: true, recursive: true });
+
+    const { output, status } = sandbox.run(body);
+
+    expect(status).not.toBe(0);
+    expect(output).toContain("Could not extract /app/dist-marketing from overture-web");
+    expect(existsSync(join(sandbox.workDirectory, "dist-marketing", "index.html"))).toBe(false);
+  },
+);
+
+test.skipIf(!marketingSyncToolsAvailable)(
+  "the unwrapped marketing sync fails loudly instead of extracting a frame",
+  () => {
+    const sandbox = marketingSyncSandbox();
+
+    const { body, remote } = marketingSyncScript(
+      readFileSync(".github/workflows/deploy.yml", "utf8"),
+    );
+
+    const unwrapped = `printf '%s\\n' '\${begin_marker}'; tar -czf - -C /app dist-marketing | base64; printf '%s\\n' '\${end_marker}'`;
+
+    expect(remote).not.toBe("");
+    expect(body).toContain(remote);
+
+    const { output, status } = sandbox.run(body.replace(remote, unwrapped));
+
+    expect(status).not.toBe(0);
+    expect(output).toContain("The archive from overture-web was not a clean base64 tar stream");
+    expect(output).toMatch(/unexpected end of file/u);
+    expect(existsSync(join(sandbox.workDirectory, "dist-marketing", "index.html"))).toBe(false);
+  },
+);

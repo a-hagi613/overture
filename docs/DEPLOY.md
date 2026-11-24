@@ -313,7 +313,7 @@ page at all.
 ```sh
 # what .github/workflows/deploy.yml runs, in order
 flyctl ssh console -q -a overture-web -C \
-  "printf '%s\n' OVERTURE-TAR-BEGIN; tar -czf - -C /app dist-marketing | base64; printf '%s\n' OVERTURE-TAR-END" \
+  "sh -c 'set -e; tar -czf /tmp/overture-dist-marketing.tgz -C /app dist-marketing; echo OVERTURE-TAR-BEGIN; base64 /tmp/overture-dist-marketing.tgz; echo OVERTURE-TAR-END; rm -f /tmp/overture-dist-marketing.tgz'" \
   > archive.txt
 awk '$0 == "OVERTURE-TAR-BEGIN" { inside = 1; started = 1; next }
      $0 == "OVERTURE-TAR-END" { inside = 0; closed = 1; next }
@@ -324,9 +324,17 @@ cd workers/marketing && bunx wrangler deploy
 bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://tryoverture.com --attempts 5
 ```
 
-`flyctl ssh console` prints its own connection text (for example `Connecting to fdaa:…`) on stdout, and a raw gzip
-stream fed straight to `tar` would be corrupted by it. The step passes `-q` to silence the progress indicators and
-carries the archive base64-encoded between sentinel markers, so only payload lines reach `tar`: a stray notice is
+`flyctl ssh console -C` does not run its argument through a shell: the machine's SSH server splits the string into
+words (honouring quotes) and executes the first word with the rest as its arguments, so a bare `;`, `|` or `&&` is
+just another argument. A pipeline passed bare therefore makes the remote `printf` print the script as literal text —
+that is exactly how the deploy failed with `gzip: stdin: unexpected end of file`. Always wrap a multi-statement remote
+command in `sh -c '…'`, whose single argument is the whole script, and `set -e` inside it so a failed `tar` or `base64`
+becomes the console's exit code instead of an empty archive. The script itself stays free of single quotes, because
+the wrapper owns them; the sentinels are plain words, so `echo` needs no quoting.
+
+`flyctl ssh console` also prints its own connection text (for example `Connecting to fdaa:…`) on stdout, and a raw
+gzip stream fed straight to `tar` would be corrupted by it. The step passes `-q` to silence the progress indicators
+and carries the archive base64-encoded between sentinel markers, so only payload lines reach `tar`: a stray notice is
 discarded, and a missing frame or corrupt payload fails the job instead of extracting a partial page.
 
 The sync fails the job when `/app/dist-marketing/index.html` is missing: shipping stale HTML is never the fallback.
@@ -346,7 +354,7 @@ workflow does.
 ```sh
 mkdir -p dist-marketing
 flyctl ssh console -q -a overture-web -C \
-  "printf '%s\n' OVERTURE-TAR-BEGIN; tar -czf - -C /app dist-marketing | base64; printf '%s\n' OVERTURE-TAR-END" \
+  "sh -c 'set -e; tar -czf /tmp/overture-dist-marketing.tgz -C /app dist-marketing; echo OVERTURE-TAR-BEGIN; base64 /tmp/overture-dist-marketing.tgz; echo OVERTURE-TAR-END; rm -f /tmp/overture-dist-marketing.tgz'" \
   > archive.txt
 awk '$0 == "OVERTURE-TAR-BEGIN" { inside = 1; started = 1; next }
      $0 == "OVERTURE-TAR-END" { inside = 0; closed = 1; next }
@@ -581,8 +589,9 @@ gh workflow run ops-live.yml -f action=seed-catalog -R a-hagi613/overture
 ```
 
 The action makes one bounded `flyctl ssh console -a overture-web -C <command>` call per step, because
-`flyctl` runs that command directly rather than through a shell, so `&&` chaining does not work. Each call
-runs under its own `timeout` and stops the action on a timeout (exit 124) or a non-zero exit:
+`flyctl` runs that command directly rather than through a shell, so `&&` chaining does not work (wrap multi-step work
+in `sh -c '…'` instead; see the marketing sync above). Each call runs under its own `timeout` and stops the action on
+a timeout (exit 124) or a non-zero exit:
 
 1. `mkdir -p /data/seed` (60 s, root) and `chown app:app /data/seed` (60 s, root);
 2. as the unprivileged `app` user, `fetch-seed.ts --dir /data/seed` (300 s) downloads the pinned
