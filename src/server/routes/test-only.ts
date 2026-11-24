@@ -236,7 +236,7 @@ const sampleLedgerBody = z.object({ email: z.email() });
 
 const homeSampleBody = z.object({
   email: z.email(),
-  variant: z.enum(["running", "paused"]).default("running"),
+  variant: z.enum(["running", "paused", "caught_up"]).default("running"),
 });
 
 const profileRunningBody = z.object({
@@ -2849,6 +2849,7 @@ export function createTestRoutes(
     await seedSampleLedger(userId, "home-sample");
 
     const paused = variant === "paused";
+    const caughtUp = variant === "caught_up";
 
     db.insert(profiles)
       .values({
@@ -3147,48 +3148,50 @@ export function createTestRoutes(
       },
     ];
 
-    for (const entry of readySeeds) {
-      const owner = addCompany(entry.company, entry.domain, entry.token);
-      const postingId = addPosting(owner, entry.title, `${entry.token}-1`);
+    if (!caughtUp) {
+      for (const entry of readySeeds) {
+        const owner = addCompany(entry.company, entry.domain, entry.token);
+        const postingId = addPosting(owner, entry.title, `${entry.token}-1`);
+
+        addApplication({
+          postingId,
+          stage: "ready",
+          status: "ready",
+          updatedAt: dayStart(0) + 7 * hour,
+        });
+      }
+
+      const approvedOwner = addCompany(
+        "Larkspur Health",
+        "ready-larkspur.example",
+        "home-ready-larkspur",
+      );
+
+      const approvedPosting = addPosting(
+        approvedOwner,
+        "Senior Backend Engineer",
+        "home-ready-larkspur-1",
+      );
 
       addApplication({
-        postingId,
+        postingId: approvedPosting,
+        scheduledFor: dayStart(0) + 14 * hour + 20 * minute,
         stage: "ready",
-        status: "ready",
-        updatedAt: dayStart(0) + 7 * hour,
+        status: "approved",
+        updatedAt: dayStart(0) + 7 * hour + minute,
+      });
+
+      const failedOwner = addCompany("Ferro Cloud", "ferro-failed.example", "home-ferro-failed");
+      const failedPosting = addPosting(failedOwner, "DevOps Engineer", "home-ferro-failed-1");
+
+      addApplication({
+        postingId: failedPosting,
+        stage: null,
+        status: "failed",
+        statusReason: "form_changed",
+        updatedAt: dayStart(-1) + 11 * hour + 5 * minute,
       });
     }
-
-    const approvedOwner = addCompany(
-      "Larkspur Health",
-      "ready-larkspur.example",
-      "home-ready-larkspur",
-    );
-
-    const approvedPosting = addPosting(
-      approvedOwner,
-      "Senior Backend Engineer",
-      "home-ready-larkspur-1",
-    );
-
-    addApplication({
-      postingId: approvedPosting,
-      scheduledFor: dayStart(0) + 14 * hour + 20 * minute,
-      stage: "ready",
-      status: "approved",
-      updatedAt: dayStart(0) + 7 * hour + minute,
-    });
-
-    const failedOwner = addCompany("Ferro Cloud", "ferro-failed.example", "home-ferro-failed");
-    const failedPosting = addPosting(failedOwner, "DevOps Engineer", "home-ferro-failed-1");
-
-    addApplication({
-      postingId: failedPosting,
-      stage: null,
-      status: "failed",
-      statusReason: "form_changed",
-      updatedAt: dayStart(-1) + 11 * hour + 5 * minute,
-    });
 
     const checkInPosting = addPosting(sample, "Backend Engineer", "home-checkin-1");
 
@@ -3271,68 +3274,70 @@ export function createTestRoutes(
       domain: string;
       title: string;
       token: string;
-    }[] = [
-      {
-        company: "Northwind Labs",
-        domain: "review-northwind.example",
-        title: "Platform Engineer",
-        token: "review-northwind",
-      },
-      {
-        company: "Ferro Cloud",
-        domain: "review-ferro.example",
-        title: "Senior DevOps Engineer",
-        token: "review-ferro",
-      },
-      {
-        company: "Halden Systems",
-        domain: "review-halden.example",
-        title: "Site Reliability Engineer",
-        token: "review-halden",
-      },
-      {
-        company: "Larkspur Health",
-        domain: "review-larkspur.example",
-        title: "Platform Engineer",
-        token: "review-larkspur",
-      },
-      {
-        company: "Halden Systems",
-        domain: "review-halden-staff.example",
-        title: "Staff Platform Engineer",
-        token: "review-halden-staff",
-      },
-      {
-        company: "Tideline Software",
-        domain: "review-tideline.example",
-        title: "Backend Engineer",
-        token: "review-tideline",
-      },
-      {
-        company: "Brightwave Analytics",
-        domain: "review-brightwave.example",
-        title: "Infrastructure Engineer",
-        token: "review-brightwave",
-      },
-      {
-        company: "Larkspur Health",
-        domain: "review-larkspur-senior.example",
-        title: "Senior Platform Engineer",
-        token: "review-larkspur-senior",
-      },
-      {
-        company: "Ferro Cloud",
-        domain: "review-ferro-cloud.example",
-        title: "Cloud Engineer",
-        token: "review-ferro-cloud",
-      },
-      {
-        company: "Ferro Cloud",
-        domain: "review-ferro-platform.example",
-        title: "Platform Engineer",
-        token: "review-ferro-platform",
-      },
-    ];
+    }[] = caughtUp
+      ? []
+      : [
+          {
+            company: "Northwind Labs",
+            domain: "review-northwind.example",
+            title: "Platform Engineer",
+            token: "review-northwind",
+          },
+          {
+            company: "Ferro Cloud",
+            domain: "review-ferro.example",
+            title: "Senior DevOps Engineer",
+            token: "review-ferro",
+          },
+          {
+            company: "Halden Systems",
+            domain: "review-halden.example",
+            title: "Site Reliability Engineer",
+            token: "review-halden",
+          },
+          {
+            company: "Larkspur Health",
+            domain: "review-larkspur.example",
+            title: "Platform Engineer",
+            token: "review-larkspur",
+          },
+          {
+            company: "Halden Systems",
+            domain: "review-halden-staff.example",
+            title: "Staff Platform Engineer",
+            token: "review-halden-staff",
+          },
+          {
+            company: "Tideline Software",
+            domain: "review-tideline.example",
+            title: "Backend Engineer",
+            token: "review-tideline",
+          },
+          {
+            company: "Brightwave Analytics",
+            domain: "review-brightwave.example",
+            title: "Infrastructure Engineer",
+            token: "review-brightwave",
+          },
+          {
+            company: "Larkspur Health",
+            domain: "review-larkspur-senior.example",
+            title: "Senior Platform Engineer",
+            token: "review-larkspur-senior",
+          },
+          {
+            company: "Ferro Cloud",
+            domain: "review-ferro-cloud.example",
+            title: "Cloud Engineer",
+            token: "review-ferro-cloud",
+          },
+          {
+            company: "Ferro Cloud",
+            domain: "review-ferro-platform.example",
+            title: "Platform Engineer",
+            token: "review-ferro-platform",
+          },
+        ];
 
     const reviewApplicationIds: string[] = [];
 
@@ -3350,32 +3355,34 @@ export function createTestRoutes(
       );
     }
 
-    const reviewSeeds = [
-      {
-        applicationIds: reviewApplicationIds.slice(0, 4),
-        fieldType: "select" as const,
-        options: ["Yes", "No"],
-        prompt: "Are you comfortable with a weekly on-call rotation?",
-      },
-      {
-        applicationIds: reviewApplicationIds.slice(4, 7),
-        fieldType: "text" as const,
-        options: [],
-        prompt: "How many years have you run Kubernetes in production?",
-      },
-      {
-        applicationIds: reviewApplicationIds.slice(7, 9),
-        fieldType: "text" as const,
-        options: [],
-        prompt: "Security clearance status",
-      },
-      {
-        applicationIds: reviewApplicationIds.slice(9),
-        fieldType: "url" as const,
-        options: [],
-        prompt: "Link to your portfolio",
-      },
-    ];
+    const reviewSeeds = caughtUp
+      ? []
+      : [
+          {
+            applicationIds: reviewApplicationIds.slice(0, 4),
+            fieldType: "select" as const,
+            options: ["Yes", "No"],
+            prompt: "Are you comfortable with a weekly on-call rotation?",
+          },
+          {
+            applicationIds: reviewApplicationIds.slice(4, 7),
+            fieldType: "text" as const,
+            options: [],
+            prompt: "How many years have you run Kubernetes in production?",
+          },
+          {
+            applicationIds: reviewApplicationIds.slice(7, 9),
+            fieldType: "text" as const,
+            options: [],
+            prompt: "Security clearance status",
+          },
+          {
+            applicationIds: reviewApplicationIds.slice(9),
+            fieldType: "url" as const,
+            options: [],
+            prompt: "Link to your portfolio",
+          },
+        ];
 
     for (const review of reviewSeeds) {
       seedReviewRow({

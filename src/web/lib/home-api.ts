@@ -72,6 +72,7 @@ const homeResponseSchema = z.object({
   checkIns: z.array(checkinSchema),
   dailyCap: z.number(),
   endingGrant: z.object({ applicationsLeft: z.number(), expiresAt: z.number() }).nullable(),
+  nextPrepAt: z.number(),
   nextSendAt: z.number().nullable(),
   now: z.number(),
   pauseReason: z.enum(PAUSE_REASONS).nullable(),

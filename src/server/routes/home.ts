@@ -24,7 +24,11 @@ import { getSetting } from "../platform/settings/index.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
 import { addLocalDays, localDateAt, localDayStartFor } from "../platform/local-time.ts";
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
-import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
+import {
+  ensurePrepDailyQueued,
+  nextPrepRunAt,
+  parsePrepRunMinutes,
+} from "../pipeline/daily-prep.ts";
 import { dueCheckins } from "../pipeline/checkins.ts";
 import { notifyPaused } from "../notify/events.ts";
 import { pauseByUser, resumeByUser } from "../profile/running-state.ts";
@@ -630,6 +634,7 @@ export function createHomeRoutes(deps: {
     const reviewList = reviews.list(userId);
     const inbox = await inboxViews(userId);
     const checkIns = dueCheckins({ db, now }, userId);
+    const prepRunMinutes = parsePrepRunMinutes(getSetting(db, "prep.run_local_time"));
 
     return context.json({
       activity: activityOf(userId, now),
@@ -638,6 +643,7 @@ export function createHomeRoutes(deps: {
       checkIns,
       dailyCap,
       endingGrant: billing.endingGrant,
+      nextPrepAt: nextPrepRunAt(now, zone, prepRunMinutes),
       nextSendAt,
       now,
       pauseReason: profile.pauseReason,

@@ -290,6 +290,7 @@
           "src/shared/support.test.ts",
           "src/web/lib/admin-resource.test.ts",
           "src/web/lib/billing-poll.test.ts",
+          "src/web/lib/home-bands.test.ts",
           "src/web/lib/live-events.test.ts"
         ]
       }
