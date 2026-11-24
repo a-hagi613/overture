@@ -1609,7 +1609,7 @@ publishing version 2 leaves version 1 and an already sent Snapshot on version 1 
 
 Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038).
 
-### 16.2 Unit tests (seventy-one files, `bun:test`, beside their code)
+### 16.2 Unit tests (seventy-five files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
