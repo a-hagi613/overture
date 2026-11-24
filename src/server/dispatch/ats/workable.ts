@@ -1,7 +1,6 @@
 import type { Page } from "playwright-core";
 
-import type { FormQuestion, SendPlanField } from "../../pipeline/send-plan.ts";
-import type { QuestionFieldType } from "../../../shared/questions.ts";
+import type { SendPlanField } from "../../pipeline/send-plan.ts";
 
 import {
   APPLICATION_RESPONSE_MS,
@@ -17,6 +16,7 @@ import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/e
 import { checkPostingIdentity } from "../posting-identity.ts";
 
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
+import { findResumeFileInput, readFormQuestions } from "./hosted.ts";
 import type { PlannedResume } from "./shared.ts";
 
 const RESUME_FIELD = "resume";
@@ -28,16 +28,6 @@ const RESUME_FIELD = "resume";
  */
 export const WORKABLE_FORM_SELECTOR =
   "form[data-ui='application-form'], form.application-form, form#application-form";
-
-const FIELD_TYPES = new Map<string, QuestionFieldType>([
-  ["email", "email"],
-  ["tel", "phone"],
-  ["url", "url"],
-  ["number", "number"],
-  ["date", "date"],
-]);
-
-const WORKABLE_FIELD_TYPE_ENTRIES: readonly [string, QuestionFieldType][] = [...FIELD_TYPES];
 
 export interface WorkableRunPlan {
   identity: PostingIdentity;
@@ -82,205 +72,8 @@ const answered = (field: SendPlanField) =>
  * @param page The apply page the browser opened.
  * @returns The controls, with their labels, kinds, options and required flags.
  */
-export async function readWorkableQuestions(page: Page) {
-  return page.evaluate<
-    FormQuestion[],
-    { fieldTypes: readonly [string, QuestionFieldType][]; selector: string }
-  >(
-    (input) => {
-      const types = new Map(input.fieldTypes);
-      const roots = [...document.querySelectorAll(input.selector)];
-
-      if (roots.length !== 1) {
-        return [];
-      }
-
-      const [root] = roots;
-
-      if (root === undefined) {
-        return [];
-      }
-
-      const labelFor = (element: Element) => {
-        const ariaLabel = element.getAttribute("aria-label");
-
-        if (ariaLabel !== null && ariaLabel.trim() !== "") {
-          return ariaLabel
-            .replaceAll(/[*✱]/gu, "")
-            .replaceAll(/\s+/gu, " ")
-            .trim();
-        }
-
-        const id = element.getAttribute("id");
-
-        if (id !== null && id !== "") {
-          const label = root.querySelector(`label[for="${CSS.escape(id)}"]`);
-
-          if (label !== null) {
-            return label.textContent
-              .replaceAll(/[*✱]/gu, "")
-              .replaceAll(/\s+/gu, " ")
-              .trim();
-          }
-        }
-
-        const legend = element.closest("fieldset")?.querySelector("legend");
-
-        if (legend !== null && legend !== undefined) {
-          return legend.textContent
-            .replaceAll(/[*✱]/gu, "")
-            .replaceAll(/\s+/gu, " ")
-            .trim();
-        }
-
-        const field = element.closest("[class*='form-field'], [class*='field']");
-
-        const fieldLabel = field?.querySelector("label, legend");
-
-        if (fieldLabel !== null && fieldLabel !== undefined) {
-          return fieldLabel.textContent
-            .replaceAll(/[*✱]/gu, "")
-            .replaceAll(/\s+/gu, " ")
-            .trim();
-        }
-
-        const wrapping = element.closest("label");
-
-        if (wrapping !== null) {
-          return wrapping.textContent
-            .replaceAll(/[*✱]/gu, "")
-            .replaceAll(/\s+/gu, " ")
-            .trim();
-        }
-
-        return "";
-      };
-
-      const optionLabelFor = (element: Element) => {
-        const wrapping = element.closest("label");
-
-        if (wrapping !== null) {
-          return wrapping.textContent
-            .replaceAll(/[*✱]/gu, "")
-            .replaceAll(/\s+/gu, " ")
-            .trim();
-        }
-
-        const id = element.getAttribute("id");
-
-        if (id !== null && id !== "") {
-          const label = root.querySelector(`label[for="${CSS.escape(id)}"]`);
-
-          if (label !== null) {
-            return label.textContent
-              .replaceAll(/[*✱]/gu, "")
-              .replaceAll(/\s+/gu, " ")
-              .trim();
-          }
-        }
-
-        return element.getAttribute("value") ?? "";
-      };
-
-      const questions: FormQuestion[] = [];
-
-      const seen = new Set<string>();
-
-      for (const element of root.querySelectorAll("input, select, textarea")) {
-        const fieldName = element.getAttribute("name") ?? element.getAttribute("id") ?? "";
-
-        if (
-          fieldName === "" ||
-          seen.has(fieldName) ||
-          (element instanceof HTMLInputElement &&
-            ["hidden", "submit", "button", "reset", "image", "file"].includes(element.type))
-        ) {
-          continue;
-        }
-
-        seen.add(fieldName);
-
-        const label = labelFor(element);
-
-        if (label === "") {
-          continue;
-        }
-
-        const required =
-          element.hasAttribute("required") || element.getAttribute("aria-required") === "true";
-
-        if (element instanceof HTMLSelectElement) {
-          questions.push({
-            fieldName,
-            fieldType: "select",
-            label,
-            options: [...element.options].flatMap((option) =>
-              option.value === "" ? [] : [option.textContent.replaceAll(/\s+/gu, " ").trim()],
-            ),
-            required,
-          });
-
-          continue;
-        }
-
-        if (element instanceof HTMLTextAreaElement) {
-          questions.push({ fieldName, fieldType: "textarea", label, options: [], required });
-
-          continue;
-        }
-
-        const radios = [
-          ...root.querySelectorAll<HTMLInputElement>(
-            `input[type="radio"][name="${CSS.escape(fieldName)}"]`,
-          ),
-        ];
-
-        if (radios.length > 0) {
-          questions.push({
-            fieldName,
-            fieldType: "radio",
-            label,
-            options: radios.map((radio) => optionLabelFor(radio)),
-            required,
-          });
-
-          continue;
-        }
-
-        const boxes = [
-          ...root.querySelectorAll<HTMLInputElement>(
-            `input[type="checkbox"][name="${CSS.escape(fieldName)}"]`,
-          ),
-        ];
-
-        if (boxes.length > 0) {
-          questions.push({
-            fieldName,
-            fieldType: "multiselect",
-            label,
-            options: boxes.map((box) => optionLabelFor(box)),
-            required,
-          });
-
-          continue;
-        }
-
-        if (element instanceof HTMLInputElement) {
-          questions.push({
-            fieldName,
-            fieldType: types.get(element.type) ?? "text",
-            label,
-            options: [],
-            required,
-          });
-        }
-      }
-
-      return questions;
-    },
-    { fieldTypes: WORKABLE_FIELD_TYPE_ENTRIES, selector: WORKABLE_FORM_SELECTOR },
-  );
-}
+export const readWorkableQuestions = async (page: Page) =>
+  readFormQuestions(page, WORKABLE_FORM_SELECTOR);
 
 async function fillByLabel(scope: FormScope, field: SendPlanField) {
   const { answer } = field;
@@ -363,101 +156,6 @@ async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanFiel
   };
 
   return fillFrom(0);
-}
-
-interface FileInputFact {
-  id: string;
-  index: number;
-  label: string;
-  name: string;
-}
-
-const normalisedWords = (raw: string) =>
-  raw
-    .normalize("NFD")
-    .replaceAll(/\p{M}/gu, "")
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/gu, " ")
-    .trim();
-
-const mentionsResume = (fact: FileInputFact) => {
-  const text = normalisedWords(`${fact.name} ${fact.id} ${fact.label}`);
-  const words = text.split(" ");
-
-  return words.includes("resume") || words.includes("cv") || text.includes("curriculum vitae");
-};
-
-async function fileInputFacts(scope: FormScope) {
-  return scope.root.locator("input[type='file']").evaluateAll((elements) =>
-    elements.map((element, index) => {
-      const id = element.getAttribute("id") ?? "";
-      const name = element.getAttribute("name") ?? "";
-
-      const labelledBy = (element.getAttribute("aria-labelledby") ?? "")
-        .split(/\s+/u)
-        .filter((value) => value !== "")
-        .map((value) => document.querySelector(`#${value}`)?.textContent ?? "")
-        .join(" ");
-
-      const wrapping = element.closest("label")?.textContent ?? "";
-
-      const form = element.closest("form") ?? document;
-
-      const forLabel =
-        id === ""
-          ? ""
-          : ([...form.querySelectorAll("label[for]")].find(
-              (label) => label.getAttribute("for") === id,
-            )?.textContent ?? "");
-
-      const block =
-        element.closest("[class*='form-field'], [class*='field']")?.querySelector("label, legend")
-          ?.textContent ?? "";
-
-      const label =
-        [element.getAttribute("aria-label") ?? "", labelledBy, wrapping, forLabel, block]
-          .map((text) => text.replaceAll(/\s+/gu, " ").trim())
-          .find((text) => text !== "") ?? "";
-
-      return { id, index, label, name };
-    }),
-  );
-}
-
-/**
- * Finds the one resume file input inside the verified form: the plan's file field name first, then a control whose
- * own name, id or label says resume/CV. No resume-ish control, or more than one, returns `null` so the attempt fails
- * closed instead of uploading the resume into a cover-letter or portfolio slot.
- *
- * @param scope The verified Workable application form.
- * @param fieldName The file field name from the approved plan, when it has one.
- * @returns The identified resume input, or `null` when the page is ambiguous.
- */
-export async function findResumeFileInput(scope: FormScope, fieldName: string | null) {
-  const inputs = scope.root.locator("input[type='file']");
-
-  if ((await inputs.count()) === 0) {
-    return null;
-  }
-
-  const facts = await fileInputFacts(scope);
-
-  if (fieldName !== null && fieldName !== "") {
-    const exact = facts.filter((fact) => fact.name === fieldName || fact.id === fieldName);
-
-    const [only] = exact;
-
-    if (only !== undefined) {
-      return exact.length === 1 ? inputs.nth(only.index) : null;
-    }
-  }
-
-  const labelled = facts.filter((fact) => mentionsResume(fact));
-  const [onlyLabelled] = labelled;
-
-  return labelled.length === 1 && onlyLabelled !== undefined
-    ? inputs.nth(onlyLabelled.index)
-    : null;
 }
 
 async function uploadResume(scope: FormScope, fieldName: string | null, resume: PlannedResume) {

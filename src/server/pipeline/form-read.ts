@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import type { FormQuestion } from "./send-plan.ts";
 import type { QuestionFieldType } from "../../shared/questions.ts";
-import type { BatchThreeAts, BatchTwoAts } from "../../shared/ats.ts";
+import type { BatchOneAts, BatchThreeAts, BatchTwoAts } from "../../shared/ats.ts";
 
 import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
 import { LEVER_FIELD_TYPES, LEVER_SKIP_NAMES } from "../dispatch/ats/lever.ts";
@@ -30,6 +30,8 @@ import {
   softgardenApplyUrl,
   teamtailorApplyUrl,
 } from "./wave1a-forms.ts";
+import type { Batch1Ats } from "./hosted-form.ts";
+import { isHostedFormAts, readHostedFormHtml } from "./hosted-form.ts";
 
 export const FORM_READ_PATHS = [
   "lever_html",
@@ -46,6 +48,11 @@ export const FORM_READ_PATHS = [
   "clearcompany_html",
   "join_com_html",
   "pinpoint_html",
+  "smartrecruiters_html",
+  "paylocity_html",
+  "manatal_html",
+  "careerplug_html",
+  "jazzhr_html",
   "browser",
 ] as const;
 
@@ -73,7 +80,14 @@ export function isLoginWallRead(read: FormReadResult | null): read is LoginWallF
   return read !== null && "loginWall" in read;
 }
 
-export type FormReadAts = "lever" | "ashby" | "workable" | "personio" | BatchTwoAts | BatchThreeAts;
+export type FormReadAts =
+  | "lever"
+  | "ashby"
+  | "workable"
+  | "personio"
+  | BatchOneAts
+  | BatchTwoAts
+  | BatchThreeAts;
 
 export interface FormReadTarget {
   ats: FormReadAts;
@@ -947,6 +961,17 @@ export function createPlainFormReader(
     return await fetchFormPage(url, readPinpointFormHtml);
   }
 
+  async function hosted(input: FormReadTarget, ats: Batch1Ats) {
+    const url = input.applyUrl ?? input.url;
+
+    const response = await guardedFetch(url, {
+      headers: { "user-agent": USER_AGENT },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    return htmlPageRead(url, response, async (html) => readHostedFormHtml(ats, html));
+  }
+
   return {
     async read(input: FormReadTarget) {
       try {
@@ -964,6 +989,10 @@ export function createPlainFormReader(
 
         if (input.ats === "personio") {
           return await personio(input);
+        }
+
+        if (isHostedFormAts(input.ats)) {
+          return await hosted(input, input.ats);
         }
 
         if (input.ats === "breezy") {

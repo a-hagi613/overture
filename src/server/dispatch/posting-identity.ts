@@ -30,6 +30,19 @@ const WORKABLE_BOARD_HOSTS: ReadonlySet<string> = new Set(["apply.workable.com"]
 
 const PERSONIO_HOST = /^(?<token>[a-z0-9-]+)\.jobs\.personio\.(?:com|de)$/iu;
 
+const SMART_RECRUITERS_BOARD_HOSTS: ReadonlySet<string> = new Set([
+  "jobs.smartrecruiters.com",
+  "careers.smartrecruiters.com",
+]);
+
+const PAYLOCITY_BOARD_HOSTS: ReadonlySet<string> = new Set(["recruiting.paylocity.com"]);
+
+const CAREERPLUG_BOARD_HOSTS: ReadonlySet<string> = new Set(["careers.careerplug.com"]);
+
+const JAZZHR_BOARD_HOSTS: ReadonlySet<string> = new Set(["jobs.jazzhr.com", "app.jazz.co"]);
+
+const MANATAL_HOST = /^(?<token>[a-z0-9-]+)\.manatal\.com$/iu;
+
 const BREEZY_HOST = /^(?<token>[a-z0-9-]+)\.breezy\.hr$/iu;
 
 const SOFTGARDEN_HOST = /^(?<token>[a-z0-9-]+)\.softgarden\.io$/iu;
@@ -65,6 +78,9 @@ const CLEARCOMPANY_HOST = /^(?:(?<token>[a-z0-9-]+)\.)?clearcompany\.com$/iu;
 
 const personioToken = (host: string) =>
   PERSONIO_HOST.exec(host)?.groups?.["token"]?.toLowerCase() ?? null;
+
+const manatalToken = (host: string) =>
+  MANATAL_HOST.exec(host)?.groups?.["token"]?.toLowerCase() ?? null;
 
 const tokenFromHost = (pattern: RegExp, host: string) =>
   pattern.exec(host)?.groups?.["token"]?.toLowerCase() ?? null;
@@ -140,8 +156,33 @@ const sameHost = (ats: ApplySupportedAts, expected: string, live: string) => {
     return CLEARCOMPANY_HOST.test(expected) && CLEARCOMPANY_HOST.test(live);
   }
 
+  if (ats === "smartrecruiters") {
+    return SMART_RECRUITERS_BOARD_HOSTS.has(expected) && SMART_RECRUITERS_BOARD_HOSTS.has(live);
+  }
+
+  if (ats === "paylocity") {
+    return PAYLOCITY_BOARD_HOSTS.has(expected) && PAYLOCITY_BOARD_HOSTS.has(live);
+  }
+
+  if (ats === "careerplug") {
+    return CAREERPLUG_BOARD_HOSTS.has(expected) && CAREERPLUG_BOARD_HOSTS.has(live);
+  }
+
+  if (ats === "jazzhr") {
+    return JAZZHR_BOARD_HOSTS.has(expected) && JAZZHR_BOARD_HOSTS.has(live);
+  }
+
+  if (ats === "manatal") {
+    const expectedToken = manatalToken(expected);
+    const liveToken = manatalToken(live);
+
+    return expectedToken !== null && liveToken !== null && expectedToken === liveToken;
+  }
+
   return ASHBY_BOARD_HOSTS.has(expected) && ASHBY_BOARD_HOSTS.has(live);
 };
+
+const jobIdSegment = (slug: string) => slug.split("-")[0] ?? slug;
 
 const pathSegments = (pathname: string) =>
   pathname
@@ -189,6 +230,41 @@ function jobIdFromPath(ats: ApplySupportedAts, segments: readonly string[]) {
 
   if (ats === "clearcompany") {
     return segments[1] ?? null;
+  }
+
+  if (ats === "smartrecruiters") {
+    const [, slug] = segments;
+
+    return slug === undefined ? null : jobIdSegment(slug);
+  }
+
+  if (ats === "careerplug") {
+    const jobsIndex = segments.indexOf("jobs");
+    const [, second] = segments;
+    const slug = segments[jobsIndex + 1] ?? second;
+
+    return slug === undefined ? null : jobIdSegment(slug);
+  }
+
+  if (ats === "jazzhr") {
+    const applyIndex = segments.indexOf("apply");
+    const [, second] = segments;
+    const slug = segments[applyIndex + 1] ?? second;
+
+    return slug === undefined ? null : jobIdSegment(slug);
+  }
+
+  if (ats === "paylocity") {
+    return (
+      /^\/Recruiting\/Jobs\/(?:Details|Apply)\/(?<id>\d+)\/?$/iu.exec(`/${segments.join("/")}`)
+        ?.groups?.["id"] ?? null
+    );
+  }
+
+  if (ats === "manatal") {
+    const jobsIndex = segments.indexOf("jobs");
+
+    return jobsIndex === -1 ? null : (segments[jobsIndex + 1] ?? null);
   }
 
   if (ats === "teamtailor" || ats === "hireology") {
@@ -263,6 +339,34 @@ function boardTokenFrom(ats: ApplySupportedAts, url: URL, segments: readonly str
     );
   }
 
+  if (ats === "paylocity") {
+    return "";
+  }
+
+  if (ats === "manatal") {
+    const hostToken = manatalToken(host);
+
+    if (hostToken !== null) {
+      return hostToken;
+    }
+
+    const jobsIndex = segments.indexOf("jobs");
+
+    return jobsIndex > 0 ? (segments[jobsIndex - 1] ?? "") : "";
+  }
+
+  if (ats === "careerplug") {
+    const jobsIndex = segments.indexOf("jobs");
+
+    return jobsIndex === 0 ? "" : (segments[0] ?? "");
+  }
+
+  if (ats === "jazzhr") {
+    const applyIndex = segments.indexOf("apply");
+
+    return applyIndex === 0 ? "" : firstSegment(segments);
+  }
+
   if (
     ats === "teamtailor" ||
     ats === "zoho_recruit" ||
@@ -305,8 +409,9 @@ function postingPath(ats: ApplySupportedAts, url: URL) {
   }
 
   const jobId = jobIdFromPath(ats, segments);
+  const allowsEmptyBoard = ats === "paylocity" || ats === "careerplug" || ats === "jazzhr";
 
-  return jobId === null || boardToken === "" ? null : { boardToken, jobId };
+  return jobId === null || (boardToken === "" && !allowsEmptyBoard) ? null : { boardToken, jobId };
 }
 
 const normalizedCompany = (value: string) =>
@@ -377,7 +482,12 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
     return livePosting.jobId === expected.jobId ? matched : mismatch("job_id");
   }
 
-  const skipEmptyBoardToken = expected.ats === "personio" && livePosting.boardToken === "";
+  const skipEmptyBoardToken =
+    (expected.ats === "personio" ||
+      expected.ats === "paylocity" ||
+      expected.ats === "careerplug" ||
+      expected.ats === "jazzhr") &&
+    livePosting.boardToken === "";
 
   const liveBoardToken = livePosting.boardToken.toLowerCase();
 

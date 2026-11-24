@@ -58,6 +58,13 @@ import { runBambooHRAttempt } from "./ats/bamboohr.ts";
 import { runRecruiteeAttempt } from "./ats/recruitee.ts";
 import { runHireologyAttempt } from "./ats/hireology.ts";
 import type { BrowserFormRun } from "./ats/browser-form.ts";
+import { runSmartRecruitersAttempt } from "./ats/smartrecruiters.ts";
+import { runPaylocityAttempt } from "./ats/paylocity.ts";
+import { runManatalAttempt } from "./ats/manatal.ts";
+import { runCareerplugAttempt } from "./ats/careerplug.ts";
+import { runJazzhrAttempt } from "./ats/jazzhr.ts";
+import type { HostedRun } from "./ats/hosted.ts";
+import { LOGIN_WALL_REASON } from "../pipeline/login-wall.ts";
 import {
   CODE_WAIT_TIMEOUT_MS,
   createCodeWait,
@@ -117,7 +124,14 @@ export interface DispatcherDeps {
 
 type AttemptRow = typeof attempts.$inferSelect;
 
-type AttemptRun = GreenhouseRun | LeverRun | AshbyRun | WorkableRun | PersonioRun | BrowserFormRun;
+type AttemptRun =
+  | GreenhouseRun
+  | LeverRun
+  | AshbyRun
+  | WorkableRun
+  | PersonioRun
+  | BrowserFormRun
+  | HostedRun;
 
 const zeroUsage: BrowserUsage = { browserMs: 0, costMicros: 0, proxyBytes: 0 };
 
@@ -153,6 +167,7 @@ const ATTEMPT_OUTCOMES = [
   ["unconfirmed", "unconfirmed"],
   ["upload_failed", "upload_failed"],
   ["identity_mismatch", "identity_mismatch"],
+  ["login_wall", "blocked"],
 ] as const satisfies readonly (readonly [string, AttemptRow["outcome"]])[];
 
 function outcomeOf(outcome: string) {
@@ -886,6 +901,26 @@ export function createDispatcher(deps: DispatcherDeps) {
           return runHireologyAttempt(page, planForRun, attemptHooks);
         }
 
+        if (plan.ats === "smartrecruiters") {
+          return runSmartRecruitersAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "paylocity") {
+          return runPaylocityAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "manatal") {
+          return runManatalAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "careerplug") {
+          return runCareerplugAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "jazzhr") {
+          return runJazzhrAttempt(page, planForRun, attemptHooks);
+        }
+
         return runAshbyAttempt(page, planForRun, attemptHooks);
       })();
 
@@ -915,6 +950,33 @@ export function createDispatcher(deps: DispatcherDeps) {
             approvedPlanSha256: approved.sha256,
           });
         }
+      } else if (run.outcome === "login_wall") {
+        releaseAttempt(applicationId, claimed.userId, attemptId);
+
+        db.update(applications)
+          .set({
+            stage: null,
+            status: "skipped",
+            statusReason: LOGIN_WALL_REASON,
+            updatedAt: clock.now(),
+          })
+          .where(eq(applications.id, applicationId))
+          .run();
+
+        recordApplicationEvent(db, clock, {
+          applicationId,
+          userId: claimed.userId,
+          kind: "status",
+          fromValue: "sending",
+          toValue: "skipped",
+          source: "system",
+        });
+
+        updateAttempt(attemptId, {
+          endedAt: clock.now(),
+          errorCode: LOGIN_WALL_REASON,
+          outcome: "blocked",
+        });
       } else if (run.outcome === "identity_mismatch") {
         const reason = run.identityReason ?? "unreadable";
 

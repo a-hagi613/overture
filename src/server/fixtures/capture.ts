@@ -21,27 +21,17 @@ import { readZohoRecruitQuestions } from "../dispatch/ats/zoho-recruit.ts";
 import { readBambooHRQuestions } from "../dispatch/ats/bamboohr.ts";
 import { readRecruiteeQuestions } from "../dispatch/ats/recruitee.ts";
 import { readHireologyQuestions } from "../dispatch/ats/hireology.ts";
+import { readSmartRecruitersQuestions } from "../dispatch/ats/smartrecruiters.ts";
+import { readPaylocityQuestions } from "../dispatch/ats/paylocity.ts";
+import { readManatalQuestions } from "../dispatch/ats/manatal.ts";
+import { readCareerplugQuestions } from "../dispatch/ats/careerplug.ts";
+import { readJazzhrQuestions } from "../dispatch/ats/jazzhr.ts";
+import { APPLY_SUPPORTED_ATS } from "../../shared/ats.ts";
 import type { LoginWallEvidence } from "../pipeline/login-wall.ts";
 import { detectLoginWall } from "../pipeline/login-wall.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
 
-export const ATS_NAMES = [
-  "greenhouse",
-  "lever",
-  "ashby",
-  "workable",
-  "personio",
-  "breezy",
-  "softgarden",
-  "clearcompany",
-  "join_com",
-  "pinpoint",
-  "teamtailor",
-  "zoho_recruit",
-  "bamboohr",
-  "recruitee",
-  "hireology",
-] as const;
+export const ATS_NAMES = APPLY_SUPPORTED_ATS;
 
 export type FixtureAts = (typeof ATS_NAMES)[number];
 
@@ -72,6 +62,11 @@ export const FORM_FIELD_SELECTORS = {
     "form#new_candidate input:not([type='hidden']), form[action*='/c/'] input:not([type='hidden']), form[data-testid='application-form'] input:not([type='hidden'])",
   hireology:
     "form#application-form input:not([type='hidden']), form#applicationForm input:not([type='hidden']), form[action*='applications'] input:not([type='hidden'])",
+  smartrecruiters: "form#application-form input:not([type='hidden'])",
+  paylocity: "form#applicationForm input:not([type='hidden'])",
+  manatal: "form#application-form input:not([type='hidden'])",
+  careerplug: "form#new_application input:not([type='hidden'])",
+  jazzhr: "form#application-form input:not([type='hidden'])",
 } as const satisfies Record<FixtureAts, string>;
 
 export const FORM_RENDER_TIMEOUT_MS = 20_000;
@@ -321,6 +316,26 @@ async function questionsFor(ats: FixtureAts, page: Page) {
 
   if (ats === "hireology") {
     return readHireologyQuestions(page);
+  }
+
+  if (ats === "smartrecruiters") {
+    return readSmartRecruitersQuestions(page);
+  }
+
+  if (ats === "paylocity") {
+    return readPaylocityQuestions(page);
+  }
+
+  if (ats === "manatal") {
+    return readManatalQuestions(page);
+  }
+
+  if (ats === "careerplug") {
+    return readCareerplugQuestions(page);
+  }
+
+  if (ats === "jazzhr") {
+    return readJazzhrQuestions(page);
   }
 
   return readAshbyQuestions(page);
