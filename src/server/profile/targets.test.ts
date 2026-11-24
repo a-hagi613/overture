@@ -375,7 +375,7 @@ describe("countMatchingPostings", () => {
     const rolePlan = queryPlan(target, roleQuery).join("\n");
     const countPlan = queryPlan(target, countQuery).join("\n");
 
-    expect(rolePlan).toContain("posting_tags_dimension_value");
+    expect(rolePlan).toContain("posting_tags_dimension_value_posting");
     expect(rolePlan).not.toMatch(/SCAN posting_tags/u);
     expect(countPlan).not.toMatch(/SCAN posting_tags/u);
     expect(countPlan).not.toContain("TEMP B-TREE");

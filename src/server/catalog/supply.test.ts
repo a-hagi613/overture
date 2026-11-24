@@ -11,6 +11,7 @@ import type { SupplyFilters } from "../../shared/supply.ts";
 import { openCatalogDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
 import { countSupportedSupply } from "./supply.ts";
+import { rebuildSupplyFacets } from "./supply-facets.ts";
 
 const NOW = 1_800_000_000_000;
 
@@ -318,6 +319,7 @@ function fixture() {
 
   sqlite.run("COMMIT");
   sqlite.run("ANALYZE");
+  rebuildSupplyFacets(db);
   queries.length = 0;
 
   return { db, path, queries, sqlite };
@@ -328,7 +330,11 @@ function filter(overrides: Partial<SupplyFilters> = {}) {
 }
 
 function countQueries(queries: readonly LoggedQuery[]) {
-  return queries.filter((entry) => entry.query.includes("count(*)")).length;
+  const aggregates = queries.filter(
+    (entry) => entry.query.includes("count(*)") || entry.query.includes("sum("),
+  );
+
+  return aggregates.length;
 }
 
 function queryPlan(target: Fixture, logged: LoggedQuery) {
@@ -406,6 +412,7 @@ describe("countSupportedSupply", () => {
       role: "Software Engineering",
       workplace: "remote",
     });
+    rebuildSupplyFacets(target.db);
 
     expect(countSupportedSupply(target.db, filter()).total).toBe(10);
 
@@ -429,6 +436,8 @@ describe("countSupportedSupply", () => {
       worker.sqlite.close();
     }
 
+    rebuildSupplyFacets(target.db);
+
     expect(countSupportedSupply(target.db, filter()).total).toBe(11);
   });
 
@@ -446,10 +455,13 @@ describe("countSupportedSupply", () => {
     expect(countSupportedSupply(target.db, filter({ role: "Software Engineering" })).total).toBe(5);
   });
 
-  test("plans the grouped count through postings_apply_supported_status and no posting_tags scan", () => {
+  test("plans the live city count through a covering supply index and no posting_tags scan", () => {
     const target = fixture();
 
-    countSupportedSupply(target.db, filter({ remote: true, role: "Software Engineering" }));
+    countSupportedSupply(
+      target.db,
+      filter({ location: "Austin", remote: true, role: "Software Engineering" }),
+    );
 
     const countQuery = target.queries.find((entry) => entry.query.includes("count(*)"));
 
@@ -459,7 +471,7 @@ describe("countSupportedSupply", () => {
 
     const plan = queryPlan(target, countQuery).join("\n");
 
-    expect(plan).toContain("postings_apply_supported_status");
+    expect(plan).toContain("postings_supply_");
     expect(plan).not.toMatch(/SCAN postings\b/u);
     expect(plan).not.toMatch(/SCAN posting_tags/u);
     expect(plan).toMatch(/SEARCH posting_tags/u);
@@ -487,6 +499,7 @@ describe("countSupportedSupply", () => {
 
     target.sqlite.run("COMMIT");
     target.sqlite.run("ANALYZE");
+    rebuildSupplyFacets(target.db);
 
     const filters = filter({ remote: true, role: "Software Engineering" });
     const started = performance.now();

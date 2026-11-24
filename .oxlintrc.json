@@ -213,6 +213,7 @@
           "src/server/catalog/stapply-delta.test.ts",
           "src/server/catalog/stapply-refresh.test.ts",
           "src/server/catalog/stapply-tagging.test.ts",
+          "src/server/catalog/supply-facets.test.ts",
           "src/server/catalog/supply.test.ts",
           "src/server/catalog/tag-rules.test.ts",
           "src/server/config/env.test.ts",

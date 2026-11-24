@@ -144,6 +144,18 @@ export const postings = sqliteTable(
     index("postings_open_location")
       .on(t.city, t.countryCode, t.locationRaw, t.workplace, t.closedAt)
       .where(sql`closed_at is null`),
+    index("postings_supply_ats")
+      .on(t.applySupported, t.status, t.ats)
+      .where(sql`closed_at is null`),
+    index("postings_supply_country")
+      .on(t.applySupported, t.status, t.countryCode, t.workplace, t.ats)
+      .where(sql`closed_at is null`),
+    index("postings_live_city")
+      .on(t.countryCode, sql`lower(${t.city})`)
+      .where(sql`closed_at is null`),
+    index("postings_live_region")
+      .on(t.countryCode, sql`lower(${t.region})`)
+      .where(sql`closed_at is null`),
   ],
 );
 
@@ -174,6 +186,29 @@ export const postingTags = sqliteTable(
   },
   (t) => [
     primaryKey({ columns: [t.postingId, t.dimension, t.value] }),
-    index("posting_tags_dimension_value").on(t.dimension, t.value),
+    index("posting_tags_dimension_value_posting").on(t.dimension, t.value, t.postingId),
   ],
+);
+
+/**
+ * The precomputed `/api/supply` rollup (issue #631). One row per `(role, country, region, workplace, ats)`
+ * over open apply-supported Postings, so the public count filters a small table instead of scanning
+ * `postings` and `posting_tags` on every request.
+ *
+ * `role` is the role or subrole tag value, or the `*` sentinel for the any-role total. A Posting with two
+ * role tags therefore appears under each tag and exactly once under `*`, so the unfiltered total never
+ * double counts it. `country_code` and `region` use `''` for SQL NULL because a SQLite primary key treats
+ * NULLs as distinct; `region` is lowercased to match `location-filter`'s `lower(region)` comparison.
+ */
+export const supplyFacets = sqliteTable(
+  "supply_facets",
+  {
+    role: text("role").notNull(),
+    countryCode: text("country_code").notNull(),
+    region: text("region").notNull(),
+    workplace: text("workplace").notNull(),
+    ats: text("ats", { enum: ATS_VALUES }).notNull(),
+    postings: integer("postings").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.role, t.countryCode, t.region, t.workplace, t.ats] })],
 );
