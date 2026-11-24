@@ -312,11 +312,22 @@ page at all.
 
 ```sh
 # what .github/workflows/deploy.yml runs, in order
-flyctl ssh console -a overture-web -C "tar -czf - -C /app dist-marketing" | tar -xzf -
+flyctl ssh console -q -a overture-web -C \
+  "printf '%s\n' OVERTURE-TAR-BEGIN; tar -czf - -C /app dist-marketing | base64; printf '%s\n' OVERTURE-TAR-END" \
+  > archive.txt
+awk '$0 == "OVERTURE-TAR-BEGIN" { inside = 1; started = 1; next }
+     $0 == "OVERTURE-TAR-END" { inside = 0; closed = 1; next }
+     inside { print }
+     END { if (!started || !closed) exit 3 }' archive.txt | base64 -d | tar -xzf -
 bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://overture-web.fly.dev
 cd workers/marketing && bunx wrangler deploy
 bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://tryoverture.com --attempts 5
 ```
+
+`flyctl ssh console` prints its own connection text (for example `Connecting to fdaa:…`) on stdout, and a raw gzip
+stream fed straight to `tar` would be corrupted by it. The step passes `-q` to silence the progress indicators and
+carries the archive base64-encoded between sentinel markers, so only payload lines reach `tar`: a stray notice is
+discarded, and a missing frame or corrupt payload fails the job instead of extracting a partial page.
 
 The sync fails the job when `/app/dist-marketing/index.html` is missing: shipping stale HTML is never the fallback.
 `scripts/verify-marketing-assets.ts` fetches every `/assets/*` the page references with `GET` (never `HEAD`: the Fly
@@ -334,7 +345,13 @@ workflow does.
 
 ```sh
 mkdir -p dist-marketing
-flyctl ssh console -a overture-web -C "tar -czf - -C /app dist-marketing" | tar -xzf -
+flyctl ssh console -q -a overture-web -C \
+  "printf '%s\n' OVERTURE-TAR-BEGIN; tar -czf - -C /app dist-marketing | base64; printf '%s\n' OVERTURE-TAR-END" \
+  > archive.txt
+awk '$0 == "OVERTURE-TAR-BEGIN" { inside = 1; started = 1; next }
+     $0 == "OVERTURE-TAR-END" { inside = 0; closed = 1; next }
+     inside { print }
+     END { if (!started || !closed) exit 3 }' archive.txt | base64 -d | tar -xzf -
 bun run scripts/verify-marketing-assets.ts --dir dist-marketing --base https://overture-web.fly.dev
 cd workers/marketing
 bunx wrangler deploy

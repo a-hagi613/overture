@@ -613,6 +613,32 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
       problems.push("deploy-workers does not extract dist-marketing from the overture-web machine");
     }
 
+    const sshLine = sync.split("\n").find((line) => line.includes("flyctl ssh console")) ?? "";
+
+    if (!/\s(?:-q|--quiet)\b/u.test(sshLine)) {
+      problems.push(
+        "deploy-workers runs flyctl ssh console without -q, so its connection text lands on stdout and corrupts the extracted archive",
+      );
+    }
+
+    if (!sync.includes("OVERTURE-TAR-BEGIN") || !sync.includes("OVERTURE-TAR-END")) {
+      problems.push(
+        "deploy-workers does not frame the synced archive between sentinel markers, so stray flyctl output can reach tar",
+      );
+    }
+
+    if (!sync.includes("base64 -d") || !sync.includes("tar -xzf -")) {
+      problems.push(
+        "deploy-workers does not decode the framed base64 archive into tar, so binary-safe extraction is gone",
+      );
+    }
+
+    if (/flyctl ssh console[^\n]*\|[^\n]*tar -xzf/u.test(sync)) {
+      problems.push(
+        "deploy-workers pipes flyctl stdout straight into tar, so any connection text corrupts the archive",
+      );
+    }
+
     if (!sync.includes("dist-marketing")) {
       problems.push("deploy-workers never writes dist-marketing while syncing from Fly");
     }

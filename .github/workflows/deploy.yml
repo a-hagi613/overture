@@ -219,12 +219,35 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf dist-marketing
-          # A hung SSH console must not hold the deploy-main concurrency group for six hours.
+          # flyctl prints its own connection text (for example "Connecting to fdaa:…") on stdout, which corrupts a raw
+          # gzip stream fed to tar. `-q` silences that progress, and the archive travels base64-encoded between
+          # sentinel markers so only the payload lines can ever reach `tar`: a stray notice is discarded, and a
+          # missing frame or corrupt payload fails the job instead of shipping half a page.
+          begin_marker=OVERTURE-TAR-BEGIN
+          end_marker=OVERTURE-TAR-END
+          archive="$(mktemp)"
           status=0
-          timeout 180s bash -c 'flyctl ssh console -a overture-web -C "tar -czf - -C /app dist-marketing"' \
-            | tar -xzf - || status=$?
+          # A hung SSH console must not hold the deploy-main concurrency group for six hours.
+          timeout 180s flyctl ssh console -q -a overture-web -C \
+            "printf '%s\n' '${begin_marker}'; tar -czf - -C /app dist-marketing | base64; printf '%s\n' '${end_marker}'" \
+            > "$archive" || status=$?
           if [ "$status" -ne 0 ]; then
             echo "::error::Could not extract /app/dist-marketing from overture-web (exit $status); the marketing Worker ships prerendered HTML, so refusing to deploy without it."
+            exit 1
+          fi
+          if [ ! -s "$archive" ]; then
+            echo "::error::flyctl returned nothing while extracting /app/dist-marketing; refusing to deploy HTML that cannot hydrate."
+            exit 1
+          fi
+          status=0
+          awk -v begin="$begin_marker" -v end="$end_marker" '
+            $0 == begin { inside = 1; started = 1; next }
+            $0 == end { inside = 0; closed = 1; next }
+            inside { print }
+            END { if (!started || !closed) exit 3 }
+          ' "$archive" | base64 -d | tar -xzf - || status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::error::The archive from overture-web was not a clean base64 tar stream (exit $status); refusing to deploy, because stray flyctl output must never reach tar."
             exit 1
           fi
           if [ ! -f dist-marketing/index.html ] || ! grep -q '<div id="root">' dist-marketing/index.html; then

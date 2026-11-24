@@ -638,6 +638,54 @@ test("a deploy workflow that skips the flyctl setup cannot extract the page and 
   ).toBe(true);
 });
 
+test("a deploy workflow that drops -q from flyctl ssh console is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    "flyctl ssh console -q -a overture-web",
+    "flyctl ssh console -a overture-web",
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) => problem.includes("without -q")),
+  ).toBe(true);
+});
+
+test("a deploy workflow that drops the sentinel framing around the archive is reported", () => {
+  const deploy = workersDeployWorkflow().replaceAll("OVERTURE-TAR-BEGIN", "unframed");
+  const problems = findWorkersDeployProblems({ deploy });
+
+  expect(problems.some((problem) => problem.includes("sentinel markers"))).toBe(true);
+
+  expect(
+    findWorkersDeployProblems({
+      deploy: workersDeployWorkflow().replaceAll("OVERTURE-TAR-END", "unframed"),
+    }).some((problem) => problem.includes("sentinel markers")),
+  ).toBe(true);
+});
+
+test("a deploy workflow that stops decoding the base64 archive is reported", () => {
+  const deploy = workersDeployWorkflow().replace("| base64 -d | tar -xzf -", "| tar -xzf -");
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) =>
+      problem.includes("binary-safe extraction"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy workflow that pipes flyctl straight into tar is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    '          archive="$(mktemp)"',
+    `          archive="$(mktemp)"
+          flyctl ssh console -q -a overture-web -C "tar -czf - -C /app dist-marketing" | tar -xzf -`,
+  );
+
+  expect(
+    findWorkersDeployProblems({ deploy }).some((problem) =>
+      problem.includes("pipes flyctl stdout straight into tar"),
+    ),
+  ).toBe(true);
+});
+
 test("a deploy workflow that syncs the page after the marketing deploy is reported", () => {
   const deploy = workersDeployWorkflow();
   const sync = workersStepBlock(deploy, MARKETING_SYNC_STEP);
