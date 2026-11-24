@@ -22,11 +22,13 @@ import {
   catalogRefreshHeaderRefusal,
   catalogSnapshotKey,
   createCatalogRefreshVerifier,
+  catalogSha256,
 } from "../catalog/stapply-refresh.ts";
 import { readBodyCapped } from "../platform/http-body.ts";
 import { logError, logInfo } from "../platform/log.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { Clock } from "../platform/ports/clock.ts";
+import { CLASSIFICATION_CACHE_KEY } from "../catalog/classification-cache.ts";
 
 /** The producer's signed "a new catalog is published" call (WS-3a, issue #568). */
 export const CATALOG_REFRESH_PATH = "/internal/catalog/refresh";
@@ -34,9 +36,13 @@ export const CATALOG_REFRESH_PATH = "/internal/catalog/refresh";
 /** The producer's fallback upload for a repository without R2 credentials (WS-3a relay path). */
 export const CATALOG_SNAPSHOT_PATH = "/internal/catalog/snapshot";
 
+/** The signed classification-cache relay (WS-17a), so a runner without R2 secrets still reads and writes the cache. */
+export const CLASSIFICATION_CACHE_PATH = "/internal/catalog/classification-cache";
+
 /** The largest compressed snapshot the relay accepts; the manifest is tiny. */
 export const CATALOG_REFRESH_MAX_BYTES = 8 * 1024;
 export const CATALOG_SNAPSHOT_MAX_BYTES = 512 * 1024 * 1024;
+export const CLASSIFICATION_CACHE_MAX_BYTES = 64 * 1024 * 1024;
 
 const REJECTION_STATUS: Readonly<Record<CatalogRefreshRejection, 401 | 409>> = {
   bad_signature: 401,
@@ -296,6 +302,71 @@ export function createInternalCatalogRoutes(deps: {
     } finally {
       await rm(temporary, { force: true });
     }
+  });
+
+  routes.get(CLASSIFICATION_CACHE_PATH, async (context) => {
+    const verdict: CatalogRefreshVerdict = verify({
+      body: "",
+      headers: {
+        [CATALOG_TIMESTAMP_HEADER]: context.req.header(CATALOG_TIMESTAMP_HEADER),
+        [CATALOG_SIGNATURE_HEADER]: context.req.header(CATALOG_SIGNATURE_HEADER),
+      },
+      nowMs: clock.now(),
+    });
+
+    if (!verdict.ok) {
+      return refuse(context, verdict.reason);
+    }
+
+    const bytes = await objects.get(CLASSIFICATION_CACHE_KEY);
+
+    if (bytes === null) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    return context.body(bytes, 200, { "content-type": "application/zstd" });
+  });
+
+  routes.put(CLASSIFICATION_CACHE_PATH, async (context) => {
+    const declaredLength = Number(context.req.header("content-length"));
+
+    if (Number.isFinite(declaredLength) && declaredLength > CLASSIFICATION_CACHE_MAX_BYTES) {
+      return context.json({ error: API_ERRORS.invalidRequest }, 413);
+    }
+
+    const body = await readBodyCapped(context.req.raw, CLASSIFICATION_CACHE_MAX_BYTES);
+
+    if (body === null) {
+      return context.json({ error: API_ERRORS.invalidRequest }, 413);
+    }
+
+    const verdict: CatalogRefreshVerdict = verify({
+      body: catalogSha256(body),
+      headers: {
+        [CATALOG_TIMESTAMP_HEADER]: context.req.header(CATALOG_TIMESTAMP_HEADER),
+        [CATALOG_SIGNATURE_HEADER]: context.req.header(CATALOG_SIGNATURE_HEADER),
+      },
+      nowMs: clock.now(),
+    });
+
+    if (!verdict.ok) {
+      return refuse(context, verdict.reason);
+    }
+
+    try {
+      await objects.put(CLASSIFICATION_CACHE_KEY, body);
+    } catch (error) {
+      logError("catalog.classification_cache", error);
+
+      return context.json({ error: API_ERRORS.internal }, 500);
+    }
+
+    logInfo(
+      "catalog.classification_cache.stored",
+      `stored the classification cache (${String(body.byteLength)} bytes)`,
+    );
+
+    return context.body(null, 204);
   });
 
   return routes;

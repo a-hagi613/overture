@@ -9,8 +9,16 @@ import type { DuckDBConnection, DuckDBValue } from "@duckdb/node-api";
 
 import { contentHash } from "./content-hash.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
+import {
+  normalizeExactTitle,
+  parseSkillRequirements,
+  parseStapplyLocations,
+  stapplyLocationKey,
+} from "./stapply-fields.ts";
 import { salaryPeriodForColumn } from "./tag-store.ts";
 import { tagPosting } from "./tag-rules.ts";
+import { taggingReportSchema } from "./tagging-report.ts";
+import type { TaggingReport } from "./tagging-report.ts";
 
 /**
  * The hard ceiling for the uncompressed `catalog.sqlite` (issue #630). The `overture-web` machine has a
@@ -56,7 +64,11 @@ export const STAPPLY_PROJECTED_COLUMNS = [
   "team",
   "location",
   "country_iso",
+  "region",
   "language",
+  "locations",
+  "job_category",
+  "skill_requirements",
   "is_remote",
   "workplace_type",
   "employment_type",
@@ -72,6 +84,29 @@ export const STAPPLY_PROJECTED_COLUMNS = [
   "salary_summary",
 ] as const;
 
+/**
+ * The ATSes whose own board is the source of truth. When the same opening appears on one of these and on a mirror or
+ * aggregator board, the native row wins even if the mirror is newer, so the canonical apply link and id survive.
+ */
+export const NATIVE_BOARD_PRIORITY: readonly Ats[] = [
+  "greenhouse",
+  "lever",
+  "ashby",
+  "smartrecruiters",
+  "workable",
+  "personio",
+];
+
+const nativeBoards = new Set<string>(NATIVE_BOARD_PRIORITY);
+
+/**
+ * @param ats A board's ATS.
+ * @returns 1 for a native primary board, 0 for a secondary or aggregator board.
+ */
+export function boardPriorityFor(ats: Ats) {
+  return nativeBoards.has(ats) ? 1 : 0;
+}
+
 const DAY_MS = 86_400_000;
 
 /**
@@ -84,6 +119,7 @@ export const catalogManifestSchema = z.object({
   builtAt: z.iso.datetime({ offset: true }),
   rowCount: z.number().int().nonnegative(),
   supportedCount: z.number().int().nonnegative(),
+  tagging: taggingReportSchema.optional(),
 });
 
 export type CatalogManifest = z.infer<typeof catalogManifestSchema>;
@@ -143,6 +179,7 @@ export function buildStapplyIngestQuery(input: StapplyIngestQueryInput) {
       `SELECT ${quote(board.ats)} AS source_key,`,
       `CAST(${board.applySupported ? 1 : 0} AS BOOLEAN) AS apply_supported,`,
       `CAST(${board.applySupported ? 1 : 0} AS INTEGER) AS apply_supported_rank,`,
+      `CAST(${boardPriorityFor(board.ats)} AS INTEGER) AS board_priority,`,
       BOARD_SELECT_COLUMNS,
       `FROM read_parquet(${quote(board.url)})`,
     ].join(" "),
@@ -165,32 +202,52 @@ export function buildStapplyIngestQuery(input: StapplyIngestQueryInput) {
     branches.join("\nUNION ALL\n"),
     "),",
     "normalized AS (",
-    "SELECT source_key, apply_supported, apply_supported_rank, global_id, ats_id, company,",
+    "SELECT source_key, apply_supported, apply_supported_rank, board_priority, global_id, ats_id, company,",
     "lower(trim(company)) AS company_norm,",
     "requisition_id, url, apply_url, title, department, team, location, country_iso, language,",
+    "region AS feed_region, locations, job_category, skill_requirements,",
     "is_remote, workplace_type, employment_type, commitment, experience,",
     "salary_min, salary_max, salary_currency, salary_period, salary_summary,",
     `${epochMsOf("posted_at")} AS posted_at_ms,`,
     `${epochMsOf("source_updated_at")} AS source_updated_at_ms,`,
-    `${epochMsOf("application_deadline")} AS application_deadline_ms`,
+    `${epochMsOf("application_deadline")} AS application_deadline_ms,`,
+    String.raw`regexp_replace(trim(lower(title)), '[^\p{L}\p{N}]+', ' ', 'g') AS exact_title_norm,`,
+    "coalesce(CASE WHEN json_valid(locations) THEN json_extract_string(locations, '$[0].label') END, location) AS primary_location_label,",
+    String.raw`lower(coalesce(country_iso, '')) || '|' || regexp_replace(trim(lower(coalesce(CASE WHEN json_valid(locations) THEN json_extract_string(locations, '$[0].label') END, location, ''))), '[^\p{L}\p{N}]+', ' ', 'g') AS location_key`,
     "FROM board_rows",
     "),",
     "filtered AS (",
     "SELECT * FROM normalized WHERE",
     filters.join("\nAND "),
     "),",
+    "windowed AS (",
+    "SELECT *, count(*) OVER (PARTITION BY company_norm, exact_title_norm, location_key, source_key) AS board_same_count",
+    "FROM filtered",
+    "),",
+    "grouped AS (",
+    "SELECT *, max(board_same_count) OVER (PARTITION BY company_norm, exact_title_norm, location_key) AS group_max_board_count,",
+    "sum(board_same_count) OVER (PARTITION BY company_norm, exact_title_norm, location_key) AS group_row_count",
+    "FROM windowed",
+    "),",
     "deduped AS (",
-    "SELECT * FROM filtered QUALIFY row_number() OVER (",
+    "SELECT * FROM grouped QUALIFY row_number() OVER (",
     "PARTITION BY company_norm,",
-    "coalesce(nullif(trim(requisition_id), ''), 'global:' || coalesce(global_id, '') || ':' || coalesce(ats_id, ''))",
-    "ORDER BY apply_supported_rank DESC, coalesce(source_updated_at_ms, posted_at_ms) DESC NULLS LAST, global_id",
+    "CASE",
+    "WHEN requisition_id IS NOT NULL AND length(trim(requisition_id)) > 0",
+    "AND lower(trim(requisition_id)) NOT IN ('null','n/a','na','none','tbd','-','0','unknown','not specified')",
+    "THEN 'req:' || lower(trim(requisition_id))",
+    "WHEN group_max_board_count = 1 AND group_row_count > 1 THEN 'title:' || exact_title_norm || '|' || location_key",
+    "ELSE 'keep:' || coalesce(global_id, '') || ':' || coalesce(ats_id, '')",
+    "END",
+    "ORDER BY board_priority DESC, apply_supported_rank DESC, coalesce(source_updated_at_ms, posted_at_ms) DESC NULLS LAST, global_id",
     ") = 1",
     "),",
     "unique_jobs AS (",
     "SELECT * FROM deduped QUALIFY row_number() OVER (PARTITION BY source_key, ats_id) = 1",
     ")",
     "SELECT source_key, apply_supported, global_id, ats_id, company, company_norm, requisition_id, url, apply_url,",
-    "title, department, team, location, country_iso, language, is_remote, workplace_type, employment_type,",
+    "title, department, team, location, country_iso, language, feed_region, locations, job_category,",
+    "skill_requirements, is_remote, workplace_type, employment_type,",
     "commitment, experience, posted_at_ms, source_updated_at_ms, application_deadline_ms,",
     "salary_min, salary_max, salary_currency, salary_period, salary_summary",
     "FROM unique_jobs",
@@ -215,6 +272,10 @@ const parquetRowSchema = z.object({
   location: z.string().nullable(),
   country_iso: z.string().nullable(),
   language: z.string().nullable(),
+  feed_region: z.string().nullable().default(null),
+  locations: z.string().nullable().default(null),
+  job_category: z.string().nullable().default(null),
+  skill_requirements: z.string().nullable().default(null),
   is_remote: z.boolean().nullable(),
   workplace_type: z.string().nullable(),
   employment_type: z.string().nullable(),
@@ -254,6 +315,10 @@ export interface StapplyIngestRow {
   readonly region: string | null;
   readonly city: string | null;
   readonly language: string | null;
+  readonly jobCategory: string | null;
+  readonly skillRequirements: readonly string[];
+  readonly exactTitleNorm: string;
+  readonly locationKey: string;
   readonly workplace: Workplace;
   readonly isRemote: boolean | null;
   readonly employmentType: string;
@@ -338,6 +403,10 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
   const row = parsed.data;
   const applyUrl = blankToNull(row.apply_url);
   const experience = experienceText(row.experience);
+  const [primaryLocation] = parseStapplyLocations(row.locations);
+  const locationRaw = blankToNull(row.location) ?? primaryLocation?.label ?? null;
+  const jobCategory = blankToNull(row.job_category);
+  const skillRequirements = parseSkillRequirements(row.skill_requirements);
 
   const salaryPeriod =
     row.salary_period === null
@@ -348,7 +417,7 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
     {
       title: row.title,
       department: blankToNull(row.department),
-      locationRaw: blankToNull(row.location),
+      locationRaw,
       workplaceType: blankToNull(row.workplace_type),
       isRemote: row.is_remote,
       employmentType: blankToNull(row.employment_type),
@@ -365,7 +434,16 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
   );
 
   const titleNorm = normalizeTitle(row.title);
+  const exactTitleNorm = normalizeExactTitle(row.title);
   const { countryCode, city } = tags;
+
+  const locationKey = stapplyLocationKey({
+    countryCode: countryCode ?? blankToNull(row.country_iso),
+    location: locationRaw,
+    locations: row.locations,
+  });
+
+  const region = tags.region ?? blankToNull(row.feed_region);
   const dedupeSuffix = `${titleNorm}|${countryCode ?? ""}|${city ?? ""}`;
 
   const rowContentHash = contentHashOf({
@@ -380,16 +458,18 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
     department: blankToNull(row.department),
     employmentType: tags.employmentType,
     experience,
+    jobCategory,
     language: tags.language,
-    locationRaw: blankToNull(row.location),
+    locationRaw,
     postedAt: row.posted_at_ms,
-    region: tags.region,
+    region,
     requisitionId: blankToNull(row.requisition_id),
     salaryCurrency: tags.salaryCurrency,
     salaryMaxMinor: tags.salaryMaxMinor,
     salaryMinMinor: tags.salaryMinMinor,
     salaryPeriod: tags.salaryPeriod,
     salarySummary: blankToNull(row.salary_summary),
+    skillRequirements,
     sourceUpdatedAt: row.source_updated_at_ms,
     team: blankToNull(row.team),
     title: row.title,
@@ -412,11 +492,15 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
     titleNorm,
     department: blankToNull(row.department),
     team: blankToNull(row.team),
-    locationRaw: blankToNull(row.location),
+    locationRaw,
     countryCode,
-    region: tags.region,
+    region,
     city,
     language: tags.language,
+    jobCategory,
+    skillRequirements,
+    exactTitleNorm,
+    locationKey,
     workplace: tags.workplace,
     isRemote: row.is_remote,
     employmentType: tags.employmentType,
@@ -452,6 +536,7 @@ interface ContentHashInput {
   readonly department: string | null;
   readonly employmentType: string;
   readonly experience: string | null;
+  readonly jobCategory: string | null;
   readonly language: string | null;
   readonly locationRaw: string | null;
   readonly postedAt: number | null;
@@ -462,6 +547,7 @@ interface ContentHashInput {
   readonly salaryMinMinor: number | null;
   readonly salaryPeriod: string | null;
   readonly salarySummary: string | null;
+  readonly skillRequirements: readonly string[];
   readonly sourceUpdatedAt: number | null;
   readonly team: string | null;
   readonly title: string;
@@ -492,6 +578,8 @@ export function contentHashOf(input: ContentHashInput) {
       input.region,
       input.city,
       input.language,
+      input.jobCategory,
+      input.skillRequirements,
       input.workplace,
       input.employmentType,
       input.commitment,
@@ -586,6 +674,7 @@ export function buildCatalogManifest(input: {
   readonly sqliteBytes: Uint8Array<ArrayBuffer>;
   readonly rowCount: number;
   readonly supportedCount: number;
+  readonly tagging?: TaggingReport;
 }) {
   return catalogManifestSchema.parse({
     version: input.version,
@@ -593,5 +682,6 @@ export function buildCatalogManifest(input: {
     builtAt: input.builtAt,
     rowCount: input.rowCount,
     supportedCount: input.supportedCount,
+    tagging: input.tagging,
   } satisfies CatalogManifest);
 }

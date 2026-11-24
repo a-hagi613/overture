@@ -452,6 +452,7 @@ export interface CatalogRelayInput {
  * @param input The origin, secret, artifacts and clock.
  * @returns Whether the endpoint accepted the snapshot.
  */
+
 export async function relayCatalogSnapshot(input: CatalogRelayInput) {
   const call: CatalogFetch = input.fetchImpl ?? fetch;
   const origin = input.origin.replace(/\/+$/u, "");
@@ -482,4 +483,102 @@ export async function relayCatalogSnapshot(input: CatalogRelayInput) {
   return input.fetchImpl === undefined
     ? notifyCatalogRefresh(notify)
     : notifyCatalogRefresh({ ...notify, fetchImpl: input.fetchImpl });
+}
+
+export interface ClassificationCacheRelayInput {
+  readonly origin: string;
+  readonly secret: string;
+  readonly nowMs: number;
+  readonly fetchImpl?: CatalogFetch;
+}
+
+/**
+ * Reads the classification cache through the signed relay. A 404 (Day 1) or a 501 is an empty cache, not an error, so
+ * the first daily run classifies cold instead of failing.
+ * @param input The origin, secret and clock.
+ * @returns The compressed cache bytes, or null when the cache does not exist yet.
+ */
+export async function fetchClassificationCacheRelay(input: ClassificationCacheRelayInput) {
+  const call: CatalogFetch = input.fetchImpl ?? fetch;
+  const origin = input.origin.replace(/\/+$/u, "");
+
+  const response = await call(`${origin}/internal/catalog/classification-cache`, {
+    method: "GET",
+    headers: catalogRefreshHeaders(input.secret, input.nowMs, ""),
+  });
+
+  if (isMissingEndpoint(response.status) || response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `GET /internal/catalog/classification-cache failed: HTTP ${String(response.status)}`,
+    );
+  }
+
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+export interface ClassificationCacheUploadInput extends ClassificationCacheRelayInput {
+  readonly compressedBytes: Uint8Array<ArrayBuffer>;
+}
+
+/**
+ * Writes the Tier-2 and Tier-3 classifications back through the signed relay, signing the compressed body's SHA-256
+ * exactly like the snapshot upload does.
+ * @param input The origin, secret, clock and compressed cache.
+ * @returns Whether the endpoint accepted the cache.
+ */
+export async function putClassificationCacheRelay(input: ClassificationCacheUploadInput) {
+  const call: CatalogFetch = input.fetchImpl ?? fetch;
+  const origin = input.origin.replace(/\/+$/u, "");
+
+  const response = await call(`${origin}/internal/catalog/classification-cache`, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/zstd",
+      ...catalogRefreshHeaders(input.secret, input.nowMs, catalogSha256(input.compressedBytes)),
+    },
+    body: input.compressedBytes,
+  });
+
+  if (isMissingEndpoint(response.status)) {
+    return { outcome: "endpoint_missing" } satisfies { outcome: RelayOutcome };
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `PUT /internal/catalog/classification-cache failed: HTTP ${String(response.status)}`,
+    );
+  }
+
+  return { outcome: "delivered" } satisfies { outcome: RelayOutcome };
+}
+
+/**
+ * Reads the cache straight from R2 when the runner has the repository's R2 secrets.
+ * @param objects The object store.
+ * @param key The cache object key.
+ * @returns The compressed bytes, or null.
+ */
+export async function readClassificationCacheObject(
+  objects: Pick<ObjectStore, "get">,
+  key: string,
+) {
+  return objects.get(key);
+}
+
+/**
+ * Writes the cache straight to R2.
+ * @param objects The object store.
+ * @param key The cache object key.
+ * @param bytes The compressed cache.
+ */
+export async function writeClassificationCacheObject(
+  objects: Pick<ObjectStore, "put">,
+  key: string,
+  bytes: Uint8Array<ArrayBuffer>,
+) {
+  await objects.put(key, bytes);
 }

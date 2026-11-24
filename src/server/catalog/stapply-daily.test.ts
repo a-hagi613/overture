@@ -55,6 +55,10 @@ const COLUMNS: readonly (readonly [string, string])[] = [
   ["salary_currency", "VARCHAR"],
   ["salary_period", "VARCHAR"],
   ["salary_summary", "VARCHAR"],
+  ["region", "VARCHAR"],
+  ["locations", "VARCHAR"],
+  ["job_category", "VARCHAR"],
+  ["skill_requirements", "VARCHAR"],
   ["description", "VARCHAR"],
   ["raw", "VARCHAR"],
 ];
@@ -189,6 +193,10 @@ describe("buildStapplyIngestQuery", () => {
 
     expect(STAPPLY_PROJECTED_COLUMNS).not.toContain("description");
     expect(STAPPLY_PROJECTED_COLUMNS).not.toContain("raw");
+    expect(STAPPLY_PROJECTED_COLUMNS).toContain("job_category");
+    expect(STAPPLY_PROJECTED_COLUMNS).toContain("region");
+    expect(STAPPLY_PROJECTED_COLUMNS).toContain("locations");
+    expect(STAPPLY_PROJECTED_COLUMNS).toContain("skill_requirements");
     expect(sql).not.toMatch(/\bdescription\b/u);
     expect(sql).not.toMatch(/\braw\b/u);
     expect(sql).not.toMatch(/read_parquet\('[^']*all\.parquet/iu);
@@ -353,6 +361,69 @@ describe("streamStapplyIngest", () => {
     ]);
 
     expect(rows.map((row) => row.atsJobId).toSorted()).toEqual(["a", "b", "c"]);
+  });
+
+  test("collapses a cross-board mirror without a requisition when the strict title and location match", async () => {
+    const directory = scratchDirectory();
+
+    const shared = {
+      company: "Northwind Systems",
+      requisition_id: null,
+      title: "Data Engineer",
+      location: "Berlin, DE",
+      country_iso: "DE",
+    };
+
+    await writeBoardParquet(directory, "varbi", [
+      fixtureRow({ ...shared, ats_id: "varbi-1", source_updated_at: "2026-11-22T00:00:00Z" }),
+    ]);
+    await writeBoardParquet(directory, "greenhouse", [
+      fixtureRow({ ...shared, ats_id: "gh-1", source_updated_at: "2026-11-18T00:00:00Z" }),
+    ]);
+
+    const { rows } = await readFixtureRows([
+      board("varbi", join(directory, "varbi", "jobs.parquet"), true),
+      board("greenhouse", join(directory, "greenhouse", "jobs.parquet"), true),
+    ]);
+
+    expect(rows.map((row) => row.atsJobId)).toEqual(["gh-1"]);
+  });
+
+  test("keeps distinct levels and seniority apart when the requisition is null", async () => {
+    const directory = scratchDirectory();
+
+    await writeBoardParquet(directory, "greenhouse", [
+      fixtureRow({ ats_id: "level-2", requisition_id: null, title: "Engineer II" }),
+      fixtureRow({ ats_id: "level-3", requisition_id: null, title: "Engineer III" }),
+      fixtureRow({ ats_id: "senior", requisition_id: null, title: "Senior Data Engineer" }),
+      fixtureRow({ ats_id: "plain", requisition_id: null, title: "Data Engineer" }),
+    ]);
+
+    const { rows } = await readFixtureRows([
+      board("greenhouse", join(directory, "greenhouse", "jobs.parquet"), true),
+    ]);
+
+    expect(rows.map((row) => row.atsJobId).toSorted()).toEqual([
+      "level-2",
+      "level-3",
+      "plain",
+      "senior",
+    ]);
+  });
+
+  test("treats a junk requisition as absent and still keeps different titles apart", async () => {
+    const directory = scratchDirectory();
+
+    await writeBoardParquet(directory, "greenhouse", [
+      fixtureRow({ ats_id: "data", requisition_id: "n/a", title: "Data Engineer" }),
+      fixtureRow({ ats_id: "marketing", requisition_id: "n/a", title: "Marketing Manager" }),
+    ]);
+
+    const { rows } = await readFixtureRows([
+      board("greenhouse", join(directory, "greenhouse", "jobs.parquet"), true),
+    ]);
+
+    expect(rows.map((row) => row.atsJobId).toSorted()).toEqual(["data", "marketing"]);
   });
 });
 
