@@ -1,5 +1,5 @@
 import { mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { z } from "zod";
 
@@ -94,6 +94,10 @@ export interface CatalogHotSwapOptions {
 export type CatalogHotSwap = ReturnType<typeof createCatalogHotSwap>;
 
 const DEFAULT_DRAIN_DELAY_MS = 250;
+
+function isInsideCatalogDirectory(directory: string, path: string) {
+  return resolve(path).startsWith(`${resolve(directory)}${sep}`);
+}
 
 function openVerified(path: string, version: string) {
   const { db, sqlite } = openReadOnlyCatalogDatabase(path);
@@ -352,7 +356,7 @@ export function createCatalogHotSwap(options: CatalogHotSwapOptions) {
   async function adoptExistingFile() {
     const pointer = await readPointer();
 
-    if (pointer !== null) {
+    if (pointer !== null && isInsideCatalogDirectory(directory, pointer.file)) {
       try {
         const opened = openVerified(pointer.file, pointer.version);
 

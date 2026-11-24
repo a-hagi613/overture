@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { sql } from "drizzle-orm";
 
-import { CatalogRefreshError, createCatalogHotSwap } from "./hot-swap.ts";
+import { CatalogRefreshError, catalogPointerPath, createCatalogHotSwap } from "./hot-swap.ts";
 import type { CatalogApplyResult, CatalogRefreshErrorReason } from "./hot-swap.ts";
 import {
   CATALOG_LATEST_KEY,
@@ -288,6 +289,36 @@ describe("the read-only catalog hot-swap", () => {
         reason: "stale_version",
         activeVersion: "2026-11-22",
       });
+    } finally {
+      hotSwap.close();
+    }
+  });
+
+  test("a pointer outside the catalog directory is ignored", async () => {
+    const { catalogPath, directory } = scratch();
+    const objects = createDiskObjectStore(join(directory, "objects"));
+    const outside = buildCatalog(join(directory, "outside.sqlite"), "Outside");
+    const manifest = manifestFor("2026-11-22", outside);
+
+    await publish(objects, manifest, outside);
+    await writeFile(
+      catalogPointerPath(catalogPath),
+      JSON.stringify({
+        version: "2026-11-22",
+        file: join(directory, "..", "outside.sqlite"),
+        sha256: manifest.sha256,
+        appliedAt: NOW,
+      }),
+    );
+
+    const hotSwap = createCatalogHotSwap({ catalogPath, objects });
+
+    try {
+      await hotSwap.coldBoot();
+
+      expect(hotSwap.activeVersion()).toBe("2026-11-22");
+      expect(companyNames(hotSwap.db)).toEqual(["Outside"]);
+      expect(hotSwap.activePath()).toBe(join(directory, "catalog.2026-11-22.sqlite"));
     } finally {
       hotSwap.close();
     }
