@@ -8,6 +8,27 @@ import { expect, test } from "./admin.fixture.ts";
 export const widths = [390, 768, 1280, 1440, 1920, 2560] as const;
 export const themes = ["light", "dark"] as const;
 
+/**
+ * The shell widths the app actually ships, in px, and the Tailwind utilities they come from:
+ * `md:w-18` on the board rail and `w-64` / `2xl:w-72` on the sidebar (`src/web/app.tsx`,
+ * `src/web/components/board-rail.tsx`). Every step is Tailwind's 4px spacing scale, so a resized
+ * shell changes these three numbers and nothing else in this guard.
+ */
+export const shellWidths = {
+  /** `md:w-18` — 4.5rem, the icon rail under `xl`. */
+  rail: 72,
+  /** `w-64` — 16rem, the sidebar from `xl`. */
+  sidebar: 256,
+  /** `2xl:w-72` — 18rem, the sidebar from `2xl`. */
+  sidebarWide: 288,
+} as const;
+
+/** The Tailwind breakpoints the shell switches its sidebar at: `xl` (sidebar) and `2xl` (wide sidebar). */
+export const shellBreakpoints = {
+  sidebar: 1280,
+  sidebarWide: 1536,
+} as const;
+
 export type Theme = (typeof themes)[number];
 
 export type Storage = "app" | "admin" | "anonymous";
@@ -241,12 +262,12 @@ async function expectSidebarFixed(page: Page, path: string, width: number) {
   expect(metrics.top, `${path} aside top after scroll`).toBe(0);
   expect(["fixed", "sticky"], `${path} aside position`).toContain(metrics.position);
 
-  if (width < 1280) {
-    expect(metrics.width, `${path} rail width`).toBe(76);
-  } else if (width >= 1700) {
-    expect(metrics.width, `${path} sidebar width`).toBe(296);
+  if (width < shellBreakpoints.sidebar) {
+    expect(metrics.width, `${path} rail width`).toBe(shellWidths.rail);
+  } else if (width < shellBreakpoints.sidebarWide) {
+    expect(metrics.width, `${path} sidebar width`).toBe(shellWidths.sidebar);
   } else {
-    expect(metrics.width, `${path} sidebar width`).toBe(268);
+    expect(metrics.width, `${path} sidebar width`).toBe(shellWidths.sidebarWide);
   }
 
   if (metrics.bottomLinkBottom !== null) {

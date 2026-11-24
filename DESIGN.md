@@ -228,7 +228,7 @@ A 4px base. Every gap, padding and margin is a multiple of 4 (a few 2 and 6px op
 | Side padding | 20 · 32 from `sm` · 48 from `lg` |
 | App main padding | 16 sides / 20 top / 28 bottom at 390 · 28 / 28 from 768 · 56 from 1700 |
 | App content max | 1440 |
-| Sidebar / rail | 268 · 296 from 1700 · rail 76 |
+| Sidebar / rail | 256 · 288 from `2xl` · rail 72 |
 | Board lane | five lanes, min 264 each, share the width (`repeat(5, minmax(264px, 1fr))`) |
 | Sheet | 468 · 520 from 1700; the Board detail sheet is 500 · 540 |
 | Phone sheet | 82dvh, bottom sheet with a 44×5 grab handle |
@@ -239,16 +239,16 @@ works and the band. The band is the only full-bleed colour change. Texture booke
 closing band plus footer as one block. Everything between sits on solid paper.
 
 Media queries are on the viewport: 480 (hide Sign in), 700 (nav row, tray labels), 767/768 (app phone
-layout, rail), 1099/1100 (KPI), 1279/1280 (sidebar), 1700 (large screens).
+layout, rail), 1099/1100 (KPI), 1279/1280 (sidebar), 1536 (wide sidebar), 1700 (large screens).
 
 | Width | What happens |
 |---|---|
 | 390 | Phone. Landing one column, hero stacked, nav on a second row. App: sidebar hidden, slim top header (title, Search, Notifications, Profile) and a bottom tab bar (Home, Ready, Review, Applications, Inbox). Home: one column. Applications: lane tabs, card stack, bottom sheet |
-| 768 | Landing stacks the hero. App: 76px icon rail replaces the sidebar; board columns scroll in their own box |
+| 768 | Landing stacks the hero. App: 72px icon rail replaces the sidebar; board columns scroll in their own box |
 | 1024 | Hero two columns again. App: icon rail; Home cards two across |
-| 1280 | Full 268px sidebar returns. Landing and app on the desktop layout at 1200 max |
+| 1280 | Full 256px sidebar returns. Landing and app on the desktop layout at 1200 max |
 | 1440 | Reference width. Container 1200 (padding 48). Sheet 468 over the board |
-| 1920 | From 1700: container 1440, sidebar 296, main padding 56, content max 1440, sheet 520 |
+| 1920 | From 2xl (1536): sidebar 288. From 1700: container 1440, main padding 56, content max 1440, sheet 520 |
 
 ## 5. Shape and depth
 
@@ -441,7 +441,7 @@ the tab bar) — the active nav marker is one of the four sanctioned orange uses
 primary destinations (Home, Ready, Review, Applications, Inbox), then Notifications, Support and the
 Profile menu (Resume & Cover Letter, Saved answers, Job Preferences, Billing, Account), then the theme
 toggle and the usage card. Under 1280, or when collapsed on desktop (remembered per browser), the sidebar
-becomes a 76px icon rail; under 768 a slim top header carries the page title plus Search, Notifications and
+becomes a 72px icon rail; under 768 a slim top header carries the page title plus Search, Notifications and
 Profile, and a 64px tab bar carries the same five primary destinations. Profile opens the `/profile` hub
 on the phone. There is no Settings destination: account and billing are Profile pages (ADR 0037).
 
