@@ -1,4 +1,11 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -12,6 +19,8 @@ import { createR2ObjectStore } from "../src/server/platform/ports/r2-object-stor
 import { openCatalogDatabase } from "../src/server/platform/db/client.ts";
 import { migrateCatalogDatabase } from "../src/server/platform/db/migrate.ts";
 import {
+  CATALOG_SIZE_BUDGET_BYTES,
+  assertCatalogSizeWithinBudget,
   buildCatalogManifest,
   buildStapplyIngestQuery,
   isRowDrop,
@@ -29,6 +38,12 @@ import {
   tagSourceSummary,
   unresolvedRoleCount,
 } from "../src/server/catalog/stapply-delta.ts";
+import {
+  rebuildPostingLocations,
+  rebuildPostingsFts,
+  seedGeoPlaces,
+} from "../src/server/catalog/geo-store.ts";
+import { salaryUsdUpdateSql } from "../src/server/catalog/salary-usd.ts";
 import {
   STAPPLY_LLM_BATCH_SIZE,
   STAPPLY_LLM_MAX_ROWS,
@@ -213,6 +228,12 @@ async function main() {
     `${seed ? "seed" : "delta"} run against ${String(previous?.manifest.rowCount ?? 0)} existing rows`,
   );
 
+  const geo = seedGeoPlaces(catalog.db);
+
+  progress(
+    `geo_places: ${String(geo.places)} places (${String(geo.cities)} cities) from dataset ${geo.datasetVersion}`,
+  );
+
   const freshnessCutoffMs = seed && freshnessDays > 0 ? seedFreshnessCutoffMs(now) : null;
 
   createStapplyStaging(catalog.db);
@@ -308,6 +329,17 @@ async function main() {
   const unresolved = unresolvedRoleCount(catalog.db);
   const tagSources = tagSourceSummary(catalog.db);
 
+  const salaryUpdate = salaryUsdUpdateSql();
+
+  if (salaryUpdate !== null) {
+    catalog.db.$client.run(salaryUpdate);
+  }
+
+  const locationRows = rebuildPostingLocations(catalog.db);
+  const ftsRows = rebuildPostingsFts(catalog.db);
+
+  progress(`derived: ${String(locationRows)} posting_locations rows, ${String(ftsRows)} FTS rows`);
+
   dropStapplyStaging(catalog.db);
 
   catalog.db.$client.run("PRAGMA optimize");
@@ -321,6 +353,7 @@ async function main() {
     `integrity ${integrity}; compressing ${String(rowCount)} rows at zstd level ${String(zstdLevel)}`,
   );
 
+  const sqliteBytesWithinBudget = assertCatalogSizeWithinBudget(statSync(catalogPath).size);
   const sqliteBytes = new Uint8Array(readFileSync(catalogPath));
   const compressedBytes = compressCatalogSnapshot(sqliteBytes, zstdLevel);
 
@@ -363,9 +396,12 @@ async function main() {
     freshnessDays: freshnessCutoffMs === null ? null : freshnessDays,
     sqlite: {
       path: catalogPath,
-      bytes: sqliteBytes.byteLength,
+      bytes: sqliteBytesWithinBudget,
       zstdBytes: compressedBytes.byteLength,
+      budgetBytes: CATALOG_SIZE_BUDGET_BYTES,
     },
+    geo,
+    derived: { ftsRows, postingLocations: locationRows },
     manifest: { ...manifest, zstdBytes: compressedBytes.byteLength },
     previousRows: previous?.manifest.rowCount ?? null,
     rows: {

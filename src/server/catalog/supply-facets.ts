@@ -5,7 +5,7 @@ import type { CatalogDatabase } from "../platform/db/client.ts";
 import type { SupplyFilters } from "../../shared/supply.ts";
 
 import { supplyFacets } from "../platform/db/catalog-schema.ts";
-import { resolveLocation } from "./geo.ts";
+import { resolveLocationQuery } from "./geo.ts";
 
 /**
  * The `role` value of a facet row that counts every open apply-supported Posting once, regardless of its
@@ -80,42 +80,68 @@ export function hasSupplyFacets(db: CatalogDatabase) {
   }
 }
 
-function facetLocation(raw: string | null) {
-  if (raw === null) {
+function facetLocation(raw: string | null, radiusKm: number | null) {
+  if (raw === null || radiusKm !== null) {
     return null;
   }
 
-  const resolved = resolveLocation(raw);
+  const groups = resolveLocationQuery(raw);
 
-  if (resolved.countryCode === null || resolved.city !== null) {
+  if (groups.length !== 1) {
     return null;
   }
 
-  if (resolved.region === null) {
-    return { countryCode: resolved.countryCode, regions: null };
+  const [group] = groups;
+
+  if (group === undefined || group.remote) {
+    return null;
   }
 
-  const region = resolved.region.toLowerCase();
-  const legacyRegion = resolved.regionCode?.split(".")[1]?.toLowerCase();
+  if (group.kind === "country") {
+    if (group.countryCodes.length !== 1) {
+      return null;
+    }
 
-  return {
-    countryCode: resolved.countryCode,
-    regions:
-      legacyRegion === undefined || legacyRegion === region ? [region] : [region, legacyRegion],
-  };
+    const [countryCode] = group.countryCodes;
+
+    return countryCode === undefined ? null : { countryCode, regions: null };
+  }
+
+  if (group.kind !== "region" || group.regionName === null) {
+    return null;
+  }
+
+  const [countryCode] = group.countryCodes;
+
+  if (countryCode === undefined) {
+    return null;
+  }
+
+  const region = group.regionName.toLowerCase();
+
+  const legacy = group.legacyRegionCode?.split(".")[1]?.toLowerCase();
+
+  const iso = group.regionIsoCode?.toLowerCase();
+
+  const regions = [region, legacy, iso].filter(
+    (candidate): candidate is string => candidate !== undefined && candidate !== "",
+  );
+
+  return { countryCode, regions: [...new Set(regions)] };
 }
 
 /**
  * Answers `/api/supply` from the precomputed rollup when the filters are a combination it groups by:
- * role (or the any-role total), country/region and remote. City and raw-text places return null so the
- * caller falls back to the indexed live query (issue #631).
+ * role (or the any-role total), one country or region, and remote. A city, metro, remote-scoped or
+ * multi-place query, or any radius, returns null so the caller falls back to the indexed live query and
+ * its R-Tree (issue #630, #631).
  * @param db The catalog database.
  * @param filters The validated public filters.
  * @returns The totals, or null when the rollup cannot answer or has not been built.
  */
 export function supplyFacetTotals(db: CatalogDatabase, filters: SupplyFilters) {
   const location: FacetLocation | null =
-    filters.location === null ? null : facetLocation(filters.location);
+    filters.location === null ? null : facetLocation(filters.location, filters.radiusKm);
 
   if (filters.location !== null && location === null) {
     return null;

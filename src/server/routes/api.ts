@@ -9,7 +9,7 @@ import type { Auth } from "../auth/index.ts";
 import { readSession } from "../auth/session.ts";
 import { consumeRateLimit } from "../platform/rate-limit.ts";
 import { createSseStream } from "../platform/sse/stream.ts";
-import { searchPostings } from "../platform/search/search.ts";
+import { postedWithinMs, searchPostings } from "../platform/search/search.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
@@ -20,7 +20,17 @@ export const searchQuerySchema = z.object({
   seniority: z.enum(SENIORITIES).optional(),
   workplace: z.enum(WORKPLACES).optional(),
   location: z.string().min(1).max(120).optional(),
+  /** The radius around a resolved city; absent keeps an exact city match. */
+  radius: z.enum(["25", "40", "80"]).optional(),
   employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
+  language: z
+    .string()
+    .trim()
+    .regex(/^[a-z]{2}$/u)
+    .optional(),
+  salaryMin: z.coerce.number().int().nonnegative().max(100_000_000).optional(),
+  salaryMax: z.coerce.number().int().nonnegative().max(100_000_000).optional(),
+  postedWithin: z.enum(["24h", "7d", "30d"]).optional(),
 });
 
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
@@ -31,22 +41,43 @@ const SEARCH_RATE_LIMIT = { windowMs: 60_000, max: 60 } as const;
  * Runs one catalog search and shapes the JSON body the web client and test routes share.
  * @param catalogDb The catalog database the postings live in.
  * @param query The validated search query.
+ * @param nowMs The clock reading the posted-age filter uses.
  * @returns The hits the client renders and how long the search took.
  */
-export function searchResponse(catalogDb: CatalogDatabase, query: SearchQuery) {
-  const { q, limit, role, seniority, workplace, location, employmentType } = query;
+export function searchResponse(catalogDb: CatalogDatabase, query: SearchQuery, nowMs: number) {
+  const {
+    q,
+    limit,
+    role,
+    seniority,
+    workplace,
+    location,
+    radius,
+    employmentType,
+    language,
+    salaryMin,
+    salaryMax,
+    postedWithin: postedWithinValue,
+  } = query;
+
   const startedAt = performance.now();
 
   const hits = searchPostings(catalogDb, {
     text: q,
     openOnly: true,
     limit,
+    nowMs,
     filters: {
       role: role ?? null,
       seniority: seniority ?? null,
       workplace: workplace ?? null,
       location: location ?? null,
+      radiusKm: radius === undefined ? null : Number(radius),
       employmentType: employmentType ?? null,
+      language: language ?? null,
+      salaryMinUsd: salaryMin ?? null,
+      salaryMaxUsd: salaryMax ?? null,
+      postedWithinMs: postedWithinMs(postedWithinValue ?? null),
     },
   });
 
@@ -94,7 +125,7 @@ export function createApiRoutes(
       return context.json({ error: API_ERRORS.rateLimited }, 429);
     }
 
-    return context.json(searchResponse(catalogDb, context.req.valid("query")));
+    return context.json(searchResponse(catalogDb, context.req.valid("query"), clock.now()));
   });
 
   routes.get("/events", async (context) => {

@@ -13,8 +13,10 @@ import { LANDING_COPY } from "./landing-copy.ts";
  * @param props The current filter values and the callbacks that change them.
  * @param props.locationDraft The place text the input shows before it is debounced.
  * @param props.onLocationChange Called with the place text on every keystroke.
+ * @param props.onRadiusChange Called with the chosen radius, or null for an exact city.
  * @param props.onRemoteChange Called with the remote switch's next value.
  * @param props.onRoleChange Called with the chosen role group, or an empty string for all roles.
+ * @param props.radius The chosen radius in kilometres, or null for an exact city.
  * @param props.remote Whether the remote-only switch is on.
  * @param props.role The chosen role group, or null for all roles.
  * @returns The filter row inside the supply preview card.
@@ -22,15 +24,19 @@ import { LANDING_COPY } from "./landing-copy.ts";
 export function LandingSupplyFilters({
   locationDraft,
   onLocationChange,
+  onRadiusChange,
   onRemoteChange,
   onRoleChange,
+  radius,
   remote,
   role,
 }: {
   locationDraft: string;
   onLocationChange: (value: string) => void;
+  onRadiusChange: (value: string | null) => void;
   onRemoteChange: (value: boolean) => void;
   onRoleChange: (value: string) => void;
+  radius: string | null;
   remote: boolean;
   role: RoleGroup | null;
 }) {
@@ -78,6 +84,34 @@ export function LandingSupplyFilters({
             placeholder={LANDING_COPY.supply.locationPlaceholder}
             type="search"
             value={locationDraft}
+          />
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <label className={`${dsEyebrow} block`} htmlFor="supply-radius">
+          {LANDING_COPY.supply.radiusLabel}
+        </label>
+        <div className="relative mt-2">
+          <select
+            className="h-12 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3.5 pr-10 text-sm font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+            id="supply-radius"
+            onChange={(event) => {
+              const { value } = event.currentTarget;
+
+              onRadiusChange(value === "" ? null : value);
+            }}
+            value={radius ?? ""}
+          >
+            <option value="">{LANDING_COPY.supply.radiusExact}</option>
+            <option value="25">{LANDING_COPY.supply.radius25}</option>
+            <option value="40">{LANDING_COPY.supply.radiusNear}</option>
+            <option value="80">{LANDING_COPY.supply.radius80}</option>
+          </select>
+          <ChevronDown
+            aria-hidden="true"
+            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            size={16}
           />
         </div>
       </div>
