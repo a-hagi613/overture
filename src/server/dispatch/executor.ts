@@ -67,6 +67,17 @@ import { runCareerplugAttempt } from "./ats/careerplug.ts";
 import { runJazzhrAttempt } from "./ats/jazzhr.ts";
 import type { HostedRun } from "./ats/hosted.ts";
 import { LOGIN_WALL_REASON } from "../pipeline/login-wall.ts";
+import type { BrowserFormHooks, BrowserFormPlan } from "./ats/browser-form.ts";
+import type { BatchFourAts } from "../../shared/ats.ts";
+import { isBatchFourAts } from "../../shared/ats.ts";
+import { runHiringthingAttempt } from "./ats/hiringthing.ts";
+import { runRipplingAttempt } from "./ats/rippling.ts";
+import { runGemAttempt } from "./ats/gem.ts";
+import { runIsolvedHireAttempt } from "./ats/isolved-hire.ts";
+import { runApplicantProAttempt } from "./ats/applicantpro.ts";
+import { runCatsoneAttempt } from "./ats/catsone.ts";
+import { runOnlyfyAttempt } from "./ats/onlyfy.ts";
+import { runVarbiAttempt } from "./ats/varbi.ts";
 import {
   CODE_WAIT_TIMEOUT_MS,
   createCodeWait,
@@ -134,6 +145,20 @@ type AttemptRun =
   | PersonioRun
   | BrowserFormRun
   | HostedRun;
+
+const BATCH_4_RUNNERS: Record<
+  BatchFourAts,
+  (page: Page, plan: BrowserFormPlan, hooks: BrowserFormHooks) => Promise<BrowserFormRun>
+> = {
+  applicantpro: runApplicantProAttempt,
+  catsone: runCatsoneAttempt,
+  gem: runGemAttempt,
+  hiringthing: runHiringthingAttempt,
+  isolved_hire: runIsolvedHireAttempt,
+  onlyfy: runOnlyfyAttempt,
+  rippling: runRipplingAttempt,
+  varbi: runVarbiAttempt,
+};
 
 const zeroUsage: BrowserUsage = { browserMs: 0, costMicros: 0, proxyBytes: 0 };
 
@@ -921,6 +946,10 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         if (plan.ats === "jazzhr") {
           return runJazzhrAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (isBatchFourAts(plan.ats)) {
+          return BATCH_4_RUNNERS[plan.ats](page, planForRun, attemptHooks);
         }
 
         return runAshbyAttempt(page, planForRun, attemptHooks);
