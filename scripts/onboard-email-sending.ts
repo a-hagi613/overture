@@ -22,6 +22,8 @@ function flagValue(name: string) {
 
 const dryRun = args.includes("--dry-run");
 const checkOnly = args.includes("--check");
+const notifyOnly = args.includes("--notify");
+const allDomains = args.includes("--all");
 const zoneArgument = flagValue("--zone");
 const domainArgument = flagValue("--domain");
 
@@ -202,6 +204,18 @@ async function onboard(config: EmailSendingConfig) {
   return readiness.ready ? 0 : 1;
 }
 
+async function runOne(domain: string) {
+  const config: EmailSendingConfig = {
+    accountId: env.CLOUDFLARE_ACCOUNT_ID ?? null,
+    zoneId: zoneArgument ?? env.CLOUDFLARE_ZONE_ID ?? null,
+    apiToken: env.CLOUDFLARE_EMAIL_API_TOKEN ?? "",
+    baseUrl: env.CLOUDFLARE_EMAIL_API_BASE_URL,
+    domain,
+  };
+
+  return checkOnly ? await check(config) : await onboard(config);
+}
+
 async function main() {
   if (env.CLOUDFLARE_EMAIL_API_TOKEN === undefined) {
     fail("set CLOUDFLARE_EMAIL_API_TOKEN in the environment before onboarding the sending domain.");
@@ -210,15 +224,12 @@ async function main() {
     return;
   }
 
-  const config: EmailSendingConfig = {
-    accountId: env.CLOUDFLARE_ACCOUNT_ID ?? null,
-    zoneId: zoneArgument ?? env.CLOUDFLARE_ZONE_ID ?? null,
-    apiToken: env.CLOUDFLARE_EMAIL_API_TOKEN,
-    baseUrl: env.CLOUDFLARE_EMAIL_API_BASE_URL,
-    domain: domainArgument ?? env.MAIL_DOMAIN,
-  };
+  const selected = domainArgument ?? (notifyOnly ? env.NOTIFY_MAIL_DOMAIN : env.MAIL_DOMAIN);
+  const domains = [...new Set(allDomains ? [env.MAIL_DOMAIN, env.NOTIFY_MAIL_DOMAIN] : [selected])];
 
-  process.exitCode = checkOnly ? await check(config) : await onboard(config);
+  const statuses = await Promise.all(domains.map(async (domain) => await runOne(domain)));
+
+  process.exitCode = statuses.find((status) => status !== 0) ?? 0;
 }
 
 await main();

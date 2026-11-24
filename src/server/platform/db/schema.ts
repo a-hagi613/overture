@@ -408,6 +408,11 @@ export const profiles = sqliteTable("profiles", {
   pendingTimezoneAt: timestamp("pending_timezone_at"),
   consentVersion: text("consent_version").notNull().default("1"),
   consentAt: timestamp("consent_at"),
+  /**
+   * When true, new applications use the person's sign-in email instead of their assigned apply
+   * alias, so verification codes arrive in their own mailbox and are pasted by hand (issue #566).
+   */
+  usePersonalEmail: integer("use_personal_email", { mode: "boolean" }).notNull().default(false),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
 });
@@ -482,6 +487,11 @@ export const mailboxes = sqliteTable("mailboxes", {
   id: text("id").primaryKey(),
   userId: cascadeUserId().unique(),
   localPart: text("local_part").notNull().unique(),
+  /**
+   * The full apply address given to employers, e.g. `alex.chen.4k@tryoverture.com` (issue #566). It
+   * is stored complete so changing `ALIAS_EMAIL_DOMAIN` never rewrites an assigned alias.
+   */
+  applyAddress: text("apply_address").unique(),
   status: text("status", { enum: ["active", "receive_only", "closed"] })
     .notNull()
     .default("active"),

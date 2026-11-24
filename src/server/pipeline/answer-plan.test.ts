@@ -5,7 +5,7 @@ import type { FactRecord } from "../profile/facts.ts";
 import { emptyTargets } from "../../shared/targets.ts";
 
 import type { QuestionFieldType } from "../../shared/questions.ts";
-import { indexFacts, resolveQuestion } from "./answer-plan.ts";
+import { indexFacts, resolveQuestion, withEmailAddress } from "./answer-plan.ts";
 import { parseSalaryExpectation } from "./answer-value.ts";
 
 const posting = {
@@ -112,5 +112,37 @@ describe("a salary Fact kept once per currency", () => {
     expect(resolve("Expected annual salary (GBP)", ranged, "number")).toMatchObject({
       kind: "blocked",
     });
+  });
+});
+
+describe("the apply alias on a new application", () => {
+  test("answers every email question from the alias instead of the stored fact", () => {
+    const stored = indexFacts([fact("email", "maya@example.com")]);
+    const facts = withEmailAddress(stored, "maya.okafor.4k@tryoverture.com");
+
+    expect(
+      resolveQuestion({
+        answerKind: "fact",
+        factKey: "email",
+        facts,
+        fieldType: "email",
+        hasCoverLetter: false,
+        hasResume: true,
+        options: [],
+        posting,
+        questionText: "Email",
+        required: true,
+        targets: emptyTargets,
+      }),
+    ).toMatchObject({ kind: "answer", value: "maya.okafor.4k@tryoverture.com" });
+  });
+
+  test("leaves the stored fact and its revision in place", () => {
+    const stored = indexFacts([fact("email", "maya@example.com")]);
+    const facts = withEmailAddress(stored, "maya.okafor.4k@tryoverture.com");
+
+    expect(stored.unscoped.get("email")).toBe("maya@example.com");
+    expect(facts.revisions).toEqual(stored.revisions);
+    expect(facts.details.get("email")).toMatchObject({ confirmed: true });
   });
 });

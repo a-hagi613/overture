@@ -1258,7 +1258,7 @@ export const copy = {
     titlePlain: "Employer ",
     addressNeverType: "Never type this address on an application form.",
     addressNeverTypeDetail:
-      "Forms get your real email address, so employers reply to you directly.",
+      "Forms get your assigned apply address, or your personal email if you chose that in Profile.",
     addressTitleItalic: "address.",
     addressTitlePlain: "Forwarding ",
     addressWhatHeading: "What it",
@@ -1347,6 +1347,25 @@ export const copy = {
     providerNote: "Linking works when both sign-ins share the same verified email.",
     jobSearchAddress: "Job-search address",
     addressDetail: "Created with your mailbox in a later milestone. Read-only then.",
+    applyEmailHeading: "Job-search email",
+    applyEmailLead:
+      "Applications use the apply address Overture assigned you, so replies and verification codes reach your Inbox.",
+    applyEmailAliasLabel: "Apply address",
+    applyEmailAliasNote: "Assigned by Overture. Read-only, and never your sign-in email.",
+    applyEmailNotAssigned: "Assigned when inbound mail is switched on.",
+    applyEmailToggle: "Use my personal email instead",
+    applyEmailToggleDetail: (email: string) =>
+      `New applications will put ${email} on the form. Verification codes then arrive in your own inbox and you paste them by hand.`,
+    applyEmailUsingAlias: (address: string) =>
+      `New applications put ${address} on the form, and codes are captured for you.`,
+    applyEmailUsingPersonal: (email: string) =>
+      `New applications put ${email} on the form, and you paste each verification code.`,
+    applyEmailLoading: "Reading your apply address…",
+    applyEmailLoadFailed: "We could not read your apply address. Try again.",
+    applyEmailRetry: "Try again",
+    applyEmailSavedAlias: "Switched back to your apply address.",
+    applyEmailSavedPersonal: "Switched to your personal email.",
+    applyEmailSaveError: "We could not save that change. Try again.",
     magicLinkTitle: "Magic link",
     magicLinkDetail: "Always available. We email a one-time link, good for 15 minutes.",
     exportRow: "Export your data",

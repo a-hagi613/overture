@@ -52,7 +52,7 @@ export const TOPIC_QUERY_KEYS: Record<LiveTopic, readonly (readonly string[])[]>
     ["onboarding-mailbox"],
   ],
   notification: [["home"], ["nav"], ["notifications"], ["code-waits"], ["billing"]],
-  "profile.updated": [["home"], ["nav"], ["profile-facts"]],
+  "profile.updated": [["home"], ["nav"], ["profile-facts"], ["apply-email"], ["ready"]],
   "review.created": [["home"], ["nav"], ["reviews"], ["ready"], ["board"]],
   "review.needed": [["home"], ["nav"], ["reviews"], ["ready"], ["board"]],
   "review.resolved": [["home"], ["nav"], ["reviews"], ["ready"], ["board"], ["profile-facts"]],

@@ -152,7 +152,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | Master key | envelope encryption | `MASTER_KEY_V1..V<n>` (each 32 bytes base64) and `MASTER_KEY_CURRENT=n`; the chain is contiguous and rotation re-wraps every user key (ADR 0039, `docs/DEPLOY.md`) | fixed test key |
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET` (single secret) or `BETTER_AUTH_SECRETS` (`"2:<new>,1:<old>"`, current first) for non-destructive rotation, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
-| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `CATALOG_DATABASE_PATH=/data/catalog.sqlite` (defaults to `catalog.sqlite` beside the application file), `MAIL_FROM`, `SUPPORT_EMAIL`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `LAB_BASE_URL` (defaults to `APP_ORIGIN`), `ALERT_NTFY_URL` (optional) | |
+| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com` (forwarding addresses), `ALIAS_EMAIL_DOMAIN` (apply aliases; defaults to `MAIL_DOMAIN`), `NOTIFY_MAIL_DOMAIN=notify.tryoverture.com` (outbound transactional mail), `OWNER_EMAIL`, `DATABASE_PATH=/data/app.sqlite`, `CATALOG_DATABASE_PATH=/data/catalog.sqlite` (defaults to `catalog.sqlite` beside the application file), `MAIL_FROM`, `SUPPORT_EMAIL`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `LAB_BASE_URL` (defaults to `APP_ORIGIN`), `ALERT_NTFY_URL` (optional) | |
 
 Inbound mail is buffered on the `overture-inbound-mail` Queue (100 retries, 14-day retention) and its dead-letter queue
 `overture-inbound-mail-dlq`; spilled messages live in the separate R2 bucket `overture-inbound-mail-spill` under
@@ -621,19 +621,42 @@ answers snapshot records the derivation key next to the value.
 - A replacement becomes current for new applications only; snapshots keep the old file.
 - `current_employer` prefilled from the most recent role in `employment_history` → `skip_companies`.
 
-### 7.3 Forwarding address (ADR 0028)
+### 7.3 Apply alias and forwarding address (ADR 0028, ADR 0040)
 
-- Each user gets `in-{id}-{mac}@tryoverture.com` when their account is created: `id` is the mailbox id, `mac` a
+- Every account gets one readable apply address, `<handle>@ALIAS_EMAIL_DOMAIN` (default: `MAIL_DOMAIN`, i.e.
+  `tryoverture.com`), when the account is created. `handle` is `first.last` from the display name, or the sign-in
+  email's local part when the name has no usable words, with a short suffix (`alex.chen.4k`) when someone already has
+  that handle. The full address is stored in `mailboxes.apply_address`, so pointing `ALIAS_EMAIL_DOMAIN` at a stealth
+  domain changes only new assignments: an existing alias keeps exactly the address it was given, with no migration,
+  rewrite or backfill.
+- The reserved system local parts (`support`, `hello`, `security`, `privacy`, `admin`, `no-reply`, `noreply`,
+  `postmaster`, `abuse`, `billing`, `help`, `info`, `legal`, `notify`, `alerts`, `jobs`, `careers`, `apply`,
+  `webmaster`, `hostmaster`, `root`, `mailer-daemon`) are never a handle and never its first dot-label, so a person's
+  alias cannot shadow an Overture system address. Handles are unique across domains: the migration's index compares
+  the local part, so a domain change can never give the same handle to a second person.
+- New applications answer every "email" question with the alias while `profiles.use_personal_email` is false, the
+  default. The stored Tier 1 `email` fact remains the person's own, editable address. Profile → Account has the switch
+  **"Use my personal email instead"**: new applications then put the sign-in email on the form, and because that code
+  goes to the person's own inbox Overture cannot read it, so the paste ask comes at once (§11.1, WS-6a).
+  Applications already approved or sent keep the address and snapshot they went out with.
+- Existing accounts get their alias lazily, with no rewrite in the migration: `GET /api/profile/apply-email`,
+  `GET /api/profile/mailbox` and `scripts/backfill-mailboxes.ts` assign one where it is missing. Profile → Account
+  shows the address read-only.
+- The alias is retired with the mailbox. The migration's delete trigger records its local part in
+  `retired_addresses`, and a trigger refuses to assign it again, exactly like the forwarding address's local part.
+  The apex catch-all in the inbound Email Worker (issue #561) accepts any address on `ALIAS_EMAIL_DOMAIN`, forwards an
+  employer's reply from `notify@notify.tryoverture.com`, and the app resolves the full stored alias to its mailbox.
+- Each user also keeps the forwarding address `in-{id}-{mac}@MAIL_DOMAIN`: `id` is the mailbox id, `mac` a
   truncated HMAC of it under `INBOUND_HMAC_SECRET`, so the Email Worker drops forged or unknown addresses without a
-  lookup, and `overture-web` also refuses an address outside `MAIL_DOMAIN`. A mailbox deleted for any reason is
-  recorded in `retired_addresses` by a trigger, and a retired local part is never assigned again.
+  lookup, and `overture-web` also refuses a forwarding address outside `MAIL_DOMAIN`. A mailbox deleted for any reason
+  is recorded in `retired_addresses` by a trigger, and a retired local part is never assigned again.
 - The user adds one filter in their own mailbox forwarding only mail from the ATS sender domains
-  (`src/shared/ats-mail-domains.ts`) to this address. In M1 the owner creates it by hand; every M2 user gets an address when their account is created, and the onboarding
+  (`src/shared/ats-mail-domains.ts`) to this forwarding address. In M1 the owner creates it by hand; every M2 user gets an address when their account is created, and the onboarding
   step guides the filter for Gmail and Outlook (as drawn on the canvas), shows when the first forwarded mail arrives (the page polls `GET /api/profile/mailbox`), and
-  can be skipped (skipping never blocks Start; after Start the user lands on Notifications, which holds the drawn install-to-home-screen and push opt-in, as no separate post-Start board exists; only the Gmail guide is drawn): without the filter a verification code is asked for as a paste within its 10-minute wait. The address is never typed on an application form. The first ATS message that arrives sets
+  can be skipped (skipping never blocks Start; after Start the user lands on Notifications, which holds the drawn install-to-home-screen and push opt-in, as no separate post-Start board exists; only the Gmail guide is drawn): without the filter a verification code is asked for as a paste within its 10-minute wait. The forwarding address is never typed on an application form. The first ATS message that arrives sets
   `mailboxes.first_forwarded_at` once; `GET /api/profile/mailbox` returns the address with `forwardingWorks` and
   `firstForwardedAt`, so onboarding and the Profile card can show "forwarding works" without a second lookup.
-- On account deletion the local part moves to `retired_addresses` and is never reused. After cancel,
+- On account deletion the local parts move to `retired_addresses` and are never reused. After cancel,
   `status='receive_only'`, `receive_until = now + 12 months`; after that `closed`, and mail to it is discarded at
   ingest.
 
@@ -1270,21 +1293,25 @@ stopping before Submit. The developer machine never drives a browser against a r
 
 ### 11.2 Outbound
 
-**Replies to employers are not built in M2.** Under real email (ADR 0028) a reply from Overture would come from an address the
-employer never saw, and a user's direct replies belong in their own mailbox. The Inbox is read-only: threads, messages and
-attachments of forwarded ATS mail. The reply composer, `limits.reply_per_day`, the 10 MB reply attachment limit, the
-suppression list and delivery-event webhooks of the old design are not built; a later decision reopens them.
+**Replies to employers are not built in M2.** The apply alias (§7.3, ADR 0040) is the address employers reply to, and
+the apex catch-all Worker (issue #561) delivers that mail into the Inbox, but composing and sending a reply from
+Overture is not built: a user's direct replies from their personal email belong in their own mailbox. The Inbox is
+read-only: threads, messages and attachments of captured mail. The reply composer, `limits.reply_per_day`, the 10 MB
+reply attachment limit, the suppression list and delivery-event webhooks of the old design are not built; a later
+decision reopens them.
 
 Overture's own mail (magic links, verification, the code-wait fallback, the daily recap email, receipts) leaves `no-reply@tryoverture.com` through
 Cloudflare Email Sending (ADR 0028, `docs/research/cloudflare-email-sending.md`); SES and Resend are no longer used.
 The inbound Worker sends its forwarding copies from `notify@notify.tryoverture.com` through the same service.
-Sending to anyone but the owner needs Workers Paid ($5 a month) and `tryoverture.com` and `notify.tryoverture.com`
-onboarded as sending domains. The idempotent operator script `scripts/onboard-email-sending.ts` does the onboarding
-and checks the bounce MX, SPF, DKIM and DMARC records; `--dry-run` calls nothing that writes and `--check` is the
-read-only form. A deploy guard runs `--check` before deploying and a live-check guard (`mail.sending`) runs it daily;
-both are gated by `REQUIRE_EMAIL_SENDING`, so they warn while the switch is off and refuse the deploy or alert the
-owner once the owner turns it on. The live mail check then sends to the reserved non-owner
-`live-check@tryoverture.com`. The switch is one command once the plan is paid (docs/DEPLOY.md, M2-02).
+`NOTIFY_MAIL_DOMAIN` (`notify.tryoverture.com`) names that isolated outbound sending domain; the high-priority code
+fallback that uses it lands with WS-6a (issue #565). Sending to anyone but the owner needs Workers Paid ($5 a month)
+and `tryoverture.com` and `notify.tryoverture.com` onboarded as sending domains. The idempotent operator script
+`scripts/onboard-email-sending.ts` does the onboarding and checks the bounce MX, SPF, DKIM and DMARC records;
+`--dry-run` calls nothing that writes, `--check` is the read-only form, `--notify` selects `NOTIFY_MAIL_DOMAIN` and
+`--all` does the apex and the notify domain. A deploy guard runs `--check` before deploying and a live-check guard
+(`mail.sending`) runs it daily; both are gated by `REQUIRE_EMAIL_SENDING`, so they warn while the switch is off and
+refuse the deploy or alert the owner once the owner turns it on. The live mail check then sends to the reserved
+non-owner `live-check@tryoverture.com`. The switch is one command once the plan is paid (docs/DEPLOY.md, M2-02).
 
 ### 11.3 Classification
 
@@ -1724,6 +1751,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/platform/outbound-interception.test.ts` | a fetch or node `https` request to an unmocked non-loopback host rejects with `UnhandledRequestError`, while a mocked host still answers, so the test interceptor fails closed |
 | `src/server/platform/ports/replica-listing.test.ts` | the newest replica transaction is read from the first non-empty Litestream level (#281) |
 | `src/server/platform/telemetry/otel.test.ts` | `http.url` loses its query string and fragment, metrics export every 60 s, span and log batches carry the 2048/512/5 s bounds, and no metric instrument attaches `http.url`, `job.id`, `sse.user_id` or `admin.target_user_id` (#580) |
+| `src/server/profile/apply-email.test.ts` | the personal-email preference defaults to the assigned apply alias, saves with a `profile.updated` announcement, and a read-only check provisions no mailbox (#566) |
 | `src/server/profile/facts.test.ts` | a Fact's scope is validated against its key |
 | `src/server/profile/onboarding-step.test.ts` | the onboarding step's salary and EEO reading |
 | `src/server/profile/pdf.test.ts` | only the `%PDF-` header in the first kilobyte is accepted, so a spoofed MIME type cannot pass HTML as a resume |
@@ -1734,6 +1762,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/profile/time-zone.test.ts` | an empty timezone change takes no write (#430) |
 | `src/server/profile/v1-import.test.ts` | the v1 answer-bank and learned-answer mapping |
 | `src/server/routes/ready.test.ts` | a corrupt or non-list `changes` value degrades to an empty card list rather than a 500 |
+| `src/shared/apply-alias.test.ts` | an apply handle is the first and last name in lowercase ASCII, never a reserved system local part or its first dot-label, and a new plan uses the alias or the sign-in email rather than the editable email Fact (#566) |
 | `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |
 | `src/shared/dossier.test.ts` | the file is sent as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key, and a "did not happen" line appears only when the stored data proves it |
 | `src/shared/host-match.test.ts` | a host matches only its own domain or a real subdomain of it, after trimming, lower-casing and dropping a trailing root dot, so `evilgreenhouse.io` never matches `greenhouse.io` |

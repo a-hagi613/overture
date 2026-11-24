@@ -204,6 +204,41 @@ fly ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.t
 It prints the plan state (`Workers Paid` when Cloudflare's Email Sending API answers), the domain state and each
 record, then exits 0 only when every record verifies.
 
+### Apply aliases and the notify sending domain (issue #566)
+
+Two optional settings name the mail domains; neither is a secret and both default safely:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `ALIAS_EMAIL_DOMAIN` | `MAIL_DOMAIN` (`tryoverture.com`) | the domain of every person's readable apply alias (`alex.chen.4k@tryoverture.com`) |
+| `NOTIFY_MAIL_DOMAIN` | `notify.tryoverture.com` | the isolated outbound sending domain for transactional mail |
+
+The full alias is stored on `mailboxes.apply_address`, so moving to a stealth apex later is one env change (set it on
+the app, with `fly secrets set` or under `[env]` in `fly.toml`):
+
+```sh
+fly secrets set ALIAS_EMAIL_DOMAIN=tryoverture.com -a overture-web
+```
+
+Only new assignments use the new domain; aliases already handed out keep the address employers were given. The
+apex catch-all in the inbound Email Worker (issue #561) answers on the alias domain and forwards employer replies from
+`notify@notify.tryoverture.com`; each user's forwarding address still works beside it. When the alias domain changes,
+keep the old domain's catch-all in place while any alias is stored on it, because the app resolves an alias by its
+full stored address.
+
+Onboard the notify sending domain once Workers Paid is active:
+
+```sh
+fly ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --notify --dry-run"
+fly ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --all"
+```
+
+`--all` onboards and verifies both `MAIL_DOMAIN` and `NOTIFY_MAIL_DOMAIN`; `--check --all` is the read-only form. The
+Ops Live `onboard-email` action runs both, and its record check reports both. The deploy guard still checks only
+`MAIL_DOMAIN`, so merging this does not block a deploy before the notify domain is onboarded. If `CLOUDFLARE_ZONE_ID`
+is unset the script walks up from `notify.tryoverture.com` to the `tryoverture.com` zone, which needs **Zone: Read**
+on the token.
+
 ### 3. Turn the guards on
 
 The deploy guard is gated so it never blocks anything before the owner turns it on. Once the script prints

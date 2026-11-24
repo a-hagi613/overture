@@ -260,6 +260,16 @@ const envSchema = z
       .min(1)
       .regex(/^[a-z0-9.-]+$/u)
       .default("tryoverture.com"),
+    ALIAS_EMAIL_DOMAIN: z
+      .string()
+      .min(1)
+      .regex(/^[a-z0-9.-]+$/u)
+      .optional(),
+    NOTIFY_MAIL_DOMAIN: z
+      .string()
+      .min(1)
+      .regex(/^[a-z0-9.-]+$/u)
+      .default("notify.tryoverture.com"),
     CLOUDFLARE_EMAIL_API_TOKEN: z.string().min(1).optional(),
     CLOUDFLARE_ACCOUNT_ID: z.string().min(1).optional(),
     CLOUDFLARE_ZONE_ID: z.string().min(1).optional(),
@@ -493,6 +503,8 @@ export const authSecretConfig: AuthSecretConfig = parseBetterAuthSecrets(env);
 export const masterKeyring: MasterKeyring = parseMasterKeyring(process.env, env.MASTER_KEY_CURRENT);
 
 export const databasePath = env.DATABASE_PATH ?? env.DATABASE_URL;
+
+export const aliasEmailDomain = (env.ALIAS_EMAIL_DOMAIN ?? env.MAIL_DOMAIN).trim().toLowerCase();
 
 /**
  * Where `catalog.sqlite` lives (ADR 0036). It sits beside the application database unless `CATALOG_DATABASE_PATH`
