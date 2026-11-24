@@ -112,7 +112,7 @@ export function SettingsForwardingCard() {
               className={dsEyebrow}
             >{`${copy.inbox.addressFilterHeading} ${copy.inbox.addressFilterItalic}`}</p>
             <SegmentedControl
-              ariaLabel="Email provider"
+              ariaLabel="Email service"
               onValueChange={(value) => {
                 if (value === "gmail" || value === "outlook") {
                   setProvider(value);
