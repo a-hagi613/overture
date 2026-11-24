@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
@@ -249,5 +249,182 @@ describe("the snapshot migration", () => {
     ).toEqual({ postingId: "posting-gone" });
 
     sqlite.close();
+  });
+});
+
+interface Migration {
+  tag: string;
+  sql: string;
+}
+
+const INITIAL_SCHEMA = [
+  "CREATE TABLE parent (id text primary key);",
+  "CREATE TABLE child (id text primary key, parent_id text references parent(id));",
+].join("--> statement-breakpoint");
+
+const ADDITIVE_MIGRATION = [
+  "CREATE TABLE fk_probe (foreign_keys integer);",
+  "INSERT INTO fk_probe SELECT foreign_keys FROM pragma_foreign_keys;",
+  "ALTER TABLE child ADD COLUMN note text;",
+  "CREATE INDEX child_note ON child (note);",
+].join("--> statement-breakpoint");
+
+const REBUILD_MIGRATION = [
+  "CREATE TABLE fk_probe (foreign_keys integer);",
+  "INSERT INTO fk_probe SELECT foreign_keys FROM pragma_foreign_keys;",
+  "CREATE TABLE __new_child (id text primary key, parent_id text references parent(id), note text);",
+  "INSERT INTO __new_child (id, parent_id, note) SELECT id, parent_id, null FROM child;",
+  "DROP TABLE child;",
+  "ALTER TABLE __new_child RENAME TO child;",
+].join("--> statement-breakpoint");
+
+function migrationFolder(prefix: string, migrations: readonly Migration[]) {
+  const directory = mkdtempSync(join(tmpdir(), prefix));
+  scratchDirectories.push(directory);
+
+  mkdirSync(join(directory, "meta"), { recursive: true });
+
+  writeFileSync(
+    join(directory, "meta", "_journal.json"),
+    JSON.stringify(
+      {
+        dialect: "sqlite",
+        entries: migrations.map((migration, index) => ({
+          breakpoints: true,
+          idx: index,
+          tag: migration.tag,
+          version: "6",
+          when: NOW + index,
+        })),
+        version: "7",
+      },
+      null,
+      2,
+    ),
+  );
+
+  for (const migration of migrations) {
+    writeFileSync(join(directory, `${migration.tag}.sql`), migration.sql);
+  }
+
+  return directory;
+}
+
+function foreignKeysOf(sqlite: ReturnType<typeof openDatabase>["sqlite"]) {
+  return z.object({ foreign_keys: z.number() }).parse(sqlite.query("PRAGMA foreign_keys").get())
+    .foreign_keys;
+}
+
+function probeReading(sqlite: ReturnType<typeof openDatabase>["sqlite"]) {
+  return z
+    .object({ foreign_keys: z.number() })
+    .parse(sqlite.query("select foreign_keys from fk_probe").get()).foreign_keys;
+}
+
+function seedOrphanChild(sqlite: ReturnType<typeof openDatabase>["sqlite"]) {
+  sqlite.run("PRAGMA foreign_keys = OFF");
+  sqlite.run("insert into child (id, parent_id) values ('orphan', 'missing-parent')");
+  sqlite.run("PRAGMA foreign_keys = ON");
+}
+
+describe("migration foreign key handling", () => {
+  test("an additive migration keeps foreign keys on and skips the full-table check", () => {
+    const { db, sqlite } = openDatabase(":memory:");
+
+    try {
+      migrateDatabase(
+        db,
+        migrationFolder("additive-migration-", [{ sql: INITIAL_SCHEMA, tag: "0000_initial" }]),
+      );
+
+      seedOrphanChild(sqlite);
+
+      migrateDatabase(
+        db,
+        migrationFolder("additive-migration-", [
+          { sql: INITIAL_SCHEMA, tag: "0000_initial" },
+          { sql: ADDITIVE_MIGRATION, tag: "0001_additive" },
+        ]),
+      );
+
+      expect(probeReading(sqlite)).toBe(1);
+      expect(foreignKeysOf(sqlite)).toBe(1);
+      expect(sqlite.query("select count(*) as total from child").get()).toEqual({ total: 1 });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("a table rebuild turns foreign keys off and turns them back on", () => {
+    const { db, sqlite } = openDatabase(":memory:");
+
+    try {
+      migrateDatabase(
+        db,
+        migrationFolder("rebuild-migration-", [{ sql: INITIAL_SCHEMA, tag: "0000_initial" }]),
+      );
+
+      migrateDatabase(
+        db,
+        migrationFolder("rebuild-migration-", [
+          { sql: INITIAL_SCHEMA, tag: "0000_initial" },
+          { sql: REBUILD_MIGRATION, tag: "0001_rebuild" },
+        ]),
+      );
+
+      expect(probeReading(sqlite)).toBe(0);
+      expect(foreignKeysOf(sqlite)).toBe(1);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("a rebuild still refuses to leave a foreign key violation behind", () => {
+    const { db, sqlite } = openDatabase(":memory:");
+
+    try {
+      migrateDatabase(
+        db,
+        migrationFolder("violation-migration-", [{ sql: INITIAL_SCHEMA, tag: "0000_initial" }]),
+      );
+
+      seedOrphanChild(sqlite);
+
+      expect(() => {
+        migrateDatabase(
+          db,
+          migrationFolder("violation-migration-", [
+            { sql: INITIAL_SCHEMA, tag: "0000_initial" },
+            { sql: REBUILD_MIGRATION, tag: "0001_rebuild" },
+          ]),
+        );
+      }).toThrow(/foreign key violations/u);
+
+      expect(foreignKeysOf(sqlite)).toBe(1);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("a database with nothing pending is never scanned", () => {
+    const { db, sqlite } = openDatabase(":memory:");
+
+    try {
+      const folder = migrationFolder("idle-migration-", [
+        { sql: INITIAL_SCHEMA, tag: "0000_initial" },
+        { sql: REBUILD_MIGRATION, tag: "0001_rebuild" },
+      ]);
+
+      migrateDatabase(db, folder);
+
+      seedOrphanChild(sqlite);
+
+      expect(() => {
+        migrateDatabase(db, folder);
+      }).not.toThrow();
+      expect(foreignKeysOf(sqlite)).toBe(1);
+    } finally {
+      sqlite.close();
+    }
   });
 });
