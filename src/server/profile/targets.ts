@@ -9,6 +9,8 @@ import { targets } from "../platform/db/schema.ts";
 import { postings, postingTags } from "../platform/db/catalog-schema.ts";
 import { normalizeTitle } from "../catalog/normalize.ts";
 import { resolveLocation } from "../catalog/geo.ts";
+import { resolvedLocationCondition } from "../catalog/location-filter.ts";
+import { catalogRevision } from "../catalog/revision.ts";
 import { emptyTargets, targetsInputSchema } from "../../shared/targets.ts";
 
 const roleTagSchema = z.object({ value: z.string() });
@@ -76,42 +78,27 @@ function sortedUnique<T extends string>(values: readonly T[]) {
 
 function locationFilter(raw: string) {
   const resolved = resolveLocation(raw);
+  const condition = resolvedLocationCondition(raw);
 
   if (resolved.countryCode === null) {
-    const needle = raw.toLowerCase();
-
-    return {
-      key: `raw:${needle}`,
-      condition: sql`lower(coalesce(${postings.locationRaw}, '')) like ${`%${needle}%`}`,
-    } satisfies LocationFilter;
+    return { condition, key: `raw:${raw.toLowerCase()}` } satisfies LocationFilter;
   }
 
   if (resolved.city !== null) {
-    const city = resolved.city.toLowerCase();
-
     return {
-      key: `city:${resolved.countryCode}:${city}`,
-      condition: sql`${postings.countryCode} = ${resolved.countryCode} and lower(${postings.city}) = ${city}`,
+      condition,
+      key: `city:${resolved.countryCode}:${resolved.city.toLowerCase()}`,
     } satisfies LocationFilter;
   }
 
   if (resolved.region !== null) {
-    const region = resolved.region.toLowerCase();
-    const legacyRegion = resolved.regionCode?.split(".")[1]?.toLowerCase();
-
     return {
-      key: `region:${resolved.countryCode}:${region}`,
-      condition:
-        legacyRegion === undefined
-          ? sql`${postings.countryCode} = ${resolved.countryCode} and lower(${postings.region}) = ${region}`
-          : sql`${postings.countryCode} = ${resolved.countryCode} and (lower(${postings.region}) = ${region} or lower(${postings.region}) = ${legacyRegion})`,
+      condition,
+      key: `region:${resolved.countryCode}:${resolved.region.toLowerCase()}`,
     } satisfies LocationFilter;
   }
 
-  return {
-    key: `country:${resolved.countryCode}`,
-    condition: sql`${postings.countryCode} = ${resolved.countryCode}`,
-  } satisfies LocationFilter;
+  return { condition, key: `country:${resolved.countryCode}` } satisfies LocationFilter;
 }
 
 function normalizeFilters(
@@ -153,24 +140,6 @@ function cacheKeyOf(filters: MatchFilters) {
     filters.salaryCurrency,
     filters.languages,
   ]);
-}
-
-function catalogRevision(db: CatalogDatabase) {
-  const client = db.$client;
-
-  const dataVersion = client
-    .query<{ data_version: number }, []>("PRAGMA data_version")
-    .get()?.data_version;
-
-  const totalChanges = client
-    .query<{ total: number }, []>("SELECT total_changes() AS total")
-    .get()?.total;
-
-  if (dataVersion === undefined || totalChanges === undefined) {
-    return null;
-  }
-
-  return `${String(dataVersion)}:${String(totalChanges)}`;
 }
 
 function salaryCondition(floorMinor: number | null, currency: string | null) {
