@@ -39,6 +39,7 @@ import { stageForStatus } from "../pipeline/stage.ts";
 import { ProviderUnavailableError, browserModeForAttempt } from "./browser/provider.ts";
 import { applySendProxyTrim } from "./browser/proxy-trim.ts";
 import { recordApplicationVariableCosts } from "./application-cost.ts";
+import { defaultMetrics } from "../platform/telemetry/metrics.ts";
 import { runAshbyAttempt } from "./ats/ashby.ts";
 import type { AshbyRun } from "./ats/ashby.ts";
 import { runGreenhouseAttempt } from "./ats/greenhouse.ts";
@@ -67,8 +68,8 @@ import { runJazzhrAttempt } from "./ats/jazzhr.ts";
 import type { HostedRun } from "./ats/hosted.ts";
 import { LOGIN_WALL_REASON } from "../pipeline/login-wall.ts";
 import type { BrowserFormHooks, BrowserFormPlan, BrowserFormRun } from "./ats/browser-form.ts";
-import type { BatchFourAts } from "../../shared/ats.ts";
-import { isBatchFourAts } from "../../shared/ats.ts";
+import type { BatchFourAts, WaveTwoAts } from "../../shared/ats.ts";
+import { isBatchFourAts, isWaveTwoAts } from "../../shared/ats.ts";
 import { runHiringthingAttempt } from "./ats/hiringthing.ts";
 import { runRipplingAttempt } from "./ats/rippling.ts";
 import { runGemAttempt } from "./ats/gem.ts";
@@ -77,6 +78,8 @@ import { runApplicantProAttempt } from "./ats/applicantpro.ts";
 import { runCatsoneAttempt } from "./ats/catsone.ts";
 import { runOnlyfyAttempt } from "./ats/onlyfy.ts";
 import { runVarbiAttempt } from "./ats/varbi.ts";
+import { runHerpAttempt } from "./ats/herp.ts";
+import { runJobviteAttempt } from "./ats/jobvite.ts";
 import {
   CODE_WAIT_TIMEOUT_MS,
   createCodeWait,
@@ -158,6 +161,14 @@ const BATCH_4_RUNNERS: Record<
   onlyfy: runOnlyfyAttempt,
   rippling: runRipplingAttempt,
   varbi: runVarbiAttempt,
+};
+
+const WAVE_2_RUNNERS: Record<
+  WaveTwoAts,
+  (page: Page, plan: BrowserFormPlan, hooks: BrowserFormHooks) => Promise<BrowserFormRun>
+> = {
+  herp: runHerpAttempt,
+  jobvite: runJobviteAttempt,
 };
 
 const zeroUsage: BrowserUsage = { browserMs: 0, costMicros: 0, proxyBytes: 0 };
@@ -704,6 +715,10 @@ export function createDispatcher(deps: DispatcherDeps) {
 
     const { attemptId } = claimed;
 
+    const attemptStartedAt = performance.now();
+    let attemptAts = "unknown";
+    let attemptMode = "unknown";
+
     activeAttempts.add(attemptId);
 
     let browser: RemoteBrowser | null = null;
@@ -759,6 +774,8 @@ export function createDispatcher(deps: DispatcherDeps) {
 
       const { plan } = approved;
 
+      attemptAts = plan.ats;
+
       let resumeBytes: Uint8Array<ArrayBuffer> | null = null;
 
       if (plan.resume !== null) {
@@ -785,10 +802,14 @@ export function createDispatcher(deps: DispatcherDeps) {
         throw new Error("shutting down before the browser opened");
       }
 
+      const mode = browserModeForAttempt(provider.id, previousOutcome(applicationId, attemptId));
+
+      attemptMode = mode;
+
       browser = await provider.open({
         attemptId,
         country: proxyCountry,
-        mode: browserModeForAttempt(provider.id, previousOutcome(applicationId, attemptId)),
+        mode,
         profileId: await provider.ensureProfile(plan.userId, proxyCountry),
         timeoutMinutes: SESSION_TIMEOUT_MINUTES,
       });
@@ -978,6 +999,10 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         if (isBatchFourAts(plan.ats)) {
           return BATCH_4_RUNNERS[plan.ats](page, planForRun, attemptHooks);
+        }
+
+        if (isWaveTwoAts(plan.ats)) {
+          return WAVE_2_RUNNERS[plan.ats](page, planForRun, attemptHooks);
         }
 
         return runAshbyAttempt(page, planForRun, attemptHooks);
@@ -1248,6 +1273,15 @@ export function createDispatcher(deps: DispatcherDeps) {
       } catch (error) {
         logError("dispatch.cost", error);
       }
+
+      const finalOutcome = finished?.outcome ?? outcome;
+
+      defaultMetrics().recordApplyAttempt({
+        ats: attemptAts,
+        durationMs: performance.now() - attemptStartedAt,
+        mode: attemptMode,
+        outcome: finalOutcome,
+      });
     }
 
     return true;

@@ -22,7 +22,7 @@ const filters = [
 ] as const;
 
 const chipClass =
-  "inline-flex min-h-8 items-center rounded-full border px-3.5 text-xs font-semibold";
+  "inline-flex min-h-11 items-center rounded-full border px-3.5 text-xs font-semibold md:min-h-8";
 
 function statusNote(entry: { invitedAt: number | null; status: "pending" | "invited" | "joined" }) {
   if (entry.status === "joined") {
@@ -120,14 +120,7 @@ export function WaitlistPage() {
   }, [request]);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          void refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   if (data === null) {
@@ -295,7 +288,7 @@ export function WaitlistPage() {
                   {canInvite ? (
                     <button
                       aria-busy={busy}
-                      className="inline-flex min-h-9 items-center justify-center rounded-md border border-foreground bg-foreground px-3.5 text-xs font-semibold text-card transition hover:opacity-90 disabled:opacity-45"
+                      className="inline-flex min-h-11 items-center justify-center rounded-md border border-foreground bg-foreground px-3.5 text-xs font-semibold text-card transition hover:opacity-90 disabled:opacity-45 md:min-h-9"
                       disabled={busy}
                       onClick={() => {
                         void invite(entry.id, entry.email);

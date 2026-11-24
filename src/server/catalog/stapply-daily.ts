@@ -44,7 +44,7 @@ export function assertCatalogSizeWithinBudget(bytes: number) {
 
 /**
  * The Stapply public snapshot base. Each board publishes `jobs.parquet` and a combined `all.parquet`; the daily pass
- * reads only the 28 per-board files, with column projection, and never `all.parquet` (issue #568).
+ * reads only the 30 per-board files, with column projection, and never `all.parquet` (issue #568).
  */
 export const STAPPLY_JOBS_BASE_URL = "https://storage.stapply.ai/jobs/v1";
 
@@ -131,7 +131,7 @@ export interface StapplyBoardSource {
 }
 
 /**
- * The 28 verified boards of issue #563, each pointing at its own `jobs.parquet`.
+ * The 30 verified boards of issues #563 and #633, each pointing at its own `jobs.parquet`.
  * @param baseUrl The snapshot base, `https://storage.stapply.ai/jobs/v1` in production.
  * @returns One source per ATS in the registry, in registry order.
  */

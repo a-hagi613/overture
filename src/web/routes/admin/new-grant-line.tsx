@@ -70,7 +70,7 @@ export function NewGrantLine({ onChanged }: { onChanged: () => void }) {
         </div>
       </div>
       <button
-        className="inline-flex h-9 items-center justify-center rounded-md bg-foreground px-3.5 text-sm font-semibold text-card hover:opacity-90"
+        className="inline-flex min-h-11 items-center justify-center rounded-md bg-foreground px-3.5 text-sm font-semibold text-card hover:opacity-90 md:min-h-9"
         disabled={!ready}
         onClick={() => {
           void grant();

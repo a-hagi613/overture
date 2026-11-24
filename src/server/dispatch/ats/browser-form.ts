@@ -7,13 +7,16 @@ import {
   APPLICATION_RESPONSE_MS,
   CONFIRMATION_SOURCES,
   CONFIRMATION_WAIT_MS,
+  fieldById,
   fillField,
   isPositiveAnswer,
   norm,
   openForm,
   preflightForm,
+  waitForStableForm,
 } from "../forms/engine.ts";
 import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
+import { detectLoginWall } from "../../pipeline/login-wall.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
 
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
@@ -32,6 +35,22 @@ export interface BrowserFormConfig {
   applyUrl?: ((url: string) => string | null) | undefined;
   /** The POST that records the application, beyond the same-origin default. */
   submitResponse?: ((url: URL) => boolean) | undefined;
+  /** Runs after navigation and before the form opens, e.g. to accept a data-consent gate. */
+  prepare?: ((page: Page) => Promise<boolean>) | undefined;
+  /** Runs after a clean preflight and before Submit, e.g. to open a preview step. */
+  beforeSubmit?: ((page: Page, scope: FormScope) => Promise<boolean>) | undefined;
+  /** The selector of a visible Next control; when set the form is filled step by step. */
+  nextControl?: string | undefined;
+  /** The page-level resume input for boards that portal it outside the form. */
+  resumeSelector?: string | undefined;
+  /** Confirms a page-level upload landed; the form scope cannot see those controls. */
+  resumeUploaded?: ((page: Page, resume: PlannedResume) => Promise<boolean>) | undefined;
+  /** Refuse a mandatory login gate before filling anything. */
+  loginWall?: boolean | undefined;
+  /** Copy shown when the employer has closed the posting. */
+  closed?: RegExp | undefined;
+  /** The board's own confirmation copy, when the shared English list does not fit. */
+  confirmationSources?: readonly string[] | undefined;
 }
 
 export interface BrowserFormPlan {
@@ -56,6 +75,7 @@ export type BrowserFormOutcome =
   | "fill_failed"
   | "upload_failed"
   | "identity_mismatch"
+  | "login_wall"
   | "needs_review";
 
 export interface BrowserFormRun {
@@ -77,6 +97,8 @@ const BROWSER_FORM_FIELD_TYPES: ReadonlyMap<string, QuestionFieldType> = new Map
 ]);
 
 const RESUME_WORDS = ["resume", "cv", "curriculum vitae"];
+
+const MAX_FORM_STEPS = 8;
 
 const SPAM_PATTERN = /\bflagged as (?:possible )?spam\b/iu;
 
@@ -403,7 +425,11 @@ async function fillByLabel(scope: FormScope, field: SendPlanField) {
     }
 
     if (kind === "radio") {
-      await control.check();
+      try {
+        await control.check();
+      } catch {
+        await control.check({ force: true });
+      }
 
       return true;
     }
@@ -458,6 +484,81 @@ async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanFiel
 
   return fillFrom(0);
 }
+
+async function fieldPresent(scope: FormScope, field: SendPlanField) {
+  if (field.fieldName !== null && field.fieldName !== "") {
+    const byName = fieldById(scope, field.fieldName).first();
+
+    if ((await byName.count()) > 0 && (await byName.isVisible().catch(() => false))) {
+      return true;
+    }
+  }
+
+  const byLabel = scope.root.getByLabel(field.label, { exact: false }).first();
+
+  return (await byLabel.count()) > 0 && (await byLabel.isVisible().catch(() => false));
+}
+
+async function fillPresentFields(
+  scope: FormScope,
+  fields: readonly SendPlanField[],
+  seen: Set<string>,
+) {
+  const fillFrom: (index: number) => Promise<boolean> = async (index) => {
+    const field = fields[index];
+
+    if (field === undefined) {
+      return true;
+    }
+
+    if (!answered(field) || !(await fieldPresent(scope, field))) {
+      return fillFrom(index + 1);
+    }
+
+    seen.add(field.fieldName ?? field.label);
+
+    if (!(await fillPlannedField(scope, field)) && field.required) {
+      return false;
+    }
+
+    return fillFrom(index + 1);
+  };
+
+  return fillFrom(0);
+}
+
+async function presentExpectations(scope: FormScope, expectations: readonly LiveFormExpectation[]) {
+  const checks = await Promise.all(
+    expectations.map(async (expectation) => {
+      const nameControl =
+        expectation.fieldName === null || expectation.fieldName === ""
+          ? null
+          : fieldById(scope, expectation.fieldName).first();
+
+      const labelControl = scope.root.getByLabel(expectation.label, { exact: false }).first();
+
+      const byName =
+        nameControl === null ? false : await nameControl.isVisible().catch(() => false);
+
+      const byLabel = await labelControl.isVisible().catch(() => false);
+
+      return byName || byLabel ? expectation : null;
+    }),
+  );
+
+  return checks.filter((expectation) => expectation !== null);
+}
+
+const missingFieldProblem = (field: SendPlanField) =>
+  ({
+    answer: field.answer,
+    fieldName: field.fieldName,
+    fieldType: field.fieldType,
+    kind: "field_missing",
+    label: field.label,
+    options: [...field.options],
+    unexpected: false,
+  }) satisfies LiveFormProblem;
 
 interface FileInputFact {
   id: string;
@@ -561,7 +662,37 @@ export async function findResumeFileInput(
     : null;
 }
 
-async function uploadResume(scope: FormScope, fieldName: string | null, resume: PlannedResume) {
+async function uploadResume(
+  page: Page,
+  scope: FormScope,
+  fieldName: string | null,
+  resume: PlannedResume,
+  config: BrowserFormConfig,
+) {
+  if (config.resumeSelector !== undefined) {
+    const pageInput = page.locator(config.resumeSelector).first();
+
+    if ((await pageInput.count()) === 0) {
+      return { fieldName: null, uploaded: false };
+    }
+
+    try {
+      await pageInput.setInputFiles({
+        buffer: Buffer.from(resume.bytes),
+        mimeType: "application/pdf",
+        name: resume.filename,
+      });
+    } catch {
+      return { fieldName: null, uploaded: false };
+    }
+
+    const landed = await (config.resumeUploaded?.(page, resume) ?? Promise.resolve(true));
+
+    return landed
+      ? { fieldName: config.resumeSelector, uploaded: true }
+      : { fieldName: null, uploaded: false };
+  }
+
   const input = await findResumeFileInput(scope, fieldName);
 
   if (input === null) {
@@ -583,23 +714,30 @@ async function uploadResume(scope: FormScope, fieldName: string | null, resume: 
   return { fieldName: liveName, uploaded: true };
 }
 
-function expectationsFor(plan: BrowserFormPlan, liveResumeField: string | null) {
+function expectationsFor(
+  plan: BrowserFormPlan,
+  liveResumeField: string | null,
+  config?: BrowserFormConfig,
+) {
   const resumeField = plan.fields.find((field) => isResumeField(field));
+  const pageLevelResume = config?.resumeSelector !== undefined;
 
-  const expectations: LiveFormExpectation[] = plan.fields.map((field) => ({
-    answer: field.answer,
-    fieldName: field === resumeField ? (liveResumeField ?? field.fieldName) : field.fieldName,
-    fieldType: field.fieldType,
-    file:
-      plan.resume !== null && field === resumeField
-        ? { name: plan.resume.filename, size: plan.resume.bytes.byteLength }
-        : null,
-    label: field.label,
-    options: field.options,
-    required: field.required,
-  }));
+  const expectations: LiveFormExpectation[] = plan.fields
+    .filter((field) => !(pageLevelResume && field.fieldType === "file"))
+    .map((field) => ({
+      answer: field.answer,
+      fieldName: field === resumeField ? (liveResumeField ?? field.fieldName) : field.fieldName,
+      fieldType: field.fieldType,
+      file:
+        plan.resume !== null && field === resumeField
+          ? { name: plan.resume.filename, size: plan.resume.bytes.byteLength }
+          : null,
+      label: field.label,
+      options: field.options,
+      required: field.required,
+    }));
 
-  if (plan.resume !== null && resumeField === undefined) {
+  if (plan.resume !== null && resumeField === undefined && !pageLevelResume) {
     expectations.push({
       answer: null,
       fieldName: liveResumeField ?? "resume",
@@ -614,19 +752,23 @@ function expectationsFor(plan: BrowserFormPlan, liveResumeField: string | null) 
   return expectations;
 }
 
-async function confirmationSeen(page: Page, formSelector: string) {
+async function confirmationSeen(
+  page: Page,
+  formSelector: string,
+  sources: readonly string[] = CONFIRMATION_SOURCES,
+) {
   try {
     await page.waitForFunction(
-      ({ sources, selector }: { sources: readonly string[]; selector: string }) => {
+      ({ sources: patterns, selector }: { sources: readonly string[]; selector: string }) => {
         if (document.querySelector(selector) !== null) {
           return false;
         }
 
         const text = document.body.textContent;
 
-        return sources.some((source) => new RegExp(source, "iu").test(text));
+        return patterns.some((source) => new RegExp(source, "iu").test(text));
       },
-      { selector: formSelector, sources: CONFIRMATION_SOURCES },
+      { selector: formSelector, sources },
       { timeout: CONFIRMATION_WAIT_MS },
     );
 
@@ -657,6 +799,41 @@ export const runBrowserFormAttempt: (
 
   await page.goto(applyUrl, { waitUntil: "domcontentloaded" });
 
+  if (config.closed !== undefined && (await pageSays(page, config.closed))) {
+    return {
+      confirmationSeen: false,
+      outcome: "blocked",
+      submitMayHaveLanded: false,
+      submitResponseStatus: null,
+    };
+  }
+
+  if (config.loginWall === true) {
+    const verdict = detectLoginWall({
+      finalUrl: page.url(),
+      html: await page.content().catch(() => ""),
+      requestedUrl: applyUrl,
+    });
+
+    if (verdict.wall) {
+      return {
+        confirmationSeen: false,
+        outcome: "login_wall",
+        submitMayHaveLanded: false,
+        submitResponseStatus: null,
+      };
+    }
+  }
+
+  if (config.prepare !== undefined && !(await config.prepare(page))) {
+    return {
+      confirmationSeen: false,
+      outcome: "form_missing",
+      submitMayHaveLanded: false,
+      submitResponseStatus: null,
+    };
+  }
+
   const identity = await checkPostingIdentity(page, plan.identity);
 
   if (!identity.ok) {
@@ -684,7 +861,7 @@ export const runBrowserFormAttempt: (
   let liveResumeField = resumeField?.fieldName ?? null;
 
   if (plan.resume !== null) {
-    const uploaded = await uploadResume(scope, liveResumeField, plan.resume);
+    const uploaded = await uploadResume(page, scope, liveResumeField, plan.resume, config);
 
     if (!uploaded.uploaded) {
       return {
@@ -698,25 +875,106 @@ export const runBrowserFormAttempt: (
     liveResumeField = uploaded.fieldName;
   }
 
-  if (!(await fillPlannedFields(scope, plan.fields))) {
+  const expectations = expectationsFor(plan, liveResumeField, config);
+
+  if (config.nextControl === undefined) {
+    if (!(await fillPlannedFields(scope, plan.fields))) {
+      return {
+        confirmationSeen: false,
+        outcome: "fill_failed",
+        submitMayHaveLanded: false,
+        submitResponseStatus: null,
+      };
+    }
+
+    const verdict = await preflightForm(scope, expectations);
+
+    if (verdict.outcome !== "ok") {
+      return {
+        confirmationSeen: false,
+        outcome: verdict.outcome,
+        preflight: verdict.problems,
+        submitMayHaveLanded: false,
+        submitResponseStatus: null,
+        ...(verdict.outcome === "needs_review" && { unexpectedRequired: verdict.reviewFields }),
+      };
+    }
+  } else {
+    const seen = new Set<string>();
+    const nextControl = scope.root.locator(config.nextControl);
+
+    const runStep: (step: number) => Promise<BrowserFormRun | null> = async (step) => {
+      if (step >= MAX_FORM_STEPS) {
+        return null;
+      }
+
+      if (!(await fillPresentFields(scope, plan.fields, seen))) {
+        return {
+          confirmationSeen: false,
+          outcome: "fill_failed",
+          submitMayHaveLanded: false,
+          submitResponseStatus: null,
+        };
+      }
+
+      const present = await presentExpectations(scope, expectations);
+      const verdict = await preflightForm(scope, present);
+
+      if (verdict.outcome !== "ok") {
+        return {
+          confirmationSeen: false,
+          outcome: verdict.outcome,
+          preflight: verdict.problems,
+          submitMayHaveLanded: false,
+          submitResponseStatus: null,
+          ...(verdict.outcome === "needs_review" && { unexpectedRequired: verdict.reviewFields }),
+        };
+      }
+
+      const more =
+        (await nextControl.count()) > 0 &&
+        (await nextControl
+          .first()
+          .isVisible()
+          .catch(() => false));
+
+      if (!more) {
+        return null;
+      }
+
+      await nextControl.first().click({ timeout: APPLICATION_RESPONSE_MS });
+      await waitForStableForm(scope);
+
+      return runStep(step + 1);
+    };
+
+    const stepFailure = await runStep(0);
+
+    if (stepFailure !== null) {
+      return stepFailure;
+    }
+
+    const missing = plan.fields.filter(
+      (field) => field.required && !seen.has(field.fieldName ?? field.label),
+    );
+
+    if (missing.length > 0) {
+      return {
+        confirmationSeen: false,
+        outcome: "form_changed",
+        preflight: missing.map((field) => missingFieldProblem(field)),
+        submitMayHaveLanded: false,
+        submitResponseStatus: null,
+      };
+    }
+  }
+
+  if (config.beforeSubmit !== undefined && !(await config.beforeSubmit(page, scope))) {
     return {
       confirmationSeen: false,
       outcome: "fill_failed",
       submitMayHaveLanded: false,
       submitResponseStatus: null,
-    };
-  }
-
-  const verdict = await preflightForm(scope, expectationsFor(plan, liveResumeField));
-
-  if (verdict.outcome !== "ok") {
-    return {
-      confirmationSeen: false,
-      outcome: verdict.outcome,
-      preflight: verdict.problems,
-      submitMayHaveLanded: false,
-      submitResponseStatus: null,
-      ...(verdict.outcome === "needs_review" && { unexpectedRequired: verdict.reviewFields }),
     };
   }
 
@@ -789,7 +1047,16 @@ export const runBrowserFormAttempt: (
     };
   }
 
-  const confirmed = await confirmationSeen(page, config.formSelector);
+  if (status === null && (await pageEventuallySays(page, CAPTCHA_PATTERN))) {
+    return {
+      confirmationSeen: false,
+      outcome: "captcha_blocked",
+      submitMayHaveLanded: false,
+      submitResponseStatus: null,
+    };
+  }
+
+  const confirmed = await confirmationSeen(page, config.formSelector, config.confirmationSources);
 
   return {
     confirmationSeen: confirmed,

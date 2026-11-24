@@ -1,7 +1,7 @@
 import type { Page } from "playwright-core";
 
 import type { ApplySupportedAts } from "../../shared/ats.ts";
-import { BATCH_4_ATS, isBatchFourAts } from "../../shared/ats.ts";
+import { BATCH_4_ATS, isBatchFourAts, isWaveTwoAts } from "../../shared/ats.ts";
 import { isSameHostOrSubdomain } from "../../shared/host-match.ts";
 import { isFixtureHost } from "../../shared/live-service-hosts.ts";
 
@@ -87,6 +87,10 @@ const BATCH_4_DOMAINS: Partial<Record<ApplySupportedAts, string>> = {
   rippling: "rippling.com",
   varbi: "varbi.com",
 };
+
+const JOBVITE_BOARD_HOSTS: ReadonlySet<string> = new Set(["jobs.jobvite.com"]);
+
+const HERP_HOST = /^(?:[a-z0-9-]+\.)?herp\.careers$/iu;
 
 const HOSTED_PATH_SUFFIXES: ReadonlySet<string> = new Set([
   "apply",
@@ -208,6 +212,14 @@ const sameHost = (ats: ApplySupportedAts, expected: string, live: string) => {
     const liveToken = manatalToken(live);
 
     return expectedToken !== null && liveToken !== null && expectedToken === liveToken;
+  }
+
+  if (ats === "jobvite") {
+    return JOBVITE_BOARD_HOSTS.has(expected) && JOBVITE_BOARD_HOSTS.has(live);
+  }
+
+  if (ats === "herp") {
+    return HERP_HOST.test(expected) && HERP_HOST.test(live);
   }
 
   if (isBatchFourAts(ats)) {
@@ -423,6 +435,26 @@ function boardTokenFrom(ats: ApplySupportedAts, url: URL, segments: readonly str
 }
 
 function postingPath(ats: ApplySupportedAts, url: URL) {
+  if (isWaveTwoAts(ats)) {
+    const segments = pathSegments(url.pathname);
+
+    while (HOSTED_PATH_SUFFIXES.has((segments.at(-1) ?? "").toLowerCase())) {
+      segments.pop();
+    }
+
+    if (ats === "jobvite") {
+      const jobIndex = segments.indexOf("job");
+      const [, jobId] = segments.slice(jobIndex);
+      const [boardToken] = segments;
+
+      return jobId === undefined || boardToken === undefined ? null : { boardToken, jobId };
+    }
+
+    const [, boardToken, jobId] = segments;
+
+    return boardToken === undefined || jobId === undefined ? null : { boardToken, jobId };
+  }
+
   if (isBatchFourAts(ats)) {
     const segments = pathSegments(url.pathname);
 
@@ -562,6 +594,56 @@ export function batchFourIdentityProblem(expected: PostingIdentity, liveUrl: str
   return null;
 }
 
+/**
+ * Compares a Wave 2 board's expected posting with the URL the page settled on. The
+ * board's host and job id are required; a fixture host is exempt from the board-slug
+ * check because local fixtures share one origin for every board.
+ *
+ * @param expected The posting the approved plan was made for.
+ * @param liveUrl The URL the browser page is on.
+ * @returns The mismatch reason, or null when the page is the expected posting.
+ */
+export function waveTwoIdentityProblem(expected: PostingIdentity, liveUrl: string) {
+  let live: URL;
+  let posting: URL;
+
+  try {
+    live = new URL(liveUrl);
+    posting = new URL(expected.url);
+  } catch {
+    return "unreadable" as const;
+  }
+
+  if (!sameHost(expected.ats, posting.host.toLowerCase(), live.host.toLowerCase())) {
+    return "host" as const;
+  }
+
+  const livePosting = postingPath(expected.ats, live);
+
+  if (livePosting === null) {
+    return "unreadable" as const;
+  }
+
+  if (livePosting.jobId !== expected.jobId) {
+    return "job_id" as const;
+  }
+
+  const expectedHost = hostnameOf(posting.host.toLowerCase());
+  const liveHost = hostnameOf(live.host.toLowerCase());
+
+  if (isFixtureHost(expectedHost) || isFixtureHost(liveHost)) {
+    return null;
+  }
+
+  const boardToken = normalizedCompany(expected.boardToken);
+
+  if (boardToken !== "" && !normalizedCompany(`${liveHost}${live.pathname}`).includes(boardToken)) {
+    return "board_token" as const;
+  }
+
+  return null;
+}
+
 export async function checkPostingIdentity(page: Page, expected: PostingIdentity) {
   let live: URL;
   let posting: URL;
@@ -575,6 +657,12 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
 
   if (isBatchFourAts(expected.ats)) {
     const reason = batchFourIdentityProblem(expected, live.toString());
+
+    return reason === null ? matched : mismatch(reason);
+  }
+
+  if (isWaveTwoAts(expected.ats)) {
+    const reason = waveTwoIdentityProblem(expected, live.toString());
 
     return reason === null ? matched : mismatch(reason);
   }

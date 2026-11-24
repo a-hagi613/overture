@@ -22,6 +22,7 @@ Bun.env.TURNSTILE_SITE_KEY ??= "turnstile-site";
 const {
   betterAuthSecretOptions,
   checkedEnvSchema,
+  emailListFromValue,
   parseBetterAuthSecrets,
   resolveTurnstileHostnames,
   turnstileDefaultHostnames,
@@ -134,6 +135,38 @@ describe("production Cloudflare Access issuer", () => {
         NODE_ENV: "test",
       });
     }).not.toThrow();
+  });
+});
+
+describe("ALLOWED_SIGNUP_EMAILS", () => {
+  test("a comma-separated list is trimmed, lowercased and stripped of blanks", () => {
+    expect(emailListFromValue(" Admin@Example.com , , second@example.com ")).toEqual([
+      "admin@example.com",
+      "second@example.com",
+    ]);
+  });
+
+  test("an unset or empty value parses to an empty allowlist", () => {
+    expect(emailListFromValue(undefined)).toEqual([]);
+    expect(emailListFromValue("   ")).toEqual([]);
+
+    expect(
+      checkedEnvSchema.parse({ ...productionEnv, ALLOWED_SIGNUP_EMAILS: "", NODE_ENV: "test" })
+        .ALLOWED_SIGNUP_EMAILS,
+    ).toEqual([]);
+    expect(
+      checkedEnvSchema.parse({ ...productionEnv, NODE_ENV: "test" }).ALLOWED_SIGNUP_EMAILS,
+    ).toEqual([]);
+  });
+
+  test("each entry must be an email address", () => {
+    expect(() =>
+      checkedEnvSchema.parse({
+        ...productionEnv,
+        ALLOWED_SIGNUP_EMAILS: "not-an-email,second@example.com",
+        NODE_ENV: "test",
+      }),
+    ).toThrow();
   });
 });
 

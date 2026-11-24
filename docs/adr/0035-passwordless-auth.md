@@ -7,7 +7,7 @@ status: accepted
 Issue #369 (parent #7). The owner ruled on 2026-11-21 that Overture supports **Google, LinkedIn and the emailed
 magic link** and nothing else for people, plus the read-only `test@email.com` demo button while
 `DEMO_LOGIN_ENABLED=true`. Email + password, which ADR 0026 had scheduled for M2 and #271 built, is removed. The
-admin passkey is unchanged.
+admin host no longer uses a passkey: it trusts a verified Cloudflare Access JWT for `OWNER_EMAIL` directly.
 
 ## Context
 
@@ -31,6 +31,13 @@ handling of unproven sign-ups) was extra surface to attack, test and keep on the
 - **Delete account re-auth is a fresh sign-in.** `POST /api/account/reauth` is gone. The page's one action is "Email
   me a sign-in link" (`POST /api/account/reauth/link`, three asks per window); opening the link creates a session
   that counts as fresh for 15 minutes. A session that is itself fresh needs no step.
+- **The admin is Access-only.** `admin.tryoverture.com` has no secondary sign-in: a verified Cloudflare Access JWT
+  whose address is `OWNER_EMAIL` authenticates the owner directly on the admin pages, `/admin/api/*` and the
+  admin-host `/api/me`, and opens a Reveal with the typed reason alone. Missing or invalid Access credentials fail
+  closed with `access_required`; any other address gets `owner_required`. The main app keeps ignoring the Access JWT.
+- **`ALLOWED_SIGNUP_EMAILS` is a tester allowlist.** With `PUBLIC_SIGNUP_ENABLED=false`, a comma-separated
+  `ALLOWED_SIGNUP_EMAILS` lets those addresses sign up and sign in on the main app. They are ordinary `user`
+  accounts; only `OWNER_EMAIL` ever receives the `owner` role.
 - **No migration.** `accounts.password` stays as a nullable column and `providerId = "credential"` rows are left in
   place; nothing reads them. Dropping them is a separate, destructive change that needs its own migration slot and
   is not part of this one. The guard that discards an unproven credential-only row when a verified provider signs in

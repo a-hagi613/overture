@@ -41,15 +41,7 @@ export function OverviewPage() {
   const refusal = overview.refusal ?? alerts.refusal;
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          overview.refresh();
-          alerts.refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   const heading = (

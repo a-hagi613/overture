@@ -2,6 +2,11 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 import type { ClaimedJob, JobHandlers } from "./queue.ts";
 
+import { eq, sql } from "drizzle-orm";
+
+import { bgJobs } from "../db/schema.ts";
+import { defaultMetrics } from "../telemetry/metrics.ts";
+import { measureSqliteQuery } from "../telemetry/sqlite-metrics.ts";
 import {
   claimJobsToRun,
   recoverStaleLocks,
@@ -213,6 +218,19 @@ export function startJobWorker(
 
     for (const job of claimed) {
       runTracked(job);
+    }
+
+    const depths = measureSqliteQuery("app", "select", () =>
+      db
+        .select({ depth: sql<number>`count(*)`, kind: bgJobs.kind })
+        .from(bgJobs)
+        .where(eq(bgJobs.status, "queued"))
+        .groupBy(bgJobs.kind)
+        .all(),
+    );
+
+    for (const row of depths) {
+      defaultMetrics().setBgQueueDepth(row.kind, row.depth);
     }
   }
 

@@ -245,14 +245,14 @@ export function LandingHeroStack({ compact = false }: { compact?: boolean }) {
       aria-label={LANDING_COPY.heroStack.ariaLabel}
       className={compact ? "w-full max-w-[520px]" : "mx-auto w-full max-w-[540px]"}
     >
-      <div className="relative z-10 h-[304px] sm:h-[314px]">
+      <div className="relative z-10 h-[324px] sm:h-[340px]">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[274px] -translate-x-1 translate-y-4 -rotate-1 scale-95 rounded-xl border border-input bg-card opacity-65 shadow-sh sm:inset-x-2.5 sm:h-[280px] sm:-translate-x-2 sm:translate-y-5 sm:-rotate-2"
+          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[292px] -translate-x-1 translate-y-4 -rotate-1 scale-95 rounded-xl border border-input bg-card opacity-65 shadow-sh sm:inset-x-2.5 sm:h-[304px] sm:-translate-x-2 sm:translate-y-5 sm:-rotate-2"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 z-1 h-[274px] translate-x-1 translate-y-2.5 rotate-1 scale-[0.97] rounded-xl border border-input bg-card opacity-85 shadow-sh sm:inset-x-2.5 sm:h-[280px] sm:translate-x-2.5 sm:translate-y-3 sm:rotate-2"
+          className="pointer-events-none absolute inset-x-0 top-0 z-1 h-[292px] translate-x-1 translate-y-2.5 rotate-1 scale-[0.97] rounded-xl border border-input bg-card opacity-85 shadow-sh sm:inset-x-2.5 sm:h-[304px] sm:translate-x-2.5 sm:translate-y-3 sm:rotate-2"
         />
 
         <AnimatePresence initial={false} mode="popLayout">

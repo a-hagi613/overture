@@ -81,6 +81,8 @@ const DISPATCHABLE_ATS = [
   "catsone",
   "onlyfy",
   "varbi",
+  "jobvite",
+  "herp",
 ] as const;
 
 type DispatchAts = (typeof DISPATCHABLE_ATS)[number];
