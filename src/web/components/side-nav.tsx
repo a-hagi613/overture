@@ -5,7 +5,7 @@ import type { NavCounts, PrimaryNavKey } from "../lib/nav-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { NAV_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
-import { SidebarProfileMenu } from "./sidebar-profile-menu.tsx";
+import { SidebarJobProfile } from "./sidebar-job-profile.tsx";
 import { Badge } from "./ui/badge.tsx";
 import { Separator } from "./ui/separator.tsx";
 
@@ -18,17 +18,19 @@ const NAV_ICONS: Record<PrimaryNavKey, typeof Home> = {
 };
 
 const ROW_CLASS =
-  "relative flex min-h-11 items-center gap-3.5 rounded-md border px-3 text-base font-medium transition";
+  "relative flex min-h-9 items-center gap-3 rounded-md border px-2.5 text-sm font-medium transition";
 
 const ROW_IDLE = "border-transparent text-foreground hover:bg-muted";
 const ROW_ACTIVE = "border-border bg-card text-foreground shadow-sh";
 
 export function SideNav({
   counts,
+  onNavigate,
   showLabels,
   unreadNotifications = 0,
 }: {
   counts: NavCounts;
+  onNavigate?: (() => void) | undefined;
   showLabels: boolean;
   unreadNotifications?: number;
 }) {
@@ -39,7 +41,12 @@ export function SideNav({
         const Icon = NAV_ICONS[destination.glyph];
 
         return (
-          <NavLink end={destination.to === "/home"} key={destination.to} to={destination.to}>
+          <NavLink
+            end={destination.to === "/home"}
+            key={destination.to}
+            onClick={onNavigate}
+            to={destination.to}
+          >
             {({ isActive }) => (
               <span
                 className={`${ROW_CLASS} ${isActive ? ROW_ACTIVE : ROW_IDLE} ${showLabels ? "" : "justify-center"}`}
@@ -77,8 +84,10 @@ export function SideNav({
           </NavLink>
         );
       })}
-      <Separator className="my-1.5" />
-      <NavLink to="/notifications">
+      <Separator className="my-1" />
+      <SidebarJobProfile onNavigate={onNavigate} wide={showLabels} />
+      <Separator className="my-1" />
+      <NavLink onClick={onNavigate} to="/notifications">
         {({ isActive }) => (
           <span className={`${ROW_CLASS} ${isActive ? ROW_ACTIVE : ROW_IDLE}`}>
             <span className="sr-only">
@@ -106,7 +115,7 @@ export function SideNav({
           </span>
         )}
       </NavLink>
-      <NavLink to="/support">
+      <NavLink onClick={onNavigate} to="/support">
         {({ isActive }) => (
           <span
             className={`${ROW_CLASS} ${isActive ? ROW_ACTIVE : ROW_IDLE} ${showLabels ? "" : "justify-center"}`}
@@ -126,7 +135,6 @@ export function SideNav({
           </span>
         )}
       </NavLink>
-      <SidebarProfileMenu wide={showLabels} />
     </nav>
   );
 }

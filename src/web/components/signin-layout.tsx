@@ -3,23 +3,26 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
-import { BrandMark } from "./brand-mark.tsx";
 import { LandingGrain } from "./landing/landing-grain.tsx";
 import { SignInStory } from "./signin-story.tsx";
 import { Button } from "./ui/button.tsx";
-import { dsCardTitle } from "./ui/ds.ts";
 import { useTheme } from "../lib/theme-context.ts";
 
-export function SignInLayout({ children }: { children: ReactNode }) {
+export function SignInLayout({
+  children,
+  mode = "signin",
+}: {
+  children: ReactNode;
+  mode?: "signin" | "signup";
+}) {
   const { theme, toggleTheme, label } = useTheme();
-  const { story } = copy.signIn;
 
   return (
-    <div className="relative flex min-h-screen overflow-x-clip bg-background text-foreground lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+    <div className="relative flex min-h-screen overflow-x-clip bg-background text-foreground lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
       <LandingGrain variant="hero" />
-      <SignInStory />
+      <SignInStory mode={mode} />
       <main
-        className="relative z-10 flex min-h-screen w-full flex-1 flex-col justify-between gap-6 px-5 py-5 outline-none sm:px-8 lg:px-12 lg:py-7"
+        className="relative z-10 flex min-h-screen w-full flex-1 flex-col justify-between gap-6 px-5 py-5 outline-none sm:px-8 lg:px-10 lg:py-7"
         id="main-content"
         tabIndex={-1}
       >
@@ -44,22 +47,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
             )}
           </Button>
         </div>
-        <div className="mx-auto my-auto flex w-full max-w-md flex-col gap-5">
-          <div className="flex flex-col items-center gap-2 text-center lg:hidden">
-            <Link
-              aria-label={copy.brand.homeAria}
-              className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-2 transition hover:bg-muted"
-              to="/"
-            >
-              <BrandMark size={32} />
-              <span className={dsCardTitle}>{copy.app.name}</span>
-            </Link>
-            <p className="font-serif text-card-title text-muted-foreground">
-              {story.heading} <em className="italic text-signal">{story.headingItalic}</em>
-            </p>
-          </div>
-          {children}
-        </div>
+        <div className="mx-auto my-auto flex w-full max-w-md flex-col gap-5">{children}</div>
         <footer className="mx-auto flex w-full max-w-md flex-col items-center gap-1.5 text-center text-xs leading-relaxed text-muted-foreground">
           <p>
             {copy.signIn.legalIntro}{" "}

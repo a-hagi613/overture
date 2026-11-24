@@ -1,8 +1,10 @@
-import { Bell, Search, User } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
+import { authClient } from "../lib/auth-client.ts";
 import { navTitleForPath } from "../lib/nav-api.ts";
+import { UserAvatar } from "./user-avatar.tsx";
 
 const ACTION_CLASS =
   "relative inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar";
@@ -15,6 +17,7 @@ export function MobileTopHeader({
   unreadNotifications?: number;
 }) {
   const { pathname, search } = useLocation();
+  const { data: session } = authClient.useSession();
 
   return (
     <header
@@ -52,7 +55,7 @@ export function MobileTopHeader({
           ) : null}
         </Link>
         <Link aria-label={copy.nav.profile} className={ACTION_CLASS} to="/profile">
-          <User aria-hidden="true" size={20} />
+          <UserAvatar email={session?.user.email ?? ""} name={session?.user.name ?? ""} size="sm" />
         </Link>
       </nav>
     </header>

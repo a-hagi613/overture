@@ -7,34 +7,34 @@ import { Badge } from "./ui/badge.tsx";
 import { dsBody, dsCardTitle, dsLead } from "./ui/ds.ts";
 import { Separator } from "./ui/separator.tsx";
 
-const pillars = [
-  {
-    n: copy.signIn.story.pillar01,
-    title: copy.signIn.story.pillar01Title,
-    detail: copy.signIn.story.pillar01Detail,
-  },
-  {
-    n: copy.signIn.story.pillar02,
-    title: copy.signIn.story.pillar02Title,
-    detail: copy.signIn.story.pillar02Detail,
-  },
-  {
-    n: copy.signIn.story.pillar03,
-    title: copy.signIn.story.pillar03Title,
-    detail: copy.signIn.story.pillar03Detail,
-  },
-];
+export function SignInStory({ mode = "signin" }: { mode?: "signin" | "signup" }) {
+  const v = mode === "signup" ? copy.signIn.signUpStory : copy.signIn.story;
 
-export function SignInStory() {
-  const v = copy.signIn.story;
+  const pillars = [
+    {
+      n: v.pillar01,
+      title: v.pillar01Title,
+      detail: v.pillar01Detail,
+    },
+    {
+      n: v.pillar02,
+      title: v.pillar02Title,
+      detail: v.pillar02Detail,
+    },
+    {
+      n: v.pillar03,
+      title: v.pillar03Title,
+      detail: v.pillar03Detail,
+    },
+  ];
 
   return (
     <section
       aria-label={copy.signIn.sampleLabel}
-      className="relative hidden overflow-hidden border-r border-border bg-sidebar px-10 py-9 lg:flex lg:flex-col xl:px-14"
+      className="relative hidden overflow-hidden border-r border-border bg-sidebar px-8 py-5 lg:flex lg:flex-col xl:px-10 xl:py-6"
     >
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col justify-between gap-7">
-        <div className="flex items-center gap-4">
+      <div className="relative z-10 mx-auto flex h-full w-full max-w-2xl flex-col justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <Link
             aria-label={copy.brand.homeAria}
             className="inline-flex items-center gap-2.5 transition hover:opacity-80"
@@ -43,22 +43,20 @@ export function SignInStory() {
             <BrandMark size={32} />
             <span className={dsCardTitle}>{copy.app.name}</span>
           </Link>
-        </div>
-        <div className="flex flex-col gap-5">
-          <Badge className="self-start" size="eyebrow" variant="signal">
+          <Badge size="eyebrow" variant="signal">
             {v.pill}
           </Badge>
-          <p className="font-serif text-hero font-normal text-foreground">
-            {v.heading}
-            <br />
-            <em className="italic text-signal">{v.headingItalic}</em>
+        </div>
+        <div className="flex flex-col gap-3">
+          <p className="font-serif text-page-title font-normal text-foreground">
+            {v.heading} <em className="italic text-signal">{v.headingItalic}</em>
           </p>
-          <p className={`${dsLead} max-w-md`}>{v.deck}</p>
+          <p className={`${dsLead} max-w-xl`}>{v.deck}</p>
           <div className="pt-1">
-            <LandingHeroStack compact />
+            <LandingHeroStack surface="sidebar" />
           </div>
         </div>
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-3.5">
           <Separator />
           <div className="grid grid-cols-3 gap-5">
             {pillars.map((pillar) => (

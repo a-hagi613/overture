@@ -49,7 +49,21 @@ test("a signed-out visitor reaches the Terms and the Privacy Policy from sign-in
 
   await expect(page).toHaveURL(/\/privacy$/u);
   await expect(page.getByRole("heading", { level: 1, name: "Privacy Policy" })).toBeVisible();
-  await expect(page.getByRole("term").filter({ hasText: "Browser Use" })).toBeVisible();
+  await expect(page.getByRole("term").filter({ hasText: "Stripe" })).toBeVisible();
+
+  await Promise.all(
+    [
+      /\bFly\b/u,
+      /\bCloudflare\b/u,
+      /\bBrowser Use\b/u,
+      /\bKernel\b/u,
+      /\bAnthropic\b/u,
+      /\bGrafana Cloud\b/u,
+    ].map(async (vendorPattern) =>
+      expect(page.locator("main").getByText(vendorPattern)).toHaveCount(0),
+    ),
+  );
+
   await expect(page.getByRole("link", { name: "admin@tryoverture.com" }).first()).toBeVisible();
 
   const privacyResults = await new AxeBuilder({ page }).analyze();
@@ -61,7 +75,7 @@ test("a signed-out visitor reaches the Terms and the Privacy Policy from sign-in
   await expect(page).toHaveURL(/\/terms$/u);
 });
 
-test("the legal pages cover billing and mark themselves as drafts", async ({
+test("the legal pages cover billing, trial terms, and corporate disclosures without vendor leaks", async ({
   page,
   appServerUrl,
 }) => {
@@ -69,11 +83,11 @@ test("the legal pages cover billing and mark themselves as drafts", async ({
 
   await Promise.all(
     [
-      "Plans and payment",
-      "Free trial",
-      "Renewal",
-      "Cancelling",
-      "Refunds and failed applications",
+      "6. Subscription Plans, Allowances, and Beta Invitations",
+      "7. Free Trial Eligibility and Card Verification",
+      "8. Automatic Renewal, Expiration, and Payment Failures",
+      "9. Cancellation and Plan Modifications",
+      "10. Refunds and Failed Submission Protections",
     ].map(async (heading) =>
       expect(page.getByRole("heading", { level: 2, name: heading })).toBeVisible(),
     ),
@@ -81,28 +95,31 @@ test("the legal pages cover billing and mark themselves as drafts", async ({
 
   await expect(page.getByText(/\$9\.99/u).first()).toBeVisible();
   await expect(page.getByText(/\$29\.99/u).first()).toBeVisible();
-  await expect(page.getByText(/One card gets one trial/u).first()).toBeVisible();
-  await expect(page.getByText(/renews automatically/u).first()).toBeVisible();
-  await expect(page.getByText(/We do not give refunds by default/u)).toBeVisible();
+  await expect(page.getByText(/one trial per payment instrument/u).first()).toBeVisible();
+  await expect(page.getByText(/automatically renews/u).first()).toBeVisible();
+  await expect(page.getByText(/non-refundable once charged/u).first()).toBeVisible();
   await expect(
-    page.getByText(/you are never charged for it and it never uses one of your applications/u),
+    page
+      .getByText(
+        /does not consume your application allowance and incurs no per-application charge/u,
+      )
+      .first(),
   ).toBeVisible();
-  await expect(page.getByText(/Stripe processes the payment for Overture/u).first()).toBeVisible();
-  await expect(
-    page.getByText("Draft for owner review, not legal advice.", { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText(/charged through Stripe/u).first()).toBeVisible();
+  await expect(page.getByText("Published by Overture Inc.", { exact: false })).toBeVisible();
 
   await page.goto(`${appServerUrl}/privacy`);
 
   await expect(
-    page.getByRole("heading", { level: 2, name: "Payments and card details" }),
+    page.getByRole("heading", {
+      level: 2,
+      name: "6. Payment Processing and Trial Card Fingerprinting",
+    }),
   ).toBeVisible();
   await expect(page.getByRole("term").filter({ hasText: "Stripe" })).toBeVisible();
-  await expect(page.getByText(/as a sub-processor/u).first()).toBeVisible();
-  await expect(page.getByText(/keyed fingerprint/u).first()).toBeVisible();
-  await expect(
-    page.getByText("Draft for owner review, not legal advice.", { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText(/as a payment sub-processor/u).first()).toBeVisible();
+  await expect(page.getByText(/keyed cryptographic fingerprint/u).first()).toBeVisible();
+  await expect(page.getByText("Published by Overture Inc.", { exact: false })).toBeVisible();
 
   const results = await new AxeBuilder({ page }).analyze();
 

@@ -53,3 +53,36 @@ test("the sign-out control is separate from signing out every device", async ({
   await expect(page.getByRole("button", { name: "Sign out everywhere" })).toBeVisible();
   await expect(page.getByText("Sign out of this device")).toBeVisible();
 });
+
+test("the sidebar account menu signs out the active session cleanly", async ({
+  page,
+  request,
+  isolatedAppServer,
+}) => {
+  const appServerUrl = isolatedAppServer.url;
+
+  await signInByMagicLink(page, appServerUrl, request, authTestIdentity.ownerEmail);
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await page.goto(`${appServerUrl}/home`);
+
+  expect((await verifyAuthState(appServerUrl, request)).sessions).toHaveLength(1);
+
+  const sidebar = page.locator("[data-shell-sidebar]");
+  const accountTrigger = sidebar.getByRole("button", { name: /Account menu/u });
+
+  await expect(accountTrigger).toBeVisible();
+  await accountTrigger.click();
+
+  const signedOut = page.waitForResponse(
+    (response) => response.url().endsWith("/api/auth/sign-out") && response.ok(),
+  );
+
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await signedOut;
+
+  await expect(page).toHaveURL(/\/signin$/u);
+  expect((await verifyAuthState(appServerUrl, request)).sessions).toHaveLength(0);
+
+  await page.goto(`${appServerUrl}/home`);
+  await expect(page).toHaveURL(/\/signin$/u);
+});

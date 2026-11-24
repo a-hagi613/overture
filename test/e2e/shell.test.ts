@@ -14,9 +14,11 @@ const desktopDestinations = [
   "Review",
   "Applications",
   "Inbox",
+  "Resume & Cover Letter",
+  "Job Preferences",
+  "Application Answers",
   "Notifications",
   "Support",
-  "Profile",
 ];
 
 const phoneDestinations = ["Home", "Ready", "Review", "Applications", "Inbox"];
@@ -90,8 +92,11 @@ test("the shell lists workspace destinations on desktop and navigates to Account
     }),
   ).toBeHidden();
 
-  await sideNav.getByRole("link", { name: "Profile" }).hover();
-  await sideNav.getByRole("menuitem", { name: "Account" }).click();
+  await shellPage
+    .locator("[data-shell-sidebar]")
+    .getByRole("button", { name: /Account menu/u })
+    .click();
+  await shellPage.getByRole("menuitem", { name: "Account settings" }).click();
   await expect(shellPage).toHaveURL(/\/profile\/account$/u);
   await expect(shellPage.getByRole("heading", { name: "Account and sign-in" })).toBeVisible();
   await expect(shellPage.getByText(authTestIdentity.ownerEmail).first()).toBeVisible();
@@ -170,10 +175,10 @@ test("the phone header and tab bar reach search, notifications, the profile hub 
   await Promise.all(
     [
       "Resume & Cover Letter",
-      "Saved answers",
       "Job Preferences",
+      "Application Answers",
       "Billing",
-      "Account",
+      "Account settings",
       "Support",
     ].map(async (label) => {
       await expect(hub.getByRole("link", { name: label })).toBeVisible();
@@ -181,6 +186,8 @@ test("the phone header and tab bar reach search, notifications, the profile hub 
   );
 
   await expect(hub.getByRole("switch", { name: "Switch to dark mode" })).toBeVisible();
+  await expect(hub.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(shellPage.getByText("Applications left", { exact: true })).toBeVisible();
   await shellPage.getByRole("link", { name: "Job Preferences" }).click();
   await expect(shellPage).toHaveURL(/\/profile\/preferences$/u);
 

@@ -220,7 +220,7 @@ function isExpectedConsoleError(entry: { text: string; url: string }) {
 async function layoutOf(page: Page) {
   return page.evaluate(() => {
     const section = document.querySelector("#live-jobs")?.getBoundingClientRect();
-    const next = document.querySelector("#how-it-works")?.getBoundingClientRect();
+    const next = document.querySelector("#pricing")?.getBoundingClientRect();
 
     return {
       nextTop: (next?.top ?? 0) + globalThis.scrollY,
@@ -241,11 +241,11 @@ test.describe("the landing live supply preview", () => {
     const caption = page.getByTestId("supply-caption");
     const category = page.getByLabel("Category", { exact: true });
     const role = page.getByLabel("Role", { exact: true });
-    const location = page.getByLabel("Location", { exact: true });
+    const location = page.getByRole("button", { name: /^Location:/u });
     const remote = page.getByRole("switch", { name: "Remote only" });
 
     await expect(count).toHaveText("5");
-    await expect(caption).toContainText("roles open now that Overture can apply to");
+    await expect(caption).toContainText("open jobs ready to apply");
 
     const layoutBefore = await layoutOf(page);
 
@@ -277,17 +277,22 @@ test.describe("the landing live supply preview", () => {
     await expect(count).toHaveText("2");
 
     await category.selectOption("");
-    await location.fill("London");
+    await location.click();
+    await page.getByPlaceholder("Type a city, country, or continent…").fill("London");
+    await page
+      .getByRole("option", { name: /London/u })
+      .first()
+      .click();
     await expect(count).toHaveText("1");
 
     await remote.click();
     await expect(count).toHaveText("2");
 
-    await location.fill("");
+    await page.getByRole("button", { name: "Clear location filter" }).click();
     await expect(count).toHaveText("5");
 
-    await expect(caption).toContainText("roles open now that Overture can apply to");
-    await expect(page.getByTestId("supply-status")).toContainText("Live catalog");
+    await expect(caption).toContainText("open jobs ready to apply");
+    await expect(page.getByTestId("supply-status")).toContainText("Last updated");
     expect(await layoutOf(page)).toEqual(layoutBefore);
 
     const results = await new AxeBuilder({ page }).analyze();

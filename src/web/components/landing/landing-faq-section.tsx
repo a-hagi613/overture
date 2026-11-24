@@ -6,7 +6,11 @@ import { LANDING_COPY } from "./landing-copy.ts";
 
 export function LandingFaqSection() {
   return (
-    <section aria-labelledby="faq-title" className={`${dsContainer} py-16 sm:py-24`} id="faq">
+    <section
+      aria-labelledby="faq-title"
+      className={`${dsContainer} pb-14 pt-12 sm:pb-20 sm:pt-16`}
+      id="faq"
+    >
       <div className="grid grid-cols-1 items-start gap-x-20 gap-y-8 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <Badge size="eyebrow" variant="signal">

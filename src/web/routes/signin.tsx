@@ -3,7 +3,7 @@ import { SignInLayout } from "../components/signin-layout.tsx";
 
 export function SignInPage() {
   return (
-    <SignInLayout>
+    <SignInLayout mode="signin">
       <SignInCard />
     </SignInLayout>
   );

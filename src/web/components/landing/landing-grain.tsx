@@ -22,7 +22,7 @@ export function LandingGrain({ variant }: LandingGrainProps) {
       className={
         isHero
           ? "pointer-events-none absolute inset-x-0 -top-28 bottom-0 z-0 opacity-[0.19] [mask-image:linear-gradient(to_bottom,black_78%,transparent)] dark:opacity-[0.125]"
-          : "pointer-events-none absolute inset-x-0 top-0 -bottom-56 z-0 opacity-[0.19] [mask-image:linear-gradient(to_top,black_78%,transparent)] dark:opacity-[0.125]"
+          : "pointer-events-none absolute inset-x-0 bottom-0 top-0 z-0 opacity-[0.19] [mask-image:linear-gradient(to_top,black_78%,transparent)] dark:opacity-[0.125]"
       }
     >
       <svg aria-hidden="true" className="absolute inset-0 block h-full w-full dark:hidden">

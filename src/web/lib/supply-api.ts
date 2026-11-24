@@ -1,15 +1,16 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { supplyCountsSchema } from "../../shared/supply.ts";
+import { locationSuggestionsResponseSchema, supplyCountsSchema } from "../../shared/supply.ts";
 
 const SUPPLY_TIMEOUT_MS = 5000;
+const LOCATION_SUGGEST_DEBOUNCE_MS = 250;
 
 export interface SupplyFilterInput {
   role: string | null;
   granularRole: string | null;
   location: string | null;
-  radius: string | null;
+  radius?: string | null;
   remote: boolean;
 }
 
@@ -28,7 +29,7 @@ const loadSupplyCounts = async (filters: SupplyFilterInput) => {
     query.set("location", filters.location);
   }
 
-  if (filters.radius !== null) {
+  if (filters.radius !== undefined && filters.radius !== null) {
     query.set("radius", filters.radius);
   }
 
@@ -73,7 +74,7 @@ export function useSupplyCounts(filters: SupplyFilterInput) {
       filters.role,
       filters.granularRole,
       filters.location,
-      filters.radius,
+      filters.radius ?? null,
       filters.remote,
     ],
     retry: false,
@@ -87,5 +88,64 @@ export function useSupplyCounts(filters: SupplyFilterInput) {
     retry: () => {
       void query.refetch();
     },
+  };
+}
+
+async function loadLocationSuggestions(search: string) {
+  const trimmed = search.trim();
+  const suffix = trimmed === "" ? "" : `?q=${encodeURIComponent(trimmed)}`;
+
+  const response = await fetch(`/api/supply/locations${suffix}`, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(SUPPLY_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Location lookup did not go through (${String(response.status)}).`);
+  }
+
+  return locationSuggestionsResponseSchema.parse(await response.json()).suggestions;
+}
+
+/**
+ * Loads debounced global location autocomplete suggestions from `/api/supply/locations`.
+ * @param search The raw query inside the location combobox search input.
+ * @param enabled Whether the popover is currently open.
+ * @returns Matched suggestions plus loading state.
+ */
+export function useLocationSuggestions(search: string, enabled: boolean) {
+  const [debounced, setDebounced] = useState("");
+  const trimmed = search.trim();
+  const effectiveSearch = trimmed.length < 2 ? "" : debounced;
+
+  useEffect(() => {
+    const nextValue = trimmed.length < 2 ? "" : trimmed;
+    const delay = trimmed.length < 2 ? 0 : LOCATION_SUGGEST_DEBOUNCE_MS;
+
+    const timer = enabled
+      ? globalThis.setTimeout(() => {
+          setDebounced(nextValue);
+        }, delay)
+      : null;
+
+    return () => {
+      if (timer !== null) {
+        globalThis.clearTimeout(timer);
+      }
+    };
+  }, [enabled, trimmed]);
+
+  const query = useQuery({
+    enabled,
+    placeholderData: keepPreviousData,
+    queryFn: async () => loadLocationSuggestions(effectiveSearch),
+    queryKey: ["supply-locations", effectiveSearch],
+    retry: false,
+    staleTime: 300_000,
+  });
+
+  return {
+    loading: query.isFetching,
+    suggestions: query.data ?? [],
   };
 }

@@ -10,6 +10,7 @@ import {
   resolvePlaceQuery,
   sameRegion,
 } from "./geo.ts";
+import { suggestLocations } from "./geo-suggest.ts";
 
 describe("resolveLocation", () => {
   test("a city, state abbreviation and country read right to left", () => {
@@ -293,5 +294,36 @@ describe("helpers", () => {
 
     expect(distance).toBeGreaterThan(20);
     expect(distance).toBeLessThan(30);
+  });
+});
+
+describe("suggestLocations", () => {
+  test("returns curated global options for empty or single-character queries", () => {
+    const empty = suggestLocations("");
+    const single = suggestLocations("n");
+
+    expect(empty.length).toBeGreaterThanOrEqual(6);
+    expect(empty.map((item) => item.label)).toContain("United States");
+    expect(empty.map((item) => item.label)).toContain("Europe");
+    expect(single).toEqual(empty);
+  });
+
+  test("surfaces Ottawa first for ott and New York near the top for ney", () => {
+    const ott = suggestLocations("ott");
+    const ney = suggestLocations("ney");
+
+    expect(ott[0]?.label).toBe("Ottawa");
+    expect(ott[0]?.meta).toContain("Canada");
+    expect(ney.slice(0, 3).map((item) => item.label)).toContain("New York City");
+  });
+
+  test("matches continents, countries, aliases and regions", () => {
+    const eur = suggestLocations("eur");
+    const can = suggestLocations("canada");
+    const usa = suggestLocations("usa");
+
+    expect(eur[0]).toMatchObject({ kind: "continent", label: "Europe" });
+    expect(can[0]).toMatchObject({ kind: "country", label: "Canada" });
+    expect(usa.map((item) => item.label)).toContain("United States");
   });
 });

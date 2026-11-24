@@ -6,7 +6,7 @@ import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { createSupplyRoutes } from "./supply.ts";
-import { supplyCountsSchema } from "../../shared/supply.ts";
+import { locationSuggestionsResponseSchema, supplyCountsSchema } from "../../shared/supply.ts";
 
 const NOW = 1_800_000_000_000;
 const RATE_LIMIT_MAX = 120;
@@ -215,5 +215,20 @@ describe("GET /api/supply", () => {
     expect(limited.headers.get("Retry-After")).toBe("60");
     expect(await limited.json()).toMatchObject({ error: "rate_limited" });
     expect((await request(app, "/api/supply", "198.51.100.5")).status).toBe(200);
+  });
+
+  test("returns global location suggestions for ott and ney queries", async () => {
+    const app = createTestApp();
+    const ottResponse = await request(app, "/api/supply/locations?q=ott");
+    const neyResponse = await request(app, "/api/supply/locations?q=ney");
+
+    expect(ottResponse.status).toBe(200);
+    expect(neyResponse.status).toBe(200);
+
+    const ott = locationSuggestionsResponseSchema.parse(await ottResponse.json());
+    const ney = locationSuggestionsResponseSchema.parse(await neyResponse.json());
+
+    expect(ott.suggestions[0]?.label).toBe("Ottawa");
+    expect(ney.suggestions.slice(0, 3).map((item) => item.label)).toContain("New York City");
   });
 });
