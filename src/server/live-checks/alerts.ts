@@ -10,7 +10,7 @@ import type { LiveCheckResult } from "./types.ts";
 import type { MailReplyCounts } from "../inbox/health.ts";
 
 import { raiseAlert } from "../platform/alerts.ts";
-import { capMicros } from "../platform/llm/caps.ts";
+import { capMicros, llmDayBudget, llmSpendAlertRatio } from "../platform/llm/budget.ts";
 import { llmSpendTodayMicros } from "../platform/llm/usage.ts";
 import { unhandledRejectionCount } from "../platform/process-guard.ts";
 import { catalogWorkerCrashCount } from "../catalog/worker-restarts.ts";
@@ -28,7 +28,6 @@ export const ATS_SUCCESS_FLOOR = 0.7;
 export const PROVIDER_SUCCESS_FLOOR = 0.6;
 export const CODE_CHALLENGE_CEILING = 0.2;
 export const QUEUE_AGE_CEILING_MS = 30 * 60_000;
-export const SPEND_CEILING_RATIO = 0.8;
 export const BACKUP_LAG_CEILING_SECONDS = 300;
 export const DISK_CEILING_RATIO = 0.8;
 export const MIN_ATTEMPTS_TO_JUDGE = 5;
@@ -46,7 +45,7 @@ export interface AlertMetrics {
   providerSuccess: RateMetric[];
   codeChallenge: { attempted: number; codeRate: number; challengeRate: number };
   queueOldestAgeMs: number;
-  llmSpend: { cap: string; spentMicros: number; capMicros: number }[];
+  llmSpend: { cap: string; spentMicros: number; capMicros: number; subscribers: number }[];
   backupReplication: "unconfigured" | "unknown" | "unavailable" | "ok";
   backupLagSeconds: number;
   health: boolean;
@@ -125,6 +124,8 @@ export async function collectAlertMetrics(deps: {
 
   const oldest = Math.min(oldestQueue?.oldest ?? clock.now(), oldestJob?.oldest ?? clock.now());
 
+  const globalBudget = llmDayBudget(db, clock.now());
+
   let health = true;
 
   try {
@@ -164,12 +165,14 @@ export async function collectAlertMetrics(deps: {
       {
         cap: "global",
         spentMicros: llmSpendTodayMicros(db, clock.now(), null, null),
-        capMicros: capMicros(db, "llm.cap_global_day_usd"),
+        capMicros: globalBudget.budgetMicros,
+        subscribers: globalBudget.subscribers,
       },
       {
         cap: "tagging",
         spentMicros: llmSpendTodayMicros(db, clock.now(), "tag_fallback", null),
         capMicros: capMicros(db, "llm.cap_tagging_day_usd"),
+        subscribers: 0,
       },
     ],
     backupReplication: deps.backupReplication,
@@ -262,17 +265,20 @@ export function evaluateAlerts(db: AppDatabase, clock: Clock, metrics: AlertMetr
     ceilingMs: QUEUE_AGE_CEILING_MS,
   });
 
+  const spendCeilingRatio = llmSpendAlertRatio(db);
+
   const overSpend = metrics.llmSpend.filter(
-    (entry) => entry.capMicros > 0 && entry.spentMicros > entry.capMicros * SPEND_CEILING_RATIO,
+    (entry) => entry.capMicros > 0 && entry.spentMicros >= entry.capMicros * spendCeilingRatio,
   );
 
   const [firstOverSpend] = overSpend;
 
   judge("alert.llm.spend", overSpend.length > 0, "llm.spend", {
     cap: overSpend.map((entry) => entry.cap).join(","),
-    ceilingRatio: SPEND_CEILING_RATIO,
+    ceilingRatio: spendCeilingRatio,
     spentMicros: firstOverSpend?.spentMicros ?? 0,
     capMicros: firstOverSpend?.capMicros ?? 0,
+    subscribers: firstOverSpend?.subscribers ?? 0,
   });
 
   judge("alert.backup.failure", metrics.backupReplication === "unavailable", "backup.failure", {
@@ -345,7 +351,7 @@ export function drillAlertMetrics() {
     providerSuccess: [{ key: "browser_use", attempts: 10, rate: 0.1 }],
     codeChallenge: { attempted: 10, codeRate: 0.5, challengeRate: 0.5 },
     queueOldestAgeMs: 60 * 60_000,
-    llmSpend: [{ cap: "global", spentMicros: 9_000_000, capMicros: 10_000_000 }],
+    llmSpend: [{ cap: "global", spentMicros: 9_000_000, capMicros: 10_000_000, subscribers: 0 }],
     backupReplication: "unavailable",
     backupLagSeconds: 900,
     health: false,

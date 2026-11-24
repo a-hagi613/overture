@@ -12,7 +12,6 @@ import { readMailSummary } from "./mail/budget.ts";
 import { getAllKillSwitches, getSettingNumber } from "./settings/index.ts";
 
 const ALERT_LIST_LIMIT = 50;
-const MAIL_WARN_RATIO = 0.8;
 const INTEGER_TEXT = /^\d+$/u;
 const DECIMAL_TEXT = /^\d+(?:\.\d+)?$/u;
 
@@ -147,6 +146,14 @@ export function validateAdminSettingValue(key: string, value: string) {
     return DECIMAL_TEXT.test(trimmed);
   }
 
+  if (key === "llm.spend_alert_ratio" || key === "mail.warning_share") {
+    return DECIMAL_TEXT.test(trimmed) && Number(trimmed) > 0 && Number(trimmed) <= 1;
+  }
+
+  if (key === "mail.cap_per_subscriber") {
+    return INTEGER_TEXT.test(trimmed);
+  }
+
   return trimmed.length > 0;
 }
 
@@ -196,7 +203,7 @@ function activeProblemsOf(db: AppDatabase, now: number, backupStatus: BackupStat
 
   const mail = readMailSummary(db, now);
 
-  if (mail.refusedAt !== null) {
+  if (mail.capReached) {
     problems.push({
       code: "mail_cap_reached",
       detail: `${String(mail.total)} of ${String(mail.cap)} emails sent in ${mail.month}.`,
@@ -204,7 +211,7 @@ function activeProblemsOf(db: AppDatabase, now: number, backupStatus: BackupStat
       severity: "critical",
       title: "Monthly email cap reached",
     });
-  } else if (mail.reserveRefusedAt !== null) {
+  } else if (mail.reserveReached) {
     problems.push({
       code: "mail_reserve_reached",
       detail: `${String(mail.total)} of ${String(mail.cap)} emails sent; notices paused to keep ${String(mail.reserve)} for sign-in.`,
@@ -212,13 +219,13 @@ function activeProblemsOf(db: AppDatabase, now: number, backupStatus: BackupStat
       severity: "warning",
       title: "Email sign-in reserve in force",
     });
-  } else if (mail.warnedAt !== null || (mail.cap > 0 && mail.total >= mail.cap * MAIL_WARN_RATIO)) {
+  } else if (mail.warnedAt !== null || (mail.cap > 0 && mail.total >= mail.warningAt)) {
     problems.push({
       code: "mail_cap_near",
       detail: `${String(mail.total)} of ${String(mail.cap)} emails sent in ${mail.month}.`,
       id: "mail:cap_near",
       severity: "warning",
-      title: "Monthly email usage above 80%",
+      title: `Monthly email usage above ${String(Math.round(mail.warningShare * 100))}%`,
     });
   }
 

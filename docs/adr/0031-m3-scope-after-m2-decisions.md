@@ -17,11 +17,13 @@ forwarded ATS mail (ADR 0028), and the plans of ADR 0018.
   cost review, #184); the prices stay configuration until the owner confirms them.
 - **The landing and pricing pages** are redrawn for the current product: Overture prepares every application and sends it
   when you approve; the ATSes are Greenhouse, Lever, Ashby, Personio and Workable; no Workday; the real prices.
-- **The owner's console steps come last.** M3 ends with "M3: owner setup" (the Stripe account, Managed Payments approval,
-  live keys, the webhook endpoint, tax settings, final prices) and then "M3 close-out: open to the public". Everything else
-  is built and verified against stripe-mock and signed webhook fixtures, gated by configuration.
-- **If Stripe declines Managed Payments**, plain Stripe Billing with Stripe Tax goes behind the same `Payments` port
-  (ADR 0018); the owner setup ticket finds this out first.
+- **The owner's console steps come last.** M3 ends with "M3: owner setup" (the Stripe account, two recurring prices,
+  live keys, the webhook endpoint, the portal, Stripe Tax settings, final prices) and then "M3 close-out: open to the
+  public". Everything else is built and verified against stripe-mock and signed webhook fixtures, gated by
+  configuration.
+- **Billing uses regular Stripe Billing with Stripe Tax, not Managed Payments.** Overture is the seller and Stripe the
+  payment processor (ADR 0018); the `Payments` port keeps the provider seam, and the margin page measures net revenue
+  after Stripe's 3.6 % + $0.30 domestic fee (5.1 % + $0.30 international).
 
 ## Considered Options
 

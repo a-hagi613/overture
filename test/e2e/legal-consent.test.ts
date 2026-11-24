@@ -86,7 +86,7 @@ test("the legal pages cover billing and mark themselves as drafts", async ({
   await expect(
     page.getByText(/never charged and never uses one of your applications/u),
   ).toBeVisible();
-  await expect(page.getByText(/merchant of record/u).first()).toBeVisible();
+  await expect(page.getByText(/Stripe processes the payment for Overture/u).first()).toBeVisible();
   await expect(
     page.getByText("Draft for owner review, not legal advice.", { exact: false }),
   ).toBeVisible();

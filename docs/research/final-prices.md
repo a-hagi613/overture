@@ -29,20 +29,25 @@ With Anthropic spend included, the number is $0.027. The browser-only figure the
 
 ## Margin per plan
 
-Gross revenue per Application is the price divided by its allowance. Stripe Managed Payments charges 6.4 % + $0.30 per
-charge; the fee line is that whole charge and the net line is what reaches Overture. Profit per Application is net revenue
-minus the measured cost, and Margin is profit over gross revenue. Taxes are set and collected by Stripe as merchant of
-record, so they are neither revenue nor cost here.
+Gross revenue per Application is the price divided by its allowance. Regular Stripe Billing charges 3.6 % + $0.30 per
+domestic charge (2.9 % card plus 0.7 % Billing) and 5.1 % + $0.30 on an international card; the fee line is that whole
+charge, rounded to cents, and the net line is what reaches Overture. Profit per Application is net revenue minus the
+measured cost, and Margin is profit over net revenue. Stripe Tax calculates the tax on each charge and Overture is the
+seller, so tax is neither revenue nor cost here.
 
 | Plan | Price | Applications | Gross per Application | Stripe fee | Net revenue | Net per Application | Cost | Profit per Application | Margin |
 |---|---|---|---|---|---|---|---|---|---|
 | Trial | $0 | 3 | $0.000 | $0.00 | $0.00 | $0.000 | $0.027 | −$0.027 | n/a (3 Applications cost about $0.08) |
-| Week | $9.99 | 50 | $0.200 | $0.94 | $9.05 | $0.181 | $0.027 | $0.154 | 77.1 % |
-| Month | $29.99 | 250 | $0.120 | $2.22 | $27.77 | $0.111 | $0.027 | $0.084 | 70.1 % |
+| Week | $9.99 | 50 | $0.200 | $0.66 | $9.33 | $0.187 | $0.027 | $0.160 | 85.5 % |
+| Month | $29.99 | 250 | $0.120 | $1.38 | $28.61 | $0.114 | $0.027 | $0.087 | 76.4 % |
 
-Break-even at the measured cost is far below the price: a Month Application nets $0.111 against $0.027 of cost and a Week
-Application nets $0.181. After fees, a 60 % margin holds while cost per completed Application stays under about $0.044 on
-Month and $0.072 on Week. The cost-m1 note's 10-minute code paste case ($0.038 per completed) keeps Month above 60 %.
+An international card takes 1.5 points more, so the same charge nets $0.184 an Application on Week and $0.113 on
+Month; the admin margin page reports both baselines and measures profit against the domestic one.
+
+Break-even at the measured cost is far below the price: a Month Application nets $0.114 against $0.027 of cost and a
+Week Application nets $0.187. After fees, a 60 % margin holds while cost per completed Application stays under about
+$0.046 on Month and $0.075 on Week. The cost-m1 note's 10-minute code paste case ($0.038 per completed) keeps Month
+above 60 %.
 
 The model and browser levers do not change with the price (cost-m1 §Limits). The live Stripe price objects are still an
 owner step (`scripts/setup-stripe.ts`, #254).
@@ -50,7 +55,7 @@ owner step (`scripts/setup-stripe.ts`, #254).
 ## Before the price is final
 
 1. **The model default and price table** (cost-m1 §5.2). The code defaults to `claude-haiku-4-5`, whose batch rates are
-   10× the Haiku 5.5 rates the spec names. At the 4.5 default the Anthropic line is $0.0051 an Application, the cost is $0.0316 and the Month margin falls to 73 % per Application (67 % per user-month once fixed infrastructure is included, cost-m1 §3). Fix
+   10× the Haiku 5.5 rates the spec names. At the 4.5 default the Anthropic line is $0.0051 an Application, the cost is $0.0316 and the Month margin falls to 72 % per Application (67 % per user-month once fixed infrastructure is included, cost-m1 §3). Fix
    the default and the exact-match prices before the beta wave, and check the Console price.
 2. **Real measurements** from the beta wave: minutes, megabytes and code-wait minutes per ATS (cost-m1 §7). Egress is
    the one lever that changes the shape of the business (cost-m1 lever 1, $5/GB against $0.20/GB). If real forms carry

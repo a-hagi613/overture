@@ -312,8 +312,9 @@ No migration, secret or DNS record is part of this deployment.
 ## M3: Stripe plans, webhook and billing portal (owner runbook)
 
 Billing turns on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both on `overture-web` (SPEC §11).
-`scripts/setup-stripe.ts` creates the two recurring prices and the webhook the app verifies, and configures the billing
-portal; it is idempotent, so the same run can be repeated safely.
+Regular Stripe Billing handles the charges and Stripe Tax calculates the tax; Overture is the seller and Stripe the
+payment processor (ADR 0018, ADR 0031). `scripts/setup-stripe.ts` creates the two recurring prices and the webhook the
+app verifies, and configures the billing portal; it is idempotent, so the same run can be repeated safely.
 
 ### 1. Store the key as a repository secret
 
@@ -344,10 +345,20 @@ with `openssl rand -hex 32` only when the app does not have one. The script's `S
 | Week | `Overture Week` | $9.99 USD recurring weekly (50 applications over 7 days) | `overture_week_usd` |
 | Month | `Overture Month` | $29.99 USD recurring monthly (250 applications over 30 days) | `overture_month_usd` |
 
-Both products are created with `tax_code=txcd_10103000` (SaaS, personal use), which Stripe Managed Payments requires.
+Both products are created with `tax_code=txcd_10103000` (SaaS, personal use), the tax code Stripe Tax uses to calculate
+the tax on each charge. No Managed Payments parameter is set: Checkout is a standard `mode=subscription` session and
+the products, prices, webhook and portal configuration are the plain Stripe Billing objects.
 
 The webhook endpoint is `https://tryoverture.com/webhooks/stripe` and subscribes to the nine events
-`src/server/billing/webhooks.ts` handles. The billing portal configuration cancels at period end, updates payment
+`src/server/billing/webhooks.ts` handles: `checkout.session.completed` and `checkout.session.async_payment_succeeded`,
+`customer.created`, `customer.updated`, `invoice.paid`, `invoice.payment_failed`, and `customer.subscription.created`,
+`customer.subscription.updated` and `customer.subscription.deleted`. Each delivery is verified against
+`Stripe-Signature` and claimed once in `stripe_events`, so a retry is a no-op. Refunds are not a webhook: the admin
+refund asks Stripe for the refund first, then records the refunded grant, its ledger row and its audit entry in one
+local transaction; a crash between those two steps leaves a Stripe refund with no local record, which the daily
+reconciliation reports as `refund_without_ledger` rather than losing silently. Because the reconciliation compares
+Stripe's invoices and refunds with the ledger, a `charge.refunded` delivery would add no state and the endpoint does
+not subscribe to it. The billing portal configuration cancels at period end, updates payment
 methods, shows invoice history and switches a subscription between the Week and Month prices with
 `proration_behavior=none`; it returns to `https://tryoverture.com/profile/billing` and links the site's privacy and
 terms pages (ADR 0037: Billing lives under Profile).

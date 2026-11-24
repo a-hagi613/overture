@@ -1,29 +1,12 @@
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
-import { getSetting } from "../settings/index.ts";
+
+import { capMicros, llmDayBudgetMicros, llmUserDayBudgetMicros } from "./budget.ts";
 import { DAY_MS, dayStartUtc, llmSpendTodayMicros } from "./usage.ts";
 
 export const TAGGING_PURPOSES = ["tag_fallback"] as const;
 
 export type LlmCapKind = "user" | "global" | "tagging";
-
-const GLOBAL_DAILY_CAP_KEY = "llm.daily_spend_cap_micros";
-
-export function capMicros(db: AppDatabase, key: string) {
-  if (key === "llm.cap_global_day_usd") {
-    const storedMicros = getSetting(db, GLOBAL_DAILY_CAP_KEY);
-    const micros = storedMicros === null ? Number.NaN : Number(storedMicros);
-
-    if (Number.isFinite(micros) && micros >= 0) {
-      return Math.round(micros);
-    }
-  }
-
-  const raw = getSetting(db, key);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 1_000_000) : 0;
-}
 
 export interface LlmCapCheck {
   withinCaps: boolean;
@@ -53,9 +36,9 @@ export function checkLlmCaps(db: AppDatabase, clock: Clock, input: LlmCapInput) 
 
   const estimate = Math.max(input.estimatedCostMicros, 0);
 
-  const userCap = input.userId === null ? null : capMicros(db, "llm.cap_user_day_usd");
+  const userCap = input.userId === null ? null : llmUserDayBudgetMicros(db, input.userId, now);
   const taggingCap = isTagging(input.purpose) ? capMicros(db, "llm.cap_tagging_day_usd") : null;
-  const globalCap = capMicros(db, "llm.cap_global_day_usd");
+  const globalCap = llmDayBudgetMicros(db, now);
 
   if (userCap !== null) {
     const spent = llmSpendTodayMicros(db, now, null, input.userId);

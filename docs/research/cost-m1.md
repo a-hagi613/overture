@@ -133,9 +133,9 @@ attempts and 70 sent.
 | **Total** | **$2.38** | **$10.17** |
 | **Gross margin** | **80 %** | **71 %** |
 
-The same month at the 4.5 default is $11.55 (67 %), and $12.29 (64 %) on a form with three open questions. Stripe
-Managed Payments fees (M3, from the merchant-of-record rate) and refunds are not included; the trial's 3 applications
-cost about $0.08 and carry no revenue by design.
+The same month at the 4.5 default is $11.55 (67 %), and $12.29 (64 %) on a form with three open questions. Regular
+Stripe Billing fees (M3, 3.6 % + $0.30 domestic and 5.1 % + $0.30 international) and refunds are not included; the
+trial's 3 applications cost about $0.08 and carry no revenue by design.
 
 With egress at $0.20/GB the Month user's cost falls to **$5.69** (84 % margin); with the trim at its realistic 16–22 %
 it falls to **$9.4–$9.1**. Egress and the trim together: $5.7, because egress has already removed most of what the

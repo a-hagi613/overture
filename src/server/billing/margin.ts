@@ -11,6 +11,12 @@ import { COST_GATE_MICROS, COST_REPORT_WINDOW_DAYS, isAttempted } from "../dispa
 import { attempts, grants, llmUsage, mailUsage, users } from "../platform/db/schema.ts";
 
 import { PLAN_DEFINITIONS } from "./plans.ts";
+import {
+  netRevenueMicrosPerApplication,
+  STRIPE_DOMESTIC_FEE_RATE,
+  STRIPE_FIXED_FEE_MICROS,
+  STRIPE_INTERNATIONAL_FEE_RATE,
+} from "./stripe-fees.ts";
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -62,7 +68,14 @@ export interface MarginPlanRow {
   users: number;
   completed: number;
   costMicrosPerCompleted: number | null;
+  /** The plan price divided by its Applications, before Stripe's fee. */
   revenueMicrosPerApplication: number;
+  /** Stripe's fee per Application (3.6 % + $0.30 domestic, 5.1 % + $0.30 international). */
+  stripeFeeMicrosPerApplication: number;
+  /** Net revenue per Application after a domestic card's fee. */
+  netRevenueMicrosPerApplication: number;
+  /** Net revenue per Application if the same charge were on an international card. */
+  internationalNetRevenueMicrosPerApplication: number;
   marginMicrosPerApplication: number | null;
   marginRatio: number | null;
   costGateMet: boolean | null;
@@ -120,7 +133,15 @@ function rowFor(plan: MarginPlan, totals: Totals) {
   const costMicros = totals.browserMicros + totals.anthropicMicros;
   const costPerCompleted = totals.sent === 0 ? null : Math.round(costMicros / totals.sent);
   const revenuePerApplication = Math.round(priceMicros / applications);
-  const margin = costPerCompleted === null ? null : revenuePerApplication - costPerCompleted;
+  const netPerApplication = netRevenueMicrosPerApplication(priceMicros, applications);
+
+  const internationalNetPerApplication = netRevenueMicrosPerApplication(
+    priceMicros,
+    applications,
+    STRIPE_INTERNATIONAL_FEE_RATE,
+  );
+
+  const margin = costPerCompleted === null ? null : netPerApplication - costPerCompleted;
 
   return {
     plan,
@@ -130,9 +151,11 @@ function rowFor(plan: MarginPlan, totals: Totals) {
     completed: totals.sent,
     costMicrosPerCompleted: costPerCompleted,
     revenueMicrosPerApplication: revenuePerApplication,
+    stripeFeeMicrosPerApplication: revenuePerApplication - netPerApplication,
+    netRevenueMicrosPerApplication: netPerApplication,
+    internationalNetRevenueMicrosPerApplication: internationalNetPerApplication,
     marginMicrosPerApplication: margin,
-    marginRatio:
-      margin === null || revenuePerApplication === 0 ? null : margin / revenuePerApplication,
+    marginRatio: margin === null || netPerApplication === 0 ? null : margin / netPerApplication,
     costGateMet: costPerCompleted === null ? null : costPerCompleted <= COST_GATE_MICROS,
   };
 }
@@ -252,6 +275,11 @@ export function buildMarginReport(db: AppDatabase, clock: Clock) {
       completed === 0 ? null : Math.round(overall.browserMicros / completed),
     anthropicMicrosPerCompleted:
       completed === 0 ? null : Math.round(overall.anthropicMicros / completed),
+    stripe: {
+      domesticRate: STRIPE_DOMESTIC_FEE_RATE,
+      fixedFeeMicros: STRIPE_FIXED_FEE_MICROS,
+      internationalRate: STRIPE_INTERNATIONAL_FEE_RATE,
+    },
     plans: MARGIN_PLANS.map((plan) => rowFor(plan, byPlan.get(plan) ?? emptyTotals())),
     beside: {
       fixedInfraMicrosPerMonth: FIXED_INFRA_MICROS_PER_MONTH,

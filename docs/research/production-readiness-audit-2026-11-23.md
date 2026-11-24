@@ -89,10 +89,10 @@ Production `limits.daily_cap` was raised from `2` to `10` with an `admin_audit` 
    - `useLiveUpdates` never invalidates `["ready"]` / `["threads"]`, and `useMarkRead` doesn't invalidate `["nav"]` (`#509`).
 
 ### 3.4 Unit Economics Check
-- **Verified pricing (`src/shared/plans.ts` & `docs/research/final-prices.md`):**
+- **Verified pricing (`src/server/billing/margin.ts` & `docs/research/final-prices.md`):**
   - **Trial:** 3 Applications free (~$0.08 acquisition cost).
-  - **Week:** **$9.99 / 50 Applications / 7 days** → $0.200 gross / **$0.181 net** (after Stripe Managed Payments 6.4% + $0.30) → at $0.027 modeled cost = **77.1% gross margin**.
-  - **Month:** **$29.99 / 250 Applications / 30 days** → $0.120 gross / **$0.111 net** → **70.1% gross margin**.
+  - **Week:** **$9.99 / 50 Applications / 7 days** → $0.200 gross / **$0.187 net** (after regular Stripe Billing 3.6% + $0.30 domestic; $0.184 on an international card). Corrected from the Managed Payments figures in WS-1a (#564).
+  - **Month:** **$29.99 / 250 Applications / 30 days** → $0.120 gross / **$0.114 net** ($0.113 international). Corrected in WS-1a (#564).
   - **Fixed infra:** **$20.76/mo** (Fly VM $13.39 + 10 GB vol $1.50 + CF Workers $5.00 + domain $0.87). **Break-even: 1 Month subscriber covers fixed infra.**
 - **Model check:** `src/server/platform/llm/models.ts:13` defaults to `DEFAULT_ANTHROPIC_MODEL = "claude-haiku-5-5"` ($0.05/$0.25 per MTok batch), NOT the 10× pricier `claude-haiku-4-5`. Verify `settings['llm.model']` is unset or `claude-haiku-5-5` in prod.
 - **Cost levers:** Drop `SESSION_TIMEOUT_MINUTES` from `15` → `12` (`src/server/dispatch/executor.ts:62`, in `#506`) to cut worst-case zombie session holds by 20% while keeping the 10-min code-paste flow intact. Complete the owner 5-app live run (#38) to replace modeled Browser Use proxy MB (2.71 MB) with real ATS measurements.

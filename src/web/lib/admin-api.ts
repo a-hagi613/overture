@@ -104,6 +104,13 @@ export const overviewSchema = z.object({
     warnedAt: z.number().nullable(),
     reserveRefusedAt: z.number().nullable(),
     refusedAt: z.number().nullable(),
+    baseCap: z.number(),
+    perSubscriber: z.number(),
+    subscribers: z.number(),
+    warningAt: z.number(),
+    warningShare: z.number(),
+    capReached: z.boolean(),
+    reserveReached: z.boolean(),
   }),
   audit: z.array(auditRowSchema),
 });
@@ -260,6 +267,9 @@ const marginPlanRowSchema = z.object({
   completed: z.number(),
   costMicrosPerCompleted: z.number().nullable(),
   revenueMicrosPerApplication: z.number(),
+  stripeFeeMicrosPerApplication: z.number(),
+  netRevenueMicrosPerApplication: z.number(),
+  internationalNetRevenueMicrosPerApplication: z.number(),
   marginMicrosPerApplication: z.number().nullable(),
   marginRatio: z.number().nullable(),
   costGateMet: z.boolean().nullable(),
@@ -273,6 +283,11 @@ export const marginResponseSchema = z.object({
   costMicrosPerCompleted: z.number().nullable(),
   browserMicrosPerCompleted: z.number().nullable(),
   anthropicMicrosPerCompleted: z.number().nullable(),
+  stripe: z.object({
+    domesticRate: z.number(),
+    fixedFeeMicros: z.number(),
+    internationalRate: z.number(),
+  }),
   plans: z.array(marginPlanRowSchema),
   beside: z.object({
     fixedInfraMicrosPerMonth: z.number(),
@@ -1251,9 +1266,13 @@ export const llmUsageModelRowSchema = llmUsageTotalsSchema.extend({
 
 export const llmUsageCapsSchema = z.object({
   dailySpendCapMicros: z.number(),
+  baseDailySpendCapMicros: z.number(),
+  perSubscriberDayMicros: z.number(),
+  subscribers: z.number(),
   monthlySpendCapMicros: z.number().nullable(),
   taggingDailyCapMicros: z.number(),
   userDailyCapMicros: z.number(),
+  subscriberUserDailyCapMicros: z.number(),
 });
 
 export const llmUsageResponseSchema = z.object({

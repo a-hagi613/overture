@@ -14,15 +14,30 @@ function monthCapHint(spentMicros: number, monthlyCapMicros: number | null) {
     : copy.admin.llmStatMonthCap(formatted);
 }
 
+function dailyHintOf(view: LlmUsageResponse) {
+  const dailyCapLabel = formatUsdMicros(view.caps.dailySpendCapMicros);
+
+  if (view.today.costMicros > view.caps.dailySpendCapMicros) {
+    return copy.admin.llmStatTodayOver(dailyCapLabel);
+  }
+
+  if (view.caps.subscribers > 0) {
+    return copy.admin.llmStatTodayScaled(
+      dailyCapLabel,
+      formatUsdMicros(view.caps.baseDailySpendCapMicros),
+      formatUsdMicros(view.caps.perSubscriberDayMicros),
+      view.caps.subscribers,
+    );
+  }
+
+  return copy.admin.llmStatTodayCap(dailyCapLabel);
+}
+
 export function LlmSummaryCards({ view }: { view: LlmUsageResponse }) {
   const dailyMeter = capRatioOf(view.today.costMicros, view.caps.dailySpendCapMicros);
   const monthlyMeter = capRatioOf(view.month.costMicros, view.caps.monthlySpendCapMicros);
-  const dailyCapLabel = formatUsdMicros(view.caps.dailySpendCapMicros);
 
-  const dailyHint =
-    view.today.costMicros > view.caps.dailySpendCapMicros
-      ? copy.admin.llmStatTodayOver(dailyCapLabel)
-      : copy.admin.llmStatTodayCap(dailyCapLabel);
+  const dailyHint = dailyHintOf(view);
 
   const cacheHint =
     view.allTime.inputTokens > 0
