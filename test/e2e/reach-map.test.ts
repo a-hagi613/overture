@@ -169,7 +169,9 @@ test("test-only diffs select only the touched test and single-route UI edits sta
     allTests,
   });
 
-  const boardVisitors = allTests.filter((file) => map.tests[file]?.routes.includes("/board"));
+  const boardVisitors = allTests.filter((file) =>
+    map.tests[file]?.routes.includes("/applications"),
+  );
 
   expect(boardCardPlan.full).toBe(false);
   expect(boardCardPlan.selected).toContain("test/e2e/board-match-board.test.ts");

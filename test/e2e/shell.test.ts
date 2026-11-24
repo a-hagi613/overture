@@ -242,7 +242,6 @@ test("the navigation, phone header, profile hub and Applications page render at 
         await document.fonts.ready;
       });
       await page.screenshot({
-        fullPage: true,
         path: join(process.cwd(), `test/e2e/.tmp/nav-home-${String(width)}-${theme}.png`),
       });
 
@@ -254,7 +253,6 @@ test("the navigation, phone header, profile hub and Applications page render at 
         await document.fonts.ready;
       });
       await page.screenshot({
-        fullPage: true,
         path: join(process.cwd(), `test/e2e/.tmp/nav-applications-${String(width)}-${theme}.png`),
       });
 
@@ -265,7 +263,6 @@ test("the navigation, phone header, profile hub and Applications page render at 
           await document.fonts.ready;
         });
         await page.screenshot({
-          fullPage: true,
           path: join(process.cwd(), `test/e2e/.tmp/nav-profile-hub-${String(width)}-${theme}.png`),
         });
       }

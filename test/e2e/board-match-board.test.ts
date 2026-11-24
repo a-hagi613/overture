@@ -56,7 +56,7 @@ async function expectBoardMatches(
     page.getByRole("heading", { level: 2, name: "Senior Backend Engineer" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Track every application from match to decision.").filter({ visible: true }),
+    page.getByText("Every application from match to decision.").filter({ visible: true }),
   ).toBeVisible();
 
   if (width === 1280) {

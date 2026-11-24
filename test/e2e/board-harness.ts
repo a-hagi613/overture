@@ -536,7 +536,7 @@ export async function openBoard(
   width: number,
   selectedId: string,
 ) {
-  await page.goto(`${appServerUrl}/board`);
+  await page.goto(`${appServerUrl}/applications`);
 
   if (width === 390) {
     await page.getByRole("button", { name: /Waiting/u }).click();
