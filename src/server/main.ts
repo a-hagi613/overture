@@ -42,7 +42,11 @@ import { isDemoUser } from "./demo/role.ts";
 import { demoStartupNotice } from "./demo/startup.ts";
 import { logError, logInfo } from "./platform/log.ts";
 import { openCatalogDatabase, openDatabase } from "./platform/db/client.ts";
+import type { CatalogDatabase } from "./platform/db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "./platform/db/migrate.ts";
+import { createCatalogHotSwap } from "./catalog/hot-swap.ts";
+import type { CatalogHotSwap } from "./catalog/hot-swap.ts";
+import { createConfiguredObjectStore } from "./platform/object-store.ts";
 import { createClock } from "./platform/ports/clock.ts";
 import { createRandom } from "./platform/ports/random.ts";
 import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
@@ -219,7 +223,35 @@ const { db, sqlite: appSqlite } = openDatabase(databasePath, {
   checkpointOwner: env.LITESTREAM_OWNS_CHECKPOINTS ? "litestream" : "sqlite",
 });
 
-const { db: catalogDb, sqlite: catalogSqlite } = openCatalogDatabase(catalogDatabasePath);
+let catalogHotSwap: CatalogHotSwap | null = null;
+
+if (env.CATALOG_R2_HOT_SWAP) {
+  const candidate = createCatalogHotSwap({
+    catalogPath: catalogDatabasePath,
+    log: (event, message) => {
+      logInfo(event, message);
+    },
+    objects: createConfiguredObjectStore(),
+  });
+
+  try {
+    await candidate.coldBoot();
+    catalogHotSwap = candidate;
+  } catch (error) {
+    logError("catalog.hot_swap", error);
+    candidate.close();
+  }
+}
+
+let localCatalog: ReturnType<typeof openCatalogDatabase> | null = null;
+let catalogDb: CatalogDatabase;
+
+if (catalogHotSwap === null) {
+  localCatalog = openCatalogDatabase(catalogDatabasePath);
+  catalogDb = localCatalog.db;
+} else {
+  catalogDb = catalogHotSwap.db;
+}
 
 createEventLoopLagMonitor({
   onLag: (lagMs) => {
@@ -232,7 +264,9 @@ createEventLoopLagMonitor({
 
 migrateDatabase(db, "drizzle");
 
-migrateCatalogDatabase(catalogDb, "drizzle-catalog");
+if (localCatalog !== null) {
+  migrateCatalogDatabase(catalogDb, "drizzle-catalog");
+}
 
 assertMasterKeyCoverage(db, masterKeyring);
 
@@ -334,7 +368,7 @@ if (env.INBOUND_HMAC_SECRET !== undefined) {
   };
 }
 
-if (env.DEMO_LOGIN_ENABLED) {
+if (env.DEMO_LOGIN_ENABLED && catalogHotSwap === null) {
   authOptions.ensureDemoUser = async () => {
     const seeded = await seedDemoAccount({
       catalogDb,
@@ -400,17 +434,36 @@ const catalogDeps = { db, catalogDb, clock };
 
 const catalogWorker = createCatalogSweepWorker({ db, clock });
 
-const catalogJobHandlers: JobHandlers = {
-  [BACKFILL_JOB_KIND]: async () => {
-    await runBackfillJob(catalogWorker, catalogDeps);
-  },
-  [SWEEP_JOB_KIND]: async () => {
-    await runSweepJob(catalogWorker, catalogDeps);
-  },
-  [WORKABLE_INGEST_JOB_KIND]: async () => {
-    await runWorkableIngestJob(catalogWorker, catalogDeps);
-  },
-};
+const catalogIngestionOff = catalogHotSwap !== null;
+
+function skipCatalogIngestion(kind: string) {
+  return async () => {
+    logInfo(
+      "catalog.hot_swap",
+      `skipped ${kind}: the catalog is a read-only R2 hot-swap, not an in-process sweep`,
+    );
+
+    await Promise.resolve();
+  };
+}
+
+const catalogJobHandlers: JobHandlers = catalogIngestionOff
+  ? {
+      [BACKFILL_JOB_KIND]: skipCatalogIngestion(BACKFILL_JOB_KIND),
+      [SWEEP_JOB_KIND]: skipCatalogIngestion(SWEEP_JOB_KIND),
+      [WORKABLE_INGEST_JOB_KIND]: skipCatalogIngestion(WORKABLE_INGEST_JOB_KIND),
+    }
+  : {
+      [BACKFILL_JOB_KIND]: async () => {
+        await runBackfillJob(catalogWorker, catalogDeps);
+      },
+      [SWEEP_JOB_KIND]: async () => {
+        await runSweepJob(catalogWorker, catalogDeps);
+      },
+      [WORKABLE_INGEST_JOB_KIND]: async () => {
+        await runWorkableIngestJob(catalogWorker, catalogDeps);
+      },
+    };
 
 const anthropicBatches = createDurableBatches({
   db,
@@ -443,11 +496,18 @@ const tagDeps = {
 
 const personal = createPersonalCrypto(db, masterKeyring);
 
-if (env.DEMO_LOGIN_ENABLED) {
+if (env.DEMO_LOGIN_ENABLED && catalogHotSwap === null) {
   const demo = await seedDemoAccount({ catalogDb, clock, db, objects, personal });
 
   logInfo("demo", demoStartupNotice(db, env.NODE_ENV));
   logInfo("demo", `account ready: ${demo.userId}`);
+}
+
+if (env.DEMO_LOGIN_ENABLED && catalogHotSwap !== null) {
+  logInfo(
+    "demo",
+    "demo seeding is skipped: the catalog is a read-only R2 hot-swap and cannot take seeded Postings",
+  );
 }
 
 const planner = createPlanner({ clock, db, random });
@@ -515,6 +575,15 @@ const llmJobHandlers: JobHandlers =
     ? {}
     : {
         [TAG_FALLBACK_JOB_KIND]: async () => {
+          if (catalogIngestionOff) {
+            logInfo(
+              "catalog.hot_swap",
+              `skipped ${TAG_FALLBACK_JOB_KIND}: the catalog is a read-only R2 hot-swap`,
+            );
+
+            return;
+          }
+
           await runTagFallbackJob(tagDeps);
         },
         [LLM_BATCH_POLL_JOB_KIND]: async (payload) => {
@@ -936,7 +1005,7 @@ const liveCheckJobHandlers: JobHandlers = {
 
 const retentionJobHandlers: JobHandlers = {
   [RETENTION_JOB_KIND]: async () => {
-    await retentionJobHandler(db, catalogDb, clock);
+    await retentionJobHandler(db, catalogDb, clock, { readOnly: catalogHotSwap !== null });
   },
 };
 
@@ -1036,15 +1105,23 @@ if (dispatchTick !== null) {
 
 ensurePlannerQueuedForRunningUsers(db, clock);
 
-ensureSweepQueued(catalogDeps);
+if (!catalogIngestionOff) {
+  ensureSweepQueued(catalogDeps);
+}
 
 if (env.NODE_ENV === "production") {
   ensureLiveCheckQueued(db, clock);
-  ensureWorkableIngestQueued(db, clock);
+
+  if (!catalogIngestionOff) {
+    ensureWorkableIngestQueued(db, clock);
+  }
 }
 
 if (env.ANTHROPIC_API_KEY !== undefined) {
-  ensureTagFallbackQueued(db, clock);
+  if (!catalogIngestionOff) {
+    ensureTagFallbackQueued(db, clock);
+  }
+
   ensurePrepQueuedForRunningUsers(db, clock);
 }
 
@@ -1061,6 +1138,7 @@ function requestWithAbsoluteUrl(request: Request) {
 const app = createApp({
   db,
   catalogDb,
+  catalogHotSwap: catalogHotSwap ?? undefined,
   clock,
   databasePath,
   degraded: degradedFlag,
@@ -1163,7 +1241,11 @@ function handleShutdown(signal: string) {
       }
 
       try {
-        catalogSqlite.close();
+        if (catalogHotSwap === null) {
+          localCatalog?.sqlite.close();
+        } else {
+          catalogHotSwap.close();
+        }
       } catch (error) {
         logError("shutdown", error);
       }

@@ -34,6 +34,7 @@ import { pauseForBlocker } from "../profile/running-state.ts";
 import { parseSendWindow, planningWindow } from "./planning.ts";
 import { APPLICATION_SEND_JOB_KIND } from "./executor.ts";
 import { browserSessionAvailability, freeSendSlots } from "./browser/session-slots.ts";
+import { bestEffortCatalogWrite } from "../platform/db/read-only-catalog.ts";
 
 export const DISPATCH_TICK_JOB_KIND = "dispatch.tick";
 
@@ -358,11 +359,13 @@ export function createDispatcherTick(deps: DispatchDeps) {
   }
 
   function skipClosed(candidate: Candidate, now: number) {
-    deps.catalogDb
-      .update(postings)
-      .set({ closedAt: now, status: "closed" })
-      .where(and(eq(postings.id, candidate.postingId), isNull(postings.closedAt)))
-      .run();
+    bestEffortCatalogWrite("dispatch.skip_closed", () => {
+      deps.catalogDb
+        .update(postings)
+        .set({ closedAt: now, status: "closed" })
+        .where(and(eq(postings.id, candidate.postingId), isNull(postings.closedAt)))
+        .run();
+    });
 
     const skipped = db.transaction((tx) =>
       skipClosedPostingApplications(tx, now, [candidate.postingId]),

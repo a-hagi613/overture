@@ -8,6 +8,7 @@ import type { RuleMapping } from "./question-rules.ts";
 
 import { questionVariants, questions } from "../platform/db/schema.ts";
 import { postingQuestions } from "../platform/db/catalog-schema.ts";
+import { bestEffortCatalogWrite } from "../platform/db/read-only-catalog.ts";
 import {
   normalizeFieldType,
   normalizeQuestionText,
@@ -216,22 +217,24 @@ export function createQuestionCatalog(deps: {
       fieldName: string | null;
     }[],
   ) {
-    catalogDb.delete(postingQuestions).where(eq(postingQuestions.postingId, postingId)).run();
+    bestEffortCatalogWrite("catalog.questions", () => {
+      catalogDb.delete(postingQuestions).where(eq(postingQuestions.postingId, postingId)).run();
 
-    for (const entry of entries) {
-      catalogDb
-        .insert(postingQuestions)
-        .values({
-          postingId,
-          questionId: entry.questionId,
-          required: entry.required,
-          position: entry.position,
-          options: JSON.stringify(entry.options),
-          fieldName: entry.fieldName,
-        })
-        .onConflictDoNothing()
-        .run();
-    }
+      for (const entry of entries) {
+        catalogDb
+          .insert(postingQuestions)
+          .values({
+            postingId,
+            questionId: entry.questionId,
+            required: entry.required,
+            position: entry.position,
+            options: JSON.stringify(entry.options),
+            fieldName: entry.fieldName,
+          })
+          .onConflictDoNothing()
+          .run();
+      }
+    });
   }
 
   function forPosting(postingId: string) {

@@ -19,6 +19,7 @@ import { ACTIVE_APPLICATION_STATUSES } from "./applications.ts";
 import { salaryMeetsFloor } from "./fx.ts";
 import { countryInRegion, remoteRegionOf } from "./regions.ts";
 import { skipMatches } from "./skip-match.ts";
+import { flaggedPostingIds } from "./posting-flags.ts";
 
 import type { SkipTarget } from "./skip-match.ts";
 
@@ -230,6 +231,7 @@ interface FilterContext {
   crowdPosting: number;
   crowdEmployer: number;
   hidden: Set<string>;
+  flaggedPostings: Set<string>;
   atsOff: Set<string>;
   employerOff: Set<string>;
   globalOff: boolean;
@@ -253,6 +255,7 @@ type FilterReason =
   | "repost_guard"
   | "crowd_limit"
   | "hidden"
+  | "flagged"
   | "kill_switch";
 
 interface Verdict {
@@ -623,6 +626,7 @@ export function createCandidateService(deps: CandidateDeps) {
       crowdEmployer: getSettingNumber(db, "limits.crowd_per_employer_week"),
       crowdPosting: getSettingNumber(db, "limits.crowd_per_posting"),
       employerOff,
+      flaggedPostings: flaggedPostingIds(db),
       globalOff,
       hidden,
       languages,
@@ -686,6 +690,15 @@ export function createCandidateService(deps: CandidateDeps) {
     if (context.hidden.has(posting.id)) {
       return {
         reason: "hidden",
+        locationScore: 0,
+        salaryKnown: false,
+        seniority: 0,
+      } satisfies Verdict;
+    }
+
+    if (context.flaggedPostings.has(posting.id)) {
+      return {
+        reason: "flagged",
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,

@@ -67,6 +67,8 @@ import {
 import { recordAutoAnswer } from "./review-events.ts";
 import { PREPARABLE_STATUSES, updatePreparableApplication } from "./preparable-status.ts";
 import { stageForStatus } from "./stage.ts";
+import { recordPostingFailure } from "../matching/posting-flags.ts";
+import { bestEffortCatalogWrite } from "../platform/db/read-only-catalog.ts";
 
 const optionsSchema = z.array(z.string());
 
@@ -383,11 +385,13 @@ export function createPreparationService(deps: {
   const targetsService = createTargetsService({ db, clock });
 
   function markQuestionsFetched(postingId: string) {
-    catalogDb
-      .update(postings)
-      .set({ questionsFetchedAt: clock.now() })
-      .where(eq(postings.id, postingId))
-      .run();
+    bestEffortCatalogWrite("prepare.questions_fetched", () => {
+      catalogDb
+        .update(postings)
+        .set({ questionsFetchedAt: clock.now() })
+        .where(eq(postings.id, postingId))
+        .run();
+    });
   }
 
   async function loadQuestions(posting: {
@@ -791,6 +795,11 @@ export function createPreparationService(deps: {
         "prepare",
         `application ${applicationId} skipped: ${LOGIN_WALL_REASON} (${loginWall.markers.join(", ")})`,
       );
+
+      recordPostingFailure(db, clock, {
+        postingId: row.postingId,
+        reason: "unsupported_login_required",
+      });
 
       const skipped = updatePreparableApplication(db, applicationId, {
         status: "skipped",

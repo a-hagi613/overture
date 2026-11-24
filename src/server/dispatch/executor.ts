@@ -82,6 +82,7 @@ import { recordApplicationEvent } from "./outcomes.ts";
 import { acquireBrowserSession } from "./browser/session-slots.ts";
 import { nextSendSlot as nextSlotInWindow, parseSendWindow, planningWindow } from "./planning.ts";
 import { openApprovedPlan } from "../pipeline/approved-plan.ts";
+import { recordPostingFailure } from "../matching/posting-flags.ts";
 
 class ReservationRefusedError extends Error {
   constructor() {
@@ -458,6 +459,21 @@ export function createDispatcher(deps: DispatcherDeps) {
       })
       .where(eq(applications.id, applicationId))
       .run();
+
+    if (outcome === "form_changed") {
+      const failed = db
+        .select({ postingId: applications.postingId })
+        .from(applications)
+        .where(eq(applications.id, applicationId))
+        .get();
+
+      if (failed !== undefined) {
+        recordPostingFailure(db, clock, {
+          postingId: failed.postingId,
+          reason: "employer_form_failed",
+        });
+      }
+    }
 
     recordApplicationEvent(db, clock, {
       applicationId,
