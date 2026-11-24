@@ -1,11 +1,13 @@
 import { AxeBuilder } from "@axe-core/playwright";
 
+import type { Page } from "@playwright/test";
+
 import { expect, test } from "./app.fixture.ts";
 
 const landingHeadline = "The job hunt, handled.";
 const screenshotDir = process.env.LANDING_SCREENSHOT_DIR;
 
-async function headerTop(page: import("@playwright/test").Page) {
+async function headerTop(page: Page) {
   return page.evaluate(() => {
     const header = document.querySelector("header");
 
@@ -26,7 +28,7 @@ test.describe("landing sticky header and hero", () => {
       globalThis.scrollTo(0, 1200);
     });
 
-    await expect.poll(() => headerTop(page)).toBe(0);
+    await expect.poll(async () => headerTop(page)).toBe(0);
     await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
   });
@@ -42,7 +44,7 @@ test.describe("landing sticky header and hero", () => {
     await page.evaluate(() => {
       globalThis.scrollTo(0, 1600);
     });
-    await expect.poll(() => headerTop(page)).toBe(0);
+    await expect.poll(async () => headerTop(page)).toBe(0);
 
     await page.getByRole("button", { name: "Open menu" }).click();
     const sheet = page.locator("#landing-msheet");
@@ -58,27 +60,30 @@ test.describe("landing sticky header and hero", () => {
     await sheet.getByRole("link", { name: "Pricing" }).click();
     await expect(sheet).toHaveCount(0);
     await expect(page.locator("#pricing")).toBeInViewport();
-    await expect.poll(() => headerTop(page)).toBe(0);
+    await expect.poll(async () => headerTop(page)).toBe(0);
   });
 
   test("section anchors land below the sticky header", async ({ page, appServerUrl }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(`${appServerUrl}/`);
 
-    for (const id of ["how-it-works", "where-it-applies", "pricing", "faq"]) {
-      await page.evaluate((anchor) => {
-        document.getElementById(anchor)?.scrollIntoView({ block: "start" });
-      }, id);
-      const gap = await page.evaluate((anchor) => {
-        const section = document.getElementById(anchor);
+    const gaps = await page.evaluate(() => {
+      const anchors = ["how-it-works", "where-it-applies", "pricing", "faq"];
+
+      return anchors.map((anchor) => {
+        const section = document.querySelector(`#${anchor}`);
         const header = document.querySelector("header");
+
+        section?.scrollIntoView({ behavior: "instant", block: "start" });
 
         return (
           (section?.getBoundingClientRect().top ?? 0) -
           (header?.getBoundingClientRect().bottom ?? 0)
         );
-      }, id);
+      });
+    });
 
+    for (const gap of gaps) {
       expect(gap).toBeGreaterThanOrEqual(0);
     }
   });
@@ -142,7 +147,7 @@ test.describe("landing sticky header and hero", () => {
         await page.evaluate(() => {
           globalThis.scrollTo(0, 1000);
         });
-        await expect.poll(() => headerTop(page)).toBe(0);
+        await expect.poll(async () => headerTop(page)).toBe(0);
         await page.screenshot({
           path: `${screenshotDir}/${String(width)}-${theme}-scrolled.png`,
         });
