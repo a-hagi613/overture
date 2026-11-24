@@ -194,9 +194,12 @@ describe("publishCatalogSnapshot", () => {
     const objects = scratchStore();
     const { compressedBytes, manifest } = artifacts();
 
-    for (const day of ["01", "02", "03", "04", "05", "06", "07", "08", "09"]) {
-      await objects.put(`catalog/snapshots/2026-11-${day}.sqlite.zst`, compressedBytes);
-    }
+    await Promise.all(
+      ["01", "02", "03", "04", "05", "06", "07", "08", "09"].map(
+        async (day) =>
+          await objects.put(`catalog/snapshots/2026-11-${day}.sqlite.zst`, compressedBytes),
+      ),
+    );
 
     const published = await publishCatalogSnapshot({
       objects,

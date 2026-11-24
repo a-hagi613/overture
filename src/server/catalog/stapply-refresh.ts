@@ -203,14 +203,9 @@ export async function pruneCatalogSnapshots(
   }
 
   const keepKeys = new Set(keys.toSorted().slice(-Math.max(1, keep)));
-  const deleted: string[] = [];
+  const deleted = keys.toSorted().filter((key) => !keepKeys.has(key));
 
-  for (const key of keys.toSorted()) {
-    if (!keepKeys.has(key)) {
-      await objects.delete(key);
-      deleted.push(key);
-    }
-  }
+  await Promise.all(deleted.map(async (key) => await objects.delete(key)));
 
   return deleted;
 }
