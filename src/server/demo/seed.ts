@@ -42,7 +42,13 @@ import { contentHash } from "../catalog/content-hash.ts";
 import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { questionVariantHash } from "../catalog/question-normalize.ts";
-import { addLocalDays, localDateAt, localTimeOn } from "../platform/local-time.ts";
+import {
+  addLocalDays,
+  localDateAt,
+  localDayStart,
+  localDayStartFor,
+  localTimeOn,
+} from "../platform/local-time.ts";
 import { sealApprovedPlan } from "../pipeline/approved-plan.ts";
 import { minimalPdf } from "./pdf.ts";
 import {
@@ -58,6 +64,33 @@ import {
 import type { DemoApplication } from "./sample-data.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The instant a demo application was sent, anchored inside the America/Toronto
+ * calendar day the sample data describes. The Home charts bucket `sentAt` by
+ * local day, so subtracting a fractional `sentDaysAgo` from `now` used to push
+ * the only same-day row (0.08 days, about two hours) into yesterday whenever the
+ * seed ran between 00:00 and 01:55 local time, leaving today's 7D bucket empty;
+ * whole-day offsets could likewise slip a day across a DST change. Same-day
+ * rows are clamped into `[todayStart, now]`, and older rows into their intended
+ * local day, so no bucket ever loses its row and nothing lands in the future.
+ * @param now The seed clock's current instant.
+ * @param daysAgo Fractional days for same-day rows, whole days for older rows.
+ * @returns The `sentAt` instant inside the intended local day.
+ */
+export function demoSentAt(now: number, daysAgo: number) {
+  const candidate = now - daysAgo * DAY_MS;
+
+  if (daysAgo < 1) {
+    return Math.max(localDayStart(now, DEMO_TIMEZONE), Math.min(now, candidate));
+  }
+
+  const day = addLocalDays(localDateAt(now, DEMO_TIMEZONE), -Math.round(daysAgo));
+  const dayStart = localDayStartFor(day, DEMO_TIMEZONE);
+  const dayEnd = localDayStartFor(addLocalDays(day, 1), DEMO_TIMEZONE) - 1;
+
+  return Math.max(dayStart, Math.min(dayEnd, candidate));
+}
 
 export const DEMO_USER_ID = "demo-user-0001";
 const DEMO_MAILBOX_ID = "demo-mailbox-0001";
@@ -362,7 +395,7 @@ async function seedApplications(input: {
     const boardId = `demo-board-${String(companyIndex).padStart(2, "0")}`;
     const postingId = `demo-posting-${String(index + 1).padStart(2, "0")}`;
     const createdAt = now - app.ageDays * DAY_MS;
-    const sentAt = app.sentDaysAgo === undefined ? null : now - app.sentDaysAgo * DAY_MS;
+    const sentAt = app.sentDaysAgo === undefined ? null : demoSentAt(now, app.sentDaysAgo);
     const url = `https://jobs.example.com/${company.boardToken}/${String(index + 1)}`;
     const titleNorm = normalizeTitle(app.title);
 
@@ -1015,7 +1048,7 @@ function seedLedger(input: { db: AppDatabase; clock: Clock; userId: string }) {
   const sent = DEMO_APPLICATIONS.filter((app) => app.sentDaysAgo !== undefined);
 
   for (const app of sent) {
-    const at = clock.now() - (app.sentDaysAgo ?? 0) * DAY_MS;
+    const at = demoSentAt(clock.now(), app.sentDaysAgo ?? 0);
 
     postLedgerEntry(db, at, {
       amount: 1,
