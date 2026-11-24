@@ -405,7 +405,7 @@ async function publishArtifacts(
       return { mode: objects.kind, pruned: published.pruned.length };
     }
 
-    const notified = await notifyCatalogRefresh({ origin, secret, manifest, nowMs: now });
+    const notified = await notifyCatalogRefresh({ origin, secret, manifest, nowMs: clock.now() });
 
     return {
       mode:
@@ -427,7 +427,7 @@ async function publishArtifacts(
     secret,
     manifest,
     compressedBytes,
-    nowMs: now,
+    nowMs: clock.now(),
   });
 
   return {

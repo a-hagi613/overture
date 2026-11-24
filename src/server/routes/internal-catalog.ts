@@ -19,6 +19,7 @@ import {
   CATALOG_MANIFEST_KEY,
   CATALOG_SIGNATURE_HEADER,
   CATALOG_TIMESTAMP_HEADER,
+  catalogRefreshHeaderRefusal,
   catalogSnapshotKey,
   createCatalogRefreshVerifier,
 } from "../catalog/stapply-refresh.ts";
@@ -219,6 +220,18 @@ export function createInternalCatalogRoutes(deps: {
 
     if (Number.isFinite(declaredLength) && declaredLength > CATALOG_SNAPSHOT_MAX_BYTES) {
       return context.json({ error: API_ERRORS.invalidRequest }, 413);
+    }
+
+    const headerRefusal = catalogRefreshHeaderRefusal(
+      {
+        [CATALOG_TIMESTAMP_HEADER]: context.req.header(CATALOG_TIMESTAMP_HEADER),
+        [CATALOG_SIGNATURE_HEADER]: context.req.header(CATALOG_SIGNATURE_HEADER),
+      },
+      clock.now(),
+    );
+
+    if (headerRefusal !== null) {
+      return refuse(context, headerRefusal);
     }
 
     try {

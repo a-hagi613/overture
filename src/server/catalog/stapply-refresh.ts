@@ -183,6 +183,39 @@ function headerValue(headers: Readonly<Record<string, string | undefined>>, name
   return null;
 }
 
+/**
+ * The cheap header check a caller can run before reading a body: the timestamp and signature must be present, and the
+ * timestamp must be a finite epoch-ms value inside the skew window. It deliberately does not check the HMAC (that
+ * needs the body) or replay state (that belongs to the verifier closure).
+ * @param headers The request headers.
+ * @param nowMs The receiver's clock.
+ * @param maxSkewMs The accepted clock difference; five minutes by default.
+ * @returns The refusal reason, or null when the headers are worth streaming a body for.
+ */
+export function catalogRefreshHeaderRefusal(
+  headers: Readonly<Record<string, string | undefined>>,
+  nowMs: number,
+  maxSkewMs: number = CATALOG_REFRESH_MAX_SKEW_MS,
+) {
+  const timestamp = headerValue(headers, CATALOG_TIMESTAMP_HEADER);
+
+  if (timestamp === null) {
+    return "missing_timestamp";
+  }
+
+  if (headerValue(headers, CATALOG_SIGNATURE_HEADER) === null) {
+    return "missing_signature";
+  }
+
+  const timestampMs = Number(timestamp);
+
+  if (!Number.isFinite(timestampMs) || Math.abs(nowMs - timestampMs) > maxSkewMs) {
+    return "stale_timestamp";
+  }
+
+  return null;
+}
+
 export type CatalogRefreshVerdict =
   | { readonly ok: true; readonly timestampMs: number }
   | { readonly ok: false; readonly reason: CatalogRefreshRejection };
@@ -215,22 +248,15 @@ export function createCatalogRefreshVerifier(
   let lastAcceptedMs = Number.NEGATIVE_INFINITY;
 
   const verify: (input: CatalogRefreshVerifierInput) => CatalogRefreshVerdict = (input) => {
-    const timestamp = headerValue(input.headers, CATALOG_TIMESTAMP_HEADER);
-    const signature = headerValue(input.headers, CATALOG_SIGNATURE_HEADER);
+    const refusal = catalogRefreshHeaderRefusal(input.headers, input.nowMs, maxSkewMs);
 
-    if (timestamp === null) {
-      return { ok: false, reason: "missing_timestamp" };
+    if (refusal !== null) {
+      return { ok: false, reason: refusal };
     }
 
-    if (signature === null) {
-      return { ok: false, reason: "missing_signature" };
-    }
-
+    const timestamp = headerValue(input.headers, CATALOG_TIMESTAMP_HEADER) ?? "";
+    const signature = headerValue(input.headers, CATALOG_SIGNATURE_HEADER) ?? "";
     const timestampMs = Number(timestamp);
-
-    if (!Number.isFinite(timestampMs) || Math.abs(input.nowMs - timestampMs) > maxSkewMs) {
-      return { ok: false, reason: "stale_timestamp" };
-    }
 
     if (timestampMs <= lastAcceptedMs) {
       return { ok: false, reason: "replayed_timestamp" };
