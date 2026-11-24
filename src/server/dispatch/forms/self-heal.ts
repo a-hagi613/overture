@@ -319,60 +319,64 @@ export function createFormSelfHealer(deps: FormSelfHealerDeps) {
     field: SendPlanField,
     scope: FormScope,
   ) {
-    const snapshot = await scope.root.ariaSnapshot();
-    const request = selfHealRequest({ ats, field, snapshot });
-    const estimated = llm.estimateBatchCostMicros([request]);
+    try {
+      const snapshot = await scope.root.ariaSnapshot();
+      const request = selfHealRequest({ ats, field, snapshot });
+      const estimated = llm.estimateBatchCostMicros([request]);
 
-    const caps = checkLlmCaps(db, clock, {
-      estimatedCostMicros: estimated,
-      purpose: FORM_SELF_HEAL_PURPOSE,
-      userId,
-    });
-
-    if (!caps.withinCaps) {
-      raiseAlert(db, clock, "llm.cap", {
-        cap: caps.exceeded,
-        capMicros: caps.capMicros,
-        estimatedMicros: estimated,
-        purpose: FORM_SELF_HEAL_PURPOSE,
-        questionsWaiting: 1,
-        spentMicros: caps.spentMicros,
-      });
-
-      return null;
-    }
-
-    const calls = await llm.runBatch([request]);
-
-    for (const call of calls) {
-      recordLlmUsage(db, clock, {
-        batch:
-          call.batchRecordId === undefined
-            ? undefined
-            : { customId: call.customId, recordId: call.batchRecordId },
-        cachedTokens: call.cachedTokens,
-        costMicros: call.costMicros,
-        inputTokens: call.inputTokens,
-        model: call.model,
-        outputTokens: call.outputTokens,
+      const caps = checkLlmCaps(db, clock, {
+        estimatedCostMicros: estimated,
         purpose: FORM_SELF_HEAL_PURPOSE,
         userId,
       });
-    }
 
-    const [call] = calls;
+      if (!caps.withinCaps) {
+        raiseAlert(db, clock, "llm.cap", {
+          cap: caps.exceeded,
+          capMicros: caps.capMicros,
+          estimatedMicros: estimated,
+          purpose: FORM_SELF_HEAL_PURPOSE,
+          questionsWaiting: 1,
+          spentMicros: caps.spentMicros,
+        });
 
-    if (call?.result.ok !== true) {
+        return null;
+      }
+
+      const calls = await llm.runBatch([request]);
+
+      for (const call of calls) {
+        recordLlmUsage(db, clock, {
+          batch:
+            call.batchRecordId === undefined
+              ? undefined
+              : { customId: call.customId, recordId: call.batchRecordId },
+          cachedTokens: call.cachedTokens,
+          costMicros: call.costMicros,
+          inputTokens: call.inputTokens,
+          model: call.model,
+          outputTokens: call.outputTokens,
+          purpose: FORM_SELF_HEAL_PURPOSE,
+          userId,
+        });
+      }
+
+      const [call] = calls;
+
+      if (call?.result.ok !== true) {
+        return null;
+      }
+
+      const parsed = outputSchema.safeParse(call.result.value);
+
+      if (!parsed.success || parsed.data.confidence < MIN_CONFIDENCE) {
+        return null;
+      }
+
+      return parsed.data satisfies SelfHealPatch;
+    } catch {
       return null;
     }
-
-    const parsed = outputSchema.safeParse(call.result.value);
-
-    if (!parsed.success || parsed.data.confidence < MIN_CONFIDENCE) {
-      return null;
-    }
-
-    return parsed.data satisfies SelfHealPatch;
   }
 
   async function healField(input: HealFieldInput) {
