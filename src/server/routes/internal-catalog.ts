@@ -119,7 +119,11 @@ export function createInternalCatalogRoutes(deps: {
         );
       }
 
-      await objects.put(CATALOG_MANIFEST_KEY, new TextEncoder().encode(text));
+      try {
+        await objects.put(CATALOG_MANIFEST_KEY, new TextEncoder().encode(text));
+      } catch (error) {
+        logError("catalog.refresh.manifest", error);
+      }
 
       return context.json({ status: "applied", version: result.version }, 200);
     } catch (error) {

@@ -201,6 +201,8 @@ describe("the read-only catalog hot-swap", () => {
 
       await publish(objects, manifestFor("2026-11-23", second), second);
 
+      const firstHandle = hotSwap.db;
+
       const reads = Array.from({ length: 40 }, async () => {
         await Promise.resolve();
 
@@ -213,6 +215,7 @@ describe("the read-only catalog hot-swap", () => {
       ]);
 
       expect(applied.applied).toBe(true);
+      expect(hotSwap.db).toBe(firstHandle);
 
       for (const names of snapshots) {
         expect(names.length).toBeGreaterThan(0);
