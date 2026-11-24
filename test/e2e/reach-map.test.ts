@@ -9,6 +9,7 @@ import {
   extractImportBindings,
   requestedPathsFromText,
   routeMatches,
+  shardNeedsMarker,
 } from "../../scripts/e2e-ci.ts";
 
 const webRouteEntryPattern =
@@ -197,4 +198,151 @@ test("test-only diffs select only the touched test and single-route UI edits sta
 
   expect(mainPlan.full).toBe(true);
   expect(mainPlan.selected).toEqual(allTests);
+});
+
+function everyTest() {
+  return [...new Glob("test/e2e/**/*.test.ts").scanSync({ cwd: process.cwd() })].toSorted(
+    (left, right) => left.localeCompare(right),
+  );
+}
+
+function secondsFor(files: readonly string[], seconds: number) {
+  return Object.fromEntries(files.map((file) => [file, seconds]));
+}
+
+test("a small diff stays on one to three shards", () => {
+  const map = buildReachMap();
+  const allTests = everyTest();
+
+  const single = computePlan({
+    changed: ["test/e2e/passwordless-auth.test.ts"],
+    isMain: false,
+    map,
+    seconds: secondsFor(["test/e2e/passwordless-auth.test.ts"], 30),
+    allTests,
+  });
+
+  expect(single.selected).toEqual(["test/e2e/passwordless-auth.test.ts"]);
+  expect(single.shards).toHaveLength(1);
+
+  const pairFiles = ["test/e2e/passwordless-auth.test.ts", "test/e2e/board-match-board.test.ts"];
+
+  const pair = computePlan({
+    changed: pairFiles,
+    isMain: false,
+    map,
+    seconds: secondsFor(pairFiles, 30),
+    allTests,
+  });
+
+  expect(pair.selected).toHaveLength(2);
+  expect(pair.shards).toHaveLength(2);
+
+  const trioFiles = [
+    "test/e2e/passwordless-auth.test.ts",
+    "test/e2e/board-match-board.test.ts",
+    "test/e2e/reach-map.test.ts",
+  ];
+
+  const trio = computePlan({
+    changed: trioFiles,
+    isMain: false,
+    map,
+    seconds: secondsFor(trioFiles, 40),
+    allTests,
+  });
+
+  expect(trio.selected).toHaveLength(3);
+  expect(trio.shards).toHaveLength(3);
+});
+
+test("a full run scales up to twelve shards and never past the selected files", () => {
+  const map = buildReachMap();
+  const allTests = everyTest();
+
+  const full = computePlan({
+    changed: [],
+    isMain: true,
+    map,
+    seconds: secondsFor(allTests, 100),
+    allTests,
+  });
+
+  expect(full.selected.length).toBeGreaterThanOrEqual(12);
+  expect(full.shards).toHaveLength(12);
+
+  const heavyTrio = [
+    "test/e2e/passwordless-auth.test.ts",
+    "test/e2e/board-match-board.test.ts",
+    "test/e2e/reach-map.test.ts",
+  ];
+
+  const capped = computePlan({
+    changed: heavyTrio,
+    isMain: false,
+    map,
+    seconds: secondsFor(heavyTrio, 1000),
+    allTests,
+  });
+
+  expect(capped.selected).toHaveLength(3);
+  expect(capped.shards).toHaveLength(3);
+});
+
+test("an explicit shard count is honoured, even above the automatic ceiling", () => {
+  const map = buildReachMap();
+  const allTests = everyTest();
+
+  const explicit = computePlan({
+    changed: [],
+    isMain: true,
+    shardCount: 20,
+    map,
+    seconds: secondsFor(allTests, 100),
+    allTests,
+  });
+
+  expect(explicit.shards).toHaveLength(20);
+
+  const pinned = computePlan({
+    changed: [],
+    isMain: true,
+    shardCount: 5,
+    map,
+    seconds: secondsFor(allTests, 100),
+    allTests,
+  });
+
+  expect(pinned.shards).toHaveLength(5);
+});
+
+test("a shard that starts stripe-mock is detected through its imports", () => {
+  const stripeTests = everyTest().filter((file) =>
+    readFileSync(file, "utf8").includes('from "./stripe-mock.fixture.ts"'),
+  );
+
+  expect(stripeTests.length).toBeGreaterThanOrEqual(10);
+
+  for (const file of stripeTests) {
+    expect(shardNeedsMarker([file], "stripe-mock")).toBe(true);
+  }
+
+  expect(
+    shardNeedsMarker(
+      ["test/e2e/billing-plans.test.ts", "test/e2e/passwordless-auth.test.ts"],
+      "stripe-mock",
+    ),
+  ).toBe(true);
+
+  expect(shardNeedsMarker(["test/e2e/passwordless-auth.test.ts"], "stripe-mock")).toBe(false);
+});
+
+test("the marker scan follows helper imports that a test file never names", () => {
+  expect(readFileSync("test/e2e/billing-plans.test.ts", "utf8")).not.toContain(
+    "TEMPLATE_CATALOG_DATABASE",
+  );
+
+  expect(shardNeedsMarker(["test/e2e/billing-plans.test.ts"], "TEMPLATE_CATALOG_DATABASE")).toBe(
+    true,
+  );
 });

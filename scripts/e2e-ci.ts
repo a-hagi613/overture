@@ -1303,7 +1303,26 @@ function resolveShardCount(
 
   const total = selectedLoadSeconds(selected, seconds);
 
-  return Math.min(6, Math.max(1, Math.ceil(total / 75)));
+  return Math.min(12, selected.length, Math.max(1, Math.ceil(total / 40)));
+}
+
+/**
+ * Whether a shard's files, or any helper they import, mention a marker such as a required binary. The e2e workflow
+ * uses it to install stripe-mock only on the shards whose tests can reach it.
+ * @param files The test files in the shard.
+ * @param marker The text a file must contain, for example `stripe-mock`.
+ * @returns True when the file or one of its imports contains the marker.
+ */
+export function shardNeedsMarker(files: readonly string[], marker: string) {
+  const graph = buildGraph(listSources());
+
+  for (const file of closureFrom(graph, files)) {
+    if (existsSync(localPath(file)) && textOf(file).includes(marker)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function computePlan(input: PlanInput) {
@@ -1458,6 +1477,23 @@ if (import.meta.main) {
       break;
     }
 
+    case "needs": {
+      const planPath = localPath(flagValue("--plan") ?? "e2e-plan.json");
+      const shardNumber = Number(flagValue("--shard") ?? "1");
+      const marker = flagValue("--marker");
+
+      if (marker === null) {
+        throw new Error("needs requires --marker");
+      }
+
+      const planBody = planSchema.parse(JSON.parse(readFileSync(planPath, "utf8")));
+      const shard = planBody.shards.find((entry) => entry.shard === shardNumber);
+      const needed = shardNeedsMarker(shard?.files ?? [], marker);
+
+      process.stdout.write(`${needed ? "true" : "false"}\n`);
+      break;
+    }
+
     case "timings": {
       writeTimings();
       break;
@@ -1470,7 +1506,7 @@ if (import.meta.main) {
     }
 
     default: {
-      throw new Error("usage: bun run scripts/e2e-ci.ts <map|timings|plan> [flags]");
+      throw new Error("usage: bun run scripts/e2e-ci.ts <map|timings|plan|shard|needs> [flags]");
     }
   }
 }
