@@ -78,6 +78,7 @@ export function createStapplyStaging(db: CatalogDatabase) {
   client.run(`DROP TABLE IF EXISTS ${STAGING}`);
   client.run(`DROP TABLE IF EXISTS ${BOARD_MAP}`);
   client.run(`DROP TABLE IF EXISTS ${NEW_IDS}`);
+  client.run("DROP TABLE IF EXISTS stapply_existing_boards");
   client.run(`CREATE TEMP TABLE ${STAGING} (
     posting_id TEXT PRIMARY KEY NOT NULL,
     source_key TEXT NOT NULL,
@@ -127,6 +128,7 @@ export function createStapplyStaging(db: CatalogDatabase) {
     PRIMARY KEY (source_key, company_norm)
   )`);
   client.run(`CREATE INDEX ${BOARD_MAP}_board ON ${BOARD_MAP} (board_id)`);
+  client.run("DROP TABLE IF EXISTS stapply_existing_boards");
   client.run(`CREATE TEMP TABLE ${NEW_IDS} (id TEXT PRIMARY KEY NOT NULL)`);
 }
 
@@ -259,6 +261,18 @@ function ensureCompanies(db: CatalogDatabase, now: number) {
     .run(now).changes;
 }
 
+function buildExistingBoardIndex(db: CatalogDatabase) {
+  db.$client.run("DROP TABLE IF EXISTS stapply_existing_boards");
+  db.$client.run(`CREATE TEMP TABLE stapply_existing_boards AS
+    SELECT c.name_norm AS company_norm, b.ats AS source_key, min(b.id) AS board_id
+    FROM company_boards b
+    JOIN companies c ON c.id = b.company_id
+    GROUP BY c.name_norm, b.ats`);
+  db.$client.run(
+    "CREATE INDEX stapply_existing_boards_ix ON stapply_existing_boards (source_key, company_norm)",
+  );
+}
+
 function ensureBoards(db: CatalogDatabase, now: number) {
   return db.$client
     .query(`INSERT INTO company_boards
@@ -270,18 +284,18 @@ function ensureBoards(db: CatalogDatabase, now: number) {
             FROM ${STAGING} GROUP BY source_key, company_norm) s
       JOIN companies c ON c.name_norm = s.company_norm
       WHERE NOT EXISTS (
-        SELECT 1 FROM company_boards b WHERE b.company_id = c.id AND b.ats = s.source_key
+        SELECT 1 FROM stapply_existing_boards e
+        WHERE e.source_key = s.source_key AND e.company_norm = s.company_norm
       )`)
     .run(now, now).changes;
 }
 
 function mapBoards(db: CatalogDatabase) {
   db.$client.run(`INSERT OR REPLACE INTO ${BOARD_MAP} (source_key, company_norm, board_id)
-    SELECT s.source_key, s.company_norm, min(b.id)
-    FROM ${STAGING} s
-    JOIN companies c ON c.name_norm = s.company_norm
-    JOIN company_boards b ON b.company_id = c.id AND b.ats = s.source_key
-    GROUP BY s.source_key, s.company_norm`);
+    SELECT s.source_key, s.company_norm, e.board_id
+    FROM (SELECT DISTINCT source_key, company_norm FROM ${STAGING}) s
+    JOIN stapply_existing_boards e
+      ON e.source_key = s.source_key AND e.company_norm = s.company_norm`);
 }
 
 const BOARD_JOIN = `JOIN ${BOARD_MAP} m
@@ -478,7 +492,9 @@ export function applyStapplyDelta(db: CatalogDatabase, input: StapplyDeltaInput)
   try {
     duplicates = dedupeStaging(db);
     ensureCompanies(db, input.now);
+    buildExistingBoardIndex(db);
     ensureBoards(db, input.now);
+    buildExistingBoardIndex(db);
     mapBoards(db);
     inserted = insertNewPostings(db, input.now);
     updated = updateChangedPostings(db, input.now);
@@ -519,6 +535,7 @@ export function dropStapplyStaging(db: CatalogDatabase) {
   client.run(`DROP TABLE IF EXISTS ${STAGING}`);
   client.run(`DROP TABLE IF EXISTS ${BOARD_MAP}`);
   client.run(`DROP TABLE IF EXISTS ${NEW_IDS}`);
+  client.run("DROP TABLE IF EXISTS stapply_existing_boards");
 }
 
 const stapplyLeftoverSchema = z.object({

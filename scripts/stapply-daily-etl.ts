@@ -99,41 +99,47 @@ const outDir = args.values["out-dir"];
 const workDir = outDir ?? mkdtempSync(join(tmpdir(), "stapply-daily-"));
 const catalogPath = join(workDir, "catalog.sqlite");
 
+function envValue(name: string) {
+  const value = Bun.env[name];
+
+  return value === undefined || value === "" ? undefined : value;
+}
+
 function objectStoreFromEnv() {
-  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_FILES, R2_ENDPOINT } =
-    Bun.env;
+  const accountId = envValue("R2_ACCOUNT_ID");
+  const accessKeyId = envValue("R2_ACCESS_KEY_ID");
+  const secretAccessKey = envValue("R2_SECRET_ACCESS_KEY");
+  const bucket = envValue("R2_BUCKET_FILES");
 
   if (
-    R2_ACCOUNT_ID === undefined ||
-    R2_ACCESS_KEY_ID === undefined ||
-    R2_SECRET_ACCESS_KEY === undefined ||
-    R2_BUCKET_FILES === undefined
+    accountId === undefined ||
+    accessKeyId === undefined ||
+    secretAccessKey === undefined ||
+    bucket === undefined
   ) {
     return null;
   }
 
   return createR2ObjectStore({
-    endpoint: R2_ENDPOINT ?? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    bucket: R2_BUCKET_FILES,
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
+    endpoint: envValue("R2_ENDPOINT") ?? `https://${accountId}.r2.cloudflarestorage.com`,
+    bucket,
+    accessKeyId,
+    secretAccessKey,
   });
 }
 
 const objects = outDir === undefined ? objectStoreFromEnv() : createDiskObjectStore(outDir);
 
 function classifierFromEnv() {
-  const apiKey = Bun.env.ANTHROPIC_API_KEY;
+  const apiKey = envValue("ANTHROPIC_API_KEY");
 
   if (apiKey === undefined) {
     return null;
   }
 
-  const model = Bun.env.CATALOG_LLM_MODEL;
+  const model = envValue("CATALOG_LLM_MODEL");
 
-  return createAnthropicStapplyClassifier(
-    model === undefined || model === "" ? { apiKey } : { apiKey, model },
-  );
+  return createAnthropicStapplyClassifier(model === undefined ? { apiKey } : { apiKey, model });
 }
 
 async function prepareCatalog() {
@@ -386,8 +392,8 @@ async function publishArtifacts(
     return "dry_run";
   }
 
-  const origin = Bun.env.CATALOG_REFRESH_ORIGIN ?? "https://tryoverture.com";
-  const secret = Bun.env.CATALOG_REFRESH_SECRET;
+  const origin = envValue("CATALOG_REFRESH_ORIGIN") ?? "https://tryoverture.com";
+  const secret = envValue("CATALOG_REFRESH_SECRET");
 
   if (objects !== null) {
     await publishCatalogSnapshot({ objects, manifest, compressedBytes });
