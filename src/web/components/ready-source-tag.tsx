@@ -4,18 +4,16 @@ import { Badge } from "./ui/badge.tsx";
 
 function sourceOf(answer: ReadyAnswer) {
   if (answer.source === "open_text") {
-    return { label: copy.ready.source.review, variant: "signal" as const };
+    return answer.byUser
+      ? { label: copy.ready.source.yours, variant: "secondary" as const }
+      : { label: copy.ready.source.drafted, variant: "signal" as const };
   }
 
-  if (answer.source === "derived") {
+  if (answer.source === "derived" || (answer.source === "fact" && answer.factSource === "resume")) {
     return { label: copy.ready.source.resume, variant: "ok" as const };
   }
 
-  if (answer.source === "fact" && answer.factSource === "resume") {
-    return { label: copy.ready.source.resume, variant: "ok" as const };
-  }
-
-  return { label: copy.ready.source.fact, variant: "secondary" as const };
+  return { label: copy.ready.source.saved, variant: "secondary" as const };
 }
 
 export function ReadySourceTag({ answer }: { answer: ReadyAnswer }) {

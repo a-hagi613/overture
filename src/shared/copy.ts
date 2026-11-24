@@ -1878,9 +1878,31 @@ export const copy = {
       `${String(ready)} ready · ${String(approved)} approved`,
     readyCountTitle: (count: number) =>
       `${plural(count, "application", "applications")} ready to send`,
-    readyHeroNote: "Review answers below or send your queued applications now.",
-    sendAllCount: (count: number) => `Send all (${String(count)})`,
-    sendApplication: "Send application",
+    readyHeroNote: "Review answers below or approve the ones with saved answers only.",
+    approveSavedOnly: (count: number) =>
+      `Approve ${String(count)} saved-only ${plural(count, "application", "applications")}`,
+    batchGuardNote:
+      "Newly written answers are approved one card at a time below, so you can read each one.",
+    approveNext: "Approve & Next",
+    approveLast: "Approve",
+    writtenTitle: "Written for this role",
+    savedTitle: "From your saved answers",
+    savedOnlyNote: "All answers come directly from your saved answers — nothing newly written.",
+    showSaved: (count: number) =>
+      `Show ${String(count)} saved ${plural(count, "answer", "answers")}`,
+    hideSaved: (count: number) =>
+      `Hide ${String(count)} saved ${plural(count, "answer", "answers")}`,
+    showSavedAria: (count: number, company: string) =>
+      `Show ${String(count)} saved ${plural(count, "answer", "answers")}, ${company}`,
+    resumeFile: "Resume",
+    reassurance: (hasResume: boolean) =>
+      [
+        ...(hasResume ? ["Using your unchanged resume PDF"] : []),
+        "Spaced 20 min apart to protect your profile",
+        "No charge if sending fails",
+      ].join(" · "),
+    shortcuts: "A approve · E edit · S skip",
+    summaryAria: "Ready summary",
     showMore: (remaining: number) => `Show more (${String(remaining)} left)`,
     showLess: "Show less",
     confirm: {
@@ -1894,21 +1916,16 @@ export const copy = {
         "Once sent, these applications cannot be recalled. Overture will submit each tailored application directly to the employers.",
       allAction: (count: number) => `Yes, send all (${String(count)})`,
     },
-    sendAll: "Send all",
     dot: "·",
     sentToday: (sent: number, cap: number) => `${String(sent)} of ${String(cap)} sent today`,
-    resume: (filename: string) => `Resume: ${filename}`,
-    answers: (count: number) => `${String(count)} ${plural(count, "answer", "answers")}`,
-    showAnswers: "Show answers",
-    hideAnswers: "Hide answers",
-    showAnswersAria: (company: string) => `Show answers, ${company}`,
+    newProseBadge: "Newly written",
+    savedOnlyBadge: "Saved answers only",
     send: "Send",
     skip: "Skip",
     undo: "Undo",
     approved: "Approved",
     sendingAround: (time: string) => `Approved · sending around ${time}`,
     approvedNoSlot: "Approved",
-    coverLetter: "Cover letter · preview",
     formChangedNote: "If the form has changed when we send, we stop and ask you first.",
     noPlan: "The plan is not ready to show yet.",
     edit: "Edit",
@@ -1928,9 +1945,11 @@ export const copy = {
     retrying: "Trying again…",
     changesTitle: "What changed",
     source: {
-      fact: "Fact",
-      review: "Review",
-      resume: "Resume",
+      drafted: "Drafted from your resume",
+      fact: "Saved answer",
+      resume: "From resume",
+      saved: "Saved answer",
+      yours: "Your answer",
     },
     toast: {
       approved: "Scheduled to send.",
@@ -1942,6 +1961,8 @@ export const copy = {
       skipped: "Skipped. It left the Tracker.",
       saved: "Answer saved.",
       planChanged: "The plan changed. The card reloaded; review it and press Send again.",
+      reviewIndividually:
+        "That card has newly written text. Approve it one card at a time so you can read it.",
       refused: (count: number) =>
         `${String(count)} ${plural(count, "card", "cards")} could not be approved.`,
       failed: "That did not go through. Try again.",

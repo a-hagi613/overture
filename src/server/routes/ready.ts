@@ -21,15 +21,20 @@ import {
 } from "../pipeline/approved-plan.ts";
 import type { ApprovedPlan } from "../pipeline/approved-plan.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
+import { logInfo } from "../platform/log.ts";
 import { isCoverLetterQuestion } from "../pipeline/open-text.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { demoLocked } from "../demo/guard.ts";
+import { planHasGeneratedProse, READY_DWELL_MAX_MS } from "../../shared/ready-approval.ts";
 
 import type { SendPlan } from "../pipeline/send-plan.ts";
 
-const approveBody = z.object({ planSha256: z.string().min(1) });
+const dwellMs = z.number().int().min(0).max(READY_DWELL_MAX_MS).optional();
 
-const approveAllBody = z.object({
+export const approveBody = z.object({ dwellMs, planSha256: z.string().min(1) });
+
+export const approveAllBody = z.object({
+  dwellMs,
   items: z
     .array(z.object({ id: z.string().min(1), planSha256: z.string().min(1) }))
     .min(1)
@@ -97,6 +102,46 @@ function factSourceMap(db: AppDatabase, userId: string) {
   return new Map(rows.map((row) => [`${row.scope}\u0000${row.key}`, row.source] as const));
 }
 
+const NO_FACT_SOURCES: ReadonlyMap<string, string> = new Map();
+
+export interface ApprovalTelemetryInput {
+  count?: number | undefined;
+  dwellMs?: number | undefined;
+  hasGeneratedProse: boolean;
+  mode: "single" | "batch";
+}
+
+interface ReadyApproveEvent {
+  count?: number | undefined;
+  dwellMs: number | null;
+  hasGeneratedProse: boolean;
+  mode: "single" | "batch";
+}
+
+/**
+ * Builds one `ready.approve` event. Dwell time stays an event value, never a
+ * metric label, and no Application id is included, so cardinality cannot grow.
+ * @param input The approval's mode, dwell time, and whether prose was drafted.
+ * @returns The event as compact JSON for the structured log.
+ */
+export function approvalTelemetryJson(input: ApprovalTelemetryInput) {
+  const event: ReadyApproveEvent = {
+    dwellMs: input.dwellMs ?? null,
+    hasGeneratedProse: input.hasGeneratedProse,
+    mode: input.mode,
+  };
+
+  if (input.count !== undefined) {
+    event.count = input.count;
+  }
+
+  return JSON.stringify(event);
+}
+
+function generatedProseOf(plan: SendPlan) {
+  return planHasGeneratedProse(answersOf(plan, NO_FACT_SOURCES));
+}
+
 export function createReadyRoutes(deps: {
   auth: Auth;
   clock: Clock;
@@ -139,10 +184,13 @@ export function createReadyRoutes(deps: {
     planSha256: string,
     factSources: ReadonlyMap<string, string>,
   ) {
+    const answers = answersOf(plan, factSources);
+
     return {
-      answers: answersOf(plan, factSources),
+      answers,
       consentVersion: plan.consentVersion,
       coverLetter: plan.coverLetter?.map((sentence) => sentence.sentence) ?? null,
+      hasGeneratedProse: planHasGeneratedProse(answers),
       planSha256,
       postingTitle: plan.postingTitle,
       postingUrl: plan.postingUrl,
@@ -369,6 +417,7 @@ export function createReadyRoutes(deps: {
 
     return {
       approvedAt: input.approvedAt,
+      hasGeneratedProse: generatedProseOf(plan),
       planSha256: sealed.sha256,
       status: "approved" as const,
     };
@@ -382,7 +431,7 @@ export function createReadyRoutes(deps: {
     }
 
     const { id } = context.req.param();
-    const { planSha256 } = context.req.valid("json");
+    const { dwellMs: dwell, planSha256 } = context.req.valid("json");
 
     const result = await approveOne({
       applicationId: id,
@@ -403,6 +452,15 @@ export function createReadyRoutes(deps: {
       return context.json({ error: result.error }, 409);
     }
 
+    logInfo(
+      "ready.approve",
+      approvalTelemetryJson({
+        dwellMs: dwell,
+        hasGeneratedProse: result.hasGeneratedProse,
+        mode: "single",
+      }),
+    );
+
     return context.json(result);
   });
 
@@ -413,11 +471,35 @@ export function createReadyRoutes(deps: {
       return context.json({ error: "sign_in_required" }, 401);
     }
 
-    const { items } = context.req.valid("json");
+    const { dwellMs: dwell, items } = context.req.valid("json");
     const userId = user.id;
     const base = clock.now();
     const approved: { approvedAt: number; id: string; planSha256: string }[] = [];
     const refused: { error: string; id: string }[] = [];
+
+    const needsReview = (
+      await Promise.all(
+        items.map(async (item) => {
+          const row = db
+            .select({ status: applications.status })
+            .from(applications)
+            .where(and(eq(applications.id, item.id), eq(applications.userId, userId)))
+            .get();
+
+          if (row?.status !== "ready") {
+            return null;
+          }
+
+          const plan = await preparation.sendPlanFor(item.id);
+
+          return plan !== null && generatedProseOf(plan) ? item.id : null;
+        }),
+      )
+    ).filter((id): id is string => id !== null);
+
+    if (needsReview.length > 0) {
+      return context.json({ applications: needsReview, error: "requires_individual_review" }, 422);
+    }
 
     async function approveFrom(index: number) {
       const item = items[index];
@@ -441,6 +523,14 @@ export function createReadyRoutes(deps: {
           id: item.id,
           planSha256: result.planSha256,
         });
+        logInfo(
+          "ready.approve",
+          approvalTelemetryJson({
+            dwellMs: dwell,
+            hasGeneratedProse: result.hasGeneratedProse,
+            mode: "batch",
+          }),
+        );
       }
 
       await approveFrom(index + 1);

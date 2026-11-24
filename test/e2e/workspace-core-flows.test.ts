@@ -289,7 +289,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await page.goto(`${demoServer.url}/ready`);
       await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeVisible();
       await page
-        .getByRole("button", { name: /Send application/u })
+        .getByRole("button", { name: /^Approve(?: & Next)?$/u })
         .first()
         .click();
 

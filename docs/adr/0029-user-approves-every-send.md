@@ -51,6 +51,15 @@ Inbox, Profile. The Board gets a **Ready** column between Queued and Applied (a 
 Application from Ready until it is confirmed sent), and Home a card ("3 ready to send").
 None of it is built until it is drawn on the canvas (ADR 0021, `DESIGN.md` §13).
 
+**Amendment of 2026-11-23: tiered approval (#590).** Bulk approval cannot rubber-stamp prose Overture wrote. A card
+whose plan carries an unedited drafted `open_text` answer or cover letter opens that text first, expanded, with inline
+edit, and is approved one card at a time ("Approve & Next" with Undo); the deterministic saved answers and the
+unchanged resume sit collapsed behind one toggle. "Send all" is a saved-answers path: the UI offers it only for cards
+with no drafted prose, and `POST /api/ready/approve` refuses a batch containing one with 422
+`requires_individual_review`, approving nothing. Every approval logs one structured `ready.approve` event with an
+optional bounded dwell time, whether prose was drafted, and `single` or `batch`; it is a log event, never a metric
+label.
+
 **Notifications.** In M1, at most one email per user per local day when that day's preparation run produced new
 Ready Applications or Reviews, from `no-reply@tryoverture.com` through the Cloudflare sender, listing them with one
 link to the Ready page (see the amendment below). Opening the link never sends, because mail scanners open links;

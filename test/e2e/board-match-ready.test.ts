@@ -51,15 +51,19 @@ async function expectReadyMatches(
 
   await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Send all" }).getByText("2", { exact: true }),
+    page.getByRole("region", { name: "Ready summary" }).getByText("2", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { level: 2, name: "applications ready to send" }),
   ).toBeVisible();
   await expect(page.getByText("1 scheduled")).toBeVisible();
   await expect(page.getByText("Approved · sending around Nov 21, 2:20 PM")).toBeVisible();
-  await expect(page.getByText("Resume: maya-okafor-2026.pdf").first()).toBeVisible();
+  await expect(page.getByText("Drafted from your resume").first()).toBeVisible();
+  await expect(page.getByText("Saved answers only").first()).toBeVisible();
   await expect(page.getByText("7 of 10 sent today", { exact: true }).first()).toBeVisible();
+
+  await page.getByRole("button", { name: /Show \d+ saved answers, Halden Systems/u }).click();
+  await expect(page.getByText("maya-okafor-2026.pdf").first()).toBeVisible();
 
   await page.evaluate(async () => {
     await Promise.all([

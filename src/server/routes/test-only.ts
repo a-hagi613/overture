@@ -390,7 +390,13 @@ const seedAnswerBody = z.object({
   questionId: z.string().min(1),
   kind: z.enum(["open_text", "cover_letter"]),
   sentences: z
-    .array(z.object({ sentence: z.string().min(1), resumeLineIds: z.array(z.string()) }))
+    .array(
+      z.object({
+        byUser: z.boolean().optional(),
+        sentence: z.string().min(1),
+        resumeLineIds: z.array(z.string()),
+      }),
+    )
     .min(1),
 });
 
