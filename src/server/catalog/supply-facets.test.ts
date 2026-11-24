@@ -264,6 +264,28 @@ describe("supply_facets", () => {
     expectParity(target.db, filter({ location: "Austin", role: "Design", remote: true }));
   });
 
+  test("declines metro, remote-scoped, multi-place and radius locations so the live R-Tree answers", () => {
+    const target = seededCatalog(300);
+
+    for (const location of ["Bay Area", "GTA", "Remote - Canada", "Canada; Germany"]) {
+      expect(supplyFacetTotals(target.db, filter({ location }))).toBeNull();
+      expectParity(target.db, filter({ location }));
+      expectParity(target.db, filter({ location, remote: true }));
+    }
+
+    expect(supplyFacetTotals(target.db, filter({ location: "Toronto", radiusKm: 40 }))).toBeNull();
+    expectParity(target.db, filter({ location: "Toronto", radiusKm: 40 }));
+  });
+
+  test("still answers a single country or region from the rollup", () => {
+    const target = seededCatalog(200);
+
+    expect(supplyFacetTotals(target.db, filter({ location: "Canada" }))).not.toBeNull();
+    expect(supplyFacetTotals(target.db, filter({ location: "Ontario" }))).not.toBeNull();
+    expectParity(target.db, filter({ location: "Canada" }));
+    expectParity(target.db, filter({ location: "Ontario" }));
+  });
+
   test("falls back cleanly while the rollup has not been built and when it is absent", () => {
     const target = catalog();
 

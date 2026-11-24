@@ -85,31 +85,34 @@ export function LandingSupplyFilters({
             type="search"
             value={locationDraft}
           />
-          <label className={`${dsEyebrow} mt-3 block`} htmlFor="supply-radius">
-            {LANDING_COPY.supply.radiusLabel}
-          </label>
-          <div className="relative mt-2">
-            <select
-              className="h-11 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3.5 pr-10 text-sm font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-              id="supply-radius"
-              onChange={(event) => {
-                const { value } = event.currentTarget;
+        </div>
+      </div>
 
-                onRadiusChange(value === "" ? null : value);
-              }}
-              value={radius ?? ""}
-            >
-              <option value="">{LANDING_COPY.supply.radiusExact}</option>
-              <option value="25">{LANDING_COPY.supply.radius25}</option>
-              <option value="40">{LANDING_COPY.supply.radiusNear}</option>
-              <option value="80">{LANDING_COPY.supply.radius80}</option>
-            </select>
-            <ChevronDown
-              aria-hidden="true"
-              className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              size={16}
-            />
-          </div>
+      <div className="mt-4">
+        <label className={`${dsEyebrow} block`} htmlFor="supply-radius">
+          {LANDING_COPY.supply.radiusLabel}
+        </label>
+        <div className="relative mt-2">
+          <select
+            className="h-12 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3.5 pr-10 text-sm font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+            id="supply-radius"
+            onChange={(event) => {
+              const { value } = event.currentTarget;
+
+              onRadiusChange(value === "" ? null : value);
+            }}
+            value={radius ?? ""}
+          >
+            <option value="">{LANDING_COPY.supply.radiusExact}</option>
+            <option value="25">{LANDING_COPY.supply.radius25}</option>
+            <option value="40">{LANDING_COPY.supply.radiusNear}</option>
+            <option value="80">{LANDING_COPY.supply.radius80}</option>
+          </select>
+          <ChevronDown
+            aria-hidden="true"
+            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            size={16}
+          />
         </div>
       </div>
 
