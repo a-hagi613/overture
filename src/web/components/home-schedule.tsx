@@ -63,7 +63,7 @@ export function HomeSchedule({ now, zone }: { now: number; zone: string }) {
           {copy.home.schedule.title}
         </h2>
         <Button asChild size="sm" variant="secondary">
-          <Link to="/calendar">
+          <Link to="/applications?view=calendar">
             {copy.home.schedule.open}
             <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
           </Link>
@@ -86,7 +86,7 @@ export function HomeSchedule({ now, zone }: { now: number; zone: string }) {
               <Link
                 className="group -mx-2 flex flex-1 items-center justify-between gap-4 rounded-lg px-2 py-4 transition hover:bg-muted"
                 key={item.id}
-                to={`/board?card=${encodeURIComponent(item.applicationId)}`}
+                to={`/applications?card=${encodeURIComponent(item.applicationId)}`}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

@@ -61,6 +61,7 @@ const targets: Target[] = routerPaths.map((path) => ({
 const shellPaths = new Set([
   "/home",
   "/ready",
+  "/applications",
   "/board",
   "/review",
   "/calendar",
@@ -282,7 +283,12 @@ async function settleLayout(page: Page) {
 
 async function checkTarget(page: Page, target: Target, url: string, width: number) {
   const requestedPath = new URL(url).pathname;
-  const expectedPath = redirectedPaths.get(requestedPath) ?? requestedPath;
+  const redirected = redirectedPaths.get(requestedPath);
+
+  const expectedPath =
+    requestedPath === "/profile" && width >= 768
+      ? "/profile/resume"
+      : new URL(redirected ?? requestedPath, "https://overture.local").pathname;
 
   await navigate(page, requestedPath, expectedPath);
   await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });

@@ -202,7 +202,7 @@ export function CodePasteSheet({
             <Link className={PRIMARY} onClick={onClose} to="/home">
               {copy.codePaste.expired.primary}
             </Link>
-            <Link className={SECONDARY} to="/board">
+            <Link className={SECONDARY} to="/applications">
               {copy.codePaste.expired.secondary}
             </Link>
           </>

@@ -26,11 +26,11 @@ import { CommandDialog } from "./ui/command-dialog.tsx";
 
 const QUICK_LINKS = [
   { icon: Home, label: copy.nav.home, to: "/home" },
-  { icon: SquareKanban, label: copy.nav.board, to: "/board" },
+  { icon: SquareKanban, label: copy.nav.applications, to: "/applications" },
   { icon: Send, label: copy.nav.ready, to: "/ready" },
   { icon: CircleHelp, label: copy.nav.review, to: "/review" },
   { icon: Inbox, label: copy.nav.inbox, to: "/inbox" },
-  { icon: Calendar, label: copy.nav.calendar, to: "/calendar" },
+  { icon: Calendar, label: copy.nav.calendar, to: "/applications?view=calendar" },
   { icon: FileText, label: copy.nav.profileMenu.resume, to: "/profile/resume" },
   { icon: User, label: copy.nav.profileMenu.details, to: "/profile/details" },
   { icon: SlidersHorizontal, label: copy.nav.profileMenu.preferences, to: "/profile/preferences" },
@@ -178,7 +178,7 @@ export function WorkspaceSearchDialog({
               className={ITEM_CLASS}
               key={app.id}
               onSelect={() => {
-                go(`/board?card=${encodeURIComponent(app.id)}`);
+                go(`/applications?card=${encodeURIComponent(app.id)}`);
               }}
               value={`app-${app.id}`}
             >
@@ -242,7 +242,7 @@ export function WorkspaceSearchDialog({
               className={ITEM_CLASS}
               key={interview.id}
               onSelect={() => {
-                go("/calendar");
+                go("/applications?view=calendar");
               }}
               value={`interview-${interview.id}`}
             >

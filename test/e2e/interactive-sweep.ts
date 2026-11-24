@@ -269,7 +269,10 @@ async function measureLandmarks(page: Page) {
 async function checkTarget(page: Page, target: Target, url: string, width: number) {
   const expectedPath = new URL(url).pathname;
 
-  await navigate(page, expectedPath, landingPath(expectedPath));
+  const landing =
+    expectedPath === "/profile" && width >= 768 ? "/profile/resume" : landingPath(expectedPath);
+
+  await navigate(page, expectedPath, landing);
   await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
   await page.evaluate(async () => {
     globalThis.scrollTo(0, 0);

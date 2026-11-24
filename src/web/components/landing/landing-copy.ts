@@ -181,7 +181,7 @@ export const LANDING_COPY = {
         q: "What happens when it's unsure about an answer?",
       },
       {
-        a: "Yes. Every card on your Tracker opens a full record with a dated timeline and every form answer plus the cover letter and resume PDF and linked employer emails.",
+        a: "Yes. Every card in Applications opens a full record with a dated timeline and every form answer plus the cover letter and resume PDF and linked employer emails.",
         open: false,
         q: "Can I see what was submitted?",
       },

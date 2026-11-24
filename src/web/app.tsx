@@ -7,6 +7,7 @@ import { copy } from "../shared/copy.ts";
 import { Backdrop } from "./components/backdrop.tsx";
 import { BoardRail } from "./components/board-rail.tsx";
 import { BrandMark } from "./components/brand-mark.tsx";
+import { MobileTopHeader } from "./components/mobile-top-header.tsx";
 import { RouteErrorBoundary } from "./components/route-error-boundary.tsx";
 import { RouteFallback } from "./components/route-fallback.tsx";
 import { SideNav } from "./components/side-nav.tsx";
@@ -80,6 +81,7 @@ export function AppShell() {
     <div className="relative overflow-x-clip bg-background text-foreground">
       <Backdrop />
       <div className="relative z-10 flex min-h-screen flex-col md:flex-row">
+        <MobileTopHeader onOpenSearch={openSearch} unreadNotifications={unreadNotifications} />
         {wide ? (
           <aside
             className="fixed left-0 top-0 z-20 flex h-dvh w-[268px] flex-col gap-2 overflow-visible border-r border-border bg-sidebar px-4 pb-2.5 pt-3.5 min-[1700px]:w-[296px]"
@@ -146,11 +148,7 @@ export function AppShell() {
             </RouteErrorBoundary>
           </div>
         </main>
-        <TabBar
-          counts={navCounts}
-          onOpenSearch={openSearch}
-          unreadNotifications={unreadNotifications}
-        />
+        <TabBar counts={navCounts} />
       </div>
       <WorkspaceSearchDialog onOpenChange={changeSearchOpen} open={searchOpen} />
       {overlayHost === null ? <Toaster /> : createPortal(<Toaster />, overlayHost)}

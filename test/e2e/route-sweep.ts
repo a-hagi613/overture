@@ -64,11 +64,16 @@ const redirects = new Map(
 /**
  * The path a route settles on: its own path, or the target of a `<Navigate>` redirect.
  *
+ * Query strings and hashes on a redirect target are dropped because every caller
+ * compares against `location.pathname`.
+ *
  * @param path - A route path as listed in the route table.
- * @returns The path the browser ends on after the route renders.
+ * @returns The pathname the browser ends on after the route renders.
  */
 export function landingPath(path: string) {
-  return redirects.get(path) ?? path;
+  const target = redirects.get(path) ?? path;
+
+  return new URL(target, "https://overture.local").pathname;
 }
 
 export async function navigate(page: Page, path: string, landing = path) {

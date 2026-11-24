@@ -1,6 +1,5 @@
 import { lazy } from "react";
 import type { ComponentType } from "react";
-import { Navigate } from "react-router";
 import type { RouteObject } from "react-router";
 
 import { PreserveSearchRedirect } from "./components/preserve-search-redirect.tsx";
@@ -30,10 +29,15 @@ const AppShell = lazyRoute(async () => import("./app.tsx"), "AppShell");
 const AdminShell = lazyRoute(async () => import("./routes/admin/shell.tsx"), "AdminShell");
 
 const HomePage = lazyRoute(async () => import("./routes/home.tsx"), "HomePage");
-const BoardPage = lazyRoute(async () => import("./routes/board.tsx"), "BoardPage");
+
+const ApplicationsPage = lazyRoute(
+  async () => import("./routes/applications.tsx"),
+  "ApplicationsPage",
+);
+
 const ReadyPage = lazyRoute(async () => import("./routes/ready.tsx"), "ReadyPage");
 const ReviewPage = lazyRoute(async () => import("./routes/review.tsx"), "ReviewPage");
-const CalendarPage = lazyRoute(async () => import("./routes/calendar.tsx"), "CalendarPage");
+
 const InboxPage = lazyRoute(async () => import("./routes/inbox.tsx"), "InboxPage");
 
 const InboxThreadPage = lazyRoute(
@@ -44,6 +48,11 @@ const InboxThreadPage = lazyRoute(
 const NotificationsPage = lazyRoute(
   async () => import("./routes/notifications.tsx"),
   "NotificationsPage",
+);
+
+const ProfileLandingPage = lazyRoute(
+  async () => import("./routes/profile-landing.tsx"),
+  "ProfileLandingPage",
 );
 
 const ProfileResumePage = lazyRoute(
@@ -160,13 +169,14 @@ const withRouteError = (routes: RouteObject[]) =>
 const appShellChildren: RouteObject[] = withRouteError([
   { path: "/home", element: <HomePage /> },
   { path: "/ready", element: <ReadyPage /> },
-  { path: "/board", element: <BoardPage /> },
+  { path: "/board", element: <PreserveSearchRedirect to="/applications" /> },
   { path: "/review", element: <ReviewPage /> },
-  { path: "/calendar", element: <CalendarPage /> },
+  { path: "/calendar", element: <PreserveSearchRedirect to="/applications?view=calendar" /> },
   { path: "/inbox", element: <InboxPage /> },
   { path: "/inbox/:id", element: <InboxThreadPage /> },
   { path: "/notifications", element: <NotificationsPage /> },
-  { path: "/profile", element: <Navigate replace to="/profile/resume" /> },
+  { path: "/applications", element: <ApplicationsPage /> },
+  { path: "/profile", element: <ProfileLandingPage /> },
   { path: "/profile/resume", element: <ProfileResumePage /> },
   { path: "/profile/details", element: <ProfileDetailsPage /> },
   { path: "/profile/preferences", element: <ProfilePreferencesPage /> },
@@ -188,7 +198,7 @@ const appShellChildren: RouteObject[] = withRouteError([
     path: "/settings/support-access",
     element: <PreserveSearchRedirect to="/profile/account#support-access" />,
   },
-  { path: "/search", element: <PreserveSearchRedirect to="/board" /> },
+  { path: "/search", element: <PreserveSearchRedirect to="/applications" /> },
   { path: "/inbox/address", element: <PreserveSearchRedirect to="/profile/account#forwarding" /> },
   { path: "*", element: <NotFoundPage /> },
 ]);

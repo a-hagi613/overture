@@ -19,7 +19,7 @@ interface ScreenDef {
 
 const screens: readonly ScreenDef[] = [
   { id: "home", label: "Home" },
-  { id: "board", label: "Tracker" },
+  { id: "board", label: "Applications" },
   { id: "inbox", label: "Inbox" },
   { id: "calendar", label: "Calendar" },
   { id: "profile", label: "Profile" },

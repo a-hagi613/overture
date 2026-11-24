@@ -219,7 +219,7 @@ test("the Board card and phone lane live in the URL through refresh and Back", a
 
   await page.goBack();
   await expect(page.locator(SHEET)).toHaveCount(0);
-  await expect(page).toHaveURL(/\/board(?:\?.*)?$/u);
+  await expect(page).toHaveURL(/\/applications(?:\?.*)?$/u);
 
   await context.close();
   await request.dispose();
@@ -320,7 +320,7 @@ test("the phone stage tabs move lanes with Arrow, Home and End when each tab is 
   await request.dispose();
 });
 
-test("crossing to the desktop layout closes the phone More sheet and frees the page", async ({
+test("crossing to the desktop layout swaps the phone header for the sidebar with no popup", async ({
   uiServer,
   browser,
 }) => {
@@ -334,18 +334,13 @@ test("crossing to the desktop layout closes the phone More sheet and frees the p
 
   await page.goto(`${uiServer.url}/home`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-
-  await page.getByRole("button", { name: copy.nav.profilePages.mobileMore }).click();
-
-  const sheet = page.locator('dialog[aria-labelledby="mobile-nav-sheet-title"]');
-
-  await expect(sheet).toBeVisible();
-  expect(await sheet.evaluate((element) => element.matches(":modal"))).toBe(true);
-  expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+  await expect(page.locator("[data-mobile-header]")).toBeVisible();
+  await expect(page.locator("dialog")).toHaveCount(0);
 
   await page.setViewportSize({ height: 900, width: 1280 });
 
-  await expect(sheet).toHaveCount(0);
+  await expect(page.locator("[data-mobile-header]")).toBeHidden();
+  await expect(page.locator('dialog[aria-labelledby="mobile-nav-sheet-title"]')).toHaveCount(0);
   expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
   await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
 
@@ -356,7 +351,10 @@ test("crossing to the desktop layout closes the phone More sheet and frees the p
   await request.dispose();
 });
 
-test("closing stacked sheets gives scrolling back to the page", async ({ uiServer, browser }) => {
+test("closing the card sheet through history gives scrolling back to the page", async ({
+  uiServer,
+  browser,
+}) => {
   const request = await apiRequest.newContext({ baseURL: uiServer.url });
   const userId = await seedBoardOwner(request, uiServer.url);
 
@@ -366,7 +364,7 @@ test("closing stacked sheets gives scrolling back to the page", async ({ uiServe
   const context = await browser.newContext({ storageState, viewport: { height: 844, width: 390 } });
   const page = await context.newPage();
 
-  await page.goto(`${uiServer.url}/board`);
+  await page.goto(`${uiServer.url}/applications`);
 
   const card = page.locator('section[aria-label="Applied"] button[data-card]').first();
 
@@ -375,22 +373,18 @@ test("closing stacked sheets gives scrolling back to the page", async ({ uiServe
   const sheet = page.locator(SHEET);
 
   await expect(sheet).toBeVisible();
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
 
   await page.goBack();
   await expect(sheet).toHaveCount(0);
-
-  await page.getByRole("button", { exact: true, name: copy.nav.profilePages.mobileMore }).click();
-
-  const navSheet = page.locator('dialog[aria-labelledby="mobile-nav-sheet-title"]');
-
-  await expect(navSheet).toBeVisible();
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
 
   await page.goForward();
   await expect(sheet).toBeVisible();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
 
   await page.setViewportSize({ height: 900, width: 1280 });
-  await expect(navSheet).toHaveCount(0);
+  await expect(sheet).toBeVisible();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
 
   await page.keyboard.press("Escape");
@@ -580,34 +574,7 @@ test("a sheet is truly modal, keeps focus inside, and returns it on Escape", asy
   const context = await browser.newContext({ storageState, viewport: { height: 844, width: 390 } });
   const page = await context.newPage();
 
-  await page.goto(`${uiServer.url}/home`);
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-
-  const more = page.getByRole("button", { name: copy.nav.profilePages.mobileMore });
-
-  await more.click();
-
-  const navSheet = page.locator('dialog[aria-labelledby="mobile-nav-sheet-title"]');
-
-  await expect(navSheet).toBeVisible();
-  expect(await navSheet.evaluate((element) => element.matches(":modal"))).toBe(true);
-  expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
-
-  await navSheet.getByRole("link").last().focus();
-  await page.keyboard.press("Tab");
-  expect(await page.evaluate(() => document.activeElement?.closest("dialog") !== null)).toBe(true);
-
-  await page.evaluate(() => {
-    document.querySelector<HTMLAnchorElement>('a[href="#main-content"]')?.focus();
-  });
-  expect(await page.evaluate(() => document.activeElement?.closest("dialog") !== null)).toBe(true);
-
-  await page.keyboard.press("Escape");
-  await expect(navSheet).toHaveCount(0);
-  await expect(more).toBeFocused();
-  expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
-
-  await page.goto(`${uiServer.url}/board`);
+  await page.goto(`${uiServer.url}/applications`);
   const card = page.locator('section[aria-label="Applied"] button[data-card]').first();
   const id = await card.getAttribute("data-card");
 

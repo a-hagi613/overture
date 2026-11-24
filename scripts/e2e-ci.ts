@@ -934,7 +934,7 @@ function visitedUiRoutes(
   }
 
   if (combined.includes("openBoard(")) {
-    routes.add("/board");
+    routes.add("/applications");
   }
 
   if (combined.includes("openAdminAsOwner(") || combined.includes("signInOwnerOnAdmin(")) {

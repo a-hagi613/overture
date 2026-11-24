@@ -263,7 +263,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
     }
   });
 
-  test("Seeded workspace supports Tracker sheet inspection, Ready confirmation modal, Review filters, and Inbox split pane", async ({
+  test("Seeded workspace supports Applications sheet inspection, Ready confirmation modal, Review filters, and Inbox split pane", async ({
     browser,
     demoServer,
   }) => {
@@ -276,8 +276,10 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await page.getByRole("button", { name: "Send sign-in link" }).click();
       await expect(page.getByRole("heading", { level: 1, name: greetingHeading })).toBeVisible();
 
-      await page.goto(`${demoServer.url}/board`);
-      await expect(page.getByRole("heading", { level: 1, name: "Job Tracker" })).toBeVisible();
+      await page.goto(`${demoServer.url}/applications`);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Your Applications" }),
+      ).toBeVisible();
       await page
         .getByRole("button", { name: /Tidepool Analytics/u })
         .first()

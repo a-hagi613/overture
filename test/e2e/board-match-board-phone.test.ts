@@ -53,7 +53,7 @@ async function expectPhoneBoardMatches(browser: Browser, appServerUrl: string, t
     page.getByRole("heading", { level: 2, name: "Senior Backend Engineer" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Track every application from match to decision.").filter({ visible: true }),
+    page.getByText("Every application from match to decision.").filter({ visible: true }),
   ).toBeVisible();
   await expect(page.getByRole("group", { name: "Stages" })).toBeVisible();
   await page.evaluate(async () => {

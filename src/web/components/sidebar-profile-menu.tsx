@@ -112,7 +112,7 @@ export function SidebarProfileMenu({ wide }: { wide: boolean }) {
           className={`rl ${isProfileActive ? "on" : ""}`}
           onKeyDown={handleKeyDown}
           ref={triggerRef}
-          to="/profile/resume"
+          to="/profile"
         >
           <User aria-hidden="true" size={20} />
         </Link>
@@ -189,7 +189,7 @@ export function SidebarProfileMenu({ wide }: { wide: boolean }) {
         }`}
         onKeyDown={handleKeyDown}
         ref={triggerRef}
-        to="/profile/resume"
+        to="/profile"
       >
         {isProfileActive ? (
           <span

@@ -47,12 +47,12 @@ async function apiSearchHits(ownerPage: Page, url: string) {
   return searchResponseSchema.parse(await response.json());
 }
 
-test("the role filter narrows search results to the tagged role and /search redirects to /board", async ({
+test("the role filter narrows search results to the tagged role and /search redirects to /applications", async ({
   ownerPage,
   appServerUrl,
 }) => {
   await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Manager")}`);
-  await expect(ownerPage).toHaveURL(/\/board\?q=Manager/u);
+  await expect(ownerPage).toHaveURL(/\/applications\?q=Manager/u);
 
   const unfiltered = await apiSearchHits(
     ownerPage,

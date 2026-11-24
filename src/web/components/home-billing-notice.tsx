@@ -58,7 +58,7 @@ export function HomeBillingNotice(props: {
             <Link to="/profile/billing">{COPY.outOfApplications.choosePlan}</Link>
           </Button>
           <Button asChild size="sm" variant="secondary">
-            <Link to="/board">{COPY.outOfApplications.seeBoard}</Link>
+            <Link to="/applications">{COPY.outOfApplications.seeBoard}</Link>
           </Button>
         </div>
       </Card>

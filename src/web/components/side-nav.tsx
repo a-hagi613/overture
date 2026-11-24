@@ -1,30 +1,27 @@
-import {
-  Bell,
-  Calendar,
-  CircleHelp,
-  Home,
-  Inbox,
-  MessageCircle,
-  Send,
-  SquareKanban,
-} from "lucide-react";
+import { Bell, CircleHelp, Home, Inbox, MessageCircle, Send, SquareKanban } from "lucide-react";
 import { NavLink } from "react-router";
 
-import type { NavCounts, NavKey } from "../lib/nav-api.ts";
+import type { NavCounts, PrimaryNavKey } from "../lib/nav-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import { NAV_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
 import { SidebarProfileMenu } from "./sidebar-profile-menu.tsx";
 import { Badge } from "./ui/badge.tsx";
+import { Separator } from "./ui/separator.tsx";
 
-const NAV_ICONS: Record<Exclude<NavKey, "profile" | "support">, typeof Home> = {
-  board: SquareKanban,
-  calendar: Calendar,
+const NAV_ICONS: Record<PrimaryNavKey, typeof Home> = {
+  applications: SquareKanban,
   home: Home,
   inbox: Inbox,
   ready: Send,
   review: CircleHelp,
 };
+
+const ROW_CLASS =
+  "relative flex min-h-11 items-center gap-3.5 rounded-md border px-3 text-base font-medium transition";
+
+const ROW_IDLE = "border-transparent text-foreground hover:bg-muted";
+const ROW_ACTIVE = "border-border bg-card text-foreground shadow-sh";
 
 export function SideNav({
   counts,
@@ -45,11 +42,7 @@ export function SideNav({
           <NavLink end={destination.to === "/home"} key={destination.to} to={destination.to}>
             {({ isActive }) => (
               <span
-                className={`relative flex min-h-11 items-center gap-3.5 rounded-md border px-3 text-base font-medium transition ${
-                  isActive
-                    ? "border-border bg-card text-foreground shadow-sh"
-                    : "border-transparent text-foreground hover:bg-muted"
-                } ${showLabels ? "" : "justify-center"}`}
+                className={`${ROW_CLASS} ${isActive ? ROW_ACTIVE : ROW_IDLE} ${showLabels ? "" : "justify-center"}`}
               >
                 <span className="sr-only">{navLabel(destination.glyph, count)}</span>
                 {isActive ? (
@@ -84,40 +77,10 @@ export function SideNav({
           </NavLink>
         );
       })}
-      <SidebarProfileMenu wide={showLabels} />
-      <NavLink to="/support">
-        {({ isActive }) => (
-          <span
-            className={`relative flex min-h-11 items-center gap-3.5 rounded-md border px-3 text-base font-medium transition ${
-              isActive
-                ? "border-border bg-card text-foreground shadow-sh"
-                : "border-transparent text-foreground hover:bg-muted"
-            } ${showLabels ? "" : "justify-center"}`}
-          >
-            {isActive ? (
-              <span
-                aria-hidden="true"
-                className="absolute -left-px bottom-2 top-2 w-0.5 rounded-full bg-signal"
-              />
-            ) : null}
-            <MessageCircle aria-hidden="true" className="shrink-0" size={20} />
-            {showLabels ? (
-              <span className="whitespace-nowrap">{copy.nav.support}</span>
-            ) : (
-              <span className="sr-only">{copy.nav.support}</span>
-            )}
-          </span>
-        )}
-      </NavLink>
+      <Separator className="my-1.5" />
       <NavLink to="/notifications">
         {({ isActive }) => (
-          <span
-            className={`relative flex min-h-11 items-center gap-3.5 rounded-md border px-3 text-base font-medium transition ${
-              isActive
-                ? "border-border bg-card text-foreground shadow-sh"
-                : "border-transparent text-foreground hover:bg-muted"
-            } ${showLabels ? "" : "justify-center"}`}
-          >
+          <span className={`${ROW_CLASS} ${isActive ? ROW_ACTIVE : ROW_IDLE}`}>
             <span className="sr-only">
               {unreadNotifications > 0
                 ? copy.shell.notifications(unreadNotifications)
@@ -143,6 +106,27 @@ export function SideNav({
           </span>
         )}
       </NavLink>
+      <NavLink to="/support">
+        {({ isActive }) => (
+          <span
+            className={`${ROW_CLASS} ${isActive ? ROW_ACTIVE : ROW_IDLE} ${showLabels ? "" : "justify-center"}`}
+          >
+            {isActive ? (
+              <span
+                aria-hidden="true"
+                className="absolute -left-px bottom-2 top-2 w-0.5 rounded-full bg-signal"
+              />
+            ) : null}
+            <MessageCircle aria-hidden="true" className="shrink-0" size={20} />
+            {showLabels ? (
+              <span className="whitespace-nowrap">{copy.nav.support}</span>
+            ) : (
+              <span className="sr-only">{copy.nav.support}</span>
+            )}
+          </span>
+        )}
+      </NavLink>
+      <SidebarProfileMenu wide={showLabels} />
     </nav>
   );
 }
