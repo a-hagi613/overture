@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { R2BucketBinding, SentinelBucket } from "../../workers/sentinel/src/bucket.ts";
 
 import { runSentinel } from "../../workers/sentinel/src/index.ts";
+import { opsHealthHeaders } from "../../workers/sentinel/src/ops-health.ts";
 import { usageMetrics, usageResponseSchema } from "../../workers/sentinel/src/usage.ts";
 
 const MINUTE = 60_000;
@@ -240,14 +241,21 @@ async function run(harness: Harness, at = NOW) {
   return runSentinel(harness.env, { now: () => at });
 }
 
-function opsBody(overrides: Record<string, unknown> = {}) {
+interface OpsOverrides {
+  ats?: { attempts: number; failures: number; failureRate: number; windowMs: number };
+  disk?: { mount: string; usedRatio: number };
+  eventLoopLag?: { p95Ms: number | null };
+  memory?: { rssBytes: number; totalBytes: number; usedRatio: number };
+  status?: string;
+}
+
+function opsBody(overrides: OpsOverrides = {}) {
   return JSON.stringify({
-    ats: { attempts: 0, failures: 0, failureRate: 0, windowMs: 3_600_000 },
-    disk: { mount: "/data", usedRatio: 0.4 },
-    eventLoopLag: { p95Ms: 20 },
-    memory: { rssBytes: 1_048_576, totalBytes: 4_194_304, usedRatio: 0.4 },
-    status: "ok",
-    ...overrides,
+    ats: overrides.ats ?? { attempts: 0, failures: 0, failureRate: 0, windowMs: 3_600_000 },
+    disk: overrides.disk ?? { mount: "/data", usedRatio: 0.4 },
+    eventLoopLag: overrides.eventLoopLag ?? { p95Ms: 20 },
+    memory: overrides.memory ?? { rssBytes: 1_048_576, totalBytes: 4_194_304, usedRatio: 0.4 },
+    status: overrides.status ?? "ok",
   });
 }
 
@@ -668,6 +676,15 @@ test("an unreadable or failing ops endpoint alerts and is recorded", async () =>
   expect((await harness.lastRun())?.ops).toBe("failed");
 
   await harness.servers.stop();
+});
+
+test("the Worker's WebCrypto signature matches the shared HMAC vector", async () => {
+  const headers = await opsHealthHeaders("shared-ops-secret", NOW);
+
+  expect(headers["x-overture-ops-signature"]).toBe(
+    "b98d5da956d7680dd063cebf760da36723f69a45c33e5b564fad6696866ead99",
+  );
+  expect(headers["x-overture-ops-timestamp"]).toBe(String(NOW));
 });
 
 test("the cron stays under 10k invocations a month and sets a CPU limit", async () => {

@@ -130,6 +130,12 @@ function startApp(secret: string) {
   return { app, seedAttempt };
 }
 
+test("the app's signature matches the shared HMAC vector the sentinel produces", () => {
+  expect(opsHealthSignature("shared-ops-secret", "1800000000000")).toBe(
+    "37f64ec40b7616621fa71e7e2648cd5b31f8da54fecf56b244e15e03b53a26e4",
+  );
+});
+
 test("a missing, stale or forged signature fails closed", async () => {
   const { app } = startApp(SECRET);
 

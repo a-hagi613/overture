@@ -51,6 +51,7 @@ export const METRIC_ATTRIBUTE_NAMES = [
   "outcome",
   "plan",
   "purpose",
+  "reason",
   "route",
   "status",
   "status_class",
