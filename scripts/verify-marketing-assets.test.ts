@@ -150,6 +150,46 @@ test("a reference that keeps failing is reported once, after every attempt", asy
   expect(result.problems[0]).toContain("HTTP 503");
 });
 
+test("a fetch that throws is reported against its URL instead of crashing the deploy step", async () => {
+  const result = await verifyMarketingAssets({
+    baseUrl: "https://overture-web.fly.dev",
+    fetchAsset: async () => {
+      await Promise.resolve();
+
+      throw new Error("connect ECONNREFUSED");
+    },
+    references: ["/assets/main-DE9lOe0s.js"],
+  });
+
+  expect(result.problems).toStrictEqual([
+    "https://overture-web.fly.dev/assets/main-DE9lOe0s.js could not be fetched: connect ECONNREFUSED",
+  ]);
+});
+
+test("a fetch that throws is retried like any other failure", async () => {
+  let attempts = 0;
+
+  const result = await verifyMarketingAssets({
+    attempts: 2,
+    baseUrl: "https://overture-web.fly.dev",
+    fetchAsset: async () => {
+      await Promise.resolve();
+      attempts += 1;
+
+      if (attempts === 1) {
+        throw new Error("socket hang up");
+      }
+
+      return { bytes: 32, status: 200 };
+    },
+    pauseMs: 0,
+    references: ["/assets/main-DE9lOe0s.js"],
+  });
+
+  expect(attempts).toBe(2);
+  expect(result.problems).toStrictEqual([]);
+});
+
 test("parseArguments requires a base origin and defaults the build directory", () => {
   expect(parseArguments([])).toStrictEqual({ kind: "error", message: "--base <url> is required" });
 
@@ -195,4 +235,11 @@ test("parseArguments rejects a retry count that is not a positive whole number",
       message: "--attempts must be a positive integer",
     },
   );
+});
+
+test("parseArguments refuses a retry flag with no value", () => {
+  expect(parseArguments(["--base", "https://tryoverture.com", "--attempts"])).toStrictEqual({
+    kind: "error",
+    message: "--attempts needs a value",
+  });
 });

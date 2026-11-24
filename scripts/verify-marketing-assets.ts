@@ -100,20 +100,34 @@ async function sleep(ms: number) {
   });
 }
 
-async function fetchUntilServed(input: AttemptInput) {
-  const response = await input.fetchAsset(input.url);
-
-  if (response.status === 200 && response.bytes > 0) {
-    return {
-      asset: { bytes: response.bytes, path: input.path, status: response.status },
-      kind: "ok",
-    } satisfies AssetOutcome;
+function describeProblem(url: string, status: number, failure: string) {
+  if (failure !== "") {
+    return `${url} could not be fetched: ${failure}`;
   }
 
-  const problem =
-    response.status === 200
-      ? `${input.url} answered 200 with an empty body`
-      : `${input.url} answered HTTP ${String(response.status)}`;
+  if (status === 200) {
+    return `${url} answered 200 with an empty body`;
+  }
+
+  return `${url} answered HTTP ${String(status)}`;
+}
+
+async function fetchUntilServed(input: AttemptInput) {
+  let status = 0;
+  let bytes = 0;
+  let failure = "";
+
+  try {
+    ({ bytes, status } = await input.fetchAsset(input.url));
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+  }
+
+  if (status === 200 && bytes > 0) {
+    return { asset: { bytes, path: input.path, status }, kind: "ok" } satisfies AssetOutcome;
+  }
+
+  const problem = describeProblem(input.url, status, failure);
 
   if (input.attempt >= input.attempts) {
     return { kind: "problem", problem } satisfies AssetOutcome;
@@ -207,6 +221,14 @@ export function parseArguments(args: readonly string[]) {
   }
 
   const attemptsFlag = flagValue("--attempts", args);
+
+  if (args.includes("--attempts") && attemptsFlag === null) {
+    return {
+      kind: "error",
+      message: "--attempts needs a value",
+    } satisfies ParsedArguments;
+  }
+
   const attempts = attemptsFlag === null ? 1 : Number(attemptsFlag);
 
   if (!Number.isInteger(attempts) || attempts < 1) {
