@@ -76,12 +76,14 @@ export const postings = sqliteTable(
       .references(() => companies.id, { onDelete: "cascade" }),
     ats: text("ats", { enum: ATS_VALUES }).notNull(),
     atsJobId: text("ats_job_id").notNull(),
+    requisitionId: text("requisition_id"),
     url: text("url").notNull(),
     applyUrl: text("apply_url"),
     applyUrlNorm: text("apply_url_norm").notNull(),
     title: text("title").notNull(),
     titleNorm: text("title_norm").notNull(),
     department: text("department"),
+    team: text("team"),
     locationRaw: text("location_raw"),
     countryCode: text("country_code"),
     region: text("region"),
@@ -90,22 +92,40 @@ export const postings = sqliteTable(
     workplace: text("workplace", { enum: ["remote", "hybrid", "onsite", "unknown"] })
       .notNull()
       .default("unknown"),
+    /**
+     * The feed's own remote flag, kept beside `workplace` for the Stapply ingest. `true` means remote; `NULL`
+     * means unknown. An `is_remote=false` row is not treated as on-site, because a missing flag is common and
+     * `workplace` stays the normalized answer every read uses.
+     */
+    isRemote: integer("is_remote", { mode: "boolean" }),
     employmentType: text("employment_type", {
       enum: ["full_time", "part_time", "contract", "internship", "temporary", "unknown"],
     })
       .notNull()
       .default("unknown"),
+    commitment: text("commitment"),
+    experience: text("experience"),
     postedAt: integer("posted_at"),
+    applicationDeadline: integer("application_deadline"),
     salaryMinMinor: integer("salary_min_minor"),
     salaryMaxMinor: integer("salary_max_minor"),
     salaryCurrency: text("salary_currency"),
     salaryPeriod: text("salary_period", { enum: ["year", "month", "hour"] }),
+    salarySummary: text("salary_summary"),
     sourceUpdatedAt: integer("source_updated_at"),
     firstSeenAt: integer("first_seen_at").notNull(),
     lastSeenAt: integer("last_seen_at").notNull(),
     missingPolls: integer("missing_polls").notNull().default(0),
     closedAt: integer("closed_at"),
+    /** `open` while the board lists the Posting; `closed` once it is gone. Both move together with `closed_at`. */
+    status: text("status", { enum: ["open", "closed"] })
+      .notNull()
+      .default("open"),
+    /** Whether Overture has a deterministic apply adapter for this Posting's ATS (issue #563). */
+    applySupported: integer("apply_supported", { mode: "boolean" }).notNull().default(false),
     dedupeKey: text("dedupe_key").notNull(),
+    contentHash: text("content_hash"),
+    skillsJson: text("skills_json"),
     descriptionGz: blob("description_gz", { mode: "buffer" }),
     descriptionHash: text("description_hash"),
     feedContentHash: text("feed_content_hash"),
@@ -119,6 +139,8 @@ export const postings = sqliteTable(
     index("postings_apply_url_norm").on(t.applyUrlNorm),
     index("postings_closed_at").on(t.closedAt),
     index("postings_ats_closed_last_seen").on(t.ats, t.closedAt, t.lastSeenAt),
+    index("postings_apply_supported_status").on(t.applySupported, t.status),
+    index("postings_company_requisition").on(t.companyId, t.requisitionId),
     index("postings_open_location")
       .on(t.city, t.countryCode, t.locationRaw, t.workplace, t.closedAt)
       .where(sql`closed_at is null`),

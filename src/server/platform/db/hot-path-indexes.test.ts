@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import { z } from "zod";
 
-import { openDatabase } from "./client.ts";
-import { migrateDatabase } from "./migrate.ts";
+import { openCatalogDatabase, openDatabase } from "./client.ts";
+import { migrateCatalogDatabase, migrateDatabase } from "./migrate.ts";
 
 const NOW = 1_800_000_000_000;
 const ROWS = 2000;
@@ -224,6 +224,110 @@ test("the retention, audit and session hot paths search their new indexes", () =
     );
 
     expect(jobs).toContain("bg_jobs_status_updated");
+  } finally {
+    db.$client.close();
+  }
+});
+
+test("the catalog candidate and requisition hot paths search their new indexes", () => {
+  const { db, sqlite } = openCatalogDatabase(":memory:");
+
+  migrateCatalogDatabase(db, "drizzle-catalog");
+
+  sqlite.run(
+    "insert into companies (id, name, name_norm, created_at) values ('company-a', 'A', 'a', ?)",
+    [NOW],
+  );
+  sqlite.run(
+    "insert into companies (id, name, name_norm, created_at) values ('company-b', 'B', 'b', ?)",
+    [NOW],
+  );
+  sqlite.run(
+    "insert into company_boards (id, company_id, ats, board_token, region, status, source, created_at) values ('board-a', 'company-a', 'greenhouse', 'a', 'us', 'active', 'v1_seed', ?)",
+    [NOW],
+  );
+  sqlite.run(
+    "insert into company_boards (id, company_id, ats, board_token, region, status, source, created_at) values ('board-b', 'company-b', 'smartrecruiters', 'b', 'us', 'active', 'v1_seed', ?)",
+    [NOW],
+  );
+
+  const insertPosting = sqlite.prepare(
+    `insert into postings (id, board_id, company_id, ats, ats_job_id, requisition_id, url, apply_url_norm,
+       title, title_norm, location_raw, country_code, city, language, workplace, employment_type,
+       first_seen_at, last_seen_at, dedupe_key, apply_supported, status)
+     values (?, ?, ?, ?, ?, ?, ?, ?, 'Engineer', 'engineer', 'Remote', 'US', 'Austin', 'en', 'remote',
+       'full_time', ?, ?, ?, ?, ?)`,
+  );
+
+  const insertTag = sqlite.prepare(
+    "insert into posting_tags (posting_id, dimension, value, source) values (?, ?, ?, 'rules')",
+  );
+
+  try {
+    for (let index = 0; index < ROWS; index += 1) {
+      const supportable = index % 5 !== 0;
+      const ats = supportable ? "greenhouse" : "smartrecruiters";
+      const boardId = supportable ? "board-a" : "board-b";
+      const companyId = supportable ? "company-a" : "company-b";
+      const url = `https://example.test/${String(index)}`;
+
+      insertPosting.run(
+        `posting-${String(index)}`,
+        boardId,
+        companyId,
+        ats,
+        String(index),
+        supportable ? `req-${String(index)}` : null,
+        url,
+        url,
+        NOW,
+        NOW,
+        `key-${String(index)}`,
+        supportable ? 1 : 0,
+        index % 7 === 0 ? "closed" : "open",
+      );
+      insertTag.run(`posting-${String(index)}`, "role", "Engineer");
+      insertTag.run(`posting-${String(index)}`, "seniority", "senior");
+    }
+
+    sqlite.run("ANALYZE");
+
+    const names = z
+      .array(nameSchema)
+      .parse(sqlite.query("select name from sqlite_master where type = 'index'").all())
+      .map((row) => row.name);
+
+    expect(names).toContain("postings_apply_supported_status");
+    expect(names).toContain("postings_company_requisition");
+
+    const candidate = sqlite
+      .query(
+        `EXPLAIN QUERY PLAN select p.id from postings p
+           inner join companies c on c.id = p.company_id
+         where p.closed_at is null and p.status = 'open' and p.apply_supported = 1
+           and p.workplace in ('remote') and p.employment_type in ('full_time')
+           and lower(p.language) in ('en')
+           and exists (select 1 from posting_tags t where t.posting_id = p.id
+             and t.dimension in ('role', 'subrole') and t.value in ('Engineer'))
+           and exists (select 1 from posting_tags t2 where t2.posting_id = p.id
+             and t2.dimension = 'seniority' and t2.value in ('senior'))`,
+      )
+      .all()
+      .map((row) => planSchema.parse(row).detail)
+      .join("\n");
+
+    expect(candidate).toContain("postings_apply_supported_status");
+    expect(candidate).not.toMatch(/SCAN p\b/u);
+
+    const requisition = sqlite
+      .query(
+        "EXPLAIN QUERY PLAN select id from postings where company_id = ? and requisition_id = ?",
+      )
+      .all("company-a", "req-3")
+      .map((row) => planSchema.parse(row).detail)
+      .join("\n");
+
+    expect(requisition).toContain("postings_company_requisition");
   } finally {
     db.$client.close();
   }

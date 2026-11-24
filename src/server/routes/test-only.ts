@@ -12,6 +12,7 @@ import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { PreparationService } from "../pipeline/prepare.ts";
 import type { CatalogSweepWorker } from "../catalog/sweep-worker-runner.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
+import { ATS_VALUES, isApplySupportedAts } from "../../shared/ats.ts";
 
 import {
   accountExports,
@@ -180,7 +181,7 @@ const createCompanyBody = z.object({
 
 const createBoardBody = z.object({
   companyId: z.string().min(1),
-  ats: z.enum(["greenhouse", "lever", "ashby", "workable", "personio"]),
+  ats: z.enum(ATS_VALUES),
   boardToken: z.string().min(1),
   region: z.enum(["us", "eu"]).default("us"),
   status: z.enum(["active", "empty", "gone", "disabled"]).default("active"),
@@ -402,7 +403,7 @@ function defaultStageFor(status: "approved" | "failed" | "needs_review" | "ready
 const createPostingBody = z.object({
   boardId: z.string().min(1),
   companyId: z.string().min(1),
-  ats: z.enum(["greenhouse", "lever", "ashby", "workable", "personio"]),
+  ats: z.enum(ATS_VALUES),
   atsJobId: z.string().min(1),
   url: z.string().min(1),
   title: z.string().min(1),
@@ -662,6 +663,8 @@ function seedPosting(
       descriptionHash: descriptionText === null ? null : contentHash(descriptionText),
       tagSource: null,
       closedAt: null,
+      status: "open",
+      applySupported: isApplySupportedAts(row.ats),
       questionsFetchedAt: row.questions.length > 0 ? now : null,
     })
     .run();
@@ -1598,7 +1601,11 @@ export function createTestRoutes(
   routes.post("/catalog/postings/close", validJson(closePostingBody), (context) => {
     const { id } = context.req.valid("json");
 
-    catalogDb.update(postings).set({ closedAt: clock.now() }).where(eq(postings.id, id)).run();
+    catalogDb
+      .update(postings)
+      .set({ closedAt: clock.now(), status: "closed" })
+      .where(eq(postings.id, id))
+      .run();
 
     return context.json({ id, closed: true });
   });
@@ -1606,7 +1613,7 @@ export function createTestRoutes(
   routes.post("/catalog/postings/close-all", (context) => {
     const closed = catalogDb
       .update(postings)
-      .set({ closedAt: clock.now() })
+      .set({ closedAt: clock.now(), status: "closed" })
       .where(isNull(postings.closedAt))
       .returning({ id: postings.id })
       .all();

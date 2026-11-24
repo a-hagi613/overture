@@ -385,6 +385,8 @@ async function seedApplications(input: {
           titleNorm,
         }),
         department: "Engineering",
+        status: app.statusReason === "posting_closed" ? ("closed" as const) : ("open" as const),
+        applySupported: true,
         descriptionGz: null,
         descriptionHash: contentHash(`${app.title} at ${company.name}`),
         employmentType: "full_time",

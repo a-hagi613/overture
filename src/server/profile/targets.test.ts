@@ -27,8 +27,8 @@ const EMPLOYMENT_TYPES = ["full_time", "part_time", "contract"] as const;
 
 const POSTING_INSERT = `INSERT INTO postings (id, board_id, company_id, ats, ats_job_id, url, apply_url_norm,
   title, title_norm, location_raw, country_code, region, city, language, workplace, employment_type,
-  salary_min_minor, salary_currency, first_seen_at, last_seen_at, closed_at, dedupe_key)
-  VALUES (?, 'board', 'company', 'greenhouse', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  salary_min_minor, salary_currency, first_seen_at, last_seen_at, closed_at, status, apply_supported, dedupe_key)
+  VALUES (?, 'board', 'company', 'greenhouse', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`;
 
 const TAG_INSERT =
   "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, ?, ?, 'rules')";
@@ -88,6 +88,7 @@ function postingValues(index: number) {
       NOW,
       NOW,
       index % 7 === 0 ? NOW : null,
+      index % 7 === 0 ? "closed" : "open",
       id,
     ],
   };

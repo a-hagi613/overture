@@ -2,6 +2,7 @@ import { and, desc, eq, isNotNull } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
+import type { Ats } from "../../shared/ats.ts";
 
 import { raiseAlert } from "../platform/alerts.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
@@ -34,7 +35,7 @@ const SAMPLE_OUTCOMES = new Set<string>([
 ]);
 
 interface AttemptScope {
-  ats: "greenhouse" | "lever" | "ashby" | "workable" | "personio";
+  ats: Ats;
   provider: "browser_use" | "kernel" | "local";
   companyId: string;
   companyName: string;

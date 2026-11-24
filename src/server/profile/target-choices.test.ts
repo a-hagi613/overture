@@ -31,8 +31,8 @@ function addPosting(fixture: Fixture, input: { closed: boolean; index: number })
     .prepare(
       `INSERT INTO postings (id, board_id, company_id, ats, ats_job_id, url, apply_url_norm, title, title_norm,
         location_raw, country_code, city, language, workplace, employment_type, first_seen_at, last_seen_at,
-        closed_at, dedupe_key)
-       VALUES (?, 'b', 'c', 'greenhouse', ?, ?, ?, ?, ?, ?, 'DE', ?, 'en', ?, 'full_time', ?, ?, ?, ?)`,
+        closed_at, status, apply_supported, dedupe_key)
+       VALUES (?, 'b', 'c', 'greenhouse', ?, ?, ?, ?, ?, ?, 'DE', ?, 'en', ?, 'full_time', ?, ?, ?, ?, 1, ?)`,
     )
     .run(
       `p${String(input.index)}`,
@@ -47,6 +47,7 @@ function addPosting(fixture: Fixture, input: { closed: boolean; index: number })
       NOW,
       NOW,
       input.closed ? NOW : null,
+      input.closed ? "closed" : "open",
       `p${String(input.index)}`,
     );
 }
