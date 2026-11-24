@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { MeConfig, MeUser } from "./me-payload.ts";
 
-import { mePayload } from "./me-payload.ts";
+import { mePayload, meUserOfOwnerRow } from "./me-payload.ts";
 
 const config: MeConfig = {
   adminOrigin: "https://admin.tryoverture.com",
@@ -78,6 +78,24 @@ describe("GET /api/me owner hint on the admin host", () => {
 });
 
 describe("GET /api/me keeps the existing body", () => {
+  test("a verified Access owner row becomes the signed-in user the admin UI reads", () => {
+    expect(
+      meUserOfOwnerRow({
+        email: "owner@tryoverture.com",
+        emailVerified: true,
+        id: "owner-1",
+        name: "Maya Okafor",
+        role: "owner",
+      }),
+    ).toEqual({
+      email: "owner@tryoverture.com",
+      emailVerified: true,
+      id: "owner-1",
+      name: "Maya Okafor",
+      role: "owner",
+    });
+  });
+
   test("the signed-in user is returned field by field", () => {
     expect(mePayload(userOf("owner"), config).user).toEqual({
       email: "person@example.com",

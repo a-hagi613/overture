@@ -16,6 +16,21 @@ export interface MeConfig {
 }
 
 /**
+ * The `/api/me` shape of the row a verified Cloudflare Access identity resolves to.
+ * @param row The owner row's public fields.
+ * @returns The public user fields.
+ */
+export function meUserOfOwnerRow(row: MeUser) {
+  return {
+    email: row.email,
+    emailVerified: row.emailVerified,
+    id: row.id,
+    name: row.name,
+    role: row.role,
+  };
+}
+
+/**
  * Builds the body of `GET /api/me`.
  *
  * The admin origin is returned to owners only. Anonymous visitors, regular users

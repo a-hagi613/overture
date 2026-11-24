@@ -7,7 +7,6 @@ import { lokiAuditEntries } from "./loki-server.ts";
 import { latestMailLink, requestMagicLink, signInByMagicLink, verifyAuthState } from "./sign-in.ts";
 
 const REVEAL_MS = 15 * 60 * 1000;
-const PASSKEY_WINDOW_MS = 10 * 60 * 1000;
 
 const detailSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]));
 
@@ -90,7 +89,7 @@ async function guestSession(appUrl: string, email: string) {
   return context;
 }
 
-test("a Reveal needs a fresh passkey and a reason, act-as is read-only and expires, EEO stays aggregate and audit ships", async ({
+test("a Reveal opens under verified Access with a reason, act-as is read-only and expires, EEO stays aggregate and audit ships", async ({
   page,
   accessServer,
   lokiServer,
@@ -141,19 +140,6 @@ test("a Reveal needs a fresh passkey and a reason, act-as is read-only and expir
 
   expect(outside.status()).toBe(403);
   expect(await outside.json()).toEqual({ error: "reveal_required" });
-
-  await page.request.post(`${appUrl}/__test__/clock/offset`, {
-    data: { offsetMs: PASSKEY_WINDOW_MS },
-  });
-
-  const stalePasskey = await page.request.post(`${adminBase}/users/${userA.id}/reveal`, {
-    data: { reason: revealReason },
-  });
-
-  expect(stalePasskey.status()).toBe(403);
-  expect(await stalePasskey.json()).toEqual({ error: "passkey_required" });
-
-  await page.request.post(`${appUrl}/__test__/clock/offset`, { data: { offsetMs: 0 } });
 
   const blankReason = await page.request.post(`${adminBase}/users/${userA.id}/reveal`, {
     data: { reason: "   " },

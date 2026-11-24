@@ -17,6 +17,18 @@ const localHostnames = ["localhost", "127.0.0.1"];
 
 const MIN_SECRET_LENGTH = 16;
 
+/**
+ * Splits a comma-separated address list into trimmed, lowercased entries.
+ * @param value The raw environment value; an empty or missing value yields no entries.
+ * @returns The addresses that remain after blank entries are dropped.
+ */
+export function emailListFromValue(value: string | undefined) {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+}
+
 /** One versioned Better Auth secret, as `BETTER_AUTH_SECRETS` names it. */
 export interface VersionedAuthSecret {
   version: number;
@@ -207,6 +219,11 @@ const envSchema = z
           .filter((host) => host.length > 0),
       )
       .optional(),
+    ALLOWED_SIGNUP_EMAILS: z
+      .string()
+      .optional()
+      .transform((value) => emailListFromValue(value))
+      .pipe(z.array(z.email())),
     BETTER_AUTH_SECRET: z.string().min(16).optional(),
     BETTER_AUTH_SECRETS: z.string().min(1).optional(),
     OWNER_EMAIL: z.email(),

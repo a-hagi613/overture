@@ -16,7 +16,6 @@ import {
   activeReveal,
   closeReveal,
   openReveal,
-  REVEAL_PASSKEY_WINDOW_MS,
   recordRevealView,
 } from "../platform/audit/reveal.ts";
 import { lastPasskeyAssertionAt } from "../platform/passkey/index.ts";
@@ -54,15 +53,11 @@ export function createAdminRevealRoutes(db: AppDatabase, clock: Clock, personal:
 
     const assertedAt = lastPasskeyAssertionAt(db, owner.userId);
 
-    if (assertedAt === null || clock.now() - assertedAt.getTime() >= REVEAL_PASSKEY_WINDOW_MS) {
-      return context.json({ error: ADMIN_REFUSAL_CODES.passkeyRequired }, 403);
-    }
-
     const session = await openReveal(db, clock, {
       actorId: owner.userId,
       targetUserId: target.id,
       reason,
-      passkeyAssertedAt: assertedAt.getTime(),
+      passkeyAssertedAt: assertedAt?.getTime() ?? clock.now(),
     });
 
     return context.json({ reveal: revealViewOf(session, clock.now()) }, 201);

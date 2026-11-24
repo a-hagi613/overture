@@ -188,6 +188,7 @@
           "scripts/workflow-config-guard.test.ts",
           "src/server/account/erase.test.ts",
           "src/server/admin/key-rotation.test.ts",
+          "src/server/admin/access-owner.test.ts",
           "src/server/admin/support.test.ts",
           "src/server/app.test.ts",
           "src/server/auth/client-ip.test.ts",

@@ -48,6 +48,8 @@ import { stripUntrustedIpHeaders } from "./auth/client-ip.ts";
 import { crossSiteRefusal } from "./auth/csrf.ts";
 import { DEMO_SIGN_IN_PATH } from "./auth/demo-paths.ts";
 import { env, labEnvironment, masterKeyring } from "./config/env.ts";
+import { accessVerifier } from "./platform/access/configured.ts";
+import { resolveAdminAccessOwner } from "./admin/access-owner.ts";
 import { demoLocked } from "./demo/guard.ts";
 import { createProfileRoutes } from "./routes/profile.ts";
 import { createOnboardingRoutes } from "./routes/onboarding.ts";
@@ -269,7 +271,7 @@ export function createApp(deps: AppDependencies) {
     origin === undefined ? [] : [origin],
   );
 
-  const adminApi = createAdminApi(deps.db, deps.clock, deps.auth, {
+  const adminApi = createAdminApi(deps.db, deps.clock, {
     backupObjects: createConfiguredBackupStore(),
     backups: deps.backups,
     catalogDb: deps.catalogDb,
@@ -311,7 +313,7 @@ export function createApp(deps: AppDependencies) {
     return next();
   });
   adminHost.route("/admin/api", adminApi);
-  adminHost.route("/api", createMeRoutes(deps.auth));
+  adminHost.route("/api", createMeRoutes(deps.auth, deps.db, deps.clock));
   adminHost.all("/api/auth/*", async (context) => {
     if (new URL(context.req.url).pathname === DEMO_SIGN_IN_PATH) {
       return context.json({ error: API_ERRORS.notFound }, 404);
@@ -324,6 +326,25 @@ export function createApp(deps: AppDependencies) {
     const { pathname } = new URL(context.req.url);
 
     if (!isAdminPageRequest(context.req.method, pathname, context.req.header("accept") ?? "")) {
+      return next();
+    }
+
+    const identity = accessVerifier === null ? null : await accessVerifier.verify(context.req.raw);
+
+    if (identity !== null) {
+      const resolved = await resolveAdminAccessOwner(deps.db, deps.clock, identity);
+
+      if (!resolved.ok) {
+        return new Response(adminOwnerRefusalPage(env.OWNER_EMAIL), {
+          headers: { "Cache-Control": "no-store", "Content-Type": "text/html; charset=utf-8" },
+          status: 403,
+        });
+      }
+
+      if (pathname === "/signin" || pathname === "/signup") {
+        return context.redirect("/admin", 302);
+      }
+
       return next();
     }
 
@@ -434,7 +455,7 @@ export function createApp(deps: AppDependencies) {
       db: deps.db,
     }),
   );
-  app.route("/api", createMeRoutes(deps.auth));
+  app.route("/api", createMeRoutes(deps.auth, deps.db, deps.clock));
   app.route("/api", createWaitlistRoutes({ clientIpConfig, clock: deps.clock, db: deps.db }));
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
   app.route(

@@ -1,6 +1,5 @@
-import { enableVirtualAuthenticator, signInOwnerOnAdmin } from "./admin-sign-in.ts";
+import { openAdminAsOwner } from "./admin-sign-in.ts";
 import { expect, test } from "./admin.fixture.ts";
-import { authTestIdentity } from "./auth.fixture.ts";
 import type { Browser, BrowserContext } from "@playwright/test";
 
 import { AxeBuilder } from "@axe-core/playwright";
@@ -106,40 +105,9 @@ test("the admin pages are axe clean at 390 and 1280 in light and dark", async ({
 }) => {
   test.setTimeout(120_000);
 
-  await enableVirtualAuthenticator(page);
-  await signInOwnerOnAdmin(page, adminIsolatedAppUrl);
-
-  const token = await accessServer.issueToken({ email: authTestIdentity.ownerEmail });
-
-  await page.context().addCookies([
-    {
-      name: "CF_Authorization",
-      value: token,
-      domain: "localhost",
-      path: "/",
-      expires: -1,
-      httpOnly: true,
-      secure: false,
-      sameSite: "Lax",
-    },
-  ]);
-
-  await page.goto(`${adminIsolatedAppUrl}/admin`);
-  await page.getByRole("button", { name: "Add your passkey" }).click();
-  await expect(page.getByRole("heading", { name: "Background jobs" })).toBeVisible();
+  await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
 
   const state = await page.context().storageState();
-
-  state.cookies.push({
-    name: "CF_Authorization",
-    value: token,
-    domain: "localhost",
-    path: "/",
-    expires: -1,
-    httpOnly: true,
-    secure: false,
-    sameSite: "Lax",
-  });
 
   await runBatches(browser, adminIsolatedAppUrl, state, combinations());
 });
