@@ -470,20 +470,7 @@ describe("Batch 2 apply URLs", () => {
 
 describe("the plain Batch 2 form read", () => {
   test("fetches each board's apply page and parses it without a browser", async () => {
-    const fetcher = async (input: RequestInfo | URL) => {
-      const href = input instanceof Request ? input.url : input.toString();
-      const host = new URL(href).host;
-
-      const board = (Object.keys(BATCH2_PAGES) as (keyof typeof BATCH2_PAGES)[]).find((name) =>
-        host.includes(name.replace("_recruit", "")),
-      );
-
-      return await Promise.resolve(
-        new Response(BATCH2_PAGES[board ?? "teamtailor"], { status: 200 }),
-      );
-    };
-
-    const reader = createPlainFormReader({ fetcher });
+    const reader = createPlainFormReader({ fetcher: fetchBatch2Page });
 
     const cases = [
       { ats: "teamtailor" as const, url: "https://acme.teamtailor.com/jobs/1" },
