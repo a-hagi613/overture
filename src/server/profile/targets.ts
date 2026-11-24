@@ -72,7 +72,21 @@ const KNOWN_LABELS = new Set(
   [...ROLE_GROUPS, ...ESCO_ROLE_NAMES].map((label) => label.toLowerCase()),
 );
 
+/**
+ * Whether one target role names one of a Posting's role tags. A target that is a known Level-1 category or Level-2
+ * ESCO role must match that exact label, case-insensitively, so `Software Engineering` never picks up
+ * `Civil Engineering` (WS-17b). A free-text target keeps the original word-overlap behaviour.
+ * @param target The target role.
+ * @param tagValues The Posting's role tags.
+ * @returns True when the target names one of them.
+ */
 export function roleTargetMatches(target: string, tagValues: readonly string[]) {
+  const normalized = target.trim().toLowerCase();
+
+  if (KNOWN_LABELS.has(normalized)) {
+    return tagValues.some((tag) => tag.trim().toLowerCase() === normalized);
+  }
+
   const targetWords = new Set(wordsOf(target));
 
   return tagValues.some((tag) => wordsOf(tag).some((word) => targetWords.has(word)));

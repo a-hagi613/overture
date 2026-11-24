@@ -9,7 +9,7 @@ import type { CatalogDatabase } from "../platform/db/client.ts";
 
 import { openCatalogDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
-import { countMatchingPostings } from "./targets.ts";
+import { countMatchingPostings, roleTargetMatches } from "./targets.ts";
 
 const NOW = 1_800_000_000_000;
 
@@ -505,5 +505,22 @@ describe("countMatchingPostings", () => {
     expect(durations).toHaveLength(25);
     expect(p95).toBeLessThan(500);
     expect(slowest).toBeLessThan(500);
+  });
+});
+
+describe("roleTargetMatches", () => {
+  test("a known Level-1 category or Level-2 role matches only its exact label, case-insensitively", () => {
+    expect(roleTargetMatches("Registered Nurse", ["Registered Nurse"])).toBe(true);
+    expect(roleTargetMatches("registered nurse", ["Registered Nurse"])).toBe(true);
+    expect(roleTargetMatches("Registered Nurse", ["Nurse Practitioner"])).toBe(false);
+    expect(roleTargetMatches("Software Engineering", ["Software Engineering"])).toBe(true);
+    expect(roleTargetMatches("Software Engineering", ["Software Engineer"])).toBe(false);
+    expect(roleTargetMatches("Software Engineering", ["Civil Engineering"])).toBe(false);
+  });
+
+  test("a free-text target still matches on a shared meaningful word", () => {
+    expect(roleTargetMatches("platform", ["Platform Engineer"])).toBe(true);
+    expect(roleTargetMatches("backend", ["Senior Backend Engineer"])).toBe(true);
+    expect(roleTargetMatches("backend", ["Frontend Engineer"])).toBe(false);
   });
 });
