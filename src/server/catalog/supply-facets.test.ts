@@ -195,7 +195,13 @@ function seededCatalog(count: number, seed = 42) {
 }
 
 function filter(overrides: Partial<SupplyFilters> = {}) {
-  return { location: null, remote: false, role: null, ...overrides } satisfies SupplyFilters;
+  return {
+    location: null,
+    radiusKm: null,
+    remote: false,
+    role: null,
+    ...overrides,
+  } satisfies SupplyFilters;
 }
 
 function expectParity(db: ReturnType<typeof catalog>["db"], filters: SupplyFilters) {

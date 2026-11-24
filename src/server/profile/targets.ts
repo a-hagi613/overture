@@ -76,9 +76,9 @@ function sortedUnique<T extends string>(values: readonly T[]) {
   return [...new Set(values)].toSorted((left, right) => left.localeCompare(right));
 }
 
-function locationFilter(raw: string) {
+function locationFilter(db: CatalogDatabase, raw: string) {
   const resolved = resolveLocation(raw);
-  const condition = resolvedLocationCondition(raw);
+  const condition = resolvedLocationCondition(db, raw);
 
   if (resolved.countryCode === null) {
     return { condition, key: `raw:${raw.toLowerCase()}` } satisfies LocationFilter;
@@ -102,13 +102,14 @@ function locationFilter(raw: string) {
 }
 
 function normalizeFilters(
+  db: CatalogDatabase,
   parsed: z.infer<typeof targetsInputSchema>,
   languages: readonly string[],
 ) {
   const locations = new Map<string, SQL>();
 
   for (const location of parsed.locations) {
-    const filter = locationFilter(location);
+    const filter = locationFilter(db, location);
 
     if (!locations.has(filter.key)) {
       locations.set(filter.key, filter.condition);
@@ -259,7 +260,7 @@ export function countMatchingPostings(
     return 0;
   }
 
-  const filters = normalizeFilters(parsed, languages);
+  const filters = normalizeFilters(db, parsed, languages);
   const revision = catalogRevision(db);
 
   if (revision === null) {

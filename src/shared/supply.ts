@@ -12,6 +12,8 @@ export const supplyQuerySchema = z.object({
   role: z.enum(ROLE_GROUPS).optional(),
   location: z.string().trim().min(2).max(120).optional(),
   remote: z.enum(["1", "0", "true", "false"]).optional(),
+  /** The radius around a resolved city; absent keeps an exact city match. */
+  radius: z.enum(["25", "40", "80"]).optional(),
 });
 
 export type SupplyQuery = z.infer<typeof supplyQuerySchema>;
@@ -19,6 +21,7 @@ export type SupplyQuery = z.infer<typeof supplyQuerySchema>;
 export interface SupplyFilters {
   role: RoleGroup | null;
   location: string | null;
+  radiusKm: number | null;
   remote: boolean;
 }
 
@@ -31,6 +34,7 @@ export function supplyFiltersOf(query: SupplyQuery) {
   return {
     role: query.role ?? null,
     location: query.location ?? null,
+    radiusKm: query.radius === undefined ? null : Number(query.radius),
     remote: query.remote === "1" || query.remote === "true",
   } satisfies SupplyFilters;
 }

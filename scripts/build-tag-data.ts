@@ -2,6 +2,8 @@ import { mkdir, writeFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { CONTINENTS, METRO_AREAS, isoRegionCodeFor } from "../src/server/catalog/geo-static.ts";
+
 const ROLE_GROUPS = [
   "Software Engineering",
   "Data & Analytics",
@@ -229,129 +231,222 @@ async function downloadZipText(url: string, entryName: string) {
   return new TextDecoder().decode(process.stdout);
 }
 
-async function buildCities() {
+type CompactCity = [number, string, string, string, number, number, number, string];
+
+interface GeoDataset {
+  published: string;
+  countries: Record<string, string>;
+  countryContinents: Record<string, string>;
+  continents: Record<string, string>;
+  regions: Record<string, string>;
+  regionIso: Record<string, string>;
+  metros: {
+    name: string;
+    aliases: string[];
+    countryCode: string;
+    isoRegionCode: string | null;
+    continentCode: string;
+    bbox: number[];
+  }[];
+  cities: CompactCity[];
+}
+
+const LATIN_NAME = /^[A-Za-z][A-Za-z '.-]{2,39}$/u;
+
+function compactCityLine(
+  geonameId: string,
+  name: string,
+  country: string,
+  admin1: string,
+  lat: string,
+  lon: string,
+  population: string,
+  alternates: string,
+) {
+  const residents = Number(population);
+  const latitude = Number(lat);
+  const longitude = Number(lon);
+  const id = Number(geonameId);
+
+  if (
+    !Number.isInteger(id) ||
+    id <= 0 ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    !Number.isFinite(residents)
+  ) {
+    return null;
+  }
+
+  const normalizedName = normalizeTitle(name);
+  const seen = new Set([normalizedName]);
+  const keptAlternates: string[] = [];
+
+  for (const alternate of alternates.split(",")) {
+    const trimmed = alternate.trim();
+    const normalized = normalizeTitle(trimmed);
+
+    if (!LATIN_NAME.test(trimmed) || normalized === "" || seen.has(normalized)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    keptAlternates.push(trimmed);
+
+    if (keptAlternates.length >= 3) {
+      break;
+    }
+  }
+
+  return [
+    id,
+    name.trim(),
+    country,
+    admin1,
+    Math.round(latitude * 10_000) / 10_000,
+    Math.round(longitude * 10_000) / 10_000,
+    Math.max(0, Math.trunc(residents)),
+    keptAlternates.join("|"),
+  ] satisfies CompactCity;
+}
+
+async function buildGeoPlaces() {
   const [citiesText, admin1Text, countryText] = await Promise.all([
-    downloadZipText("https://download.geonames.org/export/dump/cities15000.zip", "cities15000.txt"),
+    downloadZipText("https://download.geonames.org/export/dump/cities500.zip", "cities500.txt"),
     downloadText("https://download.geonames.org/export/dump/admin1CodesASCII.txt"),
     downloadText("https://download.geonames.org/export/dump/countryInfo.txt"),
   ]);
 
   const regions: Record<string, string> = {};
+  const regionIso: Record<string, string> = {};
 
   for (const line of admin1Text.split("\n")) {
     const [code, name] = line.split("\t");
 
-    if (code !== undefined && name !== undefined) {
-      regions[code] = name;
+    if (code === undefined || name === undefined || code === "" || name === "") {
+      continue;
+    }
+
+    regions[code] = name;
+    const [country] = code.split(".");
+
+    if (country !== undefined) {
+      const suffix = code.slice(country.length + 1);
+
+      regionIso[code] = isoRegionCodeFor(country, suffix);
     }
   }
 
-  const countryNames: Record<string, string> = {};
+  const countries: Record<string, string> = {};
+  const countryContinents: Record<string, string> = {};
 
   for (const line of countryText.split("\n")) {
     if (line.startsWith("#")) {
       continue;
     }
 
-    const [code, isoAlpha3, isoNumeric, fips, name] = line.split("\t");
-
-    if (isoAlpha3 === undefined || isoNumeric === undefined || fips === undefined) {
-      continue;
-    }
-
-    if (code !== undefined && name !== undefined) {
-      countryNames[code] = name;
-    }
-  }
-
-  const cityRows: [string, string, string, string, number][] = [];
-
-  for (const line of citiesText.split("\n")) {
-    const [
-      geonameid,
-      featureCode1,
-      name,
-      alternates,
-      featureCode2,
-      featureCode3,
-      featureClass,
-      featureCode4,
-      country,
-      featureCode5,
-      admin1,
-      featureCode6,
-      featureCode7,
-      featureCode8,
-      population,
-    ] = line.split("\t");
+    const columns = line.split("\t");
+    const [code, isoAlpha3, isoNumeric, fips, name] = columns;
+    const continent = columns.at(8);
 
     if (
-      featureCode1 === undefined ||
-      featureCode2 === undefined ||
-      featureCode3 === undefined ||
-      featureCode4 === undefined ||
-      featureCode5 === undefined ||
-      featureCode6 === undefined ||
-      featureCode7 === undefined ||
-      featureCode8 === undefined
+      isoAlpha3 === undefined ||
+      isoNumeric === undefined ||
+      fips === undefined ||
+      code === undefined ||
+      name === undefined ||
+      code === "" ||
+      name === ""
     ) {
       continue;
     }
 
-    const residents = Number(population);
+    countries[code] = name;
+
+    if (continent !== undefined && continent !== "" && CONTINENTS.has(continent)) {
+      countryContinents[code] = continent;
+    }
+  }
+
+  const seen = new Set<string>();
+  const cities: CompactCity[] = [];
+
+  for (const line of citiesText.split("\n")) {
+    const columns = line.split("\t");
+    const geonameid = columns.at(0);
+    const name = columns.at(2);
+    const alternates = columns.at(3);
+    const lat = columns.at(4);
+    const lon = columns.at(5);
+    const featureClass = columns.at(6);
+    const featureCode = columns.at(7);
+    const country = columns.at(8);
+    const admin1 = columns.at(10);
+    const population = columns.at(14);
 
     if (
-      geonameid === undefined ||
-      geonameid === "" ||
-      featureClass === undefined ||
       featureClass !== "P" ||
+      geonameid === undefined ||
       name === undefined ||
       name === "" ||
       country === undefined ||
       country === "" ||
-      !Number.isFinite(residents)
+      lat === undefined ||
+      lon === undefined ||
+      featureCode === "PPLX"
     ) {
       continue;
     }
 
-    cityRows.push([name, country, admin1 ?? "", alternates ?? "", residents]);
-  }
+    const city = compactCityLine(
+      geonameid,
+      name,
+      country,
+      admin1 ?? "",
+      lat,
+      lon,
+      population ?? "0",
+      alternates ?? "",
+    );
 
-  cityRows.sort((a, b) => b[4] - a[4]);
-  const seen = new Set<string>();
-  const cities: string[][] = [];
+    if (city === null) {
+      continue;
+    }
 
-  for (const [name, country, admin1, alternates] of cityRows) {
-    const key = `${normalizeTitle(name)}|${country}|${admin1}`;
+    const key = `${normalizeTitle(city[1])}|${city[2]}|${city[3]}`;
 
     if (seen.has(key)) {
       continue;
     }
 
     seen.add(key);
-
-    const trimmedAlternates = alternates
-      .split(",")
-      .map((alternate) => alternate.trim())
-      .filter(
-        (alternate) =>
-          /^[A-Za-z][A-Za-z '-]{2,29}$/u.test(alternate) &&
-          normalizeTitle(alternate) !== normalizeTitle(name),
-      )
-      .slice(0, 2);
-
-    cities.push([name, country, admin1, ...trimmedAlternates]);
+    cities.push(city);
   }
 
-  const dataset = { cities, regions, countries: countryNames };
+  cities.sort((left, right) => right[6] - left[6]);
+
+  const dataset: GeoDataset = {
+    published: new Date().toISOString().slice(0, 10),
+    countries,
+    countryContinents,
+    continents: Object.fromEntries(CONTINENTS),
+    regions,
+    regionIso,
+    metros: METRO_AREAS.map((metro) => ({
+      name: metro.name,
+      aliases: [...metro.aliases],
+      countryCode: metro.countryCode,
+      isoRegionCode: metro.isoRegionCode,
+      continentCode: metro.continentCode,
+      bbox: [...metro.bbox],
+    })),
+    cities,
+  };
 
   await mkdir("src/server/catalog/tag-data", { recursive: true });
-  await writeFile(
-    "src/server/catalog/tag-data/geonames-cities.json",
-    `${JSON.stringify(dataset)}\n`,
-  );
+  await writeFile("src/server/catalog/tag-data/geo-places.json", `${JSON.stringify(dataset)}\n`);
   process.stdout.write(
-    `geonames-cities.json: ${String(cities.length)} cities, ${String(Object.keys(regions).length)} regions\n`,
+    `geo-places.json: ${String(cities.length)} cities, ${String(Object.keys(regions).length)} regions, ${String(dataset.metros.length)} metros\n`,
   );
 }
 
@@ -421,6 +516,6 @@ async function buildOnet() {
   );
 }
 
-await buildCities();
+await buildGeoPlaces();
 
 await buildOnet();

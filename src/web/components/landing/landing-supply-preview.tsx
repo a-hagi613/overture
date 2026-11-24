@@ -50,6 +50,7 @@ export function LandingSupplyPreview() {
   const [role, setRole] = useState<RoleGroup | null>(null);
   const [locationDraft, setLocationDraft] = useState("");
   const [location, setLocation] = useState<string | null>(null);
+  const [radius, setRadius] = useState<string | null>(null);
   const [remote, setRemote] = useState(false);
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export function LandingSupplyPreview() {
     };
   }, [locationDraft]);
 
-  const { counts, failed, loading, retry } = useSupplyCounts({ location, remote, role });
+  const { counts, failed, loading, retry } = useSupplyCounts({ location, radius, remote, role });
 
   const status = statusOf(counts, failed, loading);
 
@@ -97,10 +98,12 @@ export function LandingSupplyPreview() {
             <LandingSupplyFilters
               locationDraft={locationDraft}
               onLocationChange={setLocationDraft}
+              onRadiusChange={setRadius}
               onRemoteChange={setRemote}
               onRoleChange={(value) => {
                 setRole(roleFromValue(value));
               }}
+              radius={radius}
               remote={remote}
               role={role}
             />

@@ -4,6 +4,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -109,6 +110,9 @@ export const postings = sqliteTable(
     applicationDeadline: integer("application_deadline"),
     salaryMinMinor: integer("salary_min_minor"),
     salaryMaxMinor: integer("salary_max_minor"),
+    /** The same range annualized to USD (issue #630), so a salary filter is one integer comparison. */
+    salaryMinUsd: integer("salary_min_usd"),
+    salaryMaxUsd: integer("salary_max_usd"),
     salaryCurrency: text("salary_currency"),
     salaryPeriod: text("salary_period", { enum: ["year", "month", "hour"] }),
     salarySummary: text("salary_summary"),
@@ -211,4 +215,75 @@ export const supplyFacets = sqliteTable(
     postings: integer("postings").notNull(),
   },
   (t) => [primaryKey({ columns: [t.role, t.countryCode, t.region, t.workplace, t.ats] })],
+);
+
+/**
+ * The compact open-data place table the ETL builds inside `catalog.sqlite` (issue #630). One row per
+ * continent, country, ISO-3166-2 region, colloquial metro and GeoNames city; the `kind` column says which.
+ * The R-Tree (`geo_places_rtree`) is created by the migration, not by Drizzle, and indexes only cities.
+ */
+export const GEO_PLACE_KINDS = ["continent", "country", "region", "metro", "city"] as const;
+
+export type GeoPlaceKind = (typeof GEO_PLACE_KINDS)[number];
+
+export const geoPlaces = sqliteTable(
+  "geo_places",
+  {
+    geonameId: integer("geoname_id").primaryKey(),
+    name: text("name").notNull(),
+    normName: text("norm_name").notNull(),
+    altNames: text("alt_names"),
+    kind: text("kind", { enum: GEO_PLACE_KINDS }).notNull(),
+    continentCode: text("continent_code"),
+    countryCode: text("country_code"),
+    isoRegionCode: text("iso_region_code"),
+    lat: real("lat"),
+    lon: real("lon"),
+    minLat: real("min_lat"),
+    maxLat: real("max_lat"),
+    minLon: real("min_lon"),
+    maxLon: real("max_lon"),
+    population: integer("population").notNull().default(0),
+  },
+  (t) => [
+    index("geo_places_norm_name").on(t.normName),
+    index("geo_places_kind_country").on(t.kind, t.countryCode),
+    index("geo_places_country_region").on(t.countryCode, t.isoRegionCode),
+  ],
+);
+
+/** The workplace scopes a Posting resolves to (issue #630), one row per place a location string names. */
+export const POSTING_SCOPE_KINDS = [
+  "onsite",
+  "hybrid",
+  "remote_city",
+  "remote_region",
+  "remote_country",
+  "remote_continent",
+  "remote_global",
+] as const;
+
+export type PostingScopeKind = (typeof POSTING_SCOPE_KINDS)[number];
+
+export const postingLocations = sqliteTable(
+  "posting_locations",
+  {
+    id: integer("id").primaryKey(),
+    postingId: text("posting_id")
+      .notNull()
+      .references(() => postings.id, { onDelete: "cascade" }),
+    continentCode: text("continent_code"),
+    countryCode: text("country_code"),
+    /** The ISO-3166-2 code (`CA-ON`), never the legacy GeoNames `CA.08` spelling. */
+    regionCode: text("region_code"),
+    cityGeonameId: integer("city_geoname_id"),
+    scopeKind: text("scope_kind", { enum: POSTING_SCOPE_KINDS }).notNull(),
+  },
+  (t) => [
+    index("posting_locations_continent_posting").on(t.continentCode, t.postingId),
+    index("posting_locations_country_posting").on(t.countryCode, t.postingId),
+    index("posting_locations_country_region_posting").on(t.countryCode, t.regionCode, t.postingId),
+    index("posting_locations_city_posting").on(t.cityGeonameId, t.postingId),
+    index("posting_locations_scope_country_posting").on(t.scopeKind, t.countryCode, t.postingId),
+  ],
 );

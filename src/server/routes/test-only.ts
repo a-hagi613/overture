@@ -1489,7 +1489,7 @@ export function createTestRoutes(
   });
 
   routes.get("/search", validQuery(searchQuerySchema), (context) =>
-    context.json(searchResponse(catalogDb, context.req.valid("query"))),
+    context.json(searchResponse(catalogDb, context.req.valid("query"), clock.now())),
   );
 
   routes.get("/telemetry/spans", (context) => {
