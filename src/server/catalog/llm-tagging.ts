@@ -9,6 +9,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmOutputSchema, LlmPort, LlmRequest } from "../platform/ports/llm.ts";
 import { bgJobs } from "../platform/db/schema.ts";
 import { companies, postings, postingTags } from "../platform/db/catalog-schema.ts";
+import { yieldToEventLoop } from "../platform/db/batches.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { checkLlmCaps, nextUtcMidnight } from "../platform/llm/caps.ts";
@@ -22,7 +23,28 @@ export const TAG_FALLBACK_JOB_KIND = "tag.llm_fallback";
 export const TAG_FALLBACK_PURPOSE = "tag_fallback";
 
 const DESCRIPTION_WORDS = 300;
-const MAX_BATCH_ITEMS = 10_000;
+
+/**
+ * Requests one run sends. A single Anthropic batch of this size keeps the request payload well inside the 2 GB Fly
+ * VM; a run that reaches it leaves the remaining leftovers to the continuation run, which the job queues itself.
+ */
+export const MAX_BATCH_ITEMS = 500;
+
+/**
+ * Untagged postings one run selects. The selection is the memory bound of the job: on a catalog with hundreds of
+ * thousands of Postings the old unbounded read materialized every row and its description at once and the VM
+ * OOM-killed the process on boot, so the SQL now stops here and the next run picks up the rest.
+ */
+export const LEFTOVER_SCAN_LIMIT = 2000;
+
+/**
+ * Description reads between event-loop yields. `gunzipSync` blocks the thread it runs on, so the build yields every
+ * this many items and Fly's health check keeps answering during a large batch.
+ */
+export const YIELD_EVERY = 25;
+
+const CONTINUE_DELAY_MS = 60_000;
+
 const LLM_TAG_SOURCE: (typeof postingTags.$inferInsert)["source"] = "llm";
 
 const SYSTEM_PROMPT = [
@@ -78,11 +100,11 @@ export interface TagFallbackReport {
 
 interface LeftoverPosting {
   id: string;
+  companyId: string;
   cacheKey: string;
   companyName: string;
   title: string;
   department: string | null;
-  descriptionGz: Buffer | null;
 }
 
 interface LeftoverGroup {
@@ -124,8 +146,6 @@ function selectLeftovers(db: CatalogDatabase) {
       companyName: companies.name,
       title: postings.title,
       department: postings.department,
-      descriptionGz: postings.descriptionGz,
-      roleTag: postingTags.value,
     })
     .from(postings)
     .innerJoin(companies, eq(companies.id, postings.companyId))
@@ -140,22 +160,33 @@ function selectLeftovers(db: CatalogDatabase) {
     .where(
       and(
         isNull(postings.closedAt),
+        isNull(postingTags.value),
         or(isNull(postings.tagSource), inArray(postings.tagSource, ["rules", "model", "llm"])),
       ),
     )
+    .limit(LEFTOVER_SCAN_LIMIT)
     .all()
-    .filter((row) => row.roleTag === null)
     .map((row) => ({
       id: row.id,
+      companyId: row.companyId,
       cacheKey: fallbackCacheKey(row.companyId, row.title, row.department),
       companyName: row.companyName,
       title: row.title,
       department: row.department,
-      descriptionGz: row.descriptionGz ?? null,
     }));
 }
 
-function cachedTagsByCacheKey(db: CatalogDatabase) {
+function companyIdsOf(leftovers: readonly LeftoverPosting[]) {
+  return [...new Set(leftovers.map((posting) => posting.companyId))];
+}
+
+function cachedTagsByCacheKey(db: CatalogDatabase, companyIds: readonly string[]) {
+  const byCacheKey = new Map<string, CachedTag[]>();
+
+  if (companyIds.length === 0) {
+    return byCacheKey;
+  }
+
   const rows = db
     .select({
       companyId: postings.companyId,
@@ -166,10 +197,14 @@ function cachedTagsByCacheKey(db: CatalogDatabase) {
     })
     .from(postingTags)
     .innerJoin(postings, eq(postings.id, postingTags.postingId))
-    .where(and(eq(postingTags.source, "llm"), inArray(postingTags.dimension, ["role", "subrole"])))
+    .where(
+      and(
+        eq(postingTags.source, "llm"),
+        inArray(postingTags.dimension, ["role", "subrole"]),
+        inArray(postings.companyId, [...companyIds]),
+      ),
+    )
     .all();
-
-  const bycacheKey = new Map<string, CachedTag[]>();
 
   for (const row of rows) {
     if (row.dimension !== "role" && row.dimension !== "subrole") {
@@ -177,13 +212,102 @@ function cachedTagsByCacheKey(db: CatalogDatabase) {
     }
 
     const cacheKey = fallbackCacheKey(row.companyId, row.title, row.department);
-    const entry = bycacheKey.get(cacheKey) ?? [];
+    const entry = byCacheKey.get(cacheKey) ?? [];
 
     entry.push({ dimension: row.dimension, value: row.value });
-    bycacheKey.set(cacheKey, entry);
+    byCacheKey.set(cacheKey, entry);
   }
 
-  return bycacheKey;
+  return byCacheKey;
+}
+
+function descriptionsById(db: CatalogDatabase, postingIds: readonly string[]) {
+  const byId = new Map<string, Buffer | null>();
+
+  if (postingIds.length === 0) {
+    return byId;
+  }
+
+  const rows = db
+    .select({ id: postings.id, descriptionGz: postings.descriptionGz })
+    .from(postings)
+    .where(inArray(postings.id, [...postingIds]))
+    .all();
+
+  for (const row of rows) {
+    byId.set(row.id, row.descriptionGz ?? null);
+  }
+
+  return byId;
+}
+
+async function buildRequests(
+  groups: readonly LeftoverGroup[],
+  descriptions: ReadonlyMap<string, Buffer | null>,
+  offset = 0,
+  requests: LlmRequest[] = [],
+) {
+  for (const [position, group] of groups.slice(offset, offset + YIELD_EVERY).entries()) {
+    const index = offset + position;
+
+    requests.push({
+      purpose: TAG_FALLBACK_PURPOSE,
+      customId: `tag-fallback-${String(index)}`,
+      system: SYSTEM_PROMPT,
+      user: [
+        `company: ${group.representative.companyName}`,
+        `title: ${group.representative.title}`,
+        `department: ${group.representative.department ?? "none"}`,
+        `description: ${descriptionWordsFor(descriptions.get(group.representative.id) ?? null)}`,
+      ].join("\n"),
+      schema: OUTPUT_SCHEMA,
+    });
+  }
+
+  const next = offset + YIELD_EVERY;
+
+  if (next >= groups.length) {
+    return requests;
+  }
+
+  await yieldToEventLoop();
+
+  return buildRequests(groups, descriptions, next, requests);
+}
+
+function groupLeftovers(leftovers: readonly LeftoverPosting[]) {
+  const groupsByCacheKey = new Map<string, LeftoverGroup>();
+
+  for (const posting of leftovers) {
+    const group = groupsByCacheKey.get(posting.cacheKey);
+
+    if (group === undefined) {
+      groupsByCacheKey.set(posting.cacheKey, {
+        cacheKey: posting.cacheKey,
+        representative: posting,
+        postingIds: [posting.id],
+      });
+
+      continue;
+    }
+
+    group.postingIds.push(posting.id);
+  }
+
+  return [...groupsByCacheKey.values()];
+}
+
+function queueNextRun(db: AppDatabase, clock: Clock, runAt: number) {
+  const hasQueued = db
+    .select({ one: bgJobs.id })
+    .from(bgJobs)
+    .where(and(eq(bgJobs.kind, TAG_FALLBACK_JOB_KIND), eq(bgJobs.status, "queued")))
+    .limit(1)
+    .get();
+
+  if (hasQueued === undefined) {
+    enqueueJob(db, clock, TAG_FALLBACK_JOB_KIND, "{}", { runAt });
+  }
 }
 
 export function ensureTagFallbackQueued(db: AppDatabase, clock: Clock) {
@@ -220,26 +344,8 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
 
   report.leftovers = leftovers.length;
 
-  const cached = cachedTagsByCacheKey(deps.catalogDb);
-  const groupsByCacheKey = new Map<string, LeftoverGroup>();
-
-  for (const posting of leftovers) {
-    const group = groupsByCacheKey.get(posting.cacheKey);
-
-    if (group === undefined) {
-      groupsByCacheKey.set(posting.cacheKey, {
-        cacheKey: posting.cacheKey,
-        representative: posting,
-        postingIds: [posting.id],
-      });
-
-      continue;
-    }
-
-    group.postingIds.push(posting.id);
-  }
-
-  const groups = [...groupsByCacheKey.values()];
+  const groups = groupLeftovers(leftovers);
+  const cached = cachedTagsByCacheKey(deps.catalogDb, companyIdsOf(leftovers));
   const now = deps.clock.now();
 
   for (const group of groups) {
@@ -264,21 +370,15 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
   }
 
   const uncached = groups.filter((group) => cached.get(group.cacheKey) === undefined);
+  const batch = uncached.slice(0, MAX_BATCH_ITEMS);
 
-  if (uncached.length > 0) {
-    const requests: LlmRequest[] = uncached.slice(0, MAX_BATCH_ITEMS).map((group, index) => ({
-      purpose: TAG_FALLBACK_PURPOSE,
-      customId: `tag-fallback-${String(index)}`,
-      system: SYSTEM_PROMPT,
-      user: [
-        `company: ${group.representative.companyName}`,
-        `title: ${group.representative.title}`,
-        `department: ${group.representative.department ?? "none"}`,
-        `description: ${descriptionWordsFor(group.representative.descriptionGz)}`,
-      ].join("\n"),
-      schema: OUTPUT_SCHEMA,
-    }));
+  if (batch.length > 0) {
+    const descriptions = descriptionsById(
+      deps.catalogDb,
+      batch.map((group) => group.representative.id),
+    );
 
+    const requests = await buildRequests(batch, descriptions);
     const estimated = deps.llm.estimateBatchCostMicros(requests);
 
     const caps = checkLlmCaps(deps.db, deps.clock, {
@@ -318,7 +418,7 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
         }
       }
 
-      for (const [index, group] of uncached.entries()) {
+      for (const [index, group] of batch.entries()) {
         const outcome = outcomeByCustomId.get(`tag-fallback-${String(index)}`);
 
         if (outcome !== undefined && outcome.role !== null) {
@@ -358,18 +458,16 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
     }
   }
 
-  const hasQueued = deps.db
-    .select({ one: bgJobs.id })
-    .from(bgJobs)
-    .where(and(eq(bgJobs.kind, TAG_FALLBACK_JOB_KIND), eq(bgJobs.status, "queued")))
-    .limit(1)
-    .get();
+  const hasMore =
+    !report.blocked &&
+    report.tagged > 0 &&
+    (leftovers.length >= LEFTOVER_SCAN_LIMIT || uncached.length > batch.length);
 
-  if (hasQueued === undefined) {
-    enqueueJob(deps.db, deps.clock, TAG_FALLBACK_JOB_KIND, "{}", {
-      runAt: nextUtcMidnight(deps.clock.now()),
-    });
-  }
+  queueNextRun(
+    deps.db,
+    deps.clock,
+    hasMore ? deps.clock.now() + CONTINUE_DELAY_MS : nextUtcMidnight(deps.clock.now()),
+  );
 
   return report;
 }
