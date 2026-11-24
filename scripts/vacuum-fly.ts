@@ -360,7 +360,6 @@ export function maintenanceUpdateArgs(machineId: string) {
     "--restart",
     "no",
     "--skip-health-checks",
-    "--skip-start",
     "--yes",
   ];
 }
@@ -383,23 +382,12 @@ export function restoreUpdateArgs(machineId: string) {
     "--restart",
     "on-failure",
     "--skip-health-checks",
-    "--skip-start",
     "--yes",
   ];
 }
 
-/**
- * The `flyctl machines restart` arguments the driver uses in both directions.
- * @param machineId The app machine to restart.
- * @returns The full command, including `flyctl`.
- */
-export function machineRestartArgs(machineId: string) {
-  return ["flyctl", "machines", "restart", machineId, "-a", APP, "--skip-health-checks"];
-}
-
 function restoreMachine(machineId: string) {
   runOrThrow(restoreUpdateArgs(machineId));
-  runOrThrow(machineRestartArgs(machineId));
   waitForState(machineId, "started");
 }
 
@@ -408,8 +396,6 @@ async function compact(machine: Machine) {
 
   try {
     runOrThrow(maintenanceUpdateArgs(machine.id));
-
-    runOrThrow(machineRestartArgs(machine.id));
 
     waitForState(machine.id, "started");
     await waitForReady(machine.id, clock.now() + READY_TIMEOUT_MS);

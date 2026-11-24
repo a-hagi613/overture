@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 
 import {
   compactionDecision,
-  machineRestartArgs,
   maintenanceUpdateArgs,
   parseDryRunReport,
   READY_TIMEOUT_SECONDS,
@@ -65,7 +64,6 @@ test("both machine updates run non-interactively with --yes", () => {
     "--restart",
     "no",
     "--skip-health-checks",
-    "--skip-start",
     "--yes",
   ]);
   expect(restoreUpdateArgs("machine-1")).toStrictEqual([
@@ -80,23 +78,10 @@ test("both machine updates run non-interactively with --yes", () => {
     "--restart",
     "on-failure",
     "--skip-health-checks",
-    "--skip-start",
     "--yes",
   ]);
 });
 
 test("the maintenance keepalive outlasts the driver's ready-file wait", () => {
   expect(VACUUM_KEEPALIVE_SECONDS).toBeGreaterThan(READY_TIMEOUT_SECONDS);
-});
-
-test("the restart command names the app machine and skips its health checks", () => {
-  expect(machineRestartArgs("machine-1")).toStrictEqual([
-    "flyctl",
-    "machines",
-    "restart",
-    "machine-1",
-    "-a",
-    "overture-web",
-    "--skip-health-checks",
-  ]);
 });

@@ -1,3 +1,11 @@
+import { createHash, randomUUID } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
 import { Hono } from "hono";
 import type { Context } from "hono";
 
@@ -11,7 +19,6 @@ import {
   CATALOG_MANIFEST_KEY,
   CATALOG_SIGNATURE_HEADER,
   CATALOG_TIMESTAMP_HEADER,
-  catalogSha256,
   catalogSnapshotKey,
   createCatalogRefreshVerifier,
 } from "../catalog/stapply-refresh.ts";
@@ -54,22 +61,65 @@ function refuse(context: Context, reason: CatalogRefreshRejection) {
   return context.json({ error: reason }, REJECTION_STATUS[reason]);
 }
 
+class SnapshotTooLargeError extends Error {
+  constructor() {
+    super("the relay snapshot is over the maximum size");
+    this.name = "SnapshotTooLargeError";
+  }
+}
+
+async function streamSnapshotToFile(
+  body: ReadableStream<Uint8Array> | null,
+  path: string,
+  maxBytes: number,
+) {
+  const hash = createHash("sha256");
+  const source = body === null ? Readable.from([]) : Readable.from(body);
+  const sink = createWriteStream(path);
+  let bytes = 0;
+
+  const meter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      bytes += chunk.byteLength;
+
+      if (bytes > maxBytes) {
+        callback(new SnapshotTooLargeError());
+
+        return;
+      }
+
+      hash.update(chunk);
+      callback(null, chunk);
+    },
+  });
+
+  await pipeline(source, meter, sink);
+
+  return { bytes, sha256: hash.digest("hex") };
+}
+
 /**
  * The runtime side of the WS-3a catalog contract (issue #576): a signed `POST /internal/catalog/refresh` that hands
  * the manifest to the hot-swap manager, and a signed `PUT /internal/catalog/snapshot` relay for a producer without R2
  * credentials. Both verify the timestamp and HMAC before doing anything, and the verifier refuses a replayed or
  * out-of-order timestamp. A refused refresh always leaves the active catalog serving.
- * @param deps the hot-swap manager, the R2 store, the shared secret, the clock and an optional verifier (tests)
+ *
+ * The relay upload streams to a temp file beside the catalog and hands R2 a file stream twice, so neither the request
+ * body nor the snapshot is ever held in memory.
+ * @param deps the hot-swap manager, the R2 store, the shared secret, the clock, an optional verifier (tests) and the
+ * temp directory for a relay upload
  * @returns the mounted routes
  */
 export function createInternalCatalogRoutes(deps: {
   hotSwap: CatalogHotSwap;
-  objects: Pick<ObjectStore, "get" | "put">;
+  objects: Pick<ObjectStore, "get" | "put" | "putStream">;
   secret: string;
   clock: Clock;
   verifier?: ReturnType<typeof createCatalogRefreshVerifier>;
+  stagingDir?: string;
 }) {
   const { hotSwap, objects, secret, clock } = deps;
+  const stagingDir = deps.stagingDir ?? tmpdir();
   const verify = deps.verifier ?? createCatalogRefreshVerifier(secret);
   const routes = new Hono();
 
@@ -159,52 +209,80 @@ export function createInternalCatalogRoutes(deps: {
   });
 
   routes.put(CATALOG_SNAPSHOT_PATH, async (context) => {
-    const bytes = await readBodyCapped(context.req.raw, CATALOG_SNAPSHOT_MAX_BYTES);
-
-    if (bytes === null) {
-      return context.json({ error: API_ERRORS.invalidRequest }, 413);
-    }
-
-    const verdict: CatalogRefreshVerdict = verify({
-      body: catalogSha256(bytes),
-      headers: {
-        [CATALOG_TIMESTAMP_HEADER]: context.req.header(CATALOG_TIMESTAMP_HEADER),
-        [CATALOG_SIGNATURE_HEADER]: context.req.header(CATALOG_SIGNATURE_HEADER),
-      },
-      nowMs: clock.now(),
-    });
-
-    if (!verdict.ok) {
-      return refuse(context, verdict.reason);
-    }
-
     const version = context.req.header("x-overture-catalog-version");
 
     if (version === undefined || !/^\d{4}-\d{2}-\d{2}$/u.test(version)) {
       return context.json({ error: API_ERRORS.invalidRequest }, 400);
     }
 
-    const stored = await storedVersion();
+    const declaredLength = Number(context.req.header("content-length"));
 
-    if (stored !== null && version < stored) {
-      return context.json({ error: "stale_version" }, 409);
+    if (Number.isFinite(declaredLength) && declaredLength > CATALOG_SNAPSHOT_MAX_BYTES) {
+      return context.json({ error: API_ERRORS.invalidRequest }, 413);
     }
 
     try {
-      await objects.put(catalogSnapshotKey(version), bytes);
-      await objects.put(CATALOG_LATEST_KEY, bytes);
+      await mkdir(stagingDir, { recursive: true });
     } catch (error) {
       logError("catalog.snapshot", error);
 
       return context.json({ error: API_ERRORS.internal }, 500);
     }
 
-    logInfo(
-      "catalog.snapshot.stored",
-      `archived catalog ${version} (${String(bytes.byteLength)} bytes)`,
-    );
+    const temporary = join(stagingDir, `catalog-snapshot-${randomUUID()}.zst.tmp`);
 
-    return context.body(null, 204);
+    try {
+      let bytes: number;
+      let digest: string;
+
+      try {
+        ({ bytes, sha256: digest } = await streamSnapshotToFile(
+          context.req.raw.body,
+          temporary,
+          CATALOG_SNAPSHOT_MAX_BYTES,
+        ));
+      } catch (error) {
+        if (error instanceof SnapshotTooLargeError) {
+          return context.json({ error: API_ERRORS.invalidRequest }, 413);
+        }
+
+        throw error;
+      }
+
+      const verdict: CatalogRefreshVerdict = verify({
+        body: digest,
+        headers: {
+          [CATALOG_TIMESTAMP_HEADER]: context.req.header(CATALOG_TIMESTAMP_HEADER),
+          [CATALOG_SIGNATURE_HEADER]: context.req.header(CATALOG_SIGNATURE_HEADER),
+        },
+        nowMs: clock.now(),
+      });
+
+      if (!verdict.ok) {
+        return refuse(context, verdict.reason);
+      }
+
+      const stored = await storedVersion();
+
+      if (stored !== null && version < stored) {
+        return context.json({ error: "stale_version" }, 409);
+      }
+
+      try {
+        await objects.putStream(catalogSnapshotKey(version), Bun.file(temporary).stream());
+        await objects.putStream(CATALOG_LATEST_KEY, Bun.file(temporary).stream());
+      } catch (error) {
+        logError("catalog.snapshot", error);
+
+        return context.json({ error: API_ERRORS.internal }, 500);
+      }
+
+      logInfo("catalog.snapshot.stored", `archived catalog ${version} (${String(bytes)} bytes)`);
+
+      return context.body(null, 204);
+    } finally {
+      await rm(temporary, { force: true });
+    }
   });
 
   return routes;

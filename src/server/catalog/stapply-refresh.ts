@@ -1,4 +1,9 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { createZstdDecompress } from "node:zlib";
+
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { CatalogManifest } from "./stapply-daily.ts";
 
@@ -59,6 +64,79 @@ export function compressCatalogSnapshot(sqliteBytes: Uint8Array<ArrayBuffer>, le
  */
 export function decompressCatalogSnapshot(compressedBytes: Uint8Array<ArrayBuffer>) {
   return new Uint8Array(Bun.zstdDecompressSync(compressedBytes));
+}
+
+export type CatalogStreamStage = "decompress" | "write";
+
+/**
+ * A streaming decompress that failed at one named stage, so a caller can tell a corrupt artifact (and a corrupt
+ * artifact is fine to retry from the other object key) from a full disk (a write failure).
+ */
+export class CatalogStreamStageError extends Error {
+  readonly stage: CatalogStreamStage;
+
+  constructor(stage: CatalogStreamStage, message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "CatalogStreamStageError";
+    this.stage = stage;
+  }
+}
+
+/**
+ * Streams a `catalog.sqlite.zst` payload through zstd into `destinationPath`, hashing and counting the uncompressed
+ * bytes as they pass so a multi-gigabyte catalog never sits in the Bun heap.
+ *
+ * Each stage tags its own failure: an error from the input or the decompressor is a `decompress` stage failure, an
+ * error from the destination file is a `write` stage failure. `pipeline` closes every stream on any failure, so no
+ * file descriptor leaks on a refused refresh.
+ * @param stream The compressed snapshot from the object store.
+ * @param destinationPath The file to write the uncompressed SQLite bytes to.
+ * @returns The uncompressed byte count and its SHA-256 as lowercase hex.
+ */
+export async function decompressCatalogStreamToFile(
+  stream: ReadableStream<Uint8Array>,
+  destinationPath: string,
+) {
+  const hash = createHash("sha256");
+  const decompressor = createZstdDecompress();
+  const sink = createWriteStream(destinationPath);
+  const source = Readable.from(stream);
+  const stages: CatalogStreamStage[] = [];
+  let bytes = 0;
+
+  const meter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      bytes += chunk.byteLength;
+      hash.update(chunk);
+      callback(null, chunk);
+    },
+  });
+
+  source.once("error", () => {
+    stages.push("decompress");
+  });
+  decompressor.once("error", () => {
+    stages.push("decompress");
+  });
+  sink.once("error", () => {
+    stages.push("write");
+  });
+
+  try {
+    await pipeline(source, decompressor, meter, sink);
+  } catch (error) {
+    const stage = stages[0] ?? "decompress";
+
+    throw new CatalogStreamStageError(
+      stage,
+      stage === "write"
+        ? `could not write ${destinationPath}`
+        : `the catalog artifact is not zstd (${destinationPath})`,
+      { cause: error },
+    );
+  }
+
+  return { bytes, sha256: hash.digest("hex") };
 }
 
 /**
