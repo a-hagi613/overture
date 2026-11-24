@@ -187,6 +187,7 @@ jobs:
           path: ~/.bun/bin
           key: ${{ runner.os }}-e2e-bun-bin-1.4.5
       - name: Install Bun (the Playwright image has no unzip for setup-bun)
+        shell: bash
         run: |
           set -euo pipefail
           if [ "${{ steps.bun-bin-cache.outputs.cache-hit }}" != "true" ]; then
