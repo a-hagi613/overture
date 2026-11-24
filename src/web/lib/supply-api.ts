@@ -7,6 +7,7 @@ const SUPPLY_TIMEOUT_MS = 5000;
 
 export interface SupplyFilterInput {
   role: string | null;
+  granularRole: string | null;
   location: string | null;
   radius: string | null;
   remote: boolean;
@@ -17,6 +18,10 @@ const loadSupplyCounts = async (filters: SupplyFilterInput) => {
 
   if (filters.role !== null) {
     query.set("role", filters.role);
+  }
+
+  if (filters.granularRole !== null) {
+    query.set("granularRole", filters.granularRole);
   }
 
   if (filters.location !== null) {
@@ -63,7 +68,14 @@ export function useSupplyCounts(filters: SupplyFilterInput) {
     enabled: hydrated,
     placeholderData: keepPreviousData,
     queryFn: async () => loadSupplyCounts(filters),
-    queryKey: ["supply", filters.role, filters.location, filters.radius, filters.remote],
+    queryKey: [
+      "supply",
+      filters.role,
+      filters.granularRole,
+      filters.location,
+      filters.radius,
+      filters.remote,
+    ],
     retry: false,
     staleTime: 60_000,
   });

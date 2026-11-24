@@ -33,6 +33,8 @@ interface PostingSeed {
   countryCode: string;
   locationRaw: string;
   role: "Operations" | "Software Engineering";
+  granularRole: string;
+  extraTags?: readonly { dimension: "role" | "granular_role"; value: string }[];
   title: string;
   url: string;
   workplace: "hybrid" | "remote";
@@ -50,6 +52,7 @@ const OPEN_SEEDS: readonly PostingSeed[] = [
     countryCode: "US",
     locationRaw: "Austin, TX",
     role: "Software Engineering",
+    granularRole: "Software Engineer",
     title: "Backend Engineer",
     url: "https://supply.example/gh-swe-remote",
     workplace: "remote",
@@ -61,6 +64,7 @@ const OPEN_SEEDS: readonly PostingSeed[] = [
     countryCode: "CA",
     locationRaw: "Toronto, ON",
     role: "Software Engineering",
+    granularRole: "Software Engineer",
     title: "Platform Engineer",
     url: "https://supply.example/gh-swe-onsite",
     workplace: "hybrid",
@@ -72,6 +76,7 @@ const OPEN_SEEDS: readonly PostingSeed[] = [
     countryCode: "GB",
     locationRaw: "London, United Kingdom",
     role: "Operations",
+    granularRole: "Operations Manager",
     title: "Revenue Operations Lead",
     url: "https://supply.example/lever-ops-remote",
     workplace: "remote",
@@ -83,9 +88,26 @@ const OPEN_SEEDS: readonly PostingSeed[] = [
     countryCode: "GB",
     locationRaw: "London, United Kingdom",
     role: "Operations",
+    granularRole: "Operations Manager",
     title: "Business Operations Manager",
     url: "https://supply.example/lever-ops-hybrid",
     workplace: "hybrid",
+  },
+  {
+    ats: "greenhouse",
+    atsJobId: "supply-gh-swe-data-hybrid-label",
+    city: "Austin",
+    countryCode: "US",
+    extraTags: [
+      { dimension: "role", value: "Data & Analytics" },
+      { dimension: "granular_role", value: "Data Scientist" },
+    ],
+    locationRaw: "Austin, TX",
+    role: "Software Engineering",
+    granularRole: "Software Engineer",
+    title: "Machine Learning Engineer",
+    url: "https://supply.example/gh-swe-data",
+    workplace: "remote",
   },
 ];
 
@@ -96,6 +118,7 @@ const CLOSED_SEED: PostingSeed = {
   countryCode: "US",
   locationRaw: "Austin, TX",
   role: "Software Engineering",
+  granularRole: "Software Engineer",
   title: "Closed Backend Engineer",
   url: "https://supply.example/gh-swe-closed",
   workplace: "remote",
@@ -151,7 +174,11 @@ async function seedSupplyCatalog(request: APIRequestContext) {
       employmentType: "full_time",
       language: "en",
       locationRaw: seed.locationRaw,
-      tags: [{ dimension: "role", value: seed.role }],
+      tags: [
+        { dimension: "role", value: seed.role },
+        { dimension: "granular_role", value: seed.granularRole },
+        ...(seed.extraTags ?? []),
+      ],
       title: seed.title,
       url: seed.url,
       workplace: seed.workplace,
@@ -203,7 +230,7 @@ async function layoutOf(page: Page) {
 }
 
 test.describe("the landing live supply preview", () => {
-  test("the count follows the role, location and remote filters without a layout shift or an axe violation", async ({
+  test("the count follows the category, granular role, location and remote filters without a layout shift or an axe violation", async ({
     page,
     supplyServer,
   }) => {
@@ -212,33 +239,52 @@ test.describe("the landing live supply preview", () => {
 
     const count = page.getByTestId("supply-count");
     const caption = page.getByTestId("supply-caption");
+    const category = page.getByLabel("Category", { exact: true });
     const role = page.getByLabel("Role", { exact: true });
     const location = page.getByLabel("Location", { exact: true });
     const remote = page.getByRole("switch", { name: "Remote only" });
 
-    await expect(count).toHaveText("4");
+    await expect(count).toHaveText("5");
     await expect(caption).toContainText("roles open now that Overture can apply to");
 
     const layoutBefore = await layoutOf(page);
 
-    await role.selectOption("Software Engineering");
-    await expect(count).toHaveText("2");
+    await category.selectOption("Software Engineering");
+    await expect(count).toHaveText("3");
 
-    await remote.click();
+    await role.fill("Software Engineer");
+    await role.press("Enter");
+    await expect(count).toHaveText("3");
+
+    await category.selectOption("Data & Analytics");
     await expect(count).toHaveText("1");
 
-    await role.selectOption("");
-    await expect(count).toHaveText("2");
+    await role.fill("Data Scientist");
+    await role.press("Enter");
+    await expect(count).toHaveText("1");
+
+    await category.selectOption("");
+    await expect(count).toHaveText("1");
+
+    await role.fill("");
+    await role.press("Enter");
+    await expect(count).toHaveText("5");
 
     await remote.click();
+    await expect(count).toHaveText("3");
+
+    await category.selectOption("Software Engineering");
+    await expect(count).toHaveText("2");
+
+    await category.selectOption("");
     await location.fill("London");
-    await expect(count).toHaveText("2");
+    await expect(count).toHaveText("1");
 
     await remote.click();
-    await expect(count).toHaveText("1");
+    await expect(count).toHaveText("2");
 
     await location.fill("");
-    await expect(count).toHaveText("2");
+    await expect(count).toHaveText("5");
 
     await expect(caption).toContainText("roles open now that Overture can apply to");
     await expect(page.getByTestId("supply-status")).toContainText("Live catalog");
@@ -288,7 +334,7 @@ test.describe("the landing live supply preview", () => {
 
     await page.unroute("**/api/supply**");
     await page.getByRole("button", { name: "Try again" }).click();
-    await expect(page.getByTestId("supply-count")).toHaveText("4");
+    await expect(page.getByTestId("supply-count")).toHaveText("5");
 
     expect(consoleErrors.filter((entry) => !isExpectedConsoleError(entry))).toEqual([]);
     expect(pageErrors).toEqual([]);
@@ -326,7 +372,7 @@ test.describe("the landing live supply preview", () => {
             }, theme);
             await page.setViewportSize({ width, height: 1000 });
             await page.goto(`${supplyServer.url}/`);
-            await expect(page.getByTestId("supply-count")).toHaveText("4");
+            await expect(page.getByTestId("supply-count")).toHaveText("5");
 
             const results = await new AxeBuilder({ page }).include("#live-jobs").analyze();
 

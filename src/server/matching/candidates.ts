@@ -38,7 +38,7 @@ const SENIORITY_ORDER: readonly string[] = [
   "director",
 ];
 
-type TagDimension = "role" | "subrole" | "seniority";
+type TagDimension = "role" | "subrole" | "granular_role" | "seniority";
 
 export interface CandidatePosting {
   id: string;
@@ -277,7 +277,11 @@ function targetBasicsMatch(posting: CandidatePosting, targets: TargetsInput) {
   let roleMatch = false;
 
   for (const tag of posting.tags) {
-    if (tag.dimension !== "role" && tag.dimension !== "subrole") {
+    if (
+      tag.dimension !== "role" &&
+      tag.dimension !== "subrole" &&
+      tag.dimension !== "granular_role"
+    ) {
       continue;
     }
 
@@ -324,7 +328,7 @@ export function createCandidateService(deps: CandidateDeps) {
       .where(
         and(
           inArray(postingTags.postingId, [...postingIds]),
-          inArray(postingTags.dimension, ["role", "subrole", "seniority"]),
+          inArray(postingTags.dimension, ["role", "subrole", "granular_role", "seniority"]),
         ),
       )
       .all();
@@ -335,6 +339,7 @@ export function createCandidateService(deps: CandidateDeps) {
       if (
         tag.dimension !== "role" &&
         tag.dimension !== "subrole" &&
+        tag.dimension !== "granular_role" &&
         tag.dimension !== "seniority"
       ) {
         continue;
@@ -408,7 +413,7 @@ export function createCandidateService(deps: CandidateDeps) {
               .where(
                 and(
                   eq(postingTags.postingId, postings.id),
-                  inArray(postingTags.dimension, ["role", "subrole"]),
+                  inArray(postingTags.dimension, ["role", "subrole", "granular_role"]),
                   inArray(postingTags.value, roleTags),
                 ),
               ),

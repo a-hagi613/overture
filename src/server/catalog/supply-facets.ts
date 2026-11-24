@@ -31,8 +31,10 @@ interface FacetLocation {
  *
  * Two passes keep the unfiltered total truthful. The first writes one `*` row per `(ats, country, region,
  * workplace)` with `count(*)`, so a Posting with two role tags is still counted once. The second joins the
- * role and subrole tags and writes one row per distinct `(role value, ats, country, region, workplace)`
- * with `count(distinct posting_id)`, so a Posting tagged both `role: X` and `subrole: X` is counted once.
+ * Level-1 category (`role`), legacy `subrole` and Level-2 ESCO `granular_role` tags and writes one row per
+ * distinct `(role value, ats, country, region, workplace)` with `count(distinct posting_id)`, so a Posting tagged
+ * both `role: X` and `granular_role: X` is counted once and a multi-label Posting lands under every label it
+ * carries (WS-17b).
  * @param db The catalog database.
  */
 export function rebuildSupplyFacets(db: CatalogDatabase) {
@@ -54,7 +56,7 @@ export function rebuildSupplyFacets(db: CatalogDatabase) {
              p.workplace, p.ats, count(distinct p.id)
         from postings p
         join posting_tags pt
-          on pt.posting_id = p.id and pt.dimension in ('role', 'subrole')
+          on pt.posting_id = p.id and pt.dimension in ('role', 'subrole', 'granular_role')
        where p.status = 'open' and p.apply_supported = 1 and p.closed_at is null
        group by pt.value, coalesce(p.country_code, ''), coalesce(lower(p.region), ''), p.workplace, p.ats
     `);
@@ -78,6 +80,17 @@ export function hasSupplyFacets(db: CatalogDatabase) {
 
     throw error;
   }
+}
+
+function hasRoleFacet(db: CatalogDatabase, role: string) {
+  return (
+    db
+      .select({ role: supplyFacets.role })
+      .from(supplyFacets)
+      .where(eq(supplyFacets.role, role))
+      .limit(1)
+      .get() !== undefined
+  );
 }
 
 function facetLocation(raw: string | null, radiusKm: number | null) {
@@ -132,9 +145,13 @@ function facetLocation(raw: string | null, radiusKm: number | null) {
 
 /**
  * Answers `/api/supply` from the precomputed rollup when the filters are a combination it groups by:
- * role (or the any-role total), one country or region, and remote. A city, metro, remote-scoped or
- * multi-place query, or any radius, returns null so the caller falls back to the indexed live query and
- * its R-Tree (issue #630, #631).
+ * a Level-1 category or Level-2 granular role (or the any-role total), one country or region, and remote. A city,
+ * metro, remote-scoped or multi-place query, or any radius, returns null so the caller falls back to the indexed
+ * live query and its R-Tree (issue #630, #631).
+ *
+ * A granular role is only answered from the rollup when the rollup actually holds a row for it. A catalog built
+ * before WS-17a added granular tags has no such row, so the request falls through to the live indexed query instead
+ * of falsely reading zero.
  * @param db The catalog database.
  * @param filters The validated public filters.
  * @returns The totals, or null when the rollup cannot answer or has not been built.
@@ -151,7 +168,13 @@ export function supplyFacetTotals(db: CatalogDatabase, filters: SupplyFilters) {
     return null;
   }
 
-  const conditions: SQL[] = [eq(supplyFacets.role, filters.role ?? ANY_ROLE_FACET)];
+  if (filters.granularRole !== null && !hasRoleFacet(db, filters.granularRole)) {
+    return null;
+  }
+
+  const conditions: SQL[] = [
+    eq(supplyFacets.role, filters.granularRole ?? filters.role ?? ANY_ROLE_FACET),
+  ];
 
   if (location !== null) {
     conditions.push(eq(supplyFacets.countryCode, location.countryCode));

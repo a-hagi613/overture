@@ -9,7 +9,7 @@ import type { CatalogDatabase } from "../platform/db/client.ts";
 
 import { openCatalogDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
-import { countMatchingPostings } from "./targets.ts";
+import { countMatchingPostings, roleTargetMatches } from "./targets.ts";
 
 const NOW = 1_800_000_000_000;
 
@@ -205,6 +205,68 @@ function queryPlan(target: Fixture, logged: LoggedQuery) {
 }
 
 describe("countMatchingPostings", () => {
+  test("matches a Level-1 category and a Level-2 granular role exactly, and keeps every label of a multi-label Posting", () => {
+    const target = fixture(0);
+
+    const insertPostingRow = (id: string, title: string) => {
+      target.sqlite
+        .prepare(POSTING_INSERT)
+        .run(
+          id,
+          id,
+          `https://example.test/${id}`,
+          `https://example.test/${id}`,
+          title,
+          title.toLowerCase(),
+          "Toronto, CA",
+          "CA",
+          "Ontario",
+          "Toronto",
+          "en",
+          "remote",
+          "full_time",
+          null,
+          null,
+          NOW,
+          NOW,
+          null,
+          "open",
+          id,
+        );
+    };
+
+    insertPostingRow("p-swe", "Backend Engineer");
+    insertPostingRow("p-data", "Data Scientist");
+
+    target.sqlite.prepare(TAG_INSERT).run("p-swe", "role", "Software Engineering");
+    target.sqlite.prepare(TAG_INSERT).run("p-swe", "granular_role", "Backend Engineer");
+    target.sqlite.prepare(TAG_INSERT).run("p-swe", "seniority", "senior");
+    target.sqlite.prepare(TAG_INSERT).run("p-data", "role", "Data & Analytics");
+    target.sqlite.prepare(TAG_INSERT).run("p-data", "granular_role", "Data Scientist");
+    target.sqlite.prepare(TAG_INSERT).run("p-data", "role", "Software Engineering");
+    target.sqlite.prepare(TAG_INSERT).run("p-data", "seniority", "senior");
+
+    const base = {
+      employmentTypes: [...EMPLOYMENT_TYPES],
+      locations: ["Toronto"],
+      salaryCurrency: null,
+      salaryFloorMinor: null,
+      seniorities: ["senior" as const],
+      workplaces: ["remote" as const],
+    };
+
+    expect(
+      countMatchingPostings(target.db, { ...base, roles: ["software engineering"] }, ["en"]),
+    ).toBe(2);
+    expect(countMatchingPostings(target.db, { ...base, roles: ["Data Scientist"] }, ["en"])).toBe(
+      1,
+    );
+    expect(
+      countMatchingPostings(target.db, { ...base, roles: ["Software Engineer"] }, ["en"]),
+    ).toBe(0);
+    expect(countMatchingPostings(target.db, { ...base, roles: ["backend"] }, ["en"])).toBe(1);
+  });
+
   test("counts the open Postings the filters name", () => {
     const target = fixture(12);
 
@@ -443,5 +505,22 @@ describe("countMatchingPostings", () => {
     expect(durations).toHaveLength(25);
     expect(p95).toBeLessThan(500);
     expect(slowest).toBeLessThan(500);
+  });
+});
+
+describe("roleTargetMatches", () => {
+  test("a known Level-1 category or Level-2 role matches only its exact label, case-insensitively", () => {
+    expect(roleTargetMatches("Registered Nurse", ["Registered Nurse"])).toBe(true);
+    expect(roleTargetMatches("registered nurse", ["Registered Nurse"])).toBe(true);
+    expect(roleTargetMatches("Registered Nurse", ["Nurse Practitioner"])).toBe(false);
+    expect(roleTargetMatches("Software Engineering", ["Software Engineering"])).toBe(true);
+    expect(roleTargetMatches("Software Engineering", ["Software Engineer"])).toBe(false);
+    expect(roleTargetMatches("Software Engineering", ["Civil Engineering"])).toBe(false);
+  });
+
+  test("a free-text target still matches on a shared meaningful word", () => {
+    expect(roleTargetMatches("platform", ["Platform Engineer"])).toBe(true);
+    expect(roleTargetMatches("backend", ["Senior Backend Engineer"])).toBe(true);
+    expect(roleTargetMatches("backend", ["Frontend Engineer"])).toBe(false);
   });
 });

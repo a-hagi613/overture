@@ -1,23 +1,52 @@
 import { z } from "zod";
 
-/**
- * The structured classification report the daily run publishes into `stapply-daily.json` and
- * `catalog/latest.json`. Every field is a plain count except the Haiku token and dollar figures, so the owner can read
- * coverage and cost without opening the runner log.
- */
-export const taggingReportSchema = z.object({
-  total_postings: z.number().int().nonnegative(),
-  cross_board_dupes_removed: z.number().int().nonnegative(),
-  unique_title_dept_pairs: z.number().int().nonnegative(),
-  cache_hit: z.number().int().nonnegative(),
-  tier1_esco_rules: z.number().int().nonnegative(),
-  tier2_embeddings: z.number().int().nonnegative(),
-  tier3_haiku_batch_sent: z.number().int().nonnegative(),
-  tier3_haiku_resolved: z.number().int().nonnegative(),
-  still_untagged: z.number().int().nonnegative(),
-  input_tokens: z.number().int().nonnegative(),
-  output_tokens: z.number().int().nonnegative(),
-  tier3_cost_usd: z.number().nonnegative(),
+import type { ObjectStore } from "../platform/ports/object-store.ts";
+
+import { taggingReportSchema } from "../../shared/tagging-report.ts";
+
+export { taggingReportSchema } from "../../shared/tagging-report.ts";
+
+export type { TaggingReport } from "../../shared/tagging-report.ts";
+
+const manifestTaggingSchema = z.object({
+  version: z.string(),
+  tagging: taggingReportSchema.optional(),
 });
 
-export type TaggingReport = z.infer<typeof taggingReportSchema>;
+/**
+ * Reads the tagging report out of the published catalog manifest (`catalog/latest.json`). The manifest is the same
+ * object the runtime hot-swap already trusts, so the admin page reports the classification of the catalog it is
+ * actually serving. A missing object store, a manifest written before WS-17a, a malformed document or a manifest
+ * without a `tagging` block all answer `null` instead of failing the admin request.
+ * @param deps The object store the manifest is published to and the manifest key.
+ * @returns The manifest version and its tagging report, or nulls when there is nothing to show.
+ */
+export async function readPublishedTagging(deps: {
+  key: string;
+  objects: Pick<ObjectStore, "get">;
+}) {
+  const bytes = await deps.objects.get(deps.key).catch(() => null);
+
+  if (bytes === null) {
+    return { manifestVersion: null, tagging: null };
+  }
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return { manifestVersion: null, tagging: null };
+  }
+
+  const manifest = manifestTaggingSchema.safeParse(parsed);
+
+  if (!manifest.success) {
+    return { manifestVersion: null, tagging: null };
+  }
+
+  return {
+    manifestVersion: manifest.data.version,
+    tagging: manifest.data.tagging ?? null,
+  };
+}

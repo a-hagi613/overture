@@ -1,16 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Plus, X } from "lucide-react";
+import { Check, ChevronDown, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import type { TargetsInput } from "../../shared/targets.ts";
+import type { RoleGroup } from "../../shared/tag-taxonomy.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { escoGranularRolesFor } from "../../shared/esco-roles.ts";
+import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
 import { fetchTargets, previewTargetsCount, saveTargets } from "../lib/profile-api.ts";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
 import { Input } from "./ui/input.tsx";
+import { RolePicker } from "./ui/role-picker.tsx";
 import { SectionSkeleton } from "./section-skeleton.tsx";
 
 const moneyFormat = new Intl.NumberFormat("en-US");
@@ -88,7 +92,7 @@ export function TargetsSection() {
     },
   });
 
-  const [newRole, setNewRole] = useState<string | null>(null);
+  const [roleCategory, setRoleCategory] = useState<RoleGroup | null>(null);
   const [newLocation, setNewLocation] = useState<string | null>(null);
   const matchedCount = countQuery.data?.matchedCount ?? targetsQuery.data?.matchedCount ?? 0;
 
@@ -96,20 +100,6 @@ export function TargetsSection() {
     if (draft !== null) {
       setSavedDraft({ ...draft, ...patch });
     }
-  }
-
-  function addRole() {
-    if (draft === null || newRole === null) {
-      return;
-    }
-
-    const role = newRole.trim();
-
-    if (role !== "" && !draft.roles.includes(role)) {
-      update({ roles: [...draft.roles, role] });
-    }
-
-    setNewRole(null);
   }
 
   function addLocation() {
@@ -168,39 +158,53 @@ export function TargetsSection() {
               <X aria-hidden="true" size={13} />
             </Button>
           ))}
-          {newRole === null ? (
-            <Button
-              className="rounded-full"
-              onClick={() => {
-                setNewRole("");
-              }}
-              size="sm"
-              variant="outline"
-            >
-              <Plus aria-hidden="true" size={14} />
-              <span>{targets.addRole}</span>
-            </Button>
-          ) : (
-            <form
-              className="flex items-center gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                addRole();
-              }}
-            >
-              <Input
-                ariaLabel={targets.addRole}
-                className="h-9 w-52 text-xs"
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={`${dsEyebrow} block`} htmlFor="target-category">
+              {targets.categoryLabel}
+            </label>
+            <div className="relative mt-2">
+              <select
+                className="h-12 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3.5 pr-10 text-sm font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+                id="target-category"
                 onChange={(event) => {
-                  setNewRole(event.currentTarget.value);
+                  const next = event.currentTarget.value;
+
+                  setRoleCategory(ROLE_GROUPS.find((group) => group === next) ?? null);
                 }}
-                value={newRole}
+                value={roleCategory ?? ""}
+              >
+                <option value="">{targets.categoryAny}</option>
+                {ROLE_GROUPS.map((group) => (
+                  <option key={group} value={group}>
+                    {group}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                size={16}
               />
-              <Button size="sm" submit variant="secondary">
-                {targets.add}
-              </Button>
-            </form>
-          )}
+            </div>
+          </div>
+          <RolePicker
+            allowFreeText
+            clearLabel={targets.pickRoleClear}
+            id="target-role"
+            label={targets.pickRoleLabel}
+            onChange={(role) => {
+              if (draft !== null && role !== null && !draft.roles.includes(role)) {
+                update({ roles: [...draft.roles, role] });
+              }
+            }}
+            options={escoGranularRolesFor(roleCategory)
+              .filter((option) => !(draft?.roles ?? []).includes(option.role))
+              .map((option) => ({ hint: option.category, value: option.role }))}
+            placeholder={targets.pickRolePlaceholder}
+            value={null}
+          />
         </div>
       </div>
 

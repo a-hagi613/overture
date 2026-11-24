@@ -218,8 +218,9 @@ const lowercased = (value: string) => value.trim().toLowerCase();
 const roleBody = z.object({ userId: z.string().min(1), role: z.enum(["user", "owner"]) });
 
 const postingTagBody = z.object({
-  dimension: z.enum(["role", "subrole", "seniority"]),
+  dimension: z.enum(["role", "subrole", "seniority", "granular_role", "esco"]),
   value: z.string().min(1),
+  weight: z.number().min(0).max(1).nullish(),
 });
 
 const seedPostingQuestionBody = z.object({
@@ -687,7 +688,13 @@ function seedPosting(
   for (const tag of row.tags) {
     catalogDb
       .insert(postingTags)
-      .values({ postingId: id, dimension: tag.dimension, value: tag.value, source: "import" })
+      .values({
+        postingId: id,
+        dimension: tag.dimension,
+        value: tag.value,
+        source: "import",
+        weight: tag.weight ?? null,
+      })
       .onConflictDoNothing()
       .run();
   }

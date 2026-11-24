@@ -1,16 +1,19 @@
-import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Plus } from "lucide-react";
 import { useRef, useState } from "react";
 import { Link } from "react-router";
 
 import type { OnboardingTargetChoices, OnboardingTargetsView } from "../../shared/onboarding.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
-import type { Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
+import type { RoleGroup, Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
 import type { SkipCompany } from "../lib/profile-api.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { escoGranularRolesFor } from "../../shared/esco-roles.ts";
+import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
 import { OnboardingBlockedEmployers } from "./onboarding-blocked-employers.tsx";
 import { OnboardingTargetChip } from "./onboarding-target-chip.tsx";
 import { OnboardingTargetChipGroup } from "./onboarding-target-chip-group.tsx";
+import { RolePicker } from "./ui/role-picker.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow, dsMetric } from "./ui/ds.ts";
@@ -93,6 +96,7 @@ export function OnboardingTargetsCard({
   const [matched, setMatched] = useState(view.matchedCount);
   const [salary, setSalary] = useState(() => salaryText(view.targets.salaryFloorMinor));
   const [newLocation, setNewLocation] = useState("");
+  const [category, setCategory] = useState<RoleGroup | null>(null);
   const [failed, setFailed] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const sequence = useRef(0);
@@ -187,6 +191,54 @@ export function OnboardingTargetsCard({
             </OnboardingTargetChip>
           ))}
         </OnboardingTargetChipGroup>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={`${dsEyebrow} block`} htmlFor="w-category">
+              {copy.onboarding.categoryLabel}
+            </label>
+            <div className="relative mt-2">
+              <select
+                className="h-12 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3.5 pr-10 text-sm font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+                id="w-category"
+                onChange={(event) => {
+                  const next = event.currentTarget.value;
+
+                  setCategory(ROLE_GROUPS.find((group) => group === next) ?? null);
+                }}
+                value={category ?? ""}
+              >
+                <option value="">{copy.onboarding.categoryAny}</option>
+                {ROLE_GROUPS.map((group) => (
+                  <option key={group} value={group}>
+                    {group}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                size={16}
+              />
+            </div>
+          </div>
+          <RolePicker
+            allowFreeText
+            clearLabel={copy.onboarding.pickRoleClear}
+            id="w-role"
+            label={copy.onboarding.pickRoleLabel}
+            onChange={(role) => {
+              if (role !== null && !draft.roles.includes(role)) {
+                void commit({ ...draft, roles: [...draft.roles, role] });
+              }
+            }}
+            options={escoGranularRolesFor(category)
+              .filter((option) => !draft.roles.includes(option.role))
+              .map((option) => ({ hint: option.category, value: option.role }))}
+            placeholder={copy.onboarding.pickRolePlaceholder}
+            value={null}
+          />
+        </div>
 
         <div>
           <OnboardingTargetChipGroup headingId="w-loc" label={copy.onboarding.cities}>

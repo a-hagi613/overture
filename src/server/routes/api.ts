@@ -10,13 +10,30 @@ import { readSession } from "../auth/session.ts";
 import { consumeRateLimit } from "../platform/rate-limit.ts";
 import { createSseStream } from "../platform/sse/stream.ts";
 import { postedWithinMs, searchPostings } from "../platform/search/search.ts";
-import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
+import {
+  EMPLOYMENT_TYPES,
+  ROLE_GROUPS,
+  SENIORITIES,
+  WORKPLACES,
+} from "../../shared/tag-taxonomy.ts";
+import { isEscoRole } from "../../shared/esco-roles.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
 export const searchQuerySchema = z.object({
   q: z.string().min(1).max(200),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  /** The original Level-1 filter; a granular role name here still matches legacy catalogs. */
   role: z.string().min(1).max(60).optional(),
+  /** The explicit Level-1 category alias (WS-17b). */
+  category: z.enum(ROLE_GROUPS).optional(),
+  /** A Level-2 ESCO role; when present it is the role filter and the category is only a hint. */
+  granularRole: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .refine((value) => isEscoRole(value), { message: "unknown granular role" })
+    .optional(),
   seniority: z.enum(SENIORITIES).optional(),
   workplace: z.enum(WORKPLACES).optional(),
   location: z.string().min(1).max(120).optional(),
@@ -49,6 +66,8 @@ export function searchResponse(catalogDb: CatalogDatabase, query: SearchQuery, n
     q,
     limit,
     role,
+    category,
+    granularRole,
     seniority,
     workplace,
     location,
@@ -68,7 +87,8 @@ export function searchResponse(catalogDb: CatalogDatabase, query: SearchQuery, n
     limit,
     nowMs,
     filters: {
-      role: role ?? null,
+      role: granularRole ?? role ?? category ?? null,
+      granularRole: granularRole ?? null,
       seniority: seniority ?? null,
       workplace: workplace ?? null,
       location: location ?? null,

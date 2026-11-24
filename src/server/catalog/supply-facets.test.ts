@@ -68,9 +68,10 @@ interface Seed {
   city: string | null;
   closed: boolean;
   countryCode: string | null;
+  granularRole?: string | null;
   id: string;
   region: string | null;
-  role: RoleGroup | null;
+  role: string | null;
   subrole: string | null;
   workplace: "hybrid" | "onsite" | "remote" | "unknown";
 }
@@ -162,6 +163,14 @@ function insertSeed(sqlite: Database, seed: Seed) {
       )
       .run(seed.id, seed.subrole);
   }
+
+  if (seed.granularRole !== null && seed.granularRole !== undefined) {
+    sqlite
+      .prepare(
+        "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, 'granular_role', ?, 'rules')",
+      )
+      .run(seed.id, seed.granularRole);
+  }
 }
 
 function seededCatalog(count: number, seed = 42) {
@@ -196,6 +205,7 @@ function seededCatalog(count: number, seed = 42) {
 
 function filter(overrides: Partial<SupplyFilters> = {}) {
   return {
+    granularRole: null,
     location: null,
     radiusKm: null,
     remote: false,
@@ -360,6 +370,73 @@ describe("supply_facets", () => {
       .get(ANY_ROLE_FACET);
 
     expect(anyRole).toEqual({ total: 2 });
+  });
+
+  test("rolls up Level-2 granular roles and answers them from the rollup with live parity", () => {
+    const target = catalog();
+
+    insertSeed(target.sqlite, {
+      ats: "greenhouse",
+      applySupported: true,
+      city: "Austin",
+      closed: false,
+      countryCode: "US",
+      granularRole: "Software Engineer",
+      id: "granular-swe",
+      region: "Texas",
+      role: "Software Engineering",
+      subrole: null,
+      workplace: "remote",
+    });
+    insertSeed(target.sqlite, {
+      ats: "lever",
+      applySupported: true,
+      city: "Berlin",
+      closed: false,
+      countryCode: "DE",
+      granularRole: "Data Engineer",
+      id: "granular-data",
+      region: "Bavaria",
+      role: "Data & Analytics",
+      subrole: null,
+      workplace: "hybrid",
+    });
+    insertSeed(target.sqlite, {
+      ats: "ashby",
+      applySupported: true,
+      city: "Austin",
+      closed: false,
+      countryCode: "US",
+      id: "legacy-granular-in-role",
+      region: "Texas",
+      role: "Software Engineer",
+      subrole: null,
+      workplace: "remote",
+    });
+
+    rebuildSupplyFacets(target.db);
+
+    expect(
+      countSupportedSupply(target.db, filter({ granularRole: "Software Engineer" })).total,
+    ).toBe(2);
+    expect(countSupportedSupply(target.db, filter({ granularRole: "Data Engineer" })).total).toBe(
+      1,
+    );
+    expect(countSupportedSupply(target.db, filter({ role: "Software Engineering" })).total).toBe(1);
+    expect(countSupportedSupply(target.db, filter({ role: "Data & Analytics" })).total).toBe(1);
+    expectParity(target.db, filter({ granularRole: "Software Engineer", remote: true }));
+    expectParity(target.db, filter({ granularRole: "Data Engineer", location: "Germany" }));
+
+    const rows = target.sqlite
+      .query(
+        "select role, sum(postings) as total from supply_facets where role in ('Software Engineer', 'Data Engineer') group by role order by role",
+      )
+      .all();
+
+    expect(rows).toEqual([
+      { role: "Data Engineer", total: 1 },
+      { role: "Software Engineer", total: 2 },
+    ]);
   });
 
   test("stores SQL NULL country and region as the empty sentinel, never as a NULL primary key", () => {

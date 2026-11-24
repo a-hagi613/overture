@@ -1,3 +1,7 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { AxeBuilder } from "@axe-core/playwright";
 import { z } from "zod";
 
 import { openAdminAsOwner } from "./admin-sign-in.ts";
@@ -272,4 +276,64 @@ test("the admin LLM usage query is refused without the admin gates", async ({
 
   expect(refused.status()).toBe(401);
   expect(await refused.json()).toEqual({ error: "access_required" });
+});
+
+test("the classification card says so plainly when the active catalog has no report", async ({
+  page,
+  adminIsolatedAppUrl,
+  accessServer,
+}) => {
+  await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
+  await page.goto(`${adminIsolatedAppUrl}/admin/catalog`);
+
+  await expect(page.getByRole("heading", { name: "Classification" })).toBeVisible();
+  await expect(
+    page.getByText("No classification report is attached to the active catalog yet."),
+  ).toBeVisible();
+});
+
+test("the classification card renders the published tier funnel and Tier 3 spend", async ({
+  page,
+  adminIsolatedAppServer,
+  adminIsolatedAppUrl,
+  accessServer,
+}) => {
+  mkdirSync(join(adminIsolatedAppServer.objectsRoot, "catalog"), { recursive: true });
+  writeFileSync(
+    join(adminIsolatedAppServer.objectsRoot, "catalog", "latest.json"),
+    JSON.stringify({
+      version: "2026-11-24",
+      tagging: {
+        total_postings: 849_612,
+        cross_board_dupes_removed: 41_002,
+        unique_title_dept_pairs: 312_004,
+        cache_hit: 210_100,
+        tier1_esco_rules: 80_000,
+        tier2_embeddings: 18_500,
+        tier3_haiku_batch_sent: 412,
+        tier3_haiku_resolved: 3402,
+        still_untagged: 12_004,
+        input_tokens: 5_200_000,
+        output_tokens: 310_000,
+        tier3_cost_usd: 6.71,
+      },
+    }),
+  );
+
+  await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
+  await page.goto(`${adminIsolatedAppUrl}/admin/catalog`);
+
+  const card = page.locator("section", { hasText: "Classification" });
+
+  await expect(card.getByText("Catalog 2026-11-24")).toBeVisible();
+  await expect(card.getByText("849,612", { exact: true })).toBeVisible();
+  await expect(card.getByText("80,000", { exact: true })).toBeVisible();
+  await expect(card.getByText("3,402", { exact: true })).toBeVisible();
+  await expect(card.getByText("12,004", { exact: true })).toBeVisible();
+  await expect(card.getByText("$6.71", { exact: true })).toBeVisible();
+  await expect(card.getByText("5,200,000 input · 310,000 output tokens")).toBeVisible();
+
+  const results = await new AxeBuilder({ page }).include("#admin-catalog-tagging").analyze();
+
+  expect(results.violations).toEqual([]);
 });
