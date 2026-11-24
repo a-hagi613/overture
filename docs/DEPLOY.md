@@ -1132,9 +1132,11 @@ once, and closed rows older than 30 days deleted. It then runs `PRAGMA optimize`
 
 **Published objects.** `catalog/snapshots/YYYY-MM-DD.sqlite.zst` first, then `catalog/latest.sqlite.zst`, then
 `catalog/latest.json` last so a reader never sees a manifest without its snapshot. The manifest is exactly
-`{version, sha256, builtAt, rowCount, supportedCount}`. A run whose `rowCount` is more than 20 % below the previous
-manifest is refused before anything is uploaded; re-run `workflow_dispatch` with `allow_row_drop` after checking
-upstream.
+`{version, sha256, builtAt, rowCount, supportedCount}`. In R2 mode the run then sends the signed
+`POST /internal/catalog/refresh` when `CATALOG_REFRESH_SECRET` is set, so the app hot-swaps without waiting for a cold
+boot (summary `publish: "r2+refresh"`); without the secret it only uploads (`"r2"`). A run whose `rowCount` is more
+than 20 % below the previous manifest is refused before anything is uploaded; re-run `workflow_dispatch` with
+`allow_row_drop` after checking upstream.
 
 **The relay contract (`WS-8`, issue #576).** Both requests sign `<timestamp>\n<body>` with
 `CATALOG_REFRESH_SECRET` and send `x-overture-catalog-timestamp` (epoch ms) plus
@@ -1143,7 +1145,9 @@ clock and rejects any timestamp it has already accepted, so a captured request c
 
 1. `PUT /internal/catalog/snapshot` with `content-type: application/zstd`, the compressed bytes as the body, and
    `x-overture-catalog-version` and `x-overture-catalog-sha256` (the uncompressed hash). The body to sign is the
-   SHA-256 of the compressed bytes, because the request is large.
+   SHA-256 of the compressed bytes, because the request is large. The compressed artifact is roughly 20-25 MB on the
+   seed run and can reach about 200 MB once the catalog holds every listed posting, so the runtime's request-body
+   limit must be raised for this route.
 2. `POST /internal/catalog/refresh` with the manifest as the JSON body. The app archives the snapshot to R2, verifies
    the SHA-256 and `PRAGMA integrity_check`, and hot-swaps `catalog.sqlite` read-only.
 
@@ -1153,9 +1157,10 @@ with `WS-8`); a real HTTP error or a rejected checksum fails the job and alerts.
 
 **First run and rollback.** Run it once with
 `gh workflow run stapply-daily.yml -f allow_row_drop=false -f skip_llm=false -R a-hagi613/overture` and check the step
-summary: `seed: true`, a plausible `rowCount` (the 28 boards carry about two million postings, of which roughly a
-quarter are open and apply-supported), `integrity: "ok"` and `publish` set to `r2` or `relay`, not
-`relay_endpoint_missing`. Nothing in the app changes until `WS-8` consumes the manifest, so the only production effect
+summary: `seed: true`, `integrity: "ok"`, and `publish` set to `r2`, `r2+refresh`, or `relay`, not
+`relay_endpoint_missing`. The seed run keeps the last 30 days of postings (measured: about 851,000 rows across the 28
+boards, about 171,000 of them apply-supported); from the second run on the catalog holds every posting the boards
+still list, measured at about two million rows and 500,000 apply-supported. Nothing in the app changes until `WS-8` consumes the manifest, so the only production effect
 of merging this workflow is the daily R2 object. To roll back, disable the workflow
 (`gh workflow disable stapply-daily.yml`); the last published snapshot stands, and the app's active catalog is never
 replaced by a snapshot that fails its checksum. There is no database migration to undo.

@@ -39,6 +39,7 @@ import {
   compressCatalogSnapshot,
   decompressCatalogSnapshot,
   downloadPreviousCatalog,
+  notifyCatalogRefresh,
   publishCatalogSnapshot,
   relayCatalogSnapshot,
 } from "../src/server/catalog/stapply-refresh.ts";
@@ -385,21 +386,32 @@ async function publishArtifacts(
     return "dry_run";
   }
 
+  const origin = Bun.env.CATALOG_REFRESH_ORIGIN ?? "https://tryoverture.com";
+  const secret = Bun.env.CATALOG_REFRESH_SECRET;
+
   if (objects !== null) {
     await publishCatalogSnapshot({ objects, manifest, compressedBytes });
 
-    return objects.kind;
+    if (secret === undefined) {
+      return objects.kind;
+    }
+
+    const notified = await notifyCatalogRefresh({ origin, secret, manifest, nowMs: now });
+
+    return notified.outcome === "delivered"
+      ? `${objects.kind}+refresh`
+      : `${objects.kind}+refresh_endpoint_missing`;
   }
 
-  if (Bun.env.CATALOG_REFRESH_SECRET === undefined) {
+  if (secret === undefined) {
     throw new Error(
       "no publish target: set the R2 repository secrets or CATALOG_REFRESH_SECRET (docs/DEPLOY.md, the daily catalog ETL)",
     );
   }
 
   const relay = await relayCatalogSnapshot({
-    origin: Bun.env.CATALOG_REFRESH_ORIGIN ?? "https://tryoverture.com",
-    secret: Bun.env.CATALOG_REFRESH_SECRET,
+    origin,
+    secret,
     manifest,
     compressedBytes,
     nowMs: now,

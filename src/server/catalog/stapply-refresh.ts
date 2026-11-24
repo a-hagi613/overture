@@ -254,6 +254,49 @@ export async function downloadPreviousCatalog(input: CatalogDownloadInput) {
 
 export type RelayOutcome = "delivered" | "endpoint_missing";
 
+export interface CatalogNotifyInput {
+  readonly origin: string;
+  readonly secret: string;
+  readonly manifest: CatalogManifest;
+  readonly nowMs: number;
+  readonly fetchImpl?: CatalogFetch;
+}
+
+function isMissingEndpoint(status: number) {
+  return status === 404 || status === 501;
+}
+
+/**
+ * Asks the runtime to hot-swap the snapshot the manifest names. It is sent after an R2 upload and again after the
+ * relay upload, always signed over the exact JSON body.
+ * @param input The origin, secret, manifest and clock.
+ * @returns Whether the runtime endpoint accepted the request.
+ */
+export async function notifyCatalogRefresh(input: CatalogNotifyInput) {
+  const call: CatalogFetch = input.fetchImpl ?? fetch;
+  const origin = input.origin.replace(/\/+$/u, "");
+  const body = `${JSON.stringify(input.manifest)}\n`;
+
+  const response = await call(`${origin}/internal/catalog/refresh`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...catalogRefreshHeaders(input.secret, input.nowMs, body),
+    },
+    body,
+  });
+
+  if (isMissingEndpoint(response.status)) {
+    return { outcome: "endpoint_missing" } satisfies { outcome: RelayOutcome };
+  }
+
+  if (!response.ok) {
+    throw new Error(`POST /internal/catalog/refresh failed: HTTP ${String(response.status)}`);
+  }
+
+  return { outcome: "delivered" } satisfies { outcome: RelayOutcome };
+}
+
 export interface CatalogRelayInput {
   readonly origin: string;
   readonly secret: string;
@@ -261,10 +304,6 @@ export interface CatalogRelayInput {
   readonly compressedBytes: Uint8Array<ArrayBuffer>;
   readonly nowMs: number;
   readonly fetchImpl?: CatalogFetch;
-}
-
-function isMissingEndpoint(status: number) {
-  return status === 404 || status === 501;
 }
 
 /**
@@ -303,24 +342,9 @@ export async function relayCatalogSnapshot(input: CatalogRelayInput) {
     throw new Error(`PUT /internal/catalog/snapshot failed: HTTP ${String(upload.status)}`);
   }
 
-  const body = `${JSON.stringify(input.manifest)}\n`;
+  const notify = { origin, secret: input.secret, manifest: input.manifest, nowMs: input.nowMs + 1 };
 
-  const refresh = await call(`${origin}/internal/catalog/refresh`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...catalogRefreshHeaders(input.secret, input.nowMs + 1, body),
-    },
-    body,
-  });
-
-  if (isMissingEndpoint(refresh.status)) {
-    return { outcome: "endpoint_missing" } satisfies { outcome: RelayOutcome };
-  }
-
-  if (!refresh.ok) {
-    throw new Error(`POST /internal/catalog/refresh failed: HTTP ${String(refresh.status)}`);
-  }
-
-  return { outcome: "delivered" } satisfies { outcome: RelayOutcome };
+  return input.fetchImpl === undefined
+    ? notifyCatalogRefresh(notify)
+    : notifyCatalogRefresh({ ...notify, fetchImpl: input.fetchImpl });
 }

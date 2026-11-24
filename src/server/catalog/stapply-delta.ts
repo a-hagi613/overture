@@ -126,6 +126,7 @@ export function createStapplyStaging(db: CatalogDatabase) {
     board_id TEXT NOT NULL,
     PRIMARY KEY (source_key, company_norm)
   )`);
+  client.run(`CREATE INDEX ${BOARD_MAP}_board ON ${BOARD_MAP} (board_id)`);
   client.run(`CREATE TEMP TABLE ${NEW_IDS} (id TEXT PRIMARY KEY NOT NULL)`);
 }
 
@@ -222,21 +223,25 @@ function countOf(db: CatalogDatabase, sql: string, ...params: readonly number[])
 function dedupeStaging(db: CatalogDatabase) {
   const before = countOf(db, `SELECT count(*) AS n FROM ${STAGING}`);
 
-  db.$client.run(`DELETE FROM ${STAGING} WHERE rowid IN (
-    SELECT rowid FROM (
+  db.$client.run(`CREATE TEMP TABLE stapply_duplicates AS
+    SELECT rowid AS rowid FROM (
       SELECT rowid, row_number() OVER (
         PARTITION BY company_norm, coalesce(nullif(trim(requisition_id), ''), 'global:' || posting_id)
         ORDER BY apply_supported DESC, coalesce(source_updated_at, posted_at) DESC, ats_job_id DESC
       ) AS position
       FROM ${STAGING}
-    ) WHERE position > 1
-  )`);
-  db.$client.run(`DELETE FROM ${STAGING} WHERE rowid IN (
-    SELECT rowid FROM (
+    ) WHERE position > 1`);
+  db.$client.run(`CREATE TEMP TABLE stapply_job_duplicates AS
+    SELECT rowid AS rowid FROM (
       SELECT rowid, row_number() OVER (PARTITION BY source_key, ats_job_id ORDER BY rowid) AS position
       FROM ${STAGING}
-    ) WHERE position > 1
-  )`);
+    ) WHERE position > 1`);
+  db.$client.run(`DELETE FROM ${STAGING} WHERE rowid IN (SELECT rowid FROM stapply_duplicates)`);
+  db.$client.run(
+    `DELETE FROM ${STAGING} WHERE rowid IN (SELECT rowid FROM stapply_job_duplicates)`,
+  );
+  db.$client.run("DROP TABLE stapply_duplicates");
+  db.$client.run("DROP TABLE stapply_job_duplicates");
 
   return before - countOf(db, `SELECT count(*) AS n FROM ${STAGING}`);
 }

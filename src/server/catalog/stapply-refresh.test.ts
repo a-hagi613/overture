@@ -21,6 +21,7 @@ import {
   createCatalogRefreshVerifier,
   decompressCatalogSnapshot,
   downloadPreviousCatalog,
+  notifyCatalogRefresh,
   publishCatalogSnapshot,
   readPreviousCatalogManifest,
   relayCatalogSnapshot,
@@ -195,6 +196,71 @@ describe("publishCatalogSnapshot", () => {
     expect(
       await downloadPreviousCatalog({ objects, decompress: decompressCatalogSnapshot }),
     ).toBeNull();
+  });
+});
+
+describe("notifyCatalogRefresh", () => {
+  test("sends the signed manifest so the runtime hot-swaps an R2 upload", async () => {
+    const { manifest } = artifacts();
+    const calls: { url: string; init: RequestInit }[] = [];
+
+    const result = await notifyCatalogRefresh({
+      origin: "https://tryoverture.com",
+      secret: SECRET,
+      manifest,
+      nowMs: NOW,
+      fetchImpl: async (url, init) => {
+        calls.push({ url, init });
+        await Promise.resolve();
+
+        return Response.json({ version: manifest.version, sha256: manifest.sha256 });
+      },
+    });
+
+    expect(result).toEqual({ outcome: "delivered" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("https://tryoverture.com/internal/catalog/refresh");
+    expect(calls[0]?.init.method).toBe("POST");
+
+    const headers = new Headers(calls[0]?.init.headers);
+    const body = z.string().parse(calls[0]?.init.body);
+
+    expect(headers.get(CATALOG_SIGNATURE_HEADER)).toBe(
+      catalogRefreshSignature(SECRET, String(NOW), body),
+    );
+    expect(JSON.parse(body)).toEqual(manifest);
+  });
+
+  test("reports a missing endpoint and raises a real failure", async () => {
+    const { manifest } = artifacts();
+
+    expect(
+      await notifyCatalogRefresh({
+        origin: "https://tryoverture.com",
+        secret: SECRET,
+        manifest,
+        nowMs: NOW,
+        fetchImpl: async () => {
+          await Promise.resolve();
+
+          return new Response("not implemented", { status: 501 });
+        },
+      }),
+    ).toEqual({ outcome: "endpoint_missing" });
+
+    const failed = notifyCatalogRefresh({
+      origin: "https://tryoverture.com",
+      secret: SECRET,
+      manifest,
+      nowMs: NOW,
+      fetchImpl: async () => {
+        await Promise.resolve();
+
+        return new Response("bad signature", { status: 401 });
+      },
+    });
+
+    expect(failed).rejects.toThrow(/HTTP 401/u);
   });
 });
 
