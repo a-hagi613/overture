@@ -25,6 +25,7 @@ const planSchema = z.object({
   answers: z.array(answerSchema),
   consentVersion: z.string(),
   coverLetter: z.array(z.string()).nullable(),
+  hasGeneratedProse: z.boolean(),
   planSha256: z.string(),
   postingTitle: z.string(),
   postingUrl: z.string(),
@@ -71,6 +72,16 @@ export class ReadyApiError extends Error {
   }
 }
 
+interface ApprovePayload {
+  dwellMs?: number | undefined;
+  planSha256: string;
+}
+
+interface ApproveAllPayload {
+  dwellMs?: number | undefined;
+  items: { id: string; planSha256: string }[];
+}
+
 async function jsonFrom(response: Response) {
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
@@ -86,17 +97,34 @@ export async function fetchReady() {
   return readySchema.parse(await jsonFrom(await fetch("/api/ready")));
 }
 
-async function approveOne(input: { id: string; planSha256: string }) {
+async function approveOne(input: { dwellMs?: number | undefined; id: string; planSha256: string }) {
+  const payload: ApprovePayload = {
+    planSha256: input.planSha256,
+  };
+
+  if (input.dwellMs !== undefined) {
+    payload.dwellMs = input.dwellMs;
+  }
+
   return jsonFrom(
     await fetch(`/api/applications/${encodeURIComponent(input.id)}/approve`, {
-      body: JSON.stringify({ planSha256: input.planSha256 }),
+      body: JSON.stringify(payload),
       headers: { "content-type": "application/json" },
       method: "POST",
     }),
   );
 }
 
-async function approveAll(items: { id: string; planSha256: string }[]) {
+async function approveAll(input: {
+  dwellMs?: number | undefined;
+  items: { id: string; planSha256: string }[];
+}) {
+  const payload: ApproveAllPayload = { items: input.items };
+
+  if (input.dwellMs !== undefined) {
+    payload.dwellMs = input.dwellMs;
+  }
+
   const body = z
     .object({
       approved: z.array(
@@ -107,7 +135,7 @@ async function approveAll(items: { id: string; planSha256: string }[]) {
     .parse(
       await jsonFrom(
         await fetch("/api/ready/approve", {
-          body: JSON.stringify({ items }),
+          body: JSON.stringify(payload),
           headers: { "content-type": "application/json" },
           method: "POST",
         }),

@@ -78,6 +78,7 @@ interface CardSeed {
   score: number;
   approved: boolean;
   omitNotice?: boolean;
+  savedOnly?: boolean;
 }
 
 const cards: CardSeed[] = [
@@ -92,6 +93,7 @@ const cards: CardSeed[] = [
     approved: false,
     company: "Halden Systems",
     location: "Manchester, hybrid",
+    savedOnly: true,
     score: 81,
     title: "Site Reliability Engineer",
   },
@@ -195,6 +197,7 @@ async function seedAnswers(
   userId: string,
   company: string,
   title: string,
+  savedOnly: boolean,
 ) {
   const ids = await questionIds(request, userId, postingId);
   const onCallQuestion = ids.find((question) => question.text.startsWith("Are you comfortable"));
@@ -209,7 +212,7 @@ async function seedAnswers(
       applicationId,
       kind: "open_text",
       questionId: onCallQuestion.questionId,
-      sentences: [{ resumeLineIds: [], sentence: onCall }],
+      sentences: [{ byUser: savedOnly, resumeLineIds: [], sentence: onCall }],
     },
   });
 
@@ -220,6 +223,7 @@ async function seedAnswers(
       questionId: coverQuestion.questionId,
       sentences: [
         {
+          byUser: savedOnly,
           resumeLineIds: [],
           sentence: `Dear ${company} team, I am applying for the ${title} role. For the last four years I have built and run deploy pipelines for a payments team, and I would like to bring that work to your platform group.`,
         },
@@ -285,7 +289,15 @@ async function seedCard(request: APIRequestContext, userId: string, card: CardSe
     },
   });
 
-  await seedAnswers(request, applicationId, postingId, userId, card.company, card.title);
+  await seedAnswers(
+    request,
+    applicationId,
+    postingId,
+    userId,
+    card.company,
+    card.title,
+    card.savedOnly === true,
+  );
 
   return { applicationId, card };
 }
@@ -335,6 +347,8 @@ export async function seedReady(request: APIRequestContext, appServerUrl: string
       }
     }),
   );
+
+  return userId;
 }
 
 export async function readyStorageState(appServerUrl: string) {

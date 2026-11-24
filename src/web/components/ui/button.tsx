@@ -9,6 +9,7 @@ export interface ButtonProps extends VariantProps<typeof buttonVariants> {
   ariaBusy?: boolean;
   ariaControls?: string;
   ariaExpanded?: boolean;
+  ariaKeyshortcuts?: string;
   ariaLabel?: string | undefined;
   ariaPressed?: boolean;
   asChild?: boolean;
@@ -24,6 +25,7 @@ export function Button({
   ariaBusy,
   ariaControls,
   ariaExpanded,
+  ariaKeyshortcuts,
   ariaLabel,
   ariaPressed,
   asChild = false,
@@ -44,6 +46,7 @@ export function Button({
         aria-busy={ariaBusy || undefined}
         aria-controls={ariaControls}
         aria-expanded={ariaExpanded}
+        aria-keyshortcuts={ariaKeyshortcuts}
         aria-label={ariaLabel}
         aria-pressed={ariaPressed}
         className={classes}
@@ -60,6 +63,7 @@ export function Button({
         aria-busy={ariaBusy || undefined}
         aria-controls={ariaControls}
         aria-expanded={ariaExpanded}
+        aria-keyshortcuts={ariaKeyshortcuts}
         aria-label={ariaLabel}
         aria-pressed={ariaPressed}
         className={classes}
@@ -78,6 +82,7 @@ export function Button({
       aria-busy={ariaBusy || undefined}
       aria-controls={ariaControls}
       aria-expanded={ariaExpanded}
+      aria-keyshortcuts={ariaKeyshortcuts}
       aria-label={ariaLabel}
       aria-pressed={ariaPressed}
       className={classes}
