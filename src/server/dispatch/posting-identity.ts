@@ -1,7 +1,8 @@
 import type { Page } from "playwright-core";
 
 import type { ApplySupportedAts } from "../../shared/ats.ts";
-
+import { BATCH_4_ATS, isBatchFourAts } from "../../shared/ats.ts";
+import { isSameHostOrSubdomain } from "../../shared/host-match.ts";
 import { isFixtureHost } from "../../shared/live-service-hosts.ts";
 
 export interface PostingIdentity {
@@ -75,6 +76,36 @@ const APPLY_HOST_TOKENS: ReadonlySet<string> = new Set(["app", "apply", "careers
 const JOIN_HOST = /^(?:[a-z0-9-]+\.)?join\.com$/iu;
 
 const CLEARCOMPANY_HOST = /^(?:(?<token>[a-z0-9-]+)\.)?clearcompany\.com$/iu;
+
+const BATCH_4_DOMAINS: Partial<Record<ApplySupportedAts, string>> = {
+  applicantpro: "applicantpro.com",
+  catsone: "catsone.com",
+  gem: "gem.com",
+  hiringthing: "hiringthing.com",
+  isolved_hire: "isolvedhire.com",
+  onlyfy: "onlyfy.com",
+  rippling: "rippling.com",
+  varbi: "varbi.com",
+};
+
+const HOSTED_PATH_SUFFIXES: ReadonlySet<string> = new Set([
+  "apply",
+  "application",
+  "apply-now",
+  "apply_now",
+]);
+
+const batchFourDomain = (host: string) => {
+  for (const ats of BATCH_4_ATS) {
+    const domain = BATCH_4_DOMAINS[ats];
+
+    if (domain !== undefined && isSameHostOrSubdomain(host, domain)) {
+      return domain;
+    }
+  }
+
+  return null;
+};
 
 const personioToken = (host: string) =>
   PERSONIO_HOST.exec(host)?.groups?.["token"]?.toLowerCase() ?? null;
@@ -177,6 +208,17 @@ const sameHost = (ats: ApplySupportedAts, expected: string, live: string) => {
     const liveToken = manatalToken(live);
 
     return expectedToken !== null && liveToken !== null && expectedToken === liveToken;
+  }
+
+  if (isBatchFourAts(ats)) {
+    if (isFixtureHost(hostnameOf(expected)) && isFixtureHost(hostnameOf(live))) {
+      return true;
+    }
+
+    const expectedBoard = batchFourDomain(hostnameOf(expected));
+    const liveBoard = batchFourDomain(hostnameOf(live));
+
+    return expectedBoard !== null && liveBoard !== null && expectedBoard === liveBoard;
   }
 
   return ASHBY_BOARD_HOSTS.has(expected) && ASHBY_BOARD_HOSTS.has(live);
@@ -381,6 +423,19 @@ function boardTokenFrom(ats: ApplySupportedAts, url: URL, segments: readonly str
 }
 
 function postingPath(ats: ApplySupportedAts, url: URL) {
+  if (isBatchFourAts(ats)) {
+    const segments = pathSegments(url.pathname);
+
+    while (HOSTED_PATH_SUFFIXES.has((segments.at(-1) ?? "").toLowerCase())) {
+      segments.pop();
+    }
+
+    const jobId = segments.at(-1);
+    const [boardToken] = segments;
+
+    return jobId === undefined || boardToken === undefined ? null : { boardToken, jobId };
+  }
+
   if (ats === "personio") {
     const boardToken = personioToken(url.host.toLowerCase()) ?? "";
     const jobId = /^\/job\/(?<id>\d+)(?:\/apply)?\/?$/u.exec(url.pathname)?.groups?.["id"];
@@ -457,6 +512,56 @@ const mismatch: (reason: PostingIdentityMismatch) => PostingIdentityCheck = (rea
 
 const matched: PostingIdentityCheck = { ok: true };
 
+/**
+ * Compares a Batch 4 board's expected posting with the URL the page settled on. The board's host and the
+ * job id are required; a fixture host is exempt from the board-slug check, and the page title is never
+ * treated as the company because these boards do not print one in a fixed shape.
+ *
+ * @param expected The posting the approved plan was made for.
+ * @param liveUrl The URL the browser page is on.
+ * @returns The mismatch reason, or null when the page is the expected posting.
+ */
+export function batchFourIdentityProblem(expected: PostingIdentity, liveUrl: string) {
+  let live: URL;
+  let posting: URL;
+
+  try {
+    live = new URL(liveUrl);
+    posting = new URL(expected.url);
+  } catch {
+    return "unreadable" as const;
+  }
+
+  if (!sameHost(expected.ats, posting.host.toLowerCase(), live.host.toLowerCase())) {
+    return "host" as const;
+  }
+
+  const livePosting = postingPath(expected.ats, live);
+
+  if (livePosting === null) {
+    return "unreadable" as const;
+  }
+
+  if (livePosting.jobId !== expected.jobId) {
+    return "job_id" as const;
+  }
+
+  const expectedHost = hostnameOf(posting.host.toLowerCase());
+  const liveHost = hostnameOf(live.host.toLowerCase());
+
+  if (isFixtureHost(expectedHost) || isFixtureHost(liveHost)) {
+    return null;
+  }
+
+  const boardToken = normalizedCompany(expected.boardToken);
+
+  if (boardToken !== "" && !normalizedCompany(`${liveHost}${live.pathname}`).includes(boardToken)) {
+    return "board_token" as const;
+  }
+
+  return null;
+}
+
 export async function checkPostingIdentity(page: Page, expected: PostingIdentity) {
   let live: URL;
   let posting: URL;
@@ -466,6 +571,12 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
     posting = new URL(expected.url);
   } catch {
     return mismatch("unreadable");
+  }
+
+  if (isBatchFourAts(expected.ats)) {
+    const reason = batchFourIdentityProblem(expected, live.toString());
+
+    return reason === null ? matched : mismatch(reason);
   }
 
   if (!sameHost(expected.ats, posting.host.toLowerCase(), live.host.toLowerCase())) {

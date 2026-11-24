@@ -4,9 +4,8 @@
  * The registry is the approved Stapply no-login board set (issue #563): the five boards Overture already
  * applies to, Wave 1A's pure guest-apply boards, and Wave 1B's boards whose employer may gate the form
  * behind a login. A board's wave says where its feed came from; `applySupported` says whether Overture has
- * a deterministic apply adapter for it, which is the five shipped adapters plus the Wave 1A batches that
- * have shipped their form readers and browser adapters (issue #572 Batch 1, issue #571 Batch 2, issue #569
- * Batch 3).
+ * a deterministic apply adapter for it, which is the five shipped adapters plus every wave's batches that
+ * have shipped their form readers and browser adapters (issues #572, #571, #569 and #574).
  */
 export const SHIPPED_ATS = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
 
@@ -66,6 +65,18 @@ export const BATCH_3_ATS = [
   "pinpoint",
 ] as const;
 
+/** The Batch 4 Wave 1A and Wave 1B boards whose deterministic adapters ship in issue #574. */
+export const BATCH_4_ATS = [
+  "hiringthing",
+  "rippling",
+  "gem",
+  "isolved_hire",
+  "applicantpro",
+  "catsone",
+  "onlyfy",
+  "varbi",
+] as const;
+
 /** The apply-supported boards whose form plan is cached by signature (every board but Greenhouse). */
 export const PLAN_CACHE_ATS = [
   "lever",
@@ -75,6 +86,7 @@ export const PLAN_CACHE_ATS = [
   ...BATCH_1_ATS,
   ...BATCH_2_ATS,
   ...BATCH_3_ATS,
+  ...BATCH_4_ATS,
 ] as const;
 
 export const ATS_VALUES = [...SHIPPED_ATS, ...WAVE_1A_ATS, ...WAVE_1B_ATS] as const;
@@ -89,15 +101,7 @@ export type BatchTwoAts = (typeof BATCH_2_ATS)[number];
 
 export type BatchThreeAts = (typeof BATCH_3_ATS)[number];
 
-/** Every board with a deterministic apply adapter, in registry order. */
-export const APPLY_SUPPORTED_ATS = [
-  ...SHIPPED_ATS,
-  ...BATCH_1_ATS,
-  ...BATCH_2_ATS,
-  ...BATCH_3_ATS,
-] as const;
-
-export type ApplySupportedAts = (typeof APPLY_SUPPORTED_ATS)[number];
+export type BatchFourAts = (typeof BATCH_4_ATS)[number];
 
 export type AtsWave = "shipped" | "wave1a" | "wave1b";
 
@@ -128,22 +132,37 @@ export const ATS_REGISTRY = {
   clearcompany: { applySupported: true, wave: "wave1a" },
   join_com: { applySupported: true, wave: "wave1a" },
   pinpoint: { applySupported: true, wave: "wave1a" },
-  hiringthing: { applySupported: false, wave: "wave1a" },
-  rippling: { applySupported: false, wave: "wave1a" },
-  gem: { applySupported: false, wave: "wave1a" },
+  hiringthing: { applySupported: true, wave: "wave1a" },
+  rippling: { applySupported: true, wave: "wave1a" },
+  gem: { applySupported: true, wave: "wave1a" },
   paylocity: { applySupported: true, wave: "wave1b" },
-  isolved_hire: { applySupported: false, wave: "wave1b" },
-  applicantpro: { applySupported: false, wave: "wave1b" },
-  catsone: { applySupported: false, wave: "wave1b" },
-  onlyfy: { applySupported: false, wave: "wave1b" },
-  varbi: { applySupported: false, wave: "wave1b" },
+  isolved_hire: { applySupported: true, wave: "wave1b" },
+  applicantpro: { applySupported: true, wave: "wave1b" },
+  catsone: { applySupported: true, wave: "wave1b" },
+  onlyfy: { applySupported: true, wave: "wave1b" },
+  varbi: { applySupported: true, wave: "wave1b" },
 } as const satisfies Record<Ats, AtsRegistryEntry>;
 
 /**
+ * The ATS boards with a deterministic apply adapter: the five shipped boards and every batch that has
+ * shipped its form readers and browser adapters. Every other board's postings are ingest-only and never
+ * match a user.
+ */
+export const APPLY_SUPPORTED_ATS = [
+  ...SHIPPED_ATS,
+  ...BATCH_1_ATS,
+  ...BATCH_2_ATS,
+  ...BATCH_3_ATS,
+  ...BATCH_4_ATS,
+] as const;
+
+/** Every board with a deterministic apply adapter, in registry order. */
+export type ApplySupportedAts = (typeof APPLY_SUPPORTED_ATS)[number];
+
 /**
  * Whether Overture can apply to a board through a deterministic adapter.
  * @param ats The board's ATS value.
- * @returns True for the shipped adapters and every Wave 1A batch that has shipped.
+ * @returns True for the shipped adapters and every batch that has shipped.
  */
 export function isApplySupportedAts(ats: string): ats is ApplySupportedAts {
   return APPLY_SUPPORTED_ATS.some((candidate) => candidate === ats);
@@ -158,4 +177,14 @@ export function isApplySupportedAts(ats: string): ats is ApplySupportedAts {
  */
 export function isBatch1Ats(ats: string): ats is BatchOneAts {
   return BATCH_1_ATS.some((candidate) => candidate === ats);
+}
+
+/**
+ * Whether a board belongs to Batch 4, whose hosted forms share one reader and browser adapter.
+ *
+ * @param ats The board's ATS value.
+ * @returns True for Batch 4's boards.
+ */
+export function isBatchFourAts(ats: string): ats is BatchFourAts {
+  return BATCH_4_ATS.some((candidate) => candidate === ats);
 }

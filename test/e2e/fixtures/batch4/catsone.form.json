@@ -1,0 +1,54 @@
+[
+  {
+    "name": "Personal information",
+    "fields": [
+      {
+        "id": "first_name",
+        "label": "First name",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "last_name",
+        "label": "Last name",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "email",
+        "label": "Email",
+        "type": "email",
+        "required": true
+      },
+      {
+        "id": "phone",
+        "label": "Phone",
+        "type": "tel",
+        "required": false
+      },
+      {
+        "id": "resume",
+        "label": "Resume",
+        "type": "file",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "Questions",
+    "fields": [
+      {
+        "id": "sponsorship_required",
+        "label": "Will you now, or in the future, require visa sponsorship to legally work in the country where this role is based?",
+        "type": "radio",
+        "required": true
+      },
+      {
+        "id": "privacy_consent",
+        "label": "I agree to the privacy notice and the processing of my personal data.",
+        "type": "checkbox",
+        "required": true
+      }
+    ]
+  }
+]

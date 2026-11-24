@@ -68,7 +68,20 @@ interface Block {
   reason: string;
 }
 
-const DISPATCHABLE_ATS = ["greenhouse", "lever", "ashby", "workable"] as const;
+const DISPATCHABLE_ATS = [
+  "greenhouse",
+  "lever",
+  "ashby",
+  "workable",
+  "hiringthing",
+  "rippling",
+  "gem",
+  "isolved_hire",
+  "applicantpro",
+  "catsone",
+  "onlyfy",
+  "varbi",
+] as const;
 
 type DispatchAts = (typeof DISPATCHABLE_ATS)[number];
 

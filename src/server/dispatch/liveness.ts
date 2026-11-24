@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-import type { Ats, BoardRegion } from "../catalog/board-feed.ts";
+import type { Ats as RegistryAts } from "../../shared/ats.ts";
+import { isBatchFourAts } from "../../shared/ats.ts";
+import type { BoardRegion } from "../catalog/board-feed.ts";
 import type { Env } from "../config/env.ts";
 
 import { ASHBY_DEFAULT_BASE_URL } from "../catalog/ashby-feed.ts";
@@ -13,7 +15,7 @@ export const POSTING_LIVENESS = ["open", "closed", "unknown"] as const;
 export type PostingLiveness = (typeof POSTING_LIVENESS)[number];
 
 export interface LivenessTarget {
-  ats: Ats | "workable";
+  ats: RegistryAts | "workable";
   boardToken: string;
   region: BoardRegion;
   atsJobId: string;
@@ -135,6 +137,10 @@ export function createPostingLiveness(env: Env) {
     check: async (target) => {
       if (target.ats === "workable") {
         return "open";
+      }
+
+      if (target.ats === "personio" || isBatchFourAts(target.ats)) {
+        return "unknown";
       }
 
       if (target.ats === "greenhouse") {

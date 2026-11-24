@@ -210,6 +210,25 @@ export async function readFormQuestions(page: Page, config: BrowserFormConfig) {
               .trim();
       };
 
+      const groupLabelFor = (element: Element) => {
+        const fieldset = element.closest("fieldset");
+
+        if (fieldset === null || !root.contains(fieldset)) {
+          return "";
+        }
+
+        const legend = fieldset.querySelector("legend");
+
+        if (legend !== null) {
+          return legend.textContent
+            .replaceAll(/[*✱]/gu, "")
+            .replaceAll(/\s+/gu, " ")
+            .trim();
+        }
+
+        return "";
+      };
+
       const optionLabelFor = (element: Element) => {
         const wrapping = element.closest("label");
 
@@ -299,7 +318,7 @@ export async function readFormQuestions(page: Page, config: BrowserFormConfig) {
           questions.push({
             fieldName,
             fieldType: "radio",
-            label,
+            label: groupLabelFor(element) || label,
             options: radios.map((radio) => optionLabelFor(radio)),
             required,
           });
@@ -317,7 +336,7 @@ export async function readFormQuestions(page: Page, config: BrowserFormConfig) {
           questions.push({
             fieldName,
             fieldType: "multiselect",
-            label,
+            label: groupLabelFor(element) || label,
             options: boxes.map((box) => optionLabelFor(box)),
             required,
           });

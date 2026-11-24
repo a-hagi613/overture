@@ -27,6 +27,23 @@ import { readManatalQuestions } from "../dispatch/ats/manatal.ts";
 import { readCareerplugQuestions } from "../dispatch/ats/careerplug.ts";
 import { readJazzhrQuestions } from "../dispatch/ats/jazzhr.ts";
 import { APPLY_SUPPORTED_ATS } from "../../shared/ats.ts";
+import {
+  readHiringthingQuestions,
+  HIRINGTHING_FORM_SELECTOR,
+} from "../dispatch/ats/hiringthing.ts";
+import { readRipplingQuestions, RIPPLING_FORM_SELECTOR } from "../dispatch/ats/rippling.ts";
+import { readGemQuestions, GEM_FORM_SELECTOR } from "../dispatch/ats/gem.ts";
+import {
+  readIsolvedHireQuestions,
+  ISOLVED_HIRE_FORM_SELECTOR,
+} from "../dispatch/ats/isolved-hire.ts";
+import {
+  readApplicantProQuestions,
+  APPLICANTPRO_FORM_SELECTOR,
+} from "../dispatch/ats/applicantpro.ts";
+import { readCatsoneQuestions, CATSONE_FORM_SELECTOR } from "../dispatch/ats/catsone.ts";
+import { readOnlyfyQuestions, ONLYFY_FORM_SELECTOR } from "../dispatch/ats/onlyfy.ts";
+import { readVarbiQuestions, VARBI_FORM_SELECTOR } from "../dispatch/ats/varbi.ts";
 import type { LoginWallEvidence } from "../pipeline/login-wall.ts";
 import { detectLoginWall } from "../pipeline/login-wall.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
@@ -67,6 +84,14 @@ export const FORM_FIELD_SELECTORS = {
   manatal: "form#application-form input:not([type='hidden'])",
   careerplug: "form#new_application input:not([type='hidden'])",
   jazzhr: "form#application-form input:not([type='hidden'])",
+  hiringthing: `${HIRINGTHING_FORM_SELECTOR} input:not([type='hidden'])`,
+  rippling: `${RIPPLING_FORM_SELECTOR} input:not([type='hidden'])`,
+  gem: `${GEM_FORM_SELECTOR} input:not([type='hidden'])`,
+  isolved_hire: `${ISOLVED_HIRE_FORM_SELECTOR} input:not([type='hidden'])`,
+  applicantpro: `${APPLICANTPRO_FORM_SELECTOR} input:not([type='hidden'])`,
+  catsone: `${CATSONE_FORM_SELECTOR} input:not([type='hidden'])`,
+  onlyfy: `${ONLYFY_FORM_SELECTOR} input:not([type='hidden'])`,
+  varbi: `${VARBI_FORM_SELECTOR} input:not([type='hidden'])`,
 } as const satisfies Record<FixtureAts, string>;
 
 export const FORM_RENDER_TIMEOUT_MS = 20_000;
@@ -336,6 +361,38 @@ async function questionsFor(ats: FixtureAts, page: Page) {
 
   if (ats === "jazzhr") {
     return readJazzhrQuestions(page);
+  }
+
+  if (ats === "hiringthing") {
+    return readHiringthingQuestions(page);
+  }
+
+  if (ats === "rippling") {
+    return readRipplingQuestions(page);
+  }
+
+  if (ats === "gem") {
+    return readGemQuestions(page);
+  }
+
+  if (ats === "isolved_hire") {
+    return readIsolvedHireQuestions(page);
+  }
+
+  if (ats === "applicantpro") {
+    return readApplicantProQuestions(page);
+  }
+
+  if (ats === "catsone") {
+    return readCatsoneQuestions(page);
+  }
+
+  if (ats === "onlyfy") {
+    return readOnlyfyQuestions(page);
+  }
+
+  if (ats === "varbi") {
+    return readVarbiQuestions(page);
   }
 
   return readAshbyQuestions(page);

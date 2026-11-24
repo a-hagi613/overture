@@ -4,13 +4,15 @@ import { z } from "zod";
 
 import type { FormQuestion } from "./send-plan.ts";
 import type { QuestionFieldType } from "../../shared/questions.ts";
-import type { BatchOneAts, BatchThreeAts, BatchTwoAts } from "../../shared/ats.ts";
+import type { BatchFourAts, BatchOneAts, BatchThreeAts, BatchTwoAts } from "../../shared/ats.ts";
+import { isBatchFourAts } from "../../shared/ats.ts";
 
 import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
 import { LEVER_FIELD_TYPES, LEVER_SKIP_NAMES } from "../dispatch/ats/lever.ts";
 import { assertNoLiveTraffic, LiveServiceRequestError } from "../platform/outbound-guard.ts";
 import type { LoginWallFormRead } from "./login-wall.ts";
 import { detectLoginWall } from "./login-wall.ts";
+import { readBatch4FormHtml } from "./batch4-forms.ts";
 import { readBreezyFormHtml } from "./breezy-form.ts";
 import { personioApplyUrl, readPersonioFormHtml } from "./personio-form.ts";
 import {
@@ -53,6 +55,7 @@ export const FORM_READ_PATHS = [
   "manatal_html",
   "careerplug_html",
   "jazzhr_html",
+  "batch4_html",
   "browser",
 ] as const;
 
@@ -87,7 +90,8 @@ export type FormReadAts =
   | "personio"
   | BatchOneAts
   | BatchTwoAts
-  | BatchThreeAts;
+  | BatchThreeAts
+  | BatchFourAts;
 
 export interface FormReadTarget {
   ats: FormReadAts;
@@ -972,6 +976,10 @@ export function createPlainFormReader(
     return htmlPageRead(url, response, async (html) => readHostedFormHtml(ats, html));
   }
 
+  async function batch4(input: FormReadTarget) {
+    return await fetchFormPage(input.applyUrl ?? input.url, readBatch4FormHtml);
+  }
+
   return {
     async read(input: FormReadTarget) {
       try {
@@ -1029,6 +1037,10 @@ export function createPlainFormReader(
 
         if (input.ats === "join_com") {
           return await joinCom(input);
+        }
+
+        if (isBatchFourAts(input.ats)) {
+          return await batch4(input);
         }
 
         return await pinpoint(input);

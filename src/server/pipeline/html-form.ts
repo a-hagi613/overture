@@ -22,7 +22,8 @@ export type HtmlFormPath =
   | "softgarden_html"
   | "clearcompany_html"
   | "join_com_html"
-  | "pinpoint_html";
+  | "pinpoint_html"
+  | "batch4_html";
 
 export interface HtmlFormReadOptions<P extends HtmlFormPath = HtmlFormPath> {
   /** The path recorded beside the questions, and the prefix of the form signature. */
