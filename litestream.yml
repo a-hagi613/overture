@@ -1,3 +1,7 @@
+# The app drains on SIGTERM for KILL_TIMEOUT_MS (240 s) and exits 0; Litestream forwards that signal to its
+# -exec child, and this ceiling bounds the whole shutdown, so 280 s covers the drain, the telemetry flush and the
+# SQLite close, plus a final WAL sync to R2, all inside Fly's 300 s kill_timeout.
+shutdown-timeout: 280s
 snapshot:
   interval: 24h
   retention: 720h
@@ -13,6 +17,13 @@ l0-retention-check-interval: 5m
 # Never add it here.
 dbs:
   - path: /data/app.sqlite
+    # The app opens app.sqlite with PRAGMA wal_autocheckpoint = 0, so SQLite never checkpoints on a writer's own
+    # commit and Litestream is the only checkpoint owner. These explicit defaults keep the WAL bounded: a PASSIVE
+    # checkpoint every minute (time-based) and one at ~1000 pages (~4 MB), plus the blocking TRUNCATE backstop at
+    # ~121k pages (~500 MB). journal_size_limit (64 MB) in the app caps the WAL file when SQLite resets the log at a
+    # checkpoint.
+    checkpoint-interval: 1m
+    min-checkpoint-page-count: 1000
     replicas:
       - type: s3
         endpoint: https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com

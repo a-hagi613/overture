@@ -87,14 +87,19 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 - One Fly app, one machine, one volume. `fly scale count` stays 1. Machine: `shared-cpu-2x`, 2 GB; volume 10 GB.
   No runner app: browsers are remote.
 - Same origin for API and SPA. `admin.tryoverture.com` is the same process, routed by host, behind Cloudflare Access.
-- Deploys cause ~10–30 s downtime; `kill_timeout = 300` (Fly's maximum) and Litestream's `-exec` wrapper are the
-  two clocks that matter. Litestream gives its child 30 s after the signal before it logs `shutdown timed out after
-  30s` and SIGKILLs it, so the app's own graceful budget (`KILL_TIMEOUT_MS`, 20 s) is deliberately shorter: on
-  `SIGINT`/`SIGTERM` it stops accepting, ends every open `/api/events` stream, waits for in-flight jobs, requeues
-  them, logs `shutdown: stopped in <ms>` and exits 0, with a SIGKILL backstop one second past the budget. A send
-  that has not reached `submit_clicked_at` stops, releases and is rescheduled as `interrupted`, which does not use
-  one of its two tries; a send past it waits for its confirmation signal. Anything still open at exit is recovered
-  by lease expiry (§9.4).
+- Deploys cause ~10–30 s downtime; `kill_signal = "SIGTERM"`, `kill_timeout = 300` (Fly's maximum) and Litestream's
+  `-exec` wrapper are the two clocks that matter. Litestream's own `shutdown-timeout` is 280 s: it forwards the signal
+  to the Bun server, waits for it to exit, then bounds its final WAL sync to R2. The app's graceful budget
+  (`KILL_TIMEOUT_MS`, 240 s) fits inside that, leaving Fly ~60 s for Litestream. On `SIGINT`/`SIGTERM` it stops
+  claiming new jobs, stops accepting, ends every open `/api/events` stream, waits for in-flight jobs, requeues what
+  is left, flushes OTel, closes both SQLite handles, logs `shutdown: stopped in <ms>` and exits 0, with a SIGKILL
+  backstop one second past the budget. An active browser send is drained rather than aborted: its browser stays open
+  until the budget runs out, so a 60–180 s submission can finish and commit its ledger state. A send waiting for a
+  pasted or mailed verification code does not wait for the budget: the shutdown stops the paste route and the claim
+  of `mail.ingest`, so that wait ends at once and the send is released as `interrupted` (no attempt used) instead of
+  holding the machine for an input that cannot arrive. A send that has not reached `submit_clicked_at` when it stops
+  is rescheduled; a send past it waits for its confirmation signal. Anything still open at exit is recovered by
+  lease expiry (§9.4).
 - After a restart the job worker stays quiet for `JOBS_STARTUP_SETTLE_MS` (5 s): the startup enqueues otherwise wake
   it in the same second the port opens and the new machine's first health checks compete with a full batch of jobs.
   Nothing is dropped; the queued work starts a few seconds later. `JOBS_AUTORUN=false` (test-only; refused in
@@ -118,10 +123,18 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
   leaving the machine.
 - Litestream replicates `app.sqlite` continuously to R2 `overture-backups`; a nightly snapshot is kept 30 days; a
   restore drill runs in CI weekly against a throwaway machine, checks the restored file read-only and never starts
-  the app server or any scheduler, worker or outbound client (issue #412). `catalog.sqlite` is excluded from
-  `litestream.yml` (ADR 0036): it is public, rebuildable feed data, and streaming it every second would cost more
-  than it protects. A missing or deleted catalog file is normal startup work and is repopulated by the seed and
-  board feeds.
+  the app server or any scheduler, worker or outbound client (issue #412). When Litestream owns the file
+  (`LITESTREAM_OWNS_CHECKPOINTS=true`, set by `scripts/docker-entrypoint.sh` only on its `litestream replicate -exec`
+  path), `app.sqlite` opens with `PRAGMA wal_autocheckpoint = 0`: the app never checkpoints on a writer's commit, and
+  Litestream is the only checkpoint owner (PASSIVE every minute and at ~1000 pages, a blocking TRUNCATE backstop at
+  ~121k pages), while the app's `journal_size_limit = 64 MB` caps the WAL file when SQLite resets the log at a
+  checkpoint. A failed replica sync also defers Litestream's checkpoint, so an R2 outage grows the WAL until
+  replication recovers; the volume alerts (§16.5) surface it. `bun run dev`, `bun run start` and a
+  `LITESTREAM_ENABLED=false` image run `main.ts` without a replicator, so they keep SQLite's automatic checkpoint
+  (1000 pages) and cannot grow the WAL. `catalog.sqlite` is excluded from `litestream.yml` (ADR 0036): it is public,
+  rebuildable feed data, and streaming it every second would cost more than it protects. It keeps SQLite's automatic
+  checkpoint because nothing else watches that file. A missing or deleted catalog file is normal startup work and is
+  repopulated by the seed and board feeds.
 - The catalog tables live in `/data/catalog.sqlite` on the same volume, in their own `drizzle-catalog/` migrations,
   with `synchronous=NORMAL`. The two files share no foreign key and never share a transaction: a sweep that closes
   Postings returns those ids and the application process skips their unsent Applications afterwards. This keeps the
@@ -204,7 +217,7 @@ Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both
 |---|---|
 | Runtime | Bun 1.4.5 (pinned in `package.json`, CI and the Dockerfile), strict TypeScript (`bun check` for typecheck) |
 | HTTP | Hono + `@hono/zod-validator`; Zod on every input, webhook and env var |
-| DB | Two SQLite files (ADR 0036): `/data/app.sqlite` for user and job-queue data (WAL, `synchronous=FULL`, Litestream) and `/data/catalog.sqlite` for the public job catalog (WAL, `synchronous=NORMAL`, not replicated), both `foreign_keys=ON` and STRICT; Drizzle ORM + drizzle-kit with `drizzle/` and `drizzle-catalog/` migrations; no SQLite-only SQL outside `server/platform/search` |
+| DB | Two SQLite files (ADR 0036): `/data/app.sqlite` for user and job-queue data (WAL, `synchronous=FULL`, Litestream; `wal_autocheckpoint=0` only while the container runs it, so Litestream owns the checkpoints) and `/data/catalog.sqlite` for the public job catalog (WAL, `synchronous=NORMAL`, SQLite's own checkpointing, not replicated), both `foreign_keys=ON` and STRICT; Drizzle ORM + drizzle-kit with `drizzle/` and `drizzle-catalog/` migrations; no SQLite-only SQL outside `server/platform/search` |
 | Auth | better-auth (Google, LinkedIn OIDC and magic link; no passwords, ADR 0035; passkey for admin) with Drizzle adapter |
 | Web | Vite 8, React 19, React Router 8 (library mode, Zod-typed search params), TanStack Query, `fetch` + Zod response schemas, Tailwind v4, shadcn/ui, 21st.dev, dnd-kit, lucide |
 | Browser control | `playwright-core` `chromium.connectOverCDP` |
@@ -1451,7 +1464,9 @@ body, sender or attachment, so the admin never sees message content.
   encrypted under a random per-export key that the server generates and wraps under the user's data key. The key is
   never stored in plaintext or logged; it reaches the page only with the download link (in its fragment), and the page
   decrypts the archive in the browser. The link is valid 24 h; then the archive is deleted, and a new request replaces a
-  ready one. Built in the background one page of rows at a time, so its memory does not grow with the mailbox.
+  ready one. Built in the background one page of rows at a time, so its memory does not grow with the mailbox, and
+  each page is its own short read statement — no transaction stays open across a page boundary, so the export never
+  pins a WAL snapshot while the app keeps writing.
 - Logs/traces never contain names, emails, phone numbers, answers, letters or mail content; a redaction processor in
   the OTel pipeline drops attributes outside an allowlist and strips a URL's query string and fragment.
 
@@ -1662,7 +1677,7 @@ publishing version 2 leaves version 1 and an already sent Snapshot on version 1 
 
 Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038).
 
-### 16.2 Unit tests (seventy-eight files, `bun:test`, beside their code)
+### 16.2 Unit tests (eighty-one files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1693,6 +1708,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/dispatch/outcomes.test.ts` | a Confirming Application is charged only by the one unambiguous receipt; a replayed message never commits a second credit (#413) |
 | `src/server/dispatch/planner.test.ts` | window, spacing, DST |
 | `src/server/dispatch/report.test.ts` | completion and cost divide distinct attempted Applications, so a retry counts once (#417) |
+| `src/server/export/archive.test.ts` | the account export reads each page in its own statement, so a commit between pages is visible and no read transaction holds a WAL snapshot across the boundary (#579) |
 | `src/server/fixtures/sanitise.test.ts` | a recorded page carries no script, event handler, personal data or token |
 | `src/server/inbox/linked-mail.test.ts` | an Application's linked mail is read in one query rather than one per message (#430) |
 | `src/server/inbox/threads.test.ts` | the Inbox Thread list reads its messages in one query rather than one per Thread, a page walks every Thread once even when timestamps tie, and the counts stay over every Thread rather than the page (#430, #506) |
@@ -1713,7 +1729,8 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/admin/support.test.ts` | the Support Queue lists newest-first with messages opened through the person's key (an unreadable message stays listed), the open count never counts a settled ticket, `PATCH` stamps `resolvedAt` once and clears it on reopen while writing `support.update` in the same transaction, and a reply mails the author with `[Ref: …]` and writes `support.reply` only when the send succeeded (_#513_) |
 | `src/server/platform/audit/index.test.ts` | admin audit filtering avoids wildcard injection and composite timestamp-id cursors paginate deterministically across tied timestamps (#517) |
 | `src/server/platform/crypto.test.ts` | wrap/unwrap, AAD, shred |
-| `src/server/platform/db/catalog-split.test.ts` | `litestream.yml` replicates only `/data/app.sqlite`, a catalog write transaction never holds `app.sqlite`'s write lock, deleting and recreating `catalog.sqlite` leaves every user and Application row intact, and a closed Posting a crashed sweep never reported is still reconciled (#423) |
+| `src/server/platform/db/catalog-split.test.ts` | `litestream.yml` replicates only `/data/app.sqlite`, a catalog write transaction never holds `app.sqlite`'s write lock, deleting and recreating `catalog.sqlite` leaves every user and Application row intact, and a closed Posting a crashed sweep never reported is still reconciled (#423); Litestream owns the WAL checkpoints and the shutdown clocks nest app budget < Litestream shutdown < Fly kill timeout (#579) |
+| `src/server/platform/db/client.test.ts` | `app.sqlite` opens WAL with `synchronous=FULL`, keeps SQLite's automatic checkpoint when nothing replicates it (dev, `bun run start`, `LITESTREAM_ENABLED=false`) and sets `wal_autocheckpoint=0` only when the entrypoint hands checkpoints to Litestream, while the unreplicated `catalog.sqlite` always keeps SQLite's checkpoint (#579) |
 | `src/server/platform/db/hot-path-indexes.test.ts` | the SSE catch-up, event retention, message-by-person, application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`, `messages_user_created`, `applications_user_status` and `grants_user_starts` (#506) |
 | `src/server/platform/db/migration-snapshot.test.ts` | migration `0056_snapshot_decouple` backfills the copied display fields onto every existing Application, including readable placeholders when the catalog row is already gone, and leaves `applications`, `matches`, `posting_user_state` and `skip_companies` with no foreign key into `postings` or `companies` (#422) |
 | `src/server/platform/db/restore-check.test.ts` | the restored-database check reads only, refuses outbound calls and leaves `bg_jobs` untouched (#412) |

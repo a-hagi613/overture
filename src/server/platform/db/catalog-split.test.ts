@@ -181,6 +181,32 @@ describe("the catalog split", () => {
     expect(config).not.toMatch(/^\s*-\s*path:\s*\S*catalog\.sqlite\s*$/mu);
   });
 
+  test("Litestream owns the WAL checkpoints and the shutdown clocks nest", () => {
+    const litestream = readFileSync("litestream.yml", "utf8");
+    const fly = readFileSync("fly.toml", "utf8");
+    const env = readFileSync("src/server/config/env.ts", "utf8");
+
+    const appBudgetText =
+      /KILL_TIMEOUT_MS:[\s\S]*?default\((?<milliseconds>\d[\d_]*)\)/u.exec(env)?.groups
+        ?.milliseconds ?? "";
+
+    const appBudgetMs = Number(appBudgetText.replaceAll("_", ""));
+
+    const litestreamShutdownSeconds = Number(
+      /^shutdown-timeout:\s*(?<seconds>\d+)s$/mu.exec(litestream)?.groups?.seconds ?? "",
+    );
+
+    const flyKillTimeoutSeconds = Number(
+      /^kill_timeout\s*=\s*(?<seconds>\d+)$/mu.exec(fly)?.groups?.seconds ?? "",
+    );
+
+    expect(litestream).toMatch(/^\s*checkpoint-interval:\s*1m$/mu);
+    expect(litestream).toMatch(/^\s*min-checkpoint-page-count:\s*1000$/mu);
+    expect(appBudgetMs).toBe(240_000);
+    expect(litestreamShutdownSeconds * 1000).toBeGreaterThan(appBudgetMs);
+    expect(flyKillTimeoutSeconds * 1000).toBeGreaterThan(litestreamShutdownSeconds * 1000);
+  });
+
   test("a heavy catalog write transaction never holds the application database's write lock", () => {
     const { app, catalog, catalogPath } = scratchDatabase();
 

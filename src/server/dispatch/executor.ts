@@ -101,6 +101,7 @@ export interface DispatcherDeps {
   appOrigin: string;
   proxyCountry: string;
   signal?: AbortSignal;
+  codeWaitSignal?: AbortSignal;
 }
 
 type AttemptRow = typeof attempts.$inferSelect;
@@ -203,6 +204,18 @@ function nextSendSlot(db: AppDatabase, userId: string, earliest: number) {
   return nextSlotInWindow(earliest, timezone, sendWindow(db));
 }
 
+function combineSignals(first?: AbortSignal, second?: AbortSignal) {
+  if (first === undefined) {
+    return second;
+  }
+
+  if (second === undefined) {
+    return first;
+  }
+
+  return AbortSignal.any([first, second]);
+}
+
 export function createDispatcher(deps: DispatcherDeps) {
   const {
     db,
@@ -219,6 +232,8 @@ export function createDispatcher(deps: DispatcherDeps) {
     proxyCountry,
     signal,
   } = deps;
+
+  const codeWaitSignal = combineSignals(signal, deps.codeWaitSignal);
 
   const activeAttempts = new Set<string>();
 
@@ -614,8 +629,13 @@ export function createDispatcher(deps: DispatcherDeps) {
     let usage = zeroUsage;
     let outcome: AttemptRow["outcome"] = "provider_error";
     let shutdownActive = false;
+    let codeWaitCancelled = codeWaitSignal?.aborted ?? false;
 
     const isShuttingDown = () => shutdownActive;
+
+    const markCodeWaitCancelled = () => {
+      codeWaitCancelled = true;
+    };
 
     const closeOnAbort = () => {
       shutdownActive = true;
@@ -636,6 +656,7 @@ export function createDispatcher(deps: DispatcherDeps) {
     };
 
     signal?.addEventListener("abort", closeOnAbort, { once: true });
+    codeWaitSignal?.addEventListener("abort", markCodeWaitCancelled, { once: true });
 
     try {
       const approved = await openApprovedPlan({
@@ -763,7 +784,7 @@ export function createDispatcher(deps: DispatcherDeps) {
               },
               waitId: wait.id,
             },
-            signal === undefined ? {} : { signal },
+            codeWaitSignal === undefined ? {} : { signal: codeWaitSignal },
           );
 
           if (resolved === null) {
@@ -958,6 +979,10 @@ export function createDispatcher(deps: DispatcherDeps) {
 
           announce(applicationId, claimed.userId, "confirming");
           updateAttempt(attemptId, { endedAt: clock.now(), outcome: outcomeOf(run.outcome) });
+        } else if (codeWaitCancelled) {
+          releaseAttempt(applicationId, claimed.userId, attemptId);
+          requestInterrupt(applicationId, claimed.userId, clock.now());
+          updateAttempt(attemptId, { endedAt: clock.now(), outcome: "interrupted" });
         } else {
           const preflight = "preflight" in run ? (run.preflight ?? []) : [];
 
@@ -1021,6 +1046,7 @@ export function createDispatcher(deps: DispatcherDeps) {
       }
     } finally {
       signal?.removeEventListener("abort", closeOnAbort);
+      codeWaitSignal?.removeEventListener("abort", markCodeWaitCancelled);
       activeAttempts.delete(attemptId);
 
       if (browser !== null) {

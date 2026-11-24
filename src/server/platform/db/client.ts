@@ -49,7 +49,10 @@ function tuneWorkingMemory(sqlite: Database) {
   sqlite.run("PRAGMA journal_size_limit = 67108864;");
 }
 
-export function openDatabase(path: string, options: { logger?: QueryLogger } = {}) {
+export function openDatabase(
+  path: string,
+  options: { logger?: QueryLogger; checkpointOwner?: "litestream" | "sqlite" } = {},
+) {
   if (path !== ":memory:") {
     mkdirSync(dirname(path), { recursive: true });
   }
@@ -60,6 +63,11 @@ export function openDatabase(path: string, options: { logger?: QueryLogger } = {
   sqlite.run("PRAGMA synchronous = FULL;");
   sqlite.run("PRAGMA foreign_keys = ON;");
   sqlite.run("PRAGMA busy_timeout = 5000;");
+
+  if (options.checkpointOwner === "litestream") {
+    sqlite.run("PRAGMA wal_autocheckpoint = 0;");
+  }
+
   tuneWorkingMemory(sqlite);
 
   const db = drizzle(sqlite, options.logger === undefined ? {} : { logger: options.logger });
