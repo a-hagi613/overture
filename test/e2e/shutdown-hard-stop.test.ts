@@ -36,10 +36,10 @@ test("an open event stream and a telemetry flush that never settles cannot hold 
   }
 });
 
-test("an open event stream does not hold shutdown past the default budget", async ({
+test("an open event stream does not hold shutdown past the drain budget", async ({
   identityServer,
 }) => {
-  const server = await startFreshAppServer(identityServer, { KILL_TIMEOUT_MS: "" });
+  const server = await startFreshAppServer(identityServer, { KILL_TIMEOUT_MS: "3000" });
   const session = await ownerSseSession(server.url);
 
   try {

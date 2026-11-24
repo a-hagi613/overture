@@ -15,7 +15,10 @@ import type { BoardFeeds } from "./board-feed.ts";
 import type { SweepDeps } from "./sweep-run.ts";
 import type { SweepRunKind, SweepWorkerResponse } from "./sweep-worker-protocol.ts";
 
-const { db } = openDatabase(databasePath);
+const { db } = openDatabase(databasePath, {
+  checkpointOwner: env.LITESTREAM_OWNS_CHECKPOINTS ? "litestream" : "sqlite",
+});
+
 const { db: catalogDb } = openCatalogDatabase(catalogDatabasePath);
 
 if (env.NODE_ENV !== "production") {

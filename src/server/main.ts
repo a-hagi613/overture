@@ -17,6 +17,7 @@ import { catalogDatabasePath, databasePath, env, labBaseUrl, masterKeyring } fro
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { MailCapExceededError } from "./platform/mail/errors.ts";
 import { createPayments } from "./billing/index.ts";
+import { grantApplications } from "./billing/ledger.ts";
 import {
   ensureGrantExpiryQueued,
   GRANT_EXPIRY_JOB_KIND,
@@ -207,7 +208,10 @@ const sdk = startTelemetry({
   simpleExport: env.OTEL_SIMPLE_EXPORT,
 });
 
-const { db, sqlite: appSqlite } = openDatabase(databasePath);
+const { db, sqlite: appSqlite } = openDatabase(databasePath, {
+  checkpointOwner: env.LITESTREAM_OWNS_CHECKPOINTS ? "litestream" : "sqlite",
+});
+
 const { db: catalogDb, sqlite: catalogSqlite } = openCatalogDatabase(catalogDatabasePath);
 
 createEventLoopLagMonitor({
@@ -262,6 +266,7 @@ const random = createRandom();
 installProcessGuards(db, clock);
 
 const shutdownController = new AbortController();
+const activeAttemptController = new AbortController();
 const backups = createBackupMonitor(db, clock);
 
 void backups.run(shutdownController.signal);
@@ -580,6 +585,12 @@ const billingNoticeJobHandlers: JobHandlers = {
 
 const retriedTestJobs = new Set<string>();
 
+const slowLedgerPayloadSchema = z.object({
+  delayMs: z.number().int().min(0),
+  quantity: z.number().int().min(1),
+  userId: z.string().min(1),
+});
+
 const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
   ? {
       "test.ping": async (payload) => {
@@ -613,6 +624,20 @@ const testJobHandlers: JobHandlers = env.ENABLE_TEST_ROUTES
         const { waitForBlockingRelease } = await import("./testing/blocking-job.ts");
 
         await waitForBlockingRelease(payload);
+      },
+      "test.slow-ledger": async (payload) => {
+        const { delayMs, quantity, userId } = slowLedgerPayloadSchema.parse(JSON.parse(payload));
+
+        await Bun.sleep(delayMs);
+
+        grantApplications(db, clock, {
+          expiresAt: null,
+          idempotencyKey: `test-slow-ledger:${userId}`,
+          quantity,
+          source: "admin",
+          startsAt: clock.now(),
+          userId,
+        });
       },
     }
   : {};
@@ -754,7 +779,8 @@ const activeDispatcher =
         providers: browserProviders,
         proxyCountry: env.BROWSER_PROXY_COUNTRY,
         resumes,
-        signal: shutdownController.signal,
+        signal: activeAttemptController.signal,
+        codeWaitSignal: shutdownController.signal,
       });
 
 const dispatchTick =
@@ -1051,6 +1077,7 @@ const app = createApp({
 const SERVER_IDLE_TIMEOUT_ABOVE_SSE_HEARTBEAT_SECONDS = 60;
 const SHUTDOWN_QUIET_GRACE_MS = 2000;
 const SHUTDOWN_HARD_EXIT_GRACE_MS = 1000;
+const SHUTDOWN_FLUSH_RESERVE_MS = 10_000;
 
 const server = Bun.serve({
   port: env.PORT,
@@ -1072,7 +1099,7 @@ async function quietGrace(budgetMs: number) {
   const graceMs = Math.min(SHUTDOWN_QUIET_GRACE_MS, Math.max(50, Math.floor(budgetMs / 4)));
 
   await new Promise<void>((resolve) => {
-    setTimeout(resolve, graceMs).unref();
+    setTimeout(resolve, graceMs);
   });
 }
 
@@ -1087,6 +1114,8 @@ function handleShutdown(signal: string) {
 
   const startedAt = performance.now();
   const budgetMs = env.KILL_TIMEOUT_MS;
+  const flushReserveMs = Math.min(SHUTDOWN_FLUSH_RESERVE_MS, Math.floor(budgetMs / 10));
+  const drainDeadline = startedAt + Math.max(0, budgetMs - flushReserveMs);
 
   logInfo("shutdown", `${signal}: draining with a ${String(budgetMs)} ms budget`);
 
@@ -1103,12 +1132,15 @@ function handleShutdown(signal: string) {
     try {
       await Promise.race([server.stop(false), quietGrace(budgetMs)]);
       await server.stop(true);
-      await worker?.drain(Math.max(0, budgetMs - (performance.now() - startedAt)));
+      await worker?.drain(Math.max(0, drainDeadline - performance.now()));
       catalogWorker.stop();
     } catch (error) {
       logError("shutdown", error);
     } finally {
-      await Promise.race([stopTelemetry(), quietGrace(budgetMs)]);
+      activeAttemptController.abort();
+
+      await quietGrace(flushReserveMs);
+      await Promise.race([stopTelemetry(), quietGrace(flushReserveMs)]);
 
       try {
         appSqlite.close();

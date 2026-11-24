@@ -16,7 +16,7 @@ to Fly), against names only.
 | `scripts/docker-entrypoint.sh` | On start: Litestream restores `/data/app.sqlite` from the replica if it does not exist, then runs `litestream replicate -exec "bun run /app/src/server/main.ts"`; migrations run inside `main.ts`. With `LITESTREAM_RESTORE_ONLY=true` it restores, runs the read-only restored-database check and never starts `main.ts`. With `VACUUM_ONLY=true` it compacts the application database instead, with Litestream and the server stopped |
 | `litestream.yml` | Continuous replication (1 s sync) to R2 `overture-backups`, nightly snapshot (`interval: 24h`) kept 30 days (`retention: 720h`); the L0 retention check runs every 5 minutes so its ListObjects cost stays bounded (#281) |
 | Deleted accounts in backups | The 35-day lifecycle on `overture-backups` (`app.sqlite/`) and the 30-day snapshot retention are the replay window for an erased account: only keyless ciphertext can come back, because `user_keys` is destroyed first (SPEC §13.2). R2 object deletes are not part of a replay |
-| `fly.toml` | App `overture-web`, region `yyz`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health`; `PUBLIC_SIGNUP_ENABLED = "false"` keeps production invite-only (owner, invited and verified users, and the demo account) until M3 public sign-up ships, while `DEMO_LOGIN_ENABLED = "true"` keeps the demo account |
+| `fly.toml` | App `overture-web`, region `yyz`, `kill_signal = "SIGTERM"`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health`; `PUBLIC_SIGNUP_ENABLED = "false"` keeps production invite-only (owner, invited and verified users, and the demo account) until M3 public sign-up ships, while `DEMO_LOGIN_ENABLED = "true"` keeps the demo account |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
@@ -810,24 +810,56 @@ request, a log or a test fixture. The two scripts print counts and keys only, ne
 
 ## Restarts, shutdown and the health check
 
-Two clocks bound a deploy. Fly stops a machine after `kill_timeout = 300`, but the container's main process is
-Litestream, and Litestream's `replicate -exec` gives its child — the Bun server — 30 s after the signal before it logs
-`Error: shutdown timed out after 30s: context deadline exceeded`, SIGKILLs the child and exits 1. The server's own
-graceful budget (`KILL_TIMEOUT_MS`, default 20 s) therefore has to fit inside that window.
+Two clocks bound a deploy. Fly sends `SIGTERM` (`kill_signal = "SIGTERM"`) and stops a machine after
+`kill_timeout = 300`, but the container's main process is Litestream, so its `replicate -exec` wrapper also owns a
+clock. `litestream.yml` sets `shutdown-timeout: 280s`: Litestream forwards the signal to the Bun server, waits for it
+to exit, and only then bounds its final WAL sync and close inside what remains of that 280 s. The server's own
+graceful budget (`KILL_TIMEOUT_MS`, default 240 s) fits inside it, leaving Fly roughly 60 s of its 300 s window for
+Litestream to flush the final WAL to R2 and exit 0.
 
 On `SIGINT`/`SIGTERM` (`fly logs` shows the three lines in order):
 
-1. `overture shutdown: SIGINT: draining with a 20000 ms budget`
-2. stop accepting, give in-flight requests `SHUTDOWN_QUIET_GRACE_MS` (2 s), then force the long-lived ones shut —
-   `/api/events` also ends on the shutdown signal, so a stream cannot hold the stop until the idle timeout;
-3. drain in-flight jobs with the remaining budget and requeue them (`interrupted` / lease expiry recovers the rest);
-4. `overture shutdown: stopped in <ms>` and exit 0, one second before a SIGKILL backstop. A SIGKILL or exit 1 here
-   means Litestream killed the child: the budget and the Litestream deadline have drifted apart again.
+1. `overture shutdown: SIGINT: draining with a 240000 ms budget`
+2. stop claiming new queue jobs at once (the worker's claim loop checks the shutdown signal), stop backups, and end
+   every open `/api/events` stream through the same signal; stop accepting, give in-flight requests
+   `SHUTDOWN_QUIET_GRACE_MS` (2 s), then force the long-lived ones shut;
+3. drain in-flight jobs with the budget minus a 10 s flush reserve, then requeue whatever is still running
+   (`interrupted` / lease expiry recovers the rest). An active browser send is *not* aborted by the signal: its
+   browser stays open until the drain budget runs out, so a 60–180 s submission can finish, commit its ledger state
+   and be marked `done` before exit. A send waiting for a pasted or mailed verification code stops immediately
+   instead of spending the budget: the signal ends that wait because the shutdown also stops the paste route and new
+   `mail.ingest` claims, so the code cannot arrive; that attempt is released as `interrupted` and does not use one of
+   its two tries. Only at the end of the budget does the last-resort abort close the browser, and the handler records
+   the interruption;
+4. flush OTel, close `app.sqlite` and `catalog.sqlite`, then `overture shutdown: stopped in <ms>` and exit 0, with a
+   SIGKILL backstop one second past the budget. A SIGKILL or exit 1 here means Litestream killed the child: the
+   budget and the Litestream deadline have drifted apart again.
 
 A restart also starts the job worker with a settle window (`JOBS_STARTUP_SETTLE_MS`, 5 s). Without it the startup
 enqueues (catalog sweep, check-ins, grant expiry, retention, prep) woke the worker in the same second the port opened,
 so the new machine's first health checks competed with a full batch of jobs. Queued work is not lost; it starts a few
 seconds later.
+
+### SQLite checkpoints belong to Litestream
+
+When the container runs Litestream, `scripts/docker-entrypoint.sh` exports `LITESTREAM_OWNS_CHECKPOINTS=true` on that
+one path, and `app.sqlite` opens with `PRAGMA wal_autocheckpoint = 0`: a writer's own commit never runs a checkpoint
+and never blocks on one while the machine serves. Running `main.ts` directly (`bun run dev`, `bun run start`, or the
+image with `LITESTREAM_ENABLED=false`) leaves SQLite's automatic checkpoint on, because no process would replace it.
+Litestream owns checkpointing for the replicated file and does it on its own
+schedule in v0.5.18: a PASSIVE checkpoint every minute (`checkpoint-interval`), one when the WAL passes ~1000 pages
+(~4 MB, `min-checkpoint-page-count`), and a blocking TRUNCATE backstop at ~121k pages (~500 MB) that stops unbounded
+WAL growth even if a reader lingers. The app's `journal_size_limit = 64 MB` then caps the WAL file when SQLite
+resets the log at a checkpoint, so `app.sqlite-wal` stays bounded under bursty writes. `catalog.sqlite` is not
+replicated and keeps SQLite's automatic checkpoint (1000 pages), because no Litestream process watches that file.
+
+The one gap to know about: Litestream only checkpoints after a sync succeeds, so while R2 is unreachable the WAL keeps
+growing on the volume until replication recovers, because SQLite no longer checkpoints on its own. That is the
+deliberate trade for never blocking a user write on a checkpoint; the volume's free-space alert and the storage report
+surface it, and a failing replica is already an alertable incident. If a long R2 outage ever needs a manual recovery,
+stop the machine, checkpoint the file offline (`scripts/vacuum-app-db.ts --dry-run` prints the sizes first), and
+restart it.
+
 
 `/api/health` runs `select 1` and serves the cached replica reading, so it is a main-thread operation: if health checks
 fail while the process is alive and `fly logs` shows no application line, the event loop was blocked. The server logs

@@ -1,9 +1,10 @@
 app = "overture-web"
 primary_region = "yyz"
 
-# Fly waits this long for the machine to stop. Litestream is the container's main
-# process and gives the Bun server (its `-exec` child) 30 s before SIGKILL, so the
-# server's own budget is KILL_TIMEOUT_MS (20 s); this value only has to be larger.
+# Fly sends SIGTERM and waits kill_timeout for the machine to stop. The server drains for KILL_TIMEOUT_MS (240 s),
+# then Litestream (the container's main process, whose -exec child is the Bun server) gets the rest of the window
+# for its final WAL sync and close, bounded by shutdown-timeout in litestream.yml.
+kill_signal = "SIGTERM"
 kill_timeout = 300
 
 [build]
