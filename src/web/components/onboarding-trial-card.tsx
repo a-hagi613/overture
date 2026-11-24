@@ -13,14 +13,16 @@ const text = copy.onboarding.trial;
 export type TrialCardState = "verify" | "declined" | "used";
 
 export function OnboardingTrialCard({
-  backTo = "/onboarding/forward",
+  backTo = "/onboarding/matches",
   busy,
+  disabled = false,
   error,
   onVerify,
   state,
 }: {
   backTo?: string;
   busy: boolean;
+  disabled?: boolean;
   error: boolean;
   onVerify: () => void;
   state: TrialCardState;
@@ -52,7 +54,7 @@ export function OnboardingTrialCard({
 
   let actions = (
     <>
-      <Button disabled={busy} onClick={onVerify} size="lg" variant="primary">
+      <Button disabled={busy || disabled} onClick={onVerify} size="lg" variant="primary">
         <CreditCard aria-hidden="true" size={16} />
         <span>{busy ? text.verifying : text.verifyButton}</span>
       </Button>

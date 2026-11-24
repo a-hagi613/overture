@@ -85,7 +85,7 @@ test("a suspended Gmail mailbox cannot return through a dot or plus alias", asyn
   addInvite(databasePath, guest);
 
   await signInByMagicLink(page, url, request, guest);
-  await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
 
   suspendMailbox(databasePath, guest);
 
@@ -114,7 +114,7 @@ test("an invited mailbox gets one account, not one per Gmail alias", async ({
   addInvite(databasePath, guest);
 
   await signInByMagicLink(page, url, request, guest);
-  await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
 
   const before = await accountCounts(url, request);
 
@@ -146,7 +146,7 @@ test("an unverified row on another spelling does not hold an invited mailbox", a
   addUnverifiedUser(databasePath, "squatted.guest+attacker@gmail.com");
 
   await signInByMagicLink(page, url, request, guest);
-  await expect(page.getByRole("heading", { name: /Welcome to Overture/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
 
   const state = await verifyAuthState(url, request);
   const rows = usersWithMailbox(state, guest);

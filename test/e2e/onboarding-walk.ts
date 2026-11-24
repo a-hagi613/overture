@@ -2,72 +2,60 @@ import { expect } from "@playwright/test";
 
 import type { Page } from "@playwright/test";
 
-async function actInTurn<Item>(items: readonly Item[], act: (item: Item) => Promise<void>) {
-  const first = items.at(0);
-
-  if (first === undefined) {
-    return;
-  }
-
-  await act(first);
-  await actInTurn(items.slice(1), act);
-}
-
 /**
- * Walk a fresh signed-in user through onboarding steps 1 to 4 in the real UI, with a mock PDF,
- * and stop on step 5 (Forward your job mail).
+ * Walk a fresh signed-in user through the value-first onboarding in the real UI, with a mock
+ * PDF: resume, preferences, then the live match preview with three picks. Stops on the trial gate.
  * @param page The signed-in page.
  * @param baseUrl The app server's URL.
  */
 export async function walkOnboardingSteps1To4(page: Page, baseUrl: string) {
   await page.goto(`${baseUrl}/onboarding`);
-  await expect(page.getByRole("heading", { level: 2, name: /Welcome to Overture/u })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-
   await expect(page).toHaveURL(/\/onboarding\/resume$/u);
+  await expect(page.getByRole("heading", { level: 2, name: /Upload your resume/u })).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles("test/e2e/fixtures/resume-text.pdf");
   await expect(page.getByText("resume-text.pdf")).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
 
-  await expect(page).toHaveURL(/\/onboarding\/facts$/u);
-  await expect(page.getByLabel("Current job title")).toBeVisible();
-  await expect(page.getByText("0 of 0 answered")).toHaveCount(0);
-
-  const workAuth = page.getByLabel(/^Work authorization in /u);
-  const salary = page.getByLabel(/^Salary expectation in /u);
-
-  await expect(workAuth.first()).toBeVisible();
-  await expect(salary.first()).toBeVisible();
-
-  await page.getByLabel("Current job title").fill("Staff Platform Engineer");
-
-  await actInTurn(await workAuth.all(), async (field) => {
-    await field.selectOption("Citizen");
-  });
-  await actInTurn(await salary.all(), async (field) => {
-    await field.fill("140,000");
-  });
-  await actInTurn(await page.getByLabel(/^Period for /u).all(), async (field) => {
-    await field.selectOption("a year");
-  });
-
-  await page.getByRole("switch").click();
-  await expect(page.getByLabel("Gender")).toBeEnabled();
-  await page.getByLabel("Gender").selectOption("Woman");
-  await page.getByLabel(/^How did you hear about us\?/u).fill("A friend");
-
-  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
-  await page.getByRole("button", { name: "Platform Engineer" }).click();
-  await page.getByRole("button", { name: "London" }).click();
-  await page.getByRole("button", { exact: true, name: "Remote" }).click();
-  await page.getByRole("button", { name: "Senior" }).click();
-  await expect(page.getByTestId("targets-match-count")).not.toHaveText("0");
 
+  const roles = page.getByRole("button", { name: "Platform Engineer" });
+  const locations = page.getByRole("button", { name: "London" });
+  const remote = page.getByRole("button", { exact: true, name: "Remote" });
+  const senior = page.getByRole("button", { name: "Senior" });
+
+  if ((await roles.getAttribute("aria-pressed")) === "false") {
+    await roles.click();
+  }
+
+  if ((await locations.getAttribute("aria-pressed")) === "false") {
+    await locations.click();
+  }
+
+  if ((await remote.getAttribute("aria-pressed")) === "false") {
+    await remote.click();
+  }
+
+  if ((await senior.getAttribute("aria-pressed")) === "false") {
+    await senior.click();
+  }
+
+  await expect(page.getByTestId("targets-match-count")).not.toHaveText("0");
   await page.getByLabel("Minimum salary").fill("120,000");
   await page.getByLabel("Minimum salary").blur();
 
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/\/onboarding\/forward$/u);
+  await expect(page).toHaveURL(/\/onboarding\/matches$/u);
+  await expect(page.getByRole("heading", { level: 2, name: /Your matches/u })).toBeVisible();
+
+  const picks = page.getByRole("button", { name: /^Select /u });
+
+  await expect(picks.first()).toBeVisible();
+  await picks.first().click();
+  await picks.first().click();
+  await picks.first().click();
+  await expect(page.getByRole("status")).toContainText("3 of 3 selected");
+
+  await page.getByRole("button", { name: /Prepare & review my first 3/u }).click();
+  await expect(page).toHaveURL(/\/onboarding\/trial$/u);
 }

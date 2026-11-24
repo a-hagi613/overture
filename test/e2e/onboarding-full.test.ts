@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppServer } from "./app-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { authTestIdentity } from "./auth.fixture.ts";
 import { seedOnboardingTargetsFlow } from "./onboarding-targets-harness.ts";
 import { walkOnboardingSteps1To4 } from "./onboarding-walk.ts";
 
@@ -23,15 +24,17 @@ const test = appTest.extend<{ onboardingServer: AppServer }>({
 
 const stateSchema = z.object({ onboardedAt: z.string().nullable(), step: z.number() });
 
-const factsSchema = z.object({
-  facts: z.array(z.object({ key: z.string(), scope: z.string(), value: z.string() })),
-});
+const matchesSchema = z.object({ selected: z.array(z.string()) });
+
+const consentSchema = z.object({ current: z.object({ version: z.string() }) });
+
+const prepareSchema = z.object({ prepared: z.number() });
 
 const targetsSchema = z.object({
   targets: z.object({ locations: z.array(z.string()), roles: z.array(z.string()) }),
 });
 
-test("a brand-new user answers every onboarding step through the UI", async ({
+test("a brand-new user picks three matches and the trial prepares them", async ({
   browser,
   onboardingServer,
 }) => {
@@ -49,27 +52,40 @@ test("a brand-new user answers every onboarding step through the UI", async ({
 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
-  expect(state.step).toBe(5);
+  expect(state.step).toBe(4);
   expect(state.onboardedAt).toBeNull();
 
-  await page.getByLabel(/I agree to the/u).check();
-  await page.getByRole("button", { name: "Start" }).click();
-  await expect(page).toHaveURL(/\/home$/u);
+  await expect(page.getByRole("checkbox")).not.toBeChecked();
+  await page.getByRole("checkbox").check();
+  await expect(page.getByRole("button", { name: "Verify card" })).toBeEnabled();
+
+  const matches = matchesSchema.parse(await (await request.get("/api/onboarding/matches")).json());
+  const { selected } = matches;
+
+  expect(selected).toHaveLength(3);
+
+  const consent = consentSchema.parse(await (await request.get("/api/consent")).json());
+
+  await request.post("/api/consent/accept", { data: { version: consent.current.version } });
+  await request.post("/__test__/ledger/grant", {
+    data: {
+      email: authTestIdentity.ownerEmail,
+      idempotencyKey: "onboarding-full-trial",
+      quantity: 3,
+      source: "trial",
+    },
+  });
+
+  const prepared = await request.post("/api/onboarding/prepare", {
+    data: { postingIds: selected },
+  });
+
+  expect(prepared.ok(), `${String(prepared.status())} ${await prepared.text()}`).toBe(true);
+  expect(prepareSchema.parse(await prepared.json()).prepared).toBeGreaterThan(0);
 
   const started = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
   expect(started.onboardedAt).not.toBeNull();
-
-  const { facts } = factsSchema.parse(await (await request.get("/api/profile/facts")).json());
-
-  expect(facts).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ key: "current_job_title", value: "Staff Platform Engineer" }),
-      expect.objectContaining({ key: "work_auth", value: "Citizen" }),
-      expect.objectContaining({ key: "salary_expectation" }),
-      expect.objectContaining({ key: "eeo_gender", value: "Woman" }),
-    ]),
-  );
 
   const saved = targetsSchema.parse(await (await request.get("/api/profile/targets")).json());
 

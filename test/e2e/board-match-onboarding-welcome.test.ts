@@ -54,13 +54,11 @@ async function expectWelcomeMatchesBoard(
 
   await page.goto(`${appServerUrl}/onboarding`);
 
+  await expect(page).toHaveURL(/\/onboarding\/resume$/u);
   await expect(
     page.getByRole("heading", { level: 1, name: /Set up your workspace/u }),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: /Welcome to Overture/u })).toBeVisible();
-  await expect(
-    page.getByText("Here is how Overture prepares and sends applications on your behalf."),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /Upload your resume/u })).toBeVisible();
 
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -81,7 +79,7 @@ async function expectWelcomeMatchesBoard(
 
 for (const width of [1280, 390]) {
   for (const theme of ["light", "dark"]) {
-    test(`the welcome step matches the board at ${String(width)}px in ${theme}`, async ({
+    test(`the onboarding entry resumes on the resume step at ${String(width)}px in ${theme}`, async ({
       browser,
       onboardingServer,
     }) => {

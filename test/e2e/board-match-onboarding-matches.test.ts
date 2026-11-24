@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { request as apiRequest } from "@playwright/test";
 
 import type { Browser } from "@playwright/test";
@@ -34,6 +36,16 @@ async function expectOnboardingMatchesBoard(
   const request = await apiRequest.newContext({ baseURL: appServerUrl });
 
   await seedOnboardingBoard(request, appServerUrl);
+  await request.post("/api/profile/resume", {
+    multipart: {
+      file: {
+        buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-board.pdf")),
+        mimeType: "application/pdf",
+        name: "resume.pdf",
+      },
+    },
+  });
+  await request.post("/api/onboarding/1");
 
   const storageState = await request.storageState();
 
@@ -53,18 +65,16 @@ async function expectOnboardingMatchesBoard(
     });
   }
 
-  await page.goto(`${appServerUrl}/onboarding/facts`);
+  await page.goto(`${appServerUrl}/onboarding/matches`);
 
   await expect(
     page.getByRole("heading", { level: 1, name: /Set up your workspace/u }),
   ).toBeVisible();
-  await expect(page.getByLabel("Current job title")).toHaveValue("Platform Engineer");
-  await expect(page.getByText("Unlocks 14 queued jobs").first()).toBeVisible();
-  await expect(page.getByText("Unlocks 31 queued jobs")).toBeVisible();
-  await expect(page.getByText("1 of 3 answered")).toBeVisible();
-  await expect(page.getByText("1 of 2 answered")).toBeVisible();
-  await expect(page.getByText("Not answered")).toBeVisible();
-  await expect(page.getByLabel("Salary expectation in CAD")).toHaveValue("140,000");
+  await expect(page.getByRole("heading", { level: 2, name: /Your matches/u })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("0 of 3 selected");
+  await expect(page.getByText("Why this fits").first()).toBeVisible();
+  await expect(page.locator('[aria-label^="Match score"]').first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Select /u }).first()).toBeVisible();
 
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -85,7 +95,7 @@ async function expectOnboardingMatchesBoard(
 
 for (const width of [1280, 390]) {
   for (const theme of ["light", "dark"]) {
-    test(`the Saved answers step matches the board at ${String(width)}px in ${theme}`, async ({
+    test(`the Your matches step matches the board at ${String(width)}px in ${theme}`, async ({
       browser,
       onboardingServer,
     }) => {

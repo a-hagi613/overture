@@ -5,9 +5,45 @@ import type { EmploymentType, Seniority, Workplace } from "./tag-taxonomy.ts";
 
 import { timezoneSchema } from "./targets.ts";
 
-export const ONBOARDING_STEP_COUNT = 5;
+export const ONBOARDING_STEP_COUNT = 4;
+
+/** How many openings a person previews and picks before the trial card (SPEC, M3). */
+export const ONBOARDING_MATCH_PICK_LIMIT = 3;
 
 export const onboardingTimezoneInputSchema = z.object({ timezone: timezoneSchema });
+
+export const onboardingMatchSelectionInputSchema = z.object({
+  postingIds: z.array(z.string().trim().min(1)).max(ONBOARDING_MATCH_PICK_LIMIT),
+});
+
+export const onboardingPrepareInputSchema = onboardingMatchSelectionInputSchema;
+
+export const onboardingCurrentEmployerInputSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+});
+
+export interface OnboardingMatchView {
+  id: string;
+  title: string;
+  company: string;
+  location: string | null;
+  workplace: Workplace;
+  employmentType: EmploymentType;
+  salaryMinMinor: number | null;
+  salaryCurrency: string | null;
+  salaryPeriod: "year" | "month" | "hour" | null;
+  score: number;
+  reason: string | null;
+  strong: boolean;
+  why: string[];
+}
+
+export interface OnboardingMatchesView {
+  matches: OnboardingMatchView[];
+  pickLimit: number;
+  poolCount: number;
+  selected: string[];
+}
 
 export interface OnboardingTargetChoices {
   roles: string[];

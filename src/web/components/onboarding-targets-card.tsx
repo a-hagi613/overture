@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
 import { useRef, useState } from "react";
 import { Link } from "react-router";
 
@@ -8,9 +8,9 @@ import type { Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
 import type { SkipCompany } from "../lib/profile-api.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { OnboardingBlockedEmployers } from "./onboarding-blocked-employers.tsx";
 import { OnboardingTargetChip } from "./onboarding-target-chip.tsx";
 import { OnboardingTargetChipGroup } from "./onboarding-target-chip-group.tsx";
-import { SourceChip } from "./source-chip.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow, dsMetric } from "./ui/ds.ts";
@@ -67,18 +67,22 @@ function floorFromInput(raw: string) {
 }
 
 export function OnboardingTargetsCard({
-  backTo = "/onboarding/facts",
+  backTo = "/onboarding/resume",
+  currentEmployer,
   onContinue,
   preview = false,
   save,
+  saveCurrentEmployer,
   saveSkip,
   skipCompanies,
   view,
 }: {
   backTo?: string;
+  currentEmployer: string | null;
   onContinue: () => Promise<void> | void;
   preview?: boolean;
   save: (targets: TargetsInput) => Promise<OnboardingTargetsView>;
+  saveCurrentEmployer: (name: string) => Promise<void> | void;
   saveSkip: (companies: { name: string; domain: string | null }[]) => Promise<{
     companies: SkipCompany[];
   }>;
@@ -89,8 +93,6 @@ export function OnboardingTargetsCard({
   const [matched, setMatched] = useState(view.matchedCount);
   const [salary, setSalary] = useState(() => salaryText(view.targets.salaryFloorMinor));
   const [newLocation, setNewLocation] = useState("");
-  const [newCompany, setNewCompany] = useState("");
-  const [companies, setCompanies] = useState(skipCompanies);
   const [failed, setFailed] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const sequence = useRef(0);
@@ -129,33 +131,6 @@ export function OnboardingTargetsCard({
   const locations = choicesWithSelected(choices.locations, draft.locations);
   const seniorities = choicesWithSelected(choices.seniorities, draft.seniorities);
   const workplaces = choicesWithSelected(choices.workplaces, draft.workplaces);
-
-  const userCompanies = companies.filter((company) => company.reason === "user");
-  const currentEmployer = companies.find((company) => company.reason === "current_employer");
-
-  async function persistCompanies(names: string[]) {
-    try {
-      const saved = await saveSkip(names.map((name) => ({ name, domain: null })));
-
-      setCompanies(saved.companies);
-      setFailed(false);
-    } catch {
-      if (!preview) {
-        setFailed(true);
-      }
-    }
-  }
-
-  function addCompany() {
-    const name = newCompany.trim();
-
-    if (name === "") {
-      return;
-    }
-
-    void persistCompanies([...userCompanies.map((company) => company.name), name]);
-    setNewCompany("");
-  }
 
   function commitSalary(raw: string) {
     const floor = floorFromInput(raw);
@@ -309,64 +284,30 @@ export function OnboardingTargetsCard({
           <p className="mt-1.5 text-xs text-muted-foreground">{copy.onboarding.salaryFloorNote}</p>
         </div>
 
-        <div>
-          <label className={`${dsEyebrow} mb-2 block`} htmlFor="w-skip">
-            {copy.onboarding.companiesToSkip}
-          </label>
-          {companies.length === 0 ? null : (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {currentEmployer === undefined ? null : (
-                <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border bg-muted px-3.5 text-xs font-semibold text-foreground">
-                  <span>{currentEmployer.name}</span>
-                  <SourceChip variant="dashed">{copy.profile.skipList.currentEmployer}</SourceChip>
-                </span>
-              )}
-              {userCompanies.map((company) => (
-                <Button
-                  ariaLabel={copy.profile.facts.remove(company.name)}
-                  className="rounded-full"
-                  key={company.id}
-                  onClick={() => {
-                    void persistCompanies(
-                      userCompanies
-                        .filter((candidate) => candidate.id !== company.id)
-                        .map((candidate) => candidate.name),
-                    );
-                  }}
-                  size="sm"
-                  variant="outline"
-                >
-                  <span>{company.name}</span>
-                  <X aria-hidden="true" size={13} />
-                </Button>
-              ))}
-            </div>
-          )}
-          <form
-            className="flex max-w-md gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              addCompany();
-            }}
-          >
-            <Input
-              ariaLabel={copy.onboarding.addCompanyPlaceholder}
-              id="w-skip"
-              onChange={(event) => {
-                setNewCompany(event.currentTarget.value);
-              }}
-              placeholder={copy.onboarding.addCompanyPlaceholder}
-              value={newCompany}
-            />
-            <Button size="default" submit variant="secondary">
-              <Plus aria-hidden="true" size={14} />
-              <span>{copy.onboarding.add}</span>
-            </Button>
-          </form>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            {copy.onboarding.companiesToSkipNote}
-          </p>
-        </div>
+        <OnboardingBlockedEmployers
+          currentEmployer={currentEmployer}
+          onSaveCurrentEmployer={async (name) => {
+            try {
+              await saveCurrentEmployer(name);
+            } catch {
+              if (!preview) {
+                setFailed(true);
+              }
+            }
+          }}
+          onSaveSkip={async (next) => {
+            try {
+              return await saveSkip(next);
+            } catch (error) {
+              if (!preview) {
+                setFailed(true);
+              }
+
+              throw error;
+            }
+          }}
+          skipCompanies={skipCompanies}
+        />
 
         <output
           aria-live="polite"

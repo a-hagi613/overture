@@ -8,6 +8,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmOutputSchema, LlmPort, LlmRequest } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { RankedCandidate } from "./candidates.ts";
+import type { Targets } from "../../shared/targets.ts";
 
 import { applications, matches, postingUserState, resumes } from "../platform/db/schema.ts";
 import { companies, postings } from "../platform/db/catalog-schema.ts";
@@ -79,6 +80,40 @@ interface ScoreContext {
 
 function truncateReason(reason: string) {
   return reason.trim().slice(0, 140);
+}
+
+const SALARY_FORMAT = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
+function titleCase(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function whyBullets(candidate: RankedCandidate, targets: Targets) {
+  const bullets: string[] = [];
+  const role = candidate.tags.find((tag) => tag.dimension === "role")?.value;
+  const seniority = candidate.tags.find((tag) => tag.dimension === "seniority")?.value;
+
+  if (role !== undefined) {
+    bullets.push(`Matches your ${role} target`);
+  }
+
+  if (seniority !== undefined && targets.seniorities.some((target) => target === seniority)) {
+    bullets.push(`${titleCase(seniority)} level, as you asked`);
+  }
+
+  if (candidate.workplace === "remote") {
+    bullets.push("Remote");
+  } else if (candidate.locationRaw !== null) {
+    bullets.push(`In ${candidate.locationRaw}`);
+  }
+
+  if (candidate.salaryMinMinor !== null && candidate.salaryCurrency !== null) {
+    bullets.push(
+      `Pays from ${candidate.salaryCurrency} ${SALARY_FORMAT.format(Math.round(candidate.salaryMinMinor / 100))}`,
+    );
+  }
+
+  return bullets.slice(0, 3);
 }
 
 function descriptionText(descriptionGz: Buffer | null) {
@@ -645,7 +680,104 @@ export function createMatchingService(deps: MatchDeps) {
     });
   }
 
-  return { applyManually, fill, scoreOnOpen, upNext };
+  async function preview(userId: string, limit: number) {
+    const settings = await targetsService.read(userId);
+    const { languages } = await languagesService.read(userId);
+    const list = await candidates.ranked(userId, settings.targets, languages);
+    const chosen = list.slice(0, limit);
+
+    if (chosen.length === 0) {
+      return { items: [], poolCount: 0 };
+    }
+
+    const ids = chosen.map((candidate) => candidate.id);
+
+    const matchRows = db
+      .select({ postingId: matches.postingId, score: matches.score, reason: matches.reason })
+      .from(matches)
+      .where(and(eq(matches.userId, userId), inArray(matches.postingId, ids)))
+      .all();
+
+    const scores = new Map(matchRows.map((row) => [row.postingId, row]));
+    const threshold = getSettingNumber(db, "match.strong");
+
+    return {
+      poolCount: list.length,
+      items: chosen.map((candidate) => {
+        const matched = scores.get(candidate.id);
+        const score = matched?.score ?? Math.min(100, Math.round(candidate.codeRank));
+
+        return {
+          employmentType: candidate.employmentType,
+          id: candidate.id,
+          location: candidate.locationRaw,
+          salaryCurrency: candidate.salaryCurrency,
+          salaryMinMinor: candidate.salaryMinMinor,
+          salaryPeriod: candidate.salaryPeriod,
+          score,
+          strong: score >= threshold,
+          title: candidate.title,
+          company: candidate.companyName,
+          workplace: candidate.workplace,
+          reason: matched?.reason ?? null,
+          why: whyBullets(candidate, settings.targets),
+        };
+      }),
+    };
+  }
+
+  async function prepareOne(userId: string, postingId: string) {
+    const existing = applicationFor(db, userId, postingId);
+
+    if (existing !== undefined) {
+      return existing.id;
+    }
+
+    const refused = await candidates.check(userId, postingId);
+
+    if (refused !== null) {
+      return null;
+    }
+
+    const applicationId = createApplication({ db, catalogDb }, clock.now(), {
+      origin: "manual",
+      postingId,
+      score: null,
+      userId,
+    });
+
+    if (applicationId === null) {
+      return null;
+    }
+
+    enqueueApplicationPrepare(db, clock, applicationId);
+
+    return applicationId;
+  }
+
+  async function prepareFrom(
+    userId: string,
+    postingIds: readonly string[],
+    index: number,
+    created: readonly string[],
+  ) {
+    const postingId = postingIds.at(index);
+
+    if (postingId === undefined) {
+      return [...created];
+    }
+
+    const applicationId = await prepareOne(userId, postingId);
+    const next = applicationId === null ? created : [...created, applicationId];
+
+    return prepareFrom(userId, postingIds, index + 1, next);
+  }
+
+  async function prepareChosen(userId: string, postingIds: readonly string[]) {
+    return prepareFrom(userId, postingIds, 0, []);
+  }
+
+  return { applyManually, fill, prepareChosen, preview, scoreOnOpen, upNext };
 }
 
 export type MatchingService = ReturnType<typeof createMatchingService>;

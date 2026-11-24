@@ -86,7 +86,8 @@ for (const width of [390, 1280, 2560]) {
         }),
       ).toBeVisible();
       await expect(page.getByRole("button", { name: "Verify card" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Start" })).toBeDisabled();
+      await expect(page.getByRole("button", { name: "Verify card" })).toBeDisabled();
+      await expect(page.getByRole("checkbox")).not.toBeChecked();
 
       await page.evaluate(async () => document.fonts.ready);
 

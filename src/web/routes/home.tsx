@@ -29,6 +29,7 @@ import { HomeReadyCard } from "../components/home-ready-card.tsx";
 import { HomeSchedule } from "../components/home-schedule.tsx";
 import { HomeStrengthen } from "../components/home-strengthen.tsx";
 import { PageHeader } from "../components/page-header.tsx";
+import { PostApprovalCard } from "../components/post-approval-card.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 
@@ -275,6 +276,7 @@ export function HomePage() {
           {range === null ? null : (
             <HomeOutcomes onRangeChange={setRangeKey} range={range} rangeKey={rangeKey} />
           )}
+          {home.ready.approved > 0 ? <PostApprovalCard /> : null}
         </>
       )}
 

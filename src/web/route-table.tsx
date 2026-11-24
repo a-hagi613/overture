@@ -89,19 +89,14 @@ const OnboardingResumePage = lazyRoute(
   "OnboardingResumePage",
 );
 
-const OnboardingFactsPage = lazyRoute(
-  async () => import("./routes/onboarding-facts.tsx"),
-  "OnboardingFactsPage",
-);
-
 const OnboardingTargetsPage = lazyRoute(
   async () => import("./routes/onboarding-targets.tsx"),
   "OnboardingTargetsPage",
 );
 
-const OnboardingForwardPage = lazyRoute(
-  async () => import("./routes/onboarding-forward.tsx"),
-  "OnboardingForwardPage",
+const OnboardingMatchesPage = lazyRoute(
+  async () => import("./routes/onboarding-matches.tsx"),
+  "OnboardingMatchesPage",
 );
 
 const OnboardingTrialPage = lazyRoute(
@@ -236,9 +231,8 @@ const publicRoutes: RouteObject[] = withRouteError([
   { path: "/consent", element: <ConsentPage /> },
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },
-  { path: "/onboarding/facts", element: <OnboardingFactsPage /> },
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
-  { path: "/onboarding/forward", element: <OnboardingForwardPage /> },
+  { path: "/onboarding/matches", element: <OnboardingMatchesPage /> },
   { path: "/onboarding/trial", element: <OnboardingTrialPage /> },
 ]);
 

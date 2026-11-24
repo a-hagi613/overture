@@ -32,10 +32,6 @@ const stateSchema = z.object({
   step: z.number(),
 });
 
-const factsSchema = z.object({
-  facts: z.array(z.object({ key: z.string(), scope: z.string(), value: z.string() })),
-});
-
 const targets = {
   roles: ["Platform Engineer"],
   seniorities: ["senior"],
@@ -73,7 +69,7 @@ async function upload(page: Page, fixture: string, name: string) {
   });
 }
 
-test("a new user uploads a resume, confirms Facts and returns to the step they left", async ({
+test("a new user uploads a resume, confirms preferences and returns to the step they left", async ({
   browser,
   onboardingServer,
 }) => {
@@ -88,9 +84,6 @@ test("a new user uploads a resume, confirms Facts and returns to the step they l
   const page = await context.newPage();
 
   await page.goto(`${onboardingServer.url}/onboarding`);
-  await expect(page.getByRole("heading", { level: 2, name: /Welcome to Overture/u })).toBeVisible();
-
-  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/onboarding\/resume$/u);
   await expect(page.getByRole("heading", { level: 2, name: /Upload your resume/u })).toBeVisible();
 
@@ -122,30 +115,15 @@ test("a new user uploads a resume, confirms Facts and returns to the step they l
   await page.goto(`${onboardingServer.url}/`);
   await page.goto(`${onboardingServer.url}/onboarding`);
 
-  await expect(page).toHaveURL(/\/onboarding\/resume$/u);
-  await expect(page.getByText("resume.pdf")).toBeVisible();
-
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/\/onboarding\/facts$/u);
-
-  await page.getByLabel("Current job title").fill("Staff Platform Engineer");
-  await page.getByLabel("Work authorization in Canada").selectOption("Citizen");
-  await page.getByLabel("Salary expectation in CAD").fill("140,000");
-  await page.getByLabel("Period for CAD").selectOption("a year");
-
-  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
+  await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
 
   await page.goto(`${onboardingServer.url}/onboarding`);
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
-  await page.goto(`${onboardingServer.url}/onboarding/facts`);
-  await expect(page.getByLabel("Current job title")).toHaveValue("Staff Platform Engineer");
-  await expect(page.getByLabel("Work authorization in Canada")).toHaveValue("Citizen");
-  await expect(page.getByLabel("Salary expectation in CAD")).toHaveValue("140,000");
 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
-  expect(state.step).toBe(4);
+  expect(state.step).toBe(2);
   expect(state.onboardedAt).toBeNull();
   expect(state.pauseReason).toBe("onboarding");
   expect(state.currentEmployer).toBe("Brightwave Analytics");
@@ -176,10 +154,7 @@ test("the Resume step cannot be finished without a resume", async ({ onboardingS
   await request.dispose();
 });
 
-test("an unreadable PDF leads to manual entry on the Facts step", async ({
-  browser,
-  onboardingServer,
-}) => {
+test("an unreadable PDF still continues to preferences", async ({ browser, onboardingServer }) => {
   const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
 
   await newUser(request, onboardingServer.url);
@@ -200,32 +175,13 @@ test("an unreadable PDF leads to manual entry on the Facts step", async ({
   await expect(page.getByText("resume-scanned.pdf")).toBeVisible();
   await expect(
     page.getByText(
-      "This PDF could not be parsed automatically. Upload another file, or continue and enter your details manually.",
+      "This PDF could not be parsed automatically. Upload another file, or continue and add the details from Profile → Details after setup.",
     ),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/\/onboarding\/facts$/u);
-  await expect(page.getByLabel("Current job title")).toHaveValue("");
-
-  await page.getByLabel("Current job title").fill("Platform Engineer");
-  await page.getByLabel("Work authorization in Canada").selectOption("Permanent resident");
-  await page.getByLabel("Salary expectation in CAD").fill("120,000");
-  await page.getByLabel("Period for CAD").selectOption("a year");
-
-  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
-
-  const facts = factsSchema
-    .parse(await (await request.get("/api/profile/facts")).json())
-    .facts.filter((fact) => fact.key === "current_job_title" || fact.key === "salary_expectation");
-
-  expect(facts).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ key: "current_job_title", value: "Platform Engineer" }),
-      expect.objectContaining({ key: "salary_expectation", value: "CAD 120,000 a year" }),
-    ]),
-  );
+  await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
 
   await context.close();
   await request.dispose();
