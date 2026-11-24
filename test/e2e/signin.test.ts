@@ -135,7 +135,7 @@ test("an unverified provider email is refused and no session is issued", async (
   await expect(googleButton).toBeEnabled();
   await googleButton.click();
   await expect(page.getByRole("alert")).toContainText(
-    "That provider has not verified your email, so this app cannot let it in.",
+    "Google or LinkedIn has not verified this email, so Overture cannot sign you in.",
   );
 
   const state = await verifyAuthState(appServerUrl, request);

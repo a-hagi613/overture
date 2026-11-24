@@ -70,7 +70,7 @@ const cueCards: readonly CueCardData[] = [
     role: "Merchant Operations Manager",
     rows: [
       { ask: "E-commerce onboarding", fact: "Scaled 1,200+ retail accounts" },
-      { ask: "Fulfillment & SLA metrics", fact: "99.2% on-time dispatch rate" },
+      { ask: "Fulfillment & SLA metrics", fact: "99.2% on-time delivery rate" },
       { ask: "Cross-functional rollouts", fact: "Partnered with Sales & Legal" },
       { ask: "Remote in Canada", fact: "Toronto, remote preferred" },
     ],
@@ -154,7 +154,7 @@ const cueCards: readonly CueCardData[] = [
     railTime: "6:12 pm",
     role: "Aviation Operations Coordinator",
     rows: [
-      { ask: "International hub dispatch", fact: "5 yrs wide-body turnarounds" },
+      { ask: "International hub operations", fact: "5 yrs wide-body turnarounds" },
       { ask: "IATA safety compliance", fact: "IATA certified · zero incidents" },
       { ask: "24/7 crew coordination", fact: "Managed 80+ crew rosters" },
       { ask: "UAE relocation ready", fact: "Confirmed in your saved answers" },
