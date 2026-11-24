@@ -4,6 +4,7 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
 import { raiseAlert } from "../alerts.ts";
+import { defaultMetrics } from "../telemetry/metrics.ts";
 import { MailCapExceededError } from "./errors.ts";
 import { isProtectedCategory, reserveMailSend } from "./budget.ts";
 
@@ -48,10 +49,19 @@ export function createMeteredMailSender(db: AppDatabase, clock: Clock, adapter: 
     }
 
     if (decision.reason !== null) {
+      defaultMetrics().recordMailEvent({ direction: "outbound", status: "refused" });
+
       throw new MailCapExceededError(category, decision.reason, decision.usage);
     }
 
-    await send();
+    try {
+      await send();
+      defaultMetrics().recordMailEvent({ direction: "outbound", status: "sent" });
+    } catch (error) {
+      defaultMetrics().recordMailEvent({ direction: "outbound", status: "failed" });
+
+      throw error;
+    }
   }
 
   const sender: MailSender = {

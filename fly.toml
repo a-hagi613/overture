@@ -27,6 +27,15 @@ DEMO_LOGIN_ENABLED = "true"
 # and the daily `mail.sending` live check verify the sending domain actively
 # instead of staying gated.
 REQUIRE_EMAIL_SENDING = "true"
+# The private Prometheus scrape for Fly's built-in Grafana (fly-metrics.net).
+# It binds IPv6 `::` on 9091 and is never part of [http_service].
+METRICS_ENABLED = "true"
+METRICS_PORT = "9091"
+METRICS_HOST = "::"
+
+[metrics]
+port = 9091
+path = "/metrics"
 
 [http_service]
 internal_port = 3000

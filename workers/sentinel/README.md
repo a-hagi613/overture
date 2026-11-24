@@ -13,8 +13,7 @@ Every ten minutes it does three things:
    ADR 0032) and alerts when its `fetchedAt` is older than 26 hours, when the object is missing, or
    when it cannot be parsed or read. Row-count drops stay with the app's ingest, which already
    alerts.
-3. **Usage watchdog.** Reads month-to-date usage from the Cloudflare GraphQL Analytics API —
-   R2 Class A and Class B operations, Queues billable operations, Workers requests and Workers CPU —
+3. **Usage watchdog.** Reads month-to-date usage from the Cloudflare GraphQL Analytics API —   R2 Class A and Class B operations, Queues billable operations, Workers requests and Workers CPU —
    and compares each with its monthly allowance:
 
    | Metric | Allowance |
@@ -30,6 +29,12 @@ Every ten minutes it does three things:
    Below 90 % it deletes the flag and pushes a recovery note. The app reads that flag
    (`src/server/platform/degraded.ts`): `email_classify` runs rules-only and the live-check R2 round
    trip is skipped, and it logs each change of state.
+4. **Signed ops health (#634).** When `OVERTURE_OPS_HEALTH_SECRET` is set, the sentinel also polls
+   `GET /internal/ops/health` on the app with an HMAC-SHA256 signature over
+   `METHOD\npath\ntimestamp`. It pages when RAM is above 80 %, NVMe `/data` above 75 %, event-loop
+   lag p95 above 500 ms, or the last hour's ATS apply failure rate is above 30 % of at least five
+   attempts. Without the secret the check is skipped and the three checks above behave exactly as
+   before, so a test environment without the secret keeps working.
 
 The sentinel **never revokes the R2 token**. Revoking it would stop Litestream and lose the backups;
 ADR 0033 rejects that guard explicitly. R2 is bounded by design, lifecycle rules and these alerts.
@@ -90,6 +95,8 @@ source the dashboard itself uses. It stays a follow-up cross-check, not a depend
 | `CLOUDFLARE_ACCOUNT_TAG` | secret | the account's 32-character tag |
 | `CLOUDFLARE_ANALYTICS_TOKEN` | secret | a token with **Account Analytics: Read** |
 | `CLOUDFLARE_GRAPHQL_URL` | optional variable | defaults to `https://api.cloudflare.com/client/v4/graphql` |
+| `OVERTURE_OPS_HEALTH_URL` | variable | `https://tryoverture.com/internal/ops/health` (in `wrangler.jsonc`) |
+| `OVERTURE_OPS_HEALTH_SECRET` | secret | the app's `OPS_HEALTH_SECRET`; unset skips the ops check |
 
 Without the two Cloudflare values the usage check reports `usage=unconfigured` and pushes one
 warning a day instead of failing silently. It never contacts an ATS or any other paid service.
