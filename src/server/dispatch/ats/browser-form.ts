@@ -352,45 +352,49 @@ async function fillByLabel(scope: FormScope, field: SendPlanField) {
     return false;
   }
 
-  const control = scope.root.getByLabel(field.label, { exact: false }).first();
+  try {
+    const control = scope.root.getByLabel(field.label, { exact: false }).first();
 
-  if ((await control.count()) === 0) {
+    if ((await control.count()) === 0) {
+      return false;
+    }
+
+    const kind = await control.evaluate((element) => {
+      if (element instanceof HTMLSelectElement) {
+        return "select";
+      }
+
+      if (element instanceof HTMLTextAreaElement) {
+        return "textarea";
+      }
+
+      return element instanceof HTMLInputElement ? element.type : "text";
+    });
+
+    if (kind === "select") {
+      await control.selectOption({ label: answer }, { timeout: 5000 });
+
+      return true;
+    }
+
+    if (kind === "checkbox") {
+      await control.setChecked(isPositiveAnswer(answer));
+
+      return true;
+    }
+
+    if (kind === "radio") {
+      await control.check();
+
+      return true;
+    }
+
+    await control.fill(answer);
+
+    return true;
+  } catch {
     return false;
   }
-
-  const kind = await control.evaluate((element) => {
-    if (element instanceof HTMLSelectElement) {
-      return "select";
-    }
-
-    if (element instanceof HTMLTextAreaElement) {
-      return "textarea";
-    }
-
-    return element instanceof HTMLInputElement ? element.type : "text";
-  });
-
-  if (kind === "select") {
-    await control.selectOption({ label: answer });
-
-    return true;
-  }
-
-  if (kind === "checkbox") {
-    await control.setChecked(isPositiveAnswer(answer));
-
-    return true;
-  }
-
-  if (kind === "radio") {
-    await control.check();
-
-    return true;
-  }
-
-  await control.fill(answer);
-
-  return true;
 }
 
 async function fillPlannedField(scope: FormScope, field: SendPlanField) {
@@ -402,6 +406,14 @@ async function fillPlannedField(scope: FormScope, field: SendPlanField) {
 
   if (await fillField(scope, fieldName, answer)) {
     return true;
+  }
+
+  if (
+    field.fieldType === "select" ||
+    field.fieldType === "radio" ||
+    field.fieldType === "multiselect"
+  ) {
+    return false;
   }
 
   return fillByLabel(scope, field);

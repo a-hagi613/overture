@@ -52,6 +52,11 @@ import { runSoftgardenAttempt } from "./ats/softgarden.ts";
 import { runClearCompanyAttempt } from "./ats/clearcompany.ts";
 import { runJoinComAttempt } from "./ats/join-com.ts";
 import { runPinpointAttempt } from "./ats/pinpoint.ts";
+import { runTeamtailorAttempt } from "./ats/teamtailor.ts";
+import { runZohoRecruitAttempt } from "./ats/zoho-recruit.ts";
+import { runBambooHRAttempt } from "./ats/bamboohr.ts";
+import { runRecruiteeAttempt } from "./ats/recruitee.ts";
+import { runHireologyAttempt } from "./ats/hireology.ts";
 import type { BrowserFormRun } from "./ats/browser-form.ts";
 import {
   CODE_WAIT_TIMEOUT_MS,
@@ -859,6 +864,26 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         if (plan.ats === "pinpoint") {
           return runPinpointAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "teamtailor") {
+          return runTeamtailorAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "zoho_recruit") {
+          return runZohoRecruitAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "bamboohr") {
+          return runBambooHRAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "recruitee") {
+          return runRecruiteeAttempt(page, planForRun, attemptHooks);
+        }
+
+        if (plan.ats === "hireology") {
+          return runHireologyAttempt(page, planForRun, attemptHooks);
         }
 
         return runAshbyAttempt(page, planForRun, attemptHooks);

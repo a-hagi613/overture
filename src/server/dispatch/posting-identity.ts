@@ -36,11 +36,28 @@ const SOFTGARDEN_HOST = /^(?<token>[a-z0-9-]+)\.softgarden\.io$/iu;
 
 const PINPOINT_HOST = /^(?<token>[a-z0-9-]+)\.pinpointhq\.com$/iu;
 
+const TEAMTAILOR_HOST = /^(?<token>[a-z0-9-]+)\.teamtailor\.com$/iu;
+
+const ZOHO_RECRUIT_HOST = /^(?<token>[a-z0-9-]+)\.zohorecruit\.com$/iu;
+
+const BAMBOOHR_HOST = /^(?<token>[a-z0-9-]+)\.bamboohr\.com$/iu;
+
+const RECRUITEE_HOST = /^(?<token>[a-z0-9-]+)\.recruitee\.com$/iu;
+
+const HIREOLOGY_HOST = /^(?:(?<token>[a-z0-9-]+)\.)?hireology\.com$/iu;
+
 const BOARD_HOST_PATTERNS = {
   breezy: BREEZY_HOST,
   pinpoint: PINPOINT_HOST,
   softgarden: SOFTGARDEN_HOST,
+  teamtailor: TEAMTAILOR_HOST,
+  zoho_recruit: ZOHO_RECRUIT_HOST,
+  bamboohr: BAMBOOHR_HOST,
+  recruitee: RECRUITEE_HOST,
+  hireology: HIREOLOGY_HOST,
 } as const;
+
+const APPLY_HOST_TOKENS: ReadonlySet<string> = new Set(["app", "apply", "careers", "jobs", "www"]);
 
 const JOIN_HOST = /^(?:[a-z0-9-]+\.)?join\.com$/iu;
 
@@ -90,12 +107,29 @@ const sameHost = (ats: ApplySupportedAts, expected: string, live: string) => {
     return WORKABLE_BOARD_HOSTS.has(expected) && WORKABLE_BOARD_HOSTS.has(live);
   }
 
-  if (ats === "breezy" || ats === "softgarden" || ats === "pinpoint") {
+  if (
+    ats === "breezy" ||
+    ats === "softgarden" ||
+    ats === "pinpoint" ||
+    ats === "teamtailor" ||
+    ats === "zoho_recruit" ||
+    ats === "bamboohr" ||
+    ats === "recruitee" ||
+    ats === "hireology"
+  ) {
     const pattern = BOARD_HOST_PATTERNS[ats];
     const expectedToken = tokenFromHost(pattern, expected);
     const liveToken = tokenFromHost(pattern, live);
 
-    return expectedToken !== null && liveToken !== null && expectedToken === liveToken;
+    if (expectedToken === null || liveToken === null) {
+      return false;
+    }
+
+    return (
+      expectedToken === liveToken ||
+      APPLY_HOST_TOKENS.has(expectedToken) ||
+      APPLY_HOST_TOKENS.has(liveToken)
+    );
   }
 
   if (ats === "join_com") {
@@ -157,6 +191,32 @@ function jobIdFromPath(ats: ApplySupportedAts, segments: readonly string[]) {
     return segments[1] ?? null;
   }
 
+  if (ats === "teamtailor" || ats === "hireology") {
+    const jobsIndex = segments.indexOf("jobs");
+
+    return jobsIndex === -1 ? null : (segments[jobsIndex + 1] ?? null);
+  }
+
+  if (ats === "zoho_recruit") {
+    const careersIndex = segments.findIndex((segment) => segment.toLowerCase() === "careers");
+
+    return careersIndex === -1 ? null : (segments[careersIndex + 1] ?? null);
+  }
+
+  if (ats === "bamboohr") {
+    const index = segments.findIndex((segment) =>
+      ["careers", "jobs"].includes(segment.toLowerCase()),
+    );
+
+    return index === -1 ? null : (segments[index + 1] ?? null);
+  }
+
+  if (ats === "recruitee") {
+    const oIndex = segments.indexOf("o");
+
+    return oIndex === -1 ? null : (segments[oIndex + 1] ?? null);
+  }
+
   const [boardToken, jobId] = segments;
 
   return boardToken === undefined || jobId === undefined ? null : jobId;
@@ -203,6 +263,16 @@ function boardTokenFrom(ats: ApplySupportedAts, url: URL, segments: readonly str
     );
   }
 
+  if (
+    ats === "teamtailor" ||
+    ats === "zoho_recruit" ||
+    ats === "bamboohr" ||
+    ats === "recruitee" ||
+    ats === "hireology"
+  ) {
+    return tokenFromHost(BOARD_HOST_PATTERNS[ats], host) ?? firstSegment(segments);
+  }
+
   return firstSegment(segments);
 }
 
@@ -228,6 +298,10 @@ function postingPath(ats: ApplySupportedAts, url: URL) {
     const jobId = url.searchParams.get("jobId") ?? jobIdFromPath(ats, segments);
 
     return jobId === null || boardToken === "" ? null : { boardToken, jobId };
+  }
+
+  if (ats === "bamboohr" && url.searchParams.get("id") !== null) {
+    return { boardToken, jobId: url.searchParams.get("id") ?? "" };
   }
 
   const jobId = jobIdFromPath(ats, segments);
@@ -305,9 +379,14 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
 
   const skipEmptyBoardToken = expected.ats === "personio" && livePosting.boardToken === "";
 
+  const liveBoardToken = livePosting.boardToken.toLowerCase();
+
+  const appliesWithoutToken = expected.ats === "hireology" && APPLY_HOST_TOKENS.has(liveBoardToken);
+
   if (
     !skipEmptyBoardToken &&
-    livePosting.boardToken.toLowerCase() !== expected.boardToken.toLowerCase()
+    !appliesWithoutToken &&
+    liveBoardToken !== expected.boardToken.toLowerCase()
   ) {
     return mismatch("board_token");
   }

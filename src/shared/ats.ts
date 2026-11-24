@@ -5,7 +5,7 @@
  * applies to, Wave 1A's pure guest-apply boards, and Wave 1B's boards whose employer may gate the form
  * behind a login. A board's wave says where its feed came from; `applySupported` says whether Overture has
  * a deterministic apply adapter for it, which is the five shipped adapters plus the Wave 1A batches that
- * have shipped their form readers and browser adapters.
+ * have shipped their form readers and browser adapters (issue #571 Batch 2, issue #569 Batch 3).
  */
 export const SHIPPED_ATS = ["greenhouse", "lever", "ashby", "workable", "personio"] as const;
 
@@ -38,6 +38,15 @@ export const WAVE_1B_ATS = [
   "varbi",
 ] as const;
 
+/** The Batch 2 Wave 1A boards whose deterministic adapters and form readers ship in issue #571. */
+export const BATCH_2_ATS = [
+  "teamtailor",
+  "zoho_recruit",
+  "bamboohr",
+  "recruitee",
+  "hireology",
+] as const;
+
 /** The Batch 3 Wave 1A boards whose deterministic adapters and form readers ship in issue #569. */
 export const BATCH_3_ATS = [
   "breezy",
@@ -48,7 +57,14 @@ export const BATCH_3_ATS = [
 ] as const;
 
 /** The apply-supported boards whose form plan is cached by signature (every board but Greenhouse). */
-export const PLAN_CACHE_ATS = ["lever", "ashby", "workable", "personio", ...BATCH_3_ATS] as const;
+export const PLAN_CACHE_ATS = [
+  "lever",
+  "ashby",
+  "workable",
+  "personio",
+  ...BATCH_2_ATS,
+  ...BATCH_3_ATS,
+] as const;
 
 export const ATS_VALUES = [...SHIPPED_ATS, ...WAVE_1A_ATS, ...WAVE_1B_ATS] as const;
 
@@ -56,10 +72,12 @@ export type Ats = (typeof ATS_VALUES)[number];
 
 export type ShippedAts = (typeof SHIPPED_ATS)[number];
 
+export type BatchTwoAts = (typeof BATCH_2_ATS)[number];
+
 export type BatchThreeAts = (typeof BATCH_3_ATS)[number];
 
 /** Every board with a deterministic apply adapter, in registry order. */
-export type ApplySupportedAts = ShippedAts | BatchThreeAts;
+export type ApplySupportedAts = ShippedAts | BatchTwoAts | BatchThreeAts;
 
 export type AtsWave = "shipped" | "wave1a" | "wave1b";
 
@@ -80,11 +98,11 @@ export const ATS_REGISTRY = {
   manatal: { applySupported: false, wave: "wave1a" },
   careerplug: { applySupported: false, wave: "wave1a" },
   jazzhr: { applySupported: false, wave: "wave1a" },
-  teamtailor: { applySupported: false, wave: "wave1a" },
-  zoho_recruit: { applySupported: false, wave: "wave1a" },
-  bamboohr: { applySupported: false, wave: "wave1a" },
-  recruitee: { applySupported: false, wave: "wave1a" },
-  hireology: { applySupported: false, wave: "wave1a" },
+  teamtailor: { applySupported: true, wave: "wave1a" },
+  zoho_recruit: { applySupported: true, wave: "wave1a" },
+  bamboohr: { applySupported: true, wave: "wave1a" },
+  recruitee: { applySupported: true, wave: "wave1a" },
+  hireology: { applySupported: true, wave: "wave1a" },
   breezy: { applySupported: true, wave: "wave1a" },
   softgarden: { applySupported: true, wave: "wave1a" },
   clearcompany: { applySupported: true, wave: "wave1a" },
@@ -102,15 +120,15 @@ export const ATS_REGISTRY = {
 } as const satisfies Record<Ats, AtsRegistryEntry>;
 
 /**
- * The ATS boards with a deterministic apply adapter: the five shipped boards and Batch 3's five Wave 1A
- * boards. Every other board's postings are ingest-only and never match a user.
+ * The ATS boards with a deterministic apply adapter: the five shipped boards and the Wave 1A batches that
+ * have shipped their form readers and browser adapters. Every other board's postings are ingest-only.
  */
-export const APPLY_SUPPORTED_ATS = [...SHIPPED_ATS, ...BATCH_3_ATS] as const;
+export const APPLY_SUPPORTED_ATS = [...SHIPPED_ATS, ...BATCH_2_ATS, ...BATCH_3_ATS] as const;
 
 /**
  * Whether Overture can apply to a board through a deterministic adapter.
  * @param ats The board's ATS value.
- * @returns True for the shipped adapters and the Wave 1A batches that have shipped.
+ * @returns True for the shipped adapters and every Wave 1A batch that has shipped.
  */
 export function isApplySupportedAts(ats: string): ats is ApplySupportedAts {
   return APPLY_SUPPORTED_ATS.some((candidate) => candidate === ats);

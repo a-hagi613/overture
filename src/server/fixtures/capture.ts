@@ -16,6 +16,11 @@ import { readSoftgardenQuestions } from "../dispatch/ats/softgarden.ts";
 import { readClearCompanyQuestions } from "../dispatch/ats/clearcompany.ts";
 import { readJoinComQuestions } from "../dispatch/ats/join-com.ts";
 import { readPinpointQuestions } from "../dispatch/ats/pinpoint.ts";
+import { readTeamtailorQuestions } from "../dispatch/ats/teamtailor.ts";
+import { readZohoRecruitQuestions } from "../dispatch/ats/zoho-recruit.ts";
+import { readBambooHRQuestions } from "../dispatch/ats/bamboohr.ts";
+import { readRecruiteeQuestions } from "../dispatch/ats/recruitee.ts";
+import { readHireologyQuestions } from "../dispatch/ats/hireology.ts";
 import type { LoginWallEvidence } from "../pipeline/login-wall.ts";
 import { detectLoginWall } from "../pipeline/login-wall.ts";
 import { assetExtension, formSignature, sanitiseFormHtml } from "./sanitise.ts";
@@ -31,6 +36,11 @@ export const ATS_NAMES = [
   "clearcompany",
   "join_com",
   "pinpoint",
+  "teamtailor",
+  "zoho_recruit",
+  "bamboohr",
+  "recruitee",
+  "hireology",
 ] as const;
 
 export type FixtureAts = (typeof ATS_NAMES)[number];
@@ -52,6 +62,16 @@ export const FORM_FIELD_SELECTORS = {
     "form#application-form input:not([type='hidden']), form#apply-form input:not([type='hidden'])",
   pinpoint:
     "form#application-form input:not([type='hidden']), form#new_application input:not([type='hidden'])",
+  teamtailor:
+    "form#new_candidate input:not([type='hidden']), form#application_form input:not([type='hidden']), form[action*='/applications'] input:not([type='hidden'])",
+  zoho_recruit:
+    "form#application_form input:not([type='hidden']), form#apply-form input:not([type='hidden']), form[action*='apply'] input:not([type='hidden'])",
+  bamboohr:
+    "form#applicationForm input:not([type='hidden']), form#application-form input:not([type='hidden']), form[action*='apply'] input:not([type='hidden'])",
+  recruitee:
+    "form#new_candidate input:not([type='hidden']), form[action*='/c/'] input:not([type='hidden']), form[data-testid='application-form'] input:not([type='hidden'])",
+  hireology:
+    "form#application-form input:not([type='hidden']), form#applicationForm input:not([type='hidden']), form[action*='applications'] input:not([type='hidden'])",
 } as const satisfies Record<FixtureAts, string>;
 
 export const FORM_RENDER_TIMEOUT_MS = 20_000;
@@ -281,6 +301,26 @@ async function questionsFor(ats: FixtureAts, page: Page) {
 
   if (ats === "pinpoint") {
     return readPinpointQuestions(page);
+  }
+
+  if (ats === "teamtailor") {
+    return readTeamtailorQuestions(page);
+  }
+
+  if (ats === "zoho_recruit") {
+    return readZohoRecruitQuestions(page);
+  }
+
+  if (ats === "bamboohr") {
+    return readBambooHRQuestions(page);
+  }
+
+  if (ats === "recruitee") {
+    return readRecruiteeQuestions(page);
+  }
+
+  if (ats === "hireology") {
+    return readHireologyQuestions(page);
   }
 
   return readAshbyQuestions(page);

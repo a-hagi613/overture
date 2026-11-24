@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import type { FormQuestion } from "./send-plan.ts";
 import type { QuestionFieldType } from "../../shared/questions.ts";
-import type { BatchThreeAts } from "../../shared/ats.ts";
+import type { BatchThreeAts, BatchTwoAts } from "../../shared/ats.ts";
 
 import { formSignature, sanitiseFormHtml } from "../fixtures/sanitise.ts";
 import { LEVER_FIELD_TYPES, LEVER_SKIP_NAMES } from "../dispatch/ats/lever.ts";
@@ -20,8 +20,15 @@ import {
   readClearCompanyFormHtml,
   readJoinComFormHtml,
   readPinpointFormHtml,
+  readBambooHRFormHtml,
+  readHireologyFormHtml,
+  readRecruiteeFormHtml,
   readSoftgardenFormHtml,
+  readTeamtailorFormHtml,
+  readZohoRecruitFormHtml,
+  recruiteeApplyUrl,
   softgardenApplyUrl,
+  teamtailorApplyUrl,
 } from "./wave1a-forms.ts";
 
 export const FORM_READ_PATHS = [
@@ -30,6 +37,11 @@ export const FORM_READ_PATHS = [
   "workable_form",
   "personio_html",
   "breezy_json",
+  "teamtailor_html",
+  "zoho_recruit_html",
+  "bamboohr_html",
+  "recruitee_html",
+  "hireology_html",
   "softgarden_html",
   "clearcompany_html",
   "join_com_html",
@@ -61,7 +73,7 @@ export function isLoginWallRead(read: FormReadResult | null): read is LoginWallF
   return read !== null && "loginWall" in read;
 }
 
-export type FormReadAts = "lever" | "ashby" | "workable" | "personio" | BatchThreeAts;
+export type FormReadAts = "lever" | "ashby" | "workable" | "personio" | BatchTwoAts | BatchThreeAts;
 
 export interface FormReadTarget {
   ats: FormReadAts;
@@ -889,6 +901,30 @@ export function createPlainFormReader(
     });
   }
 
+  async function teamtailor(input: FormReadTarget) {
+    const url = teamtailorApplyUrl(input.applyUrl ?? input.url) ?? input.applyUrl ?? input.url;
+
+    return await fetchFormPage(url, readTeamtailorFormHtml);
+  }
+
+  async function zohoRecruit(input: FormReadTarget) {
+    return await fetchFormPage(input.applyUrl ?? input.url, readZohoRecruitFormHtml);
+  }
+
+  async function bambooHr(input: FormReadTarget) {
+    return await fetchFormPage(input.applyUrl ?? input.url, readBambooHRFormHtml);
+  }
+
+  async function recruitee(input: FormReadTarget) {
+    const url = recruiteeApplyUrl(input.applyUrl ?? input.url) ?? input.applyUrl ?? input.url;
+
+    return await fetchFormPage(url, readRecruiteeFormHtml);
+  }
+
+  async function hireology(input: FormReadTarget) {
+    return await fetchFormPage(input.applyUrl ?? input.url, readHireologyFormHtml);
+  }
+
   async function softgarden(input: FormReadTarget) {
     const url = softgardenApplyUrl(input.applyUrl ?? input.url) ?? input.applyUrl ?? input.url;
 
@@ -932,6 +968,26 @@ export function createPlainFormReader(
 
         if (input.ats === "breezy") {
           return await breezy(input);
+        }
+
+        if (input.ats === "teamtailor") {
+          return await teamtailor(input);
+        }
+
+        if (input.ats === "zoho_recruit") {
+          return await zohoRecruit(input);
+        }
+
+        if (input.ats === "bamboohr") {
+          return await bambooHr(input);
+        }
+
+        if (input.ats === "recruitee") {
+          return await recruitee(input);
+        }
+
+        if (input.ats === "hireology") {
+          return await hireology(input);
         }
 
         if (input.ats === "softgarden") {
