@@ -181,6 +181,7 @@
           "scripts/database-sync-guard.test.ts",
           "scripts/design-scale-guard.test.ts",
           "scripts/lint-config-guard.test.ts",
+          "scripts/ops-live-stripe.test.ts",
           "scripts/setup-stripe.test.ts",
           "scripts/vacuum-app-db.test.ts",
           "scripts/vacuum-fly.test.ts",
