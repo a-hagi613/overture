@@ -220,6 +220,7 @@
           "src/server/pipeline/answer-plan.test.ts",
           "src/server/pipeline/approved-plan.test.ts",
           "src/server/pipeline/email-notes.test.ts",
+          "src/server/pipeline/login-wall.test.ts",
           "src/server/pipeline/personio-form.test.ts",
           "src/server/pipeline/prepare-status.test.ts",
           "src/server/pipeline/reviews.test.ts",

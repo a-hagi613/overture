@@ -714,6 +714,15 @@ Job `application.prepare`:
    `personio_html` or `browser`); later postings with the same form signature reuse the cached questions and their
    catalog mappings. The development machine never makes these reads (ADR 0016). An Application never reaches
    `ready` with questions still unknown, because the user approves every answer (ADR 0029).
+   **Login-wall pre-flight:** every Lever and Personio HTML read, and the browser fallback, runs the deterministic
+   `detectLoginWall` check before anything is mapped or answered (`src/server/pipeline/login-wall.ts`). It reads the
+   URL the fetch settled on — a redirect to a sign-in, registration or SSO path, an identity-provider host, or an
+   added login query — and the page itself — a credentialed sign-in form or mandatory sign-in copy with no guest
+   application form. A wall marks the Application `skipped` with `status_reason='unsupported_login_required'` before
+   any model call, browser form-wait, retry or credit reservation, so nothing is charged and Home shows it as
+   Couldn't apply; the Posting's `questions_fetched_at` stays null so another user's Application is checked again.
+   The check is deliberately conservative: a page with an active guest form is never a wall, even when it also
+   offers "Sign in to autofill" or "Apply with LinkedIn", and an optional sign-in prompt alone is never a wall.
 2. Map each question to the catalog: normalise text (lowercase, strip punctuation/numbers/company names) → hash →
    `question_variants`; unknown → rules (regex set for common facts) → else Haiku mapping call returning
    `{fact_key | 'open_text' | 'consent' | 'skip' | 'unknown'}` from the fixed fact list. Rules alone may also map a

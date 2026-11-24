@@ -220,3 +220,48 @@ test("the admin accepts loopback fixtures in tests and refuses any other probe h
     fixture.close();
   }
 });
+
+test("a login-walled Personio page is probed as unreadable, not as a readable form", async ({
+  page,
+  adminIsolatedAppServer,
+  adminIsolatedAppUrl,
+  accessServer,
+}) => {
+  test.setTimeout(120_000);
+
+  const open = startPersonioFixture({ variant: "standard" });
+  const gated = startPersonioFixture({ loginWall: true });
+
+  try {
+    const urls = [open.applyUrl("930001"), gated.applyUrl("930002")];
+
+    const queued = await fetch(`${adminIsolatedAppServer.url}/__test__/jobs/run-now`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "probe.personio", payload: JSON.stringify({ urls }) }),
+    });
+
+    expect(queued.ok).toBe(true);
+
+    await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
+
+    const response = await page.request.get(`${adminIsolatedAppUrl}/admin/api/probes/personio`);
+
+    expect(response.status()).toBe(200);
+
+    const probe = probeSchema.parse(await response.json());
+
+    const walled = probe.forms.find((form) => form.url === urls[1]);
+    const readable = probe.forms.find((form) => form.url === urls[0]);
+
+    expect(readable?.outcome).toBe("readable");
+    expect(walled?.outcome).toBe("unreadable");
+    expect(walled?.questions).toBe(0);
+    expect(walled?.unhandled).toContain("login_wall");
+    expect(probe.summary?.unreadable).toBe(1);
+    expect(probe.summary?.passed).toBe(false);
+  } finally {
+    open.close();
+    gated.close();
+  }
+});

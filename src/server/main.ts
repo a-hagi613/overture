@@ -120,7 +120,7 @@ import { createPushSender } from "./platform/push/index.ts";
 import { createReviewService } from "./pipeline/reviews.ts";
 import { createResumeService } from "./profile/resume.ts";
 import { createBrowserProvider } from "./dispatch/browser/index.ts";
-import { captureFixtures } from "./fixtures/capture.ts";
+import { captureFixtures, LoginWallError } from "./fixtures/capture.ts";
 import {
   APPLICATION_SEND_JOB_KIND,
   DISPATCH_RECOVER_JOB_KIND,
@@ -457,8 +457,16 @@ const preparation = createPreparationService({
         { applyUrls: [input.applyUrl ?? input.url], ats: input.ats },
       );
 
-      return captured ?? null;
-    } catch {
+      if (captured === undefined) {
+        return null;
+      }
+
+      return { formSignature: captured.formSignature, questions: captured.questions };
+    } catch (error) {
+      if (error instanceof LoginWallError) {
+        return { evidence: error.evidence, loginWall: true };
+      }
+
       return null;
     }
   },

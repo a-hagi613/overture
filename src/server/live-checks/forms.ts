@@ -11,7 +11,7 @@ import { ATS_NAMES, captureFixtures } from "../fixtures/capture.ts";
 import { postings } from "../platform/db/catalog-schema.ts";
 
 import { env } from "../config/env.ts";
-import { createPlainFormReader } from "../pipeline/form-read.ts";
+import { createPlainFormReader, isLoginWallRead } from "../pipeline/form-read.ts";
 import { isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { previousCheckDetail } from "./store.ts";
 import { failedResult, skippedResult } from "./types.ts";
@@ -55,6 +55,15 @@ async function runPersonioCheck(
     region: "us",
     url: posting.url,
   });
+
+  if (isLoginWallRead(read)) {
+    return failedResult(
+      "forms.personio",
+      startedAt,
+      `a mandatory login gate stopped the read (${read.evidence.markers.join(", ")}); no form was read`,
+      deps.clock.now() - startedAt,
+    );
+  }
 
   if (read === null || read.questions.length === 0) {
     return failedResult(

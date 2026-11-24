@@ -105,6 +105,10 @@ const FAILED_REASON_TEXT = new Map<string, string>([
     "unconfirmed",
     "Overture couldn't confirm this one reached the employer, so it won't send it again.",
   ],
+  [
+    "unsupported_login_required",
+    "This employer needs an account before anyone can apply, so Overture skipped it.",
+  ],
   ["upload_failed", "The resume upload failed, so nothing was sent."],
 ]);
 

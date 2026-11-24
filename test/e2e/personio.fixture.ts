@@ -10,6 +10,11 @@ const TEMPLATE = readFileSync(
   "utf8",
 );
 
+const SIGN_IN = readFileSync(
+  join(process.cwd(), "test/e2e/fixtures/forms/login-wall/sign-in.html"),
+  "utf8",
+);
+
 export type PersonioVariant = "standard" | "custom" | "documents";
 
 export interface PersonioFixtureState {
@@ -34,6 +39,7 @@ interface PersonioFixtureOptions {
   submitStatus?: number | undefined;
   redirectToAlternateHost?: boolean | undefined;
   redirectJobId?: string | undefined;
+  loginWall?: boolean | undefined;
 }
 
 const CUSTOM_FIELDS = `
@@ -237,6 +243,12 @@ export function startPersonioFixture(options: PersonioFixtureOptions = {}) {
 
       if (applyPage?.groups?.job !== undefined && request.method === "GET") {
         const jobId = applyPage.groups.job;
+
+        if (options.loginWall === true) {
+          return new Response(SIGN_IN, {
+            headers: { "content-type": "text/html; charset=utf-8" },
+          });
+        }
 
         if (
           url.searchParams.get("redirected") !== "1" &&

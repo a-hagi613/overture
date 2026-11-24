@@ -9,6 +9,7 @@ import type { AppServer } from "./app-server.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import {
+  grantApplications,
   ownerContextFor,
   seedApplication,
   seedBoard,
@@ -22,7 +23,15 @@ const LEVER_JOB_ID = "46a2b956-a8e4-4b91-a404-08121e10bb62";
 
 const ASHBY_JOB_ID = "0a278229-474e-4534-82d0-ebfafe18ad9d";
 
+const LOGIN_WALL_JOB_ID = "c4f1c0d2-6b7a-4c3e-9d10-3f4c2b8e7a11";
+
+const AUTOFILL_JOB_ID = "9f7e2d31-0a4b-4f68-8c25-51d0b4e6f212";
+
 const HIVE_FORM = readFileSync(join(FORMS, "lever", `hive-${LEVER_JOB_ID}.fixture.html`), "utf8");
+
+const SIGN_IN_PAGE = readFileSync(join(FORMS, "login-wall", "sign-in.html"), "utf8");
+
+const GUEST_FORM_PAGE = readFileSync(join(FORMS, "login-wall", "lever-guest-form.html"), "utf8");
 
 const CLERA_FORM = readFileSync(join(FORMS, "ashby", `clera-${ASHBY_JOB_ID}.form.json`), "utf8");
 
@@ -41,6 +50,7 @@ const FACTS = [
 
 interface FormFixtureServer {
   url: string;
+  gatedReads: () => number;
   leverReads: () => number;
   ashbyReads: () => { boardToken: string; jobPostingId: string }[];
   stop: () => void;
@@ -48,6 +58,7 @@ interface FormFixtureServer {
 
 function startFormFixtureServer() {
   let leverReads = 0;
+  let gatedReads = 0;
   const ashbyReads: { boardToken: string; jobPostingId: string }[] = [];
 
   const server = Bun.serve({
@@ -83,12 +94,30 @@ function startFormFixtureServer() {
         return new Response(HIVE_FORM, { headers: { "content-type": "text/html" } });
       }
 
+      if (/^\/gated\/[^/]+\/apply$/u.test(url.pathname)) {
+        gatedReads += 1;
+
+        if (url.pathname.includes(LOGIN_WALL_JOB_ID)) {
+          return new Response(null, {
+            headers: { location: `/login?returnUrl=${encodeURIComponent(url.pathname)}` },
+            status: 302,
+          });
+        }
+
+        return new Response(GUEST_FORM_PAGE, { headers: { "content-type": "text/html" } });
+      }
+
+      if (url.pathname === "/login") {
+        return new Response(SIGN_IN_PAGE, { headers: { "content-type": "text/html" } });
+      }
+
       return new Response("not found", { status: 404 });
     },
   });
 
   return {
     ashbyReads: () => ashbyReads,
+    gatedReads: () => gatedReads,
     leverReads: () => leverReads,
     stop: () => {
       void server.stop(true);
@@ -127,6 +156,15 @@ const planCacheSchema = z.object({
 
 const applicationSchema = z.object({
   application: z.object({ status: z.string(), statusReason: z.string().nullable() }),
+});
+
+const attemptsSchema = z.object({
+  attempts: z.array(z.object({ id: z.string(), outcome: z.string().nullable() })),
+});
+
+const billingStateSchema = z.object({
+  applicationsLeft: z.number(),
+  ledger: z.array(z.object({ kind: z.string() })),
 });
 
 async function runJob(owner: APIRequestContext, kind: string, payload: string) {
@@ -264,6 +302,24 @@ async function seedClera(owner: APIRequestContext, fixture: FormFixtureServer) {
     title: "Werkstudent Content & Brand (m/w/d)",
     url: `${fixture.url}/clera/${ASHBY_JOB_ID}/application`,
   });
+}
+
+async function seedGated(owner: APIRequestContext, fixture: FormFixtureServer) {
+  const companyId = await seedCompany(owner, "Gated Co", "gated.example");
+  const boardId = await seedBoard(owner, companyId, "lever", "gated");
+
+  async function posting(jobId: string) {
+    return seedPosting(owner, {
+      ats: "lever",
+      atsJobId: jobId,
+      boardId,
+      companyId,
+      title: "Senior Product Designer",
+      url: `${fixture.url}/gated/${jobId}/apply`,
+    });
+  }
+
+  return { companyId, posting };
 }
 
 appTest.describe("reading Lever and Ashby forms in preparation", () => {
@@ -442,6 +498,147 @@ appTest.describe("reading Lever and Ashby forms in preparation", () => {
         expect(plan?.readPath).toBe("ashby_graphql");
         expect(plan?.questions).toBe(4);
         expect(plan?.hits).toBe(0);
+        expect(anthropic.batchesCreated()).toBe(0);
+        expect(anthropic.singleMessages()).toHaveLength(0);
+      } finally {
+        await server?.stop();
+        anthropic.stop();
+        fixture.stop();
+      }
+    },
+  );
+});
+
+appTest.describe("the login-wall pre-flight in preparation", () => {
+  appTest(
+    "skips a posting behind a mandatory login wall without spending an Application",
+    async ({ identityServer }) => {
+      const fixture = startFormFixtureServer();
+      const anthropic = await startAnthropicFixtureServer();
+
+      let server: AppServer | null = null;
+
+      try {
+        server = await startFreshAppServer(identityServer, {
+          ANTHROPIC_API_KEY: "test-anthropic-key",
+          ANTHROPIC_BASE_URL: anthropic.url,
+          LEVER_JOBS_BASE_URL: fixture.url,
+        });
+
+        const { owner, userId } = await ownerContextFor(server.url);
+
+        await grantApplications(owner, 3);
+        await prepareProfile(owner);
+
+        const gated = await seedGated(owner, fixture);
+        const postingId = await gated.posting(LOGIN_WALL_JOB_ID);
+
+        const applicationId = await seedApplication(owner, {
+          postingId,
+          status: "preparing",
+          userId,
+        });
+
+        await prepare(owner, applicationId);
+
+        expect(fixture.gatedReads()).toBe(1);
+
+        const skipped = await applicationStatus(owner, applicationId);
+
+        expect(skipped).toEqual({
+          status: "skipped",
+          statusReason: "unsupported_login_required",
+        });
+
+        const attempts = attemptsSchema.parse(
+          await (
+            await owner.get(`/__test__/attempts?applicationId=${encodeURIComponent(applicationId)}`)
+          ).json(),
+        );
+
+        expect(attempts.attempts).toHaveLength(0);
+
+        const billing = billingStateSchema.parse(
+          await (
+            await owner.get(`/__test__/billing-state?userId=${encodeURIComponent(userId)}`)
+          ).json(),
+        );
+
+        expect(billing.applicationsLeft).toBe(3);
+        expect(billing.ledger.map((entry) => entry.kind)).toEqual(["grant"]);
+
+        expect((await planCache(owner)).filter((plan) => plan.ats === "lever")).toHaveLength(0);
+        expect(anthropic.batchesCreated()).toBe(0);
+        expect(anthropic.singleMessages()).toHaveLength(0);
+      } finally {
+        await server?.stop();
+        anthropic.stop();
+        fixture.stop();
+      }
+    },
+  );
+
+  appTest(
+    "prepares a guest form that only offers an optional sign-in to autofill",
+    async ({ identityServer }) => {
+      const fixture = startFormFixtureServer();
+      const anthropic = await startAnthropicFixtureServer();
+
+      let server: AppServer | null = null;
+
+      try {
+        server = await startFreshAppServer(identityServer, {
+          ANTHROPIC_API_KEY: "test-anthropic-key",
+          ANTHROPIC_BASE_URL: anthropic.url,
+          LEVER_JOBS_BASE_URL: fixture.url,
+        });
+
+        const { owner, userId } = await ownerContextFor(server.url);
+
+        await grantApplications(owner, 3);
+        await prepareProfile(owner);
+
+        const gated = await seedGated(owner, fixture);
+        const postingId = await gated.posting(AUTOFILL_JOB_ID);
+
+        const applicationId = await seedApplication(owner, {
+          postingId,
+          status: "preparing",
+          userId,
+        });
+
+        await prepare(owner, applicationId);
+
+        expect(fixture.gatedReads()).toBe(1);
+
+        const prepared = await applicationStatus(owner, applicationId);
+
+        expect(prepared).toEqual({ status: "ready", statusReason: null });
+
+        const answers = await answersFor(owner, applicationId);
+        const byPrompt = new Map(answers.map((answer) => [answer.text, answer]));
+
+        expect(byPrompt.get("Full name")?.answer).toBe("Maya Okafor");
+        expect(byPrompt.get("Email")?.answer).toBe("maya.okafor@example.com");
+        expect(byPrompt.get("Phone")?.resolved).toBe(true);
+        expect(byPrompt.get("Current location")?.answer).toBe("London");
+        expect(byPrompt.get("LinkedIn URL")?.answer).toBe(
+          "https://www.linkedin.com/in/maya-okafor",
+        );
+
+        const plan = (await planCache(owner)).find((entry) => entry.ats === "lever");
+
+        expect(plan?.readPath).toBe("lever_html");
+        expect(plan?.questions).toBe(5);
+
+        const billing = billingStateSchema.parse(
+          await (
+            await owner.get(`/__test__/billing-state?userId=${encodeURIComponent(userId)}`)
+          ).json(),
+        );
+
+        expect(billing.applicationsLeft).toBe(3);
+        expect(billing.ledger.map((entry) => entry.kind)).toEqual(["grant"]);
         expect(anthropic.batchesCreated()).toBe(0);
         expect(anthropic.singleMessages()).toHaveLength(0);
       } finally {
