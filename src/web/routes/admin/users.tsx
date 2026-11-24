@@ -19,13 +19,13 @@ const filters = [
 ] as const;
 
 const buttonClass =
-  "inline-flex h-10 flex-none items-center justify-center rounded-md border border-foreground bg-foreground px-4 text-sm font-semibold text-card hover:opacity-90";
+  "inline-flex min-h-11 flex-none items-center justify-center rounded-md border border-foreground bg-foreground px-4 text-sm font-semibold text-card hover:opacity-90 md:min-h-10";
 
 const chipClass =
-  "inline-flex min-h-8 items-center rounded-full border px-3.5 text-xs font-semibold";
+  "inline-flex min-h-11 items-center rounded-full border px-3.5 text-xs font-semibold md:min-h-8";
 
 const pageButtonClass =
-  "inline-flex h-9 min-w-[92px] items-center justify-center rounded-md border border-input bg-card px-3 text-xs font-semibold disabled:opacity-50";
+  "inline-flex min-h-11 min-w-[92px] items-center justify-center rounded-md border border-input bg-card px-3 text-xs font-semibold disabled:opacity-50 md:min-h-9";
 
 export function UsersPage() {
   const [status, setStatus] = useState<AdminStatus>("all");
@@ -92,14 +92,7 @@ export function UsersPage() {
   }, [request]);
 
   if (refusal !== null) {
-    return (
-      <AdminGateScreen
-        code={refusal}
-        onPasskeyDone={() => {
-          void refresh();
-        }}
-      />
-    );
+    return <AdminGateScreen code={refusal} />;
   }
 
   if (data === null) {

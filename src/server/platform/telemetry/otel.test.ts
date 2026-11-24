@@ -146,7 +146,13 @@ test("the metric attribute scan catches a label passed when recording", () => {
 test("no metric caller attaches a high-cardinality identifier", () => {
   expect([...OTEL_METRIC_ATTRIBUTE_DENYLIST]).toEqual([
     "http.url",
+    "url",
     "job.id",
+    "job_id",
+    "user.id",
+    "user_id",
+    "email",
+    "email_address",
     "sse.user_id",
     "admin.target_user_id",
   ]);

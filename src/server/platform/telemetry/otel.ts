@@ -27,6 +27,8 @@ import {
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 import type { ExportResult } from "@opentelemetry/core";
 
+import { prometheusExporter } from "./prometheus.ts";
+
 export { trace } from "@opentelemetry/api";
 
 export const METRIC_EXPORT_INTERVAL_MILLIS = 60_000;
@@ -40,7 +42,13 @@ export const BATCH_PROCESSOR_LIMITS = {
 
 export const OTEL_METRIC_ATTRIBUTE_DENYLIST = new Set([
   "http.url",
+  "url",
   "job.id",
+  "job_id",
+  "user.id",
+  "user_id",
+  "email",
+  "email_address",
   "sse.user_id",
   "admin.target_user_id",
 ]);
@@ -247,6 +255,7 @@ export function startTelemetry(options: {
         exporter: metricExporter,
         exportIntervalMillis: METRIC_EXPORT_INTERVAL_MILLIS,
       }),
+      prometheusExporter,
     ],
     logRecordProcessors: [
       new BatchLogRecordProcessor({ exporter: logExporter, ...BATCH_PROCESSOR_LIMITS }),

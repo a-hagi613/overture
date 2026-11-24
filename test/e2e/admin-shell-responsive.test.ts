@@ -1,6 +1,5 @@
-import { enableVirtualAuthenticator, signInOwnerOnAdmin } from "./admin-sign-in.ts";
+import { openAdminAsOwner } from "./admin-sign-in.ts";
 import { expect, test } from "./admin.fixture.ts";
-import { authTestIdentity } from "./auth.fixture.ts";
 
 import { AxeBuilder } from "@axe-core/playwright";
 
@@ -59,32 +58,9 @@ async function signInAsOwner(
   adminIsolatedAppUrl: string,
   issueToken: (claims: { email: string }) => Promise<string>,
 ) {
-  await enableVirtualAuthenticator(page);
-  await signInOwnerOnAdmin(page, adminIsolatedAppUrl);
+  await openAdminAsOwner(page, adminIsolatedAppUrl, issueToken);
 
-  const token = await issueToken({ email: authTestIdentity.ownerEmail });
-
-  const cookie = {
-    name: "CF_Authorization",
-    value: token,
-    domain: "localhost",
-    path: "/",
-    expires: -1,
-    httpOnly: true,
-    secure: false,
-    sameSite: "Lax" as const,
-  };
-
-  await page.context().addCookies([cookie]);
-  await page.goto(`${adminIsolatedAppUrl}/admin`);
-  await page.getByRole("button", { name: "Add your passkey" }).click();
-  await expect(page.getByRole("heading", { name: "Background jobs" })).toBeVisible();
-
-  const state = await page.context().storageState();
-
-  state.cookies.push(cookie);
-
-  return state;
+  return page.context().storageState();
 }
 
 async function openAdminShell(

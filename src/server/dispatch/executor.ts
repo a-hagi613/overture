@@ -42,6 +42,7 @@ import { stageForStatus } from "../pipeline/stage.ts";
 import { ProviderUnavailableError, browserModeForAttempt } from "./browser/provider.ts";
 import { applySendProxyTrim } from "./browser/proxy-trim.ts";
 import { recordApplicationVariableCosts } from "./application-cost.ts";
+import { defaultMetrics } from "../platform/telemetry/metrics.ts";
 import { runAshbyAttempt } from "./ats/ashby.ts";
 import type { AshbyRun } from "./ats/ashby.ts";
 import { runGreenhouseAttempt } from "./ats/greenhouse.ts";
@@ -728,6 +729,10 @@ export function createDispatcher(deps: DispatcherDeps) {
 
     const { attemptId } = claimed;
 
+    const attemptStartedAt = performance.now();
+    let attemptAts = "unknown";
+    let attemptMode = "unknown";
+
     activeAttempts.add(attemptId);
 
     let browser: RemoteBrowser | null = null;
@@ -783,6 +788,8 @@ export function createDispatcher(deps: DispatcherDeps) {
 
       const { plan } = approved;
 
+      attemptAts = plan.ats;
+
       let resumeBytes: Uint8Array<ArrayBuffer> | null = null;
 
       if (plan.resume !== null) {
@@ -809,10 +816,14 @@ export function createDispatcher(deps: DispatcherDeps) {
         throw new Error("shutting down before the browser opened");
       }
 
+      const mode = browserModeForAttempt(provider.id, previousOutcome(applicationId, attemptId));
+
+      attemptMode = mode;
+
       browser = await provider.open({
         attemptId,
         country: proxyCountry,
-        mode: browserModeForAttempt(provider.id, previousOutcome(applicationId, attemptId)),
+        mode,
         profileId: await provider.ensureProfile(plan.userId, proxyCountry),
         timeoutMinutes: SESSION_TIMEOUT_MINUTES,
       });
@@ -1293,6 +1304,15 @@ export function createDispatcher(deps: DispatcherDeps) {
       } catch (error) {
         logError("dispatch.cost", error);
       }
+
+      const finalOutcome = finished?.outcome ?? outcome;
+
+      defaultMetrics().recordApplyAttempt({
+        ats: attemptAts,
+        durationMs: performance.now() - attemptStartedAt,
+        mode: attemptMode,
+        outcome: finalOutcome,
+      });
     }
 
     return true;

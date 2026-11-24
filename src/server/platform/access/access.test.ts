@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { accessIssuer, createAccessVerifier } from "./index.ts";
+import { accessIssuer, accessJwksUrlFromEnv, createAccessVerifier } from "./index.ts";
 
 const audience = "overture-admin-audience";
 const teamDomain = "overture.cloudflareaccess.com";
@@ -46,5 +46,28 @@ describe("the Cloudflare Access verifier", () => {
   test("does not invent an issuer from a missing team domain", () => {
     expect(accessIssuer(teamDomain)).toBe(`https://${teamDomain}`);
     expect(accessIssuer(undefined)).toBeUndefined();
+  });
+
+  test("an explicit JWKS URL wins, the team domain is the fallback, and neither configures no verifier", () => {
+    expect(accessJwksUrlFromEnv(jwksUrl, teamDomain)?.href).toBe(jwksUrl);
+    expect(accessJwksUrlFromEnv(undefined, teamDomain)?.href).toBe(jwksUrl);
+    expect(accessJwksUrlFromEnv(undefined, undefined)).toBeNull();
+
+    expect(createAccessVerifier({ audience: undefined, jwksUrl, teamDomain })).toBeNull();
+    expect(
+      createAccessVerifier({ audience, jwksUrl: undefined, teamDomain: undefined }),
+    ).toBeNull();
+  });
+
+  test("no Access credential at all verifies to null", async () => {
+    const verifier = verifierFor();
+
+    if (verifier === null) {
+      throw new Error("the verifier should be configured");
+    }
+
+    const request = new Request("https://admin.example.com/admin/api/overview");
+
+    expect(await verifier.verify(request)).toBeNull();
   });
 });

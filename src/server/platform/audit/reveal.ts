@@ -17,8 +17,6 @@ import {
 
 export const REVEAL_DURATION_MS = 15 * 60 * 1000;
 
-export const REVEAL_PASSKEY_WINDOW_MS = 5 * 60 * 1000;
-
 const REVEAL_STATE_ACTIONS = ["reveal.open", "reveal.close", "reveal.expired"] as const;
 
 const revealDetailSchema = z.object({

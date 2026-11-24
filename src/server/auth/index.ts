@@ -116,8 +116,26 @@ const ownerEmail = env.OWNER_EMAIL;
 
 const inviteHashSecrets = authSecretConfig.accepted;
 
-export function isAllowedEmail(email: string) {
+/**
+ * Whether an address belongs to the single owner account the admin host trusts.
+ * @param email The address to compare, in any case.
+ * @returns True when the address is the owner's mailbox.
+ */
+export function isOwnerEmail(email: string) {
   return isSameMailbox(email, ownerEmail);
+}
+
+/**
+ * Whether an address may sign up while public sign-up is off: the owner or a
+ * deliberately allowlisted tester. Allowlisted addresses never become owners.
+ * @param email The address to compare, in any case.
+ * @returns True when the address may create an account without an invite.
+ */
+export function isAllowedEmail(email: string) {
+  return (
+    isOwnerEmail(email) ||
+    env.ALLOWED_SIGNUP_EMAILS.some((allowed) => isSameMailbox(email, allowed))
+  );
 }
 
 export type Auth = ReturnType<typeof createAuth>;
@@ -337,7 +355,7 @@ export function createAuth(
               data: {
                 ...user,
                 email,
-                role: isSameMailbox(email, ownerEmail) ? "owner" : "user",
+                role: isOwnerEmail(email) ? "owner" : "user",
               },
             };
 
@@ -355,7 +373,7 @@ export function createAuth(
             await options.onUserCreated?.({ id: user.id, email: user.email });
             await Promise.resolve(invite);
 
-            if (!user.emailVerified || isSameMailbox(email, ownerEmail)) {
+            if (!user.emailVerified || isOwnerEmail(email)) {
               return;
             }
 
@@ -363,7 +381,7 @@ export function createAuth(
 
             const accepted = invite === null ? null : acceptInvite(db, clock, invite, user.id);
 
-            if (accepted !== null || env.PUBLIC_SIGNUP_ENABLED) {
+            if (accepted !== null || env.PUBLIC_SIGNUP_ENABLED || isAllowedEmail(email)) {
               return;
             }
 
@@ -385,11 +403,11 @@ export function createAuth(
 
             await Promise.resolve(invite);
 
-            if (user.emailVerified && !isSameMailbox(email, ownerEmail)) {
+            if (user.emailVerified && !isOwnerEmail(email)) {
               markWaitlistJoined(db, clock, email);
             }
 
-            if (invite !== null && !isSameMailbox(email, ownerEmail)) {
+            if (invite !== null && !isOwnerEmail(email)) {
               acceptInvite(db, clock, invite, user.id);
             }
           },

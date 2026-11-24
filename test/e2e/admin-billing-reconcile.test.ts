@@ -307,7 +307,7 @@ test("the per-user billing view and its refund page are reachable and axe clean"
   await page.goto(`${adminIsolatedAppUrl}/admin/billing/users/${owner.id}`);
 
   await expect(
-    page.getByRole("heading", { name: authTestIdentity.ownerEmail, exact: true }),
+    page.getByRole("heading", { name: authTestIdentity.ownerName, exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("main").getByText(authTestIdentity.ownerEmail, { exact: true }),
