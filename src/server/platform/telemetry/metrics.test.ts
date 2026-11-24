@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 
+import { Hono } from "hono";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { MeterProvider } from "@opentelemetry/sdk-metrics";
 
@@ -11,7 +12,12 @@ import {
   METRIC_NAMES,
   sanitizeMetricAttributes,
 } from "./metrics.ts";
-import { normalizeRouteTemplate, routeLabel, statusClassOf } from "./http-metrics.ts";
+import {
+  createHttpRequestMetrics,
+  normalizeRouteTemplate,
+  routeLabel,
+  statusClassOf,
+} from "./http-metrics.ts";
 
 async function scrape(run: (recorder: ReturnType<typeof createMetrics>) => void) {
   const exporter = createPrometheusExporter();
@@ -126,7 +132,7 @@ test("LLM cost follows the rate card in models.ts", () => {
   ).toBeCloseTo(0.05 + 0.25);
 });
 
-test("route labels use bounded templates, never raw ids or query strings", () => {
+test("route labels use bounded templates, never raw ids or scanner paths", () => {
   expect(normalizeRouteTemplate("/api/applications/42/status")).toBe(
     "/api/applications/:id/status",
   );
@@ -135,12 +141,51 @@ test("route labels use bounded templates, never raw ids or query strings", () =>
   ).toBe("/api/applications/:id/ready");
   expect(normalizeRouteTemplate("/api/supply")).toBe("/api/supply");
 
-  const request = new Request("https://overture.test/api/supply?q=acme%20corp");
-  const label = routeLabel(request, "*");
-
-  expect(label).toBe("/api/supply");
-  expect(label).not.toContain("?");
-  expect(routeLabel(request, "/api/supply")).toBe("/api/supply");
+  expect(routeLabel("/api/supply", 200)).toBe("/api/supply");
+  expect(routeLabel("/api/applications/:id/ready", 200)).toBe("/api/applications/:id/ready");
+  expect(routeLabel(undefined, 404)).toBe("_unmatched");
+  expect(routeLabel("", 404)).toBe("_unmatched");
+  expect(routeLabel("*", 404)).toBe("_unmatched");
+  expect(routeLabel("/*", 404)).toBe("_unmatched");
+  expect(routeLabel("*", 200)).toBe("/*");
+  expect(routeLabel(undefined, 500)).toBe("/*");
   expect(statusClassOf(204)).toBe("2xx");
   expect(statusClassOf(503)).toBe("5xx");
+});
+
+test("random scanner 404 paths collapse to the bounded _unmatched series", async () => {
+  const samples: { method: string; route: string; statusClass: string }[] = [];
+  const app = new Hono();
+
+  app.use(
+    "*",
+    createHttpRequestMetrics((sample) => samples.push(sample)),
+  );
+  app.get("/api/supply", (context) => context.json({ ok: true }));
+  app.all("*", (context) => context.text("Not found", 404));
+
+  const responses = await Promise.all(
+    ["/wp-login.php", "/.env", "/random-word-xyz", "/api/../../etc/passwd"].map(
+      async (path) => await app.request(`https://overture.test${path}?probe=1`),
+    ),
+  );
+
+  for (const response of responses) {
+    expect(response.status).toBe(404);
+  }
+
+  const matched = await app.request("https://overture.test/api/supply");
+
+  expect(matched.status).toBe(200);
+  expect(samples.map((sample) => sample.route)).toEqual([
+    "_unmatched",
+    "_unmatched",
+    "_unmatched",
+    "_unmatched",
+    "/api/supply",
+  ]);
+  expect(
+    samples.every((sample) => sample.statusClass === "4xx" || sample.statusClass === "2xx"),
+  ).toBe(true);
+  expect(new Set(samples.map((sample) => sample.route)).size).toBe(2);
 });

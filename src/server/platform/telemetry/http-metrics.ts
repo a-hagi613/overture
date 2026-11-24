@@ -28,13 +28,16 @@ export function normalizeRouteTemplate(pathname: string) {
 }
 
 /**
- * Picks the label for one request: Hono's matched route template when it has one, otherwise the
- * normalized pathname. It never uses `request.url`, so a query string cannot reach a metric.
- * @param request The incoming request.
+ * Picks the label for one request: Hono's matched route template when it has one, otherwise a
+ * bounded constant. An unmatched path is never used as a label: internet scanners hit thousands of
+ * random 404s (`/wp-login.php`, `/.env`, `/random-word-xyz`), and each raw pathname would become its
+ * own Prometheus series in RAM and blow the scraper's cardinality cap.
  * @param matchedRoute Hono's `routePath`, which is `*` for an unmatched wildcard middleware.
- * @returns The bounded route label.
+ * @param status The final response status.
+ * @returns `_unmatched` for a 404 on no matched route, `/*` for any other unmatched response, or the
+ * bounded template of the matched route.
  */
-export function routeLabel(request: Request, matchedRoute: string | undefined) {
+export function routeLabel(matchedRoute: string | undefined, status: number) {
   if (
     matchedRoute !== undefined &&
     matchedRoute !== "" &&
@@ -44,31 +47,54 @@ export function routeLabel(request: Request, matchedRoute: string | undefined) {
     return normalizeRouteTemplate(matchedRoute);
   }
 
-  return normalizeRouteTemplate(new URL(request.url).pathname);
+  return status === 404 ? "_unmatched" : "/*";
 }
 
 export function statusClassOf(status: number) {
   return `${String(Math.floor(status / 100))}xx`;
 }
 
-const httpRequestMetrics: MiddlewareHandler = async (context: Context, next: Next) => {
-  const startedAt = performance.now();
-  let status = 500;
+export interface HttpMetricSample {
+  durationMs: number;
+  method: string;
+  route: string;
+  statusClass: string;
+}
 
-  try {
-    await next();
-    ({ status } = context.res);
-  } finally {
-    const { method } = context.req;
+type HttpMetricRecorder = (sample: HttpMetricSample) => void;
 
-    defaultMetrics().recordHttpRequest({
-      durationMs: performance.now() - startedAt,
-      method,
-      route: routeLabel(context.req.raw, routePath(context, -1)),
-      statusClass: statusClassOf(status),
-    });
-  }
-};
+/**
+ * Builds the request middleware around an injected recorder, so a test can observe the labels the
+ * real Hono routing produces without a meter provider.
+ * @param record Where each finished request's sample goes.
+ * @returns The Hono middleware.
+ */
+export function createHttpRequestMetrics(record: HttpMetricRecorder) {
+  const middleware: MiddlewareHandler = async (context: Context, next: Next) => {
+    const startedAt = performance.now();
+    let status = 500;
+
+    try {
+      await next();
+      ({ status } = context.res);
+    } finally {
+      const { method } = context.req;
+
+      record({
+        durationMs: performance.now() - startedAt,
+        method,
+        route: routeLabel(routePath(context), status),
+        statusClass: statusClassOf(status),
+      });
+    }
+  };
+
+  return middleware;
+}
+
+const httpRequestMetrics = createHttpRequestMetrics((sample) => {
+  defaultMetrics().recordHttpRequest(sample);
+});
 
 /**
  * Records `overture_http_requests_total` and `overture_http_duration_ms` for every request the
