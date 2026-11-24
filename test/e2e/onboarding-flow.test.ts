@@ -175,7 +175,7 @@ test("an unreadable PDF still continues to preferences", async ({ browser, onboa
   await expect(page.getByText("resume-scanned.pdf")).toBeVisible();
   await expect(
     page.getByText(
-      "This PDF could not be parsed automatically. Upload another file, or continue and add the details from Profile → Details after setup.",
+      "This PDF could not be parsed automatically. Upload another file, or continue and add the details from Profile → Saved answers after setup.",
     ),
   ).toBeVisible();
 

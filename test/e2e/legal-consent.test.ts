@@ -85,7 +85,7 @@ test("the legal pages cover billing and mark themselves as drafts", async ({
   await expect(page.getByText(/renews automatically/u).first()).toBeVisible();
   await expect(page.getByText(/We do not give refunds by default/u)).toBeVisible();
   await expect(
-    page.getByText(/never charged and never uses one of your applications/u),
+    page.getByText(/you are never charged for it and it never uses one of your applications/u),
   ).toBeVisible();
   await expect(page.getByText(/Stripe processes the payment for Overture/u).first()).toBeVisible();
   await expect(
