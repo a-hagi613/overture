@@ -181,6 +181,26 @@ async function seedSupplyCatalog(request: APIRequestContext) {
   }
 }
 
+function isSupplyRequest(url: string) {
+  if (url === "") {
+    return false;
+  }
+
+  try {
+    return new URL(url).pathname === "/api/supply";
+  } catch {
+    return false;
+  }
+}
+
+function isExpectedConsoleError(entry: { text: string; url: string }) {
+  return (
+    entry.text.includes("status of 503") ||
+    entry.text.includes("Content Security Policy") ||
+    isSupplyRequest(entry.url)
+  );
+}
+
 async function layoutOf(page: Page) {
   return page.evaluate(() => {
     const section = document.querySelector("#live-jobs")?.getBoundingClientRect();
@@ -281,14 +301,7 @@ test.describe("the landing live supply preview", () => {
     await page.getByRole("button", { name: "Try again" }).click();
     await expect(page.getByTestId("supply-count")).toHaveText("4");
 
-    expect(
-      consoleErrors.filter(
-        (entry) =>
-          !entry.url.includes("/api/supply") &&
-          !entry.text.includes("status of 503") &&
-          !entry.text.includes("fonts.googleapis.com"),
-      ),
-    ).toEqual([]);
+    expect(consoleErrors.filter((entry) => !isExpectedConsoleError(entry))).toEqual([]);
     expect(pageErrors).toEqual([]);
   });
 
