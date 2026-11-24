@@ -63,3 +63,16 @@ test("a subject carrying a line break is flattened to one line before it is sent
   expect(payload.subject).toBe("Re: Ready card Bcc: evil@example.test");
   expect(payload.reply_to).toBeUndefined();
 });
+
+test("a waitlist invite carries its own subject and the onboarding link", async () => {
+  await sender.sendWaitlistInvite({
+    to: "person@example.test",
+    url: "https://app.tryoverture.com/signin",
+  });
+
+  const payload = sentBodySchema.parse(sent.at(-1));
+
+  expect(payload.subject).toBe("Your Overture invite is ready");
+  expect(payload.text).toContain("https://app.tryoverture.com/signin");
+  expect(payload.to).toEqual(["person@example.test"]);
+});

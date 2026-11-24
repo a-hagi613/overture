@@ -3,6 +3,12 @@ export interface OutboundMagicLinkMail {
   url: string;
 }
 
+/** The onboarding link an approved waitlist entry receives (WS-22). */
+export interface OutboundWaitlistInviteMail {
+  to: string;
+  url: string;
+}
+
 export interface SentMail {
   id: string;
   to: string;
@@ -65,6 +71,7 @@ export interface OutboundSupportReplyMail {
 
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
+  sendWaitlistInvite: (mail: OutboundWaitlistInviteMail) => Promise<void>;
   sendCheck: (mail: OutboundCheckMail) => Promise<void>;
   sendCodeWait: (mail: OutboundCodeWaitMail) => Promise<void>;
   sendReadyRecap: (mail: OutboundReadyRecapMail) => Promise<void>;

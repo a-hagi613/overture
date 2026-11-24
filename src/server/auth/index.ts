@@ -35,6 +35,7 @@ import {
   verifiedUserWithEmail,
 } from "./invites.ts";
 import { verifyTurnstile } from "./turnstile-gate.ts";
+import { markWaitlistJoined } from "../waitlist/store.ts";
 import { clientIpHeaders } from "./client-ip.ts";
 import { trustedOriginsFor } from "./trusted-origins.ts";
 import { demoLoginPlugin, DEMO_SESSION_MS } from "./demo-login.ts";
@@ -358,6 +359,8 @@ export function createAuth(
               return;
             }
 
+            markWaitlistJoined(db, clock, email);
+
             const accepted = invite === null ? null : acceptInvite(db, clock, invite, user.id);
 
             if (accepted !== null || env.PUBLIC_SIGNUP_ENABLED) {
@@ -381,6 +384,10 @@ export function createAuth(
               : null;
 
             await Promise.resolve(invite);
+
+            if (user.emailVerified && !isSameMailbox(email, ownerEmail)) {
+              markWaitlistJoined(db, clock, email);
+            }
 
             if (invite !== null && !isSameMailbox(email, ownerEmail)) {
               acceptInvite(db, clock, invite, user.id);

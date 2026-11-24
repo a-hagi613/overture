@@ -7,6 +7,7 @@ import { mePayload } from "./me-payload.ts";
 const config: MeConfig = {
   adminOrigin: "https://admin.tryoverture.com",
   adminOwnerEmail: null,
+  publicSignupEnabled: true,
   socialProviders: ["google"],
   turnstileScriptUrl: "/turnstile.js",
   turnstileSiteKey: "site-key",
@@ -46,6 +47,20 @@ describe("GET /api/me admin origin scoping", () => {
     for (const role of ["", "Owner", "admin", "owner "]) {
       expect(mePayload(userOf(role), config).adminOrigin).toBeNull();
     }
+  });
+});
+
+describe("GET /api/me public sign-up flag", () => {
+  test("the waitlist page can tell that public sign-up is closed", () => {
+    expect(mePayload(null, { ...config, publicSignupEnabled: false }).publicSignupEnabled).toBe(
+      false,
+    );
+  });
+
+  test("an open sign-up passes the flag through", () => {
+    expect(mePayload(null, { ...config, publicSignupEnabled: true }).publicSignupEnabled).toBe(
+      true,
+    );
   });
 });
 

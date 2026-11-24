@@ -156,6 +156,7 @@ const BillingRefundPage = lazyRoute(
 const UsersPage = lazyRoute(async () => import("./routes/admin/users.tsx"), "UsersPage");
 const UserPage = lazyRoute(async () => import("./routes/admin/user.tsx"), "UserPage");
 const InvitesPage = lazyRoute(async () => import("./routes/admin/invites.tsx"), "InvitesPage");
+const WaitlistPage = lazyRoute(async () => import("./routes/admin/waitlist.tsx"), "WaitlistPage");
 const AuditLogPage = lazyRoute(async () => import("./routes/admin/audit.tsx"), "AuditLogPage");
 
 const withRouteError = (routes: RouteObject[]) =>
@@ -218,6 +219,7 @@ const adminShellChildren: RouteObject[] = withRouteError([
   { path: "/admin/users", element: <UsersPage /> },
   { path: "/admin/users/:id", element: <UserPage /> },
   { path: "/admin/invites", element: <InvitesPage /> },
+  { path: "/admin/waitlist", element: <WaitlistPage /> },
   { path: "/admin/audit", element: <AuditLogPage /> },
 ]);
 
