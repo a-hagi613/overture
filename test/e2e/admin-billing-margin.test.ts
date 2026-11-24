@@ -21,11 +21,19 @@ const marginSchema = z.object({
       completed: z.number(),
       costMicrosPerCompleted: z.number().nullable(),
       revenueMicrosPerApplication: z.number(),
+      stripeFeeMicrosPerApplication: z.number(),
+      netRevenueMicrosPerApplication: z.number(),
+      internationalNetRevenueMicrosPerApplication: z.number(),
       marginMicrosPerApplication: z.number().nullable(),
       marginRatio: z.number().nullable(),
       costGateMet: z.boolean().nullable(),
     }),
   ),
+  stripe: z.object({
+    domesticRate: z.number(),
+    fixedFeeMicros: z.number(),
+    internationalRate: z.number(),
+  }),
   beside: z.object({
     fixedInfraMicrosPerMonth: z.number(),
     mail: z.object({
@@ -128,16 +136,24 @@ test("cost and margin per plan come from attempts and model calls, and Anthropic
 
   expect(report.completed).toBe(1);
   expect(report.costMicrosPerCompleted).toBe(33_000);
+  expect(report.stripe).toMatchObject({
+    domesticRate: 0.036,
+    fixedFeeMicros: 300_000,
+    internationalRate: 0.051,
+  });
   expect(week).toMatchObject({
     applications: 50,
     users: 1,
     completed: 1,
     costMicrosPerCompleted: 33_000,
     revenueMicrosPerApplication: 199_800,
-    marginMicrosPerApplication: 166_800,
+    stripeFeeMicrosPerApplication: 13_200,
+    netRevenueMicrosPerApplication: 186_600,
+    internationalNetRevenueMicrosPerApplication: 183_600,
+    marginMicrosPerApplication: 153_600,
     costGateMet: false,
   });
-  expect(week?.marginRatio).toBeCloseTo(166_800 / 199_800, 6);
+  expect(week?.marginRatio).toBeCloseTo(153_600 / 186_600, 6);
   expect(report.plans.find((row) => row.plan === "trial")).toMatchObject({
     users: 0,
     costMicrosPerCompleted: null,
@@ -199,6 +215,6 @@ test("the margin page shows the measured numbers and marks the unbuilt billing s
     page.getByRole("navigation", { name: "Billing sections" }).getByRole("link", { name: "Users" }),
   ).toHaveAttribute("href", "/admin/billing");
   await expect(page.getByText("$0.033").first()).toBeVisible();
-  await expect(page.getByText("83%").first()).toBeVisible();
+  await expect(page.getByText("82%").first()).toBeVisible();
   await expect(page.getByText("n/a").first()).toBeVisible();
 });

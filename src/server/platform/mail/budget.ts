@@ -3,21 +3,37 @@ import { eq } from "drizzle-orm";
 import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 
+import { activeSubscriberCount, scaledBudget, settingInteger, settingRatio } from "../budgets.ts";
 import { mailUsage } from "../db/schema.ts";
-import { getSetting } from "../settings/index.ts";
+import type { SETTING_DEFAULTS } from "../settings/index.ts";
 
 /**
  * Cloudflare Email Sending includes 3,000 emails a month and bills $0.35 per
  * 1,000 after that. No native limit covers it (ADR 0033), so the app counts
  * every send in SQLite and stops itself below the allowance.
  */
-export const MAIL_MONTHLY_CAP_KEY = "mail.monthly_cap";
-export const MAIL_SIGN_IN_RESERVE_KEY = "mail.sign_in_reserve";
+export const MAIL_MONTHLY_CAP_KEY = "mail.monthly_cap" satisfies keyof typeof SETTING_DEFAULTS;
+
+export const MAIL_PER_SUBSCRIBER_CAP_KEY =
+  "mail.cap_per_subscriber" satisfies keyof typeof SETTING_DEFAULTS;
+
+export const MAIL_WARNING_SHARE_KEY = "mail.warning_share" satisfies keyof typeof SETTING_DEFAULTS;
+
+export const MAIL_SIGN_IN_RESERVE_KEY =
+  "mail.sign_in_reserve" satisfies keyof typeof SETTING_DEFAULTS;
+
 export const DEFAULT_MAIL_MONTHLY_CAP = 2700;
+
+/**
+ * One paying subscriber can ask for a Month plan's Applications in notices, so
+ * the month's cap grows by one Month allowance each, on top of the base
+ * (issue #564). Overage above the 3,000 included sends costs $0.35 per 1,000.
+ */
+export const DEFAULT_MAIL_PER_SUBSCRIBER_CAP = 250;
 export const DEFAULT_MAIL_SIGN_IN_RESERVE = 270;
 
-/** The owner hears about the cap when the month reaches four fifths of it. */
-export const MAIL_WARNING_SHARE = 0.8;
+/** The owner hears about the cap when the month reaches four fifths of it, unless the admin sets another share. */
+export const DEFAULT_MAIL_WARNING_SHARE = 0.8;
 
 /**
  * Sends that keep the account useful when the month is nearly spent, and the
@@ -50,6 +66,12 @@ export interface MailUsage {
 }
 
 export interface MailBudget {
+  /** The cap with no paying subscribers. */
+  baseCap: number;
+  /** The share one paying subscriber adds. */
+  perSubscriber: number;
+  /** The paying subscribers counted when the cap was read. */
+  subscribers: number;
   cap: number;
   reserve: number;
   /** The most the month may spend on notices, leaving the reserve untouched. */
@@ -72,13 +94,6 @@ export interface MailSendDecision {
   firstCapRefusal: boolean;
 }
 
-function integerSetting(db: Pick<AppDatabase, "select">, key: string, fallback: number) {
-  const raw = getSetting(db, key);
-  const parsed = raw === null ? Number.NaN : Number(raw);
-
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
-}
-
 /**
  * The UTC calendar month the counter belongs to, such as `2026-11`.
  * @param atMs The instant to read the month from.
@@ -90,19 +105,43 @@ export function monthKey(atMs: number) {
   return `${String(date.getUTCFullYear())}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export function mailBudget(db: Pick<AppDatabase, "select">) {
-  const cap = integerSetting(db, MAIL_MONTHLY_CAP_KEY, DEFAULT_MAIL_MONTHLY_CAP);
+/**
+ * The month's mail budget at one instant: the base, one Month plan's
+ * allowance for every paying subscriber, and the sign-in reserve kept back
+ * (issue #564). It grows from `period` grants only, which a paid Stripe
+ * invoice issues, so subscriber growth can never silently stop the notices
+ * paid Applications need.
+ * @param db The application database.
+ * @param atMs The instant to count paying subscribers at.
+ * @returns The effective cap and how it was reached.
+ */
+export function mailBudget(db: Pick<AppDatabase, "select">, atMs: number) {
+  const baseCap = settingInteger(db, MAIL_MONTHLY_CAP_KEY, {
+    fallback: DEFAULT_MAIL_MONTHLY_CAP,
+  });
+
+  const perSubscriber = settingInteger(db, MAIL_PER_SUBSCRIBER_CAP_KEY, {
+    fallback: DEFAULT_MAIL_PER_SUBSCRIBER_CAP,
+  });
+
+  const subscribers = activeSubscriberCount(db, atMs);
+  const cap = scaledBudget(baseCap, perSubscriber, subscribers);
 
   const reserve = Math.min(
-    integerSetting(db, MAIL_SIGN_IN_RESERVE_KEY, DEFAULT_MAIL_SIGN_IN_RESERVE),
+    settingInteger(db, MAIL_SIGN_IN_RESERVE_KEY, { fallback: DEFAULT_MAIL_SIGN_IN_RESERVE }),
     cap,
   );
 
+  const warningShare = settingRatio(db, MAIL_WARNING_SHARE_KEY, DEFAULT_MAIL_WARNING_SHARE);
+
   return {
+    baseCap,
     cap,
-    reserve,
     noticeLimit: cap - reserve,
-    warningAt: Math.ceil(cap * MAIL_WARNING_SHARE),
+    perSubscriber,
+    reserve,
+    subscribers,
+    warningAt: Math.ceil(cap * warningShare),
   };
 }
 
@@ -125,7 +164,7 @@ export function readMailUsage(db: Pick<AppDatabase, "select">, month: string) {
 }
 
 export function readMailSummary(db: Pick<AppDatabase, "select">, atMs: number) {
-  return { ...readMailUsage(db, monthKey(atMs)), ...mailBudget(db) };
+  return { ...readMailUsage(db, monthKey(atMs)), ...mailBudget(db, atMs) };
 }
 
 function limitReason(budget: MailBudget, usage: MailUsage, category: MailCategory) {
@@ -160,7 +199,7 @@ export function reserveMailSend(db: AppDatabase, clock: Clock, category: MailCat
 
   return db.transaction(
     (tx) => {
-      const budget = mailBudget(tx);
+      const budget = mailBudget(tx, now);
       const current = readMailUsage(tx, month);
       const reason = limitReason(budget, current, category);
 

@@ -147,6 +147,14 @@ export function validateAdminSettingValue(key: string, value: string) {
     return DECIMAL_TEXT.test(trimmed);
   }
 
+  if (key === "llm.spend_alert_ratio" || key === "mail.warning_share") {
+    return DECIMAL_TEXT.test(trimmed) && Number(trimmed) > 0 && Number(trimmed) <= 1;
+  }
+
+  if (key === "mail.cap_per_subscriber") {
+    return INTEGER_TEXT.test(trimmed);
+  }
+
   return trimmed.length > 0;
 }
 

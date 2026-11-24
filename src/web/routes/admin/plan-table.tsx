@@ -43,7 +43,7 @@ export function PlanTable({ rows }: { rows: MarginPlanRow[] }) {
               <td className="px-4 py-5 tabular-nums">{row.applications}</td>
               <td className="px-4 py-5 tabular-nums">{costLabel(row)}</td>
               <td className="px-4 py-5 tabular-nums">
-                {formatUsd(row.revenueMicrosPerApplication, 3)}
+                {formatUsd(row.netRevenueMicrosPerApplication, 3)}
               </td>
               <td className="px-4 py-5 tabular-nums">{marginLabel(row)}</td>
               <td className="px-4 py-5">

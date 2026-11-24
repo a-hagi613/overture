@@ -4,14 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { openDatabase } from "../db/client.ts";
-import { mailUsage } from "../db/schema.ts";
+import { grants, mailUsage, users } from "../db/schema.ts";
 import { migrateDatabase } from "../db/migrate.ts";
 import { setSetting } from "../settings/index.ts";
 import {
   DEFAULT_MAIL_MONTHLY_CAP,
+  DEFAULT_MAIL_PER_SUBSCRIBER_CAP,
   DEFAULT_MAIL_SIGN_IN_RESERVE,
   MAIL_MONTHLY_CAP_KEY,
+  MAIL_PER_SUBSCRIBER_CAP_KEY,
   MAIL_SIGN_IN_RESERVE_KEY,
+  MAIL_WARNING_SHARE_KEY,
   mailBudget,
   monthKey,
   readMailSummary,
@@ -20,6 +23,7 @@ import {
 } from "./budget.ts";
 
 const AT = Date.UTC(2026, 10, 21, 9, 0, 0);
+const DAY_MS = 24 * 60 * 60_000;
 
 function memoryDatabase() {
   const { db } = openDatabase(":memory:");
@@ -31,6 +35,41 @@ function memoryDatabase() {
 
 function clockAt(now: number) {
   return { now: () => now };
+}
+
+function addGrant(
+  db: ReturnType<typeof memoryDatabase>,
+  userId: string,
+  source: "admin" | "period" | "trial",
+  expiry: number | null = AT + DAY_MS,
+) {
+  const existing = db.select({ id: users.id }).from(users).all();
+
+  if (!existing.some((row) => row.id === userId)) {
+    db.insert(users)
+      .values({
+        createdAt: new Date(AT),
+        email: `${userId}@example.com`,
+        emailVerified: true,
+        id: userId,
+        name: userId,
+        role: "user",
+        updatedAt: new Date(AT),
+      })
+      .run();
+  }
+
+  db.insert(grants)
+    .values({
+      createdAt: AT,
+      expiresAt: expiry,
+      id: crypto.randomUUID(),
+      quantity: 50,
+      source,
+      startsAt: AT - DAY_MS,
+      userId,
+    })
+    .run();
 }
 
 function capAt(db: ReturnType<typeof memoryDatabase>, cap: number, reserve: number) {
@@ -47,7 +86,7 @@ test("the month is the UTC calendar month", () => {
 });
 
 test("the default budget stops at 2,700 with 270 kept back", () => {
-  const budget = mailBudget(memoryDatabase());
+  const budget = mailBudget(memoryDatabase(), AT);
 
   expect(budget.cap).toBe(DEFAULT_MAIL_MONTHLY_CAP);
   expect(budget.reserve).toBe(DEFAULT_MAIL_SIGN_IN_RESERVE);
@@ -61,8 +100,8 @@ test("a bad setting falls back to the documented default", () => {
   setSetting(db, clockAt(AT), MAIL_MONTHLY_CAP_KEY, "not-a-number", "test");
   setSetting(db, clockAt(AT), MAIL_SIGN_IN_RESERVE_KEY, "-5", "test");
 
-  expect(mailBudget(db).cap).toBe(DEFAULT_MAIL_MONTHLY_CAP);
-  expect(mailBudget(db).reserve).toBe(DEFAULT_MAIL_SIGN_IN_RESERVE);
+  expect(mailBudget(db, AT).cap).toBe(DEFAULT_MAIL_MONTHLY_CAP);
+  expect(mailBudget(db, AT).reserve).toBe(DEFAULT_MAIL_SIGN_IN_RESERVE);
 });
 
 test("a reserve larger than the cap leaves no room for notices", () => {
@@ -70,7 +109,7 @@ test("a reserve larger than the cap leaves no room for notices", () => {
 
   capAt(db, 5, 9);
 
-  expect(mailBudget(db)).toMatchObject({ cap: 5, noticeLimit: 0, reserve: 5 });
+  expect(mailBudget(db, AT)).toMatchObject({ cap: 5, noticeLimit: 0, reserve: 5 });
 });
 
 test("every send is counted per kind and the month starts again", () => {
@@ -226,4 +265,71 @@ test("the counter survives reopening the database", () => {
 
   expect(readMailSummary(second.db, AT)).toMatchObject({ auth: 1, notice: 1, total: 2 });
   second.sqlite.close();
+});
+
+test("the month's cap grows by one Month allowance for every paying subscriber", () => {
+  const db = memoryDatabase();
+
+  addGrant(db, "paying-1", "period");
+  addGrant(db, "paying-2", "period");
+
+  const budget = mailBudget(db, AT);
+
+  expect(budget).toMatchObject({
+    baseCap: DEFAULT_MAIL_MONTHLY_CAP,
+    cap: DEFAULT_MAIL_MONTHLY_CAP + 2 * DEFAULT_MAIL_PER_SUBSCRIBER_CAP,
+    perSubscriber: DEFAULT_MAIL_PER_SUBSCRIBER_CAP,
+    subscribers: 2,
+  });
+  expect(budget.warningAt).toBe(Math.ceil(budget.cap * 0.8));
+});
+
+test("admin and trial grants never grow the cap, and an ended period stops counting", () => {
+  const db = memoryDatabase();
+
+  addGrant(db, "invited", "admin", null);
+  addGrant(db, "trialing", "trial");
+  addGrant(db, "lapsed", "period", AT - 1);
+
+  expect(mailBudget(db, AT)).toMatchObject({
+    cap: DEFAULT_MAIL_MONTHLY_CAP,
+    subscribers: 0,
+  });
+});
+
+test("overlapping periods for one person count once", () => {
+  const db = memoryDatabase();
+
+  addGrant(db, "paying", "period");
+  addGrant(db, "paying", "period", AT + 7 * DAY_MS);
+
+  expect(mailBudget(db, AT).subscribers).toBe(1);
+});
+
+test("the admin sets the per-subscriber share and the warning share", () => {
+  const db = memoryDatabase();
+
+  setSetting(db, clockAt(AT), MAIL_PER_SUBSCRIBER_CAP_KEY, "100", "test");
+  setSetting(db, clockAt(AT), MAIL_WARNING_SHARE_KEY, "0.5", "test");
+  addGrant(db, "paying", "period");
+
+  expect(mailBudget(db, AT)).toMatchObject({
+    cap: DEFAULT_MAIL_MONTHLY_CAP + 100,
+    perSubscriber: 100,
+    subscribers: 1,
+    warningAt: Math.ceil((DEFAULT_MAIL_MONTHLY_CAP + 100) * 0.5),
+  });
+});
+
+test("a budget raised by paid growth no longer halts a paying subscriber's mail", () => {
+  const db = memoryDatabase();
+  const clock = clockAt(AT);
+
+  addGrant(db, "paying", "period");
+
+  db.insert(mailUsage)
+    .values({ month: monthKey(AT), noticeSends: 2700 })
+    .run();
+
+  expect(reserveMailSend(db, clock, "auth").reason).toBeNull();
 });

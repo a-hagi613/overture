@@ -22,13 +22,17 @@ export function createMeteredMailSender(db: AppDatabase, clock: Clock, adapter: 
     const decision = reserveMailSend(db, clock, category);
 
     const detail = {
+      baseCap: decision.budget.baseCap,
       cap: decision.budget.cap,
       category,
       noticeLimit: decision.budget.noticeLimit,
+      perSubscriber: decision.budget.perSubscriber,
       protected: isProtectedCategory(category),
       month: decision.usage.month,
       reserve: decision.budget.reserve,
       sent: decision.usage.total,
+      subscribers: decision.budget.subscribers,
+      warningAt: decision.budget.warningAt,
     };
 
     if (decision.warningRaised) {

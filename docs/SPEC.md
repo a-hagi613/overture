@@ -53,7 +53,7 @@ per-user AI keys, resume generation or restyling, annual plans.
 |---|---|---|---|
 | **M1 — Owner applies from the cloud** | owner only (allowlist) | catalog (Greenhouse, Lever, Ashby), tagging, profile via importer, matching, preparation, Reviews, Ready and approval (ADR 0029), owner's forwarded ATS mail (inbound, ADR 0028), Browser Use provider (Kernel adapter behind the same port, exercised in M2's synthetic lab), dispatch, ledger with admin grants, Board, Home, Review, minimal Profile, minimal admin, fixture capture job, observability | ≥ 25 real owner applications on Browser Use, each approved by the owner (ADR 0029); **≥ 85 % of attempted applications reach `sent`**; cost ≤ **$0.03 per completed application**; zero wrong-company or duplicate sends. *Attempted* and *cost* are defined in ADR 0026; an Application never approved is never attempted. Testing phase: keep spend minimal |
 | **M2 — Invite-only beta** | invited users: the owner's friends and family; the owner keeps testing on a burner account | **Invites** replace the owner allowlist; each accepted invite gets an admin grant of 300 applications over 30 days, no card · **onboarding** in five steps (Sign in, Resume, Your facts, What you want, Forward ATS mail + consent + Start), resumable, with the forwarding-filter guide for Gmail and Outlook and the 10-minute code paste as a first-class path (ADR 0028) · a **forwarding address for every user** and the read-only **Inbox** of forwarded ATS mail · **email-driven Stage moves** with Undo, and **Check-ins** · **the daily 07:00 preparation run and one recap email** (M1 #198, #196) plus **push notifications** for the recap, Reviews, replies, interviews, offers, auto-moves and pauses, so a user approves from the phone (ADR 0029) · **full admin** (users and invites, Reveal, audit, support access log, mail health) · **export and delete** · **legal pages and consent versioning** (Terms, Privacy, business name "Overture", contact `admin@tryoverture.com`) · **Personio** (per-company XML) and **Workable** (bulk XML feed keyed by `referencenumber`) after a 20-form probe each, read by plain HTTP first and a Browser Use session only where a fill must be proven; Recruitee and SmartRecruiters are dropped (ADR 0028) · **the Browser Use SDK and proxy-cost levers** (#180) · **the synthetic lab and provider report** (#36) · **a one-command switch to Cloudflare Email Sending for every recipient** once Workers Paid is on (an idempotent operator script and a deploy and live-check guard) · the **security, scalability and cost reviews** (#182, #183, #184) run near the end, before the beta wave. Not in M2: replying to employers from Overture (the user replies from their own mailbox, ADR 0028), billing, public sign-up. Tickets are the sub-issues of #6 | M2 ends with two tickets for the owner: "M2: owner setup" (pay Cloudflare Workers Paid, run the sending-domain script, publish the Google OAuth consent screen) and then "M2 close-out: onboard the first wave of beta testers". Everything else in M2 is built and verified without the payment (gated by config, fake sender in tests). The first wave is then onboarded. Then **10 beta users for 14 days; submit rate holds ≥ 85 %; no P1 privacy/security finding**. Testing phase: keep spend minimal |
-| **M3 — Public** | anyone | **Public sign-up** replaces invites (Turnstile, rate limits, nothing is prepared until a trial card is verified or a plan is paid, a global spend cap) · **Stripe Managed Payments** (Checkout, customer portal, signed webhooks processed once) behind the `Payments` port · **plans**: a trial of 3 applications once per card (HMAC card fingerprint that survives deletion), Week $9.99 → 50 over 7 days, Month $29.99 → 250 over 30 days, renewing, no rollover; each paid period issues a grant, unused ones expire, failures are never charged · plan changes (trial upgrade at once, Week/Month switch at renewal, cancel at period end) · payment-failure and plan-end pause · admin refunds and a per-user billing view · daily Stripe↔ledger reconciliation · measured cost and margin per application, then final prices · **public landing and pricing**, prerendered, redrawn for the current product (you approve every send, the real prices, Greenhouse, Lever, Ashby, Personio and Workable, no Workday) · Terms and Privacy extended for billing · plan and billing on Profile → Billing · M3 ends with two owner tickets: "M3: owner setup" (Stripe account and Managed Payments approval, live keys, webhook, tax, final prices) and "M3 close-out: open to the public" | first 20 paying users; Stripe reconciliation matches the ledger for 30 days. Users invited in M2 keep their admin grants and choose a plan when they run out |
+| **M3 — Public** | anyone | **Public sign-up** replaces invites (Turnstile, rate limits, nothing is prepared until a trial card is verified or a plan is paid, subscriber-scaled spend budgets) · **regular Stripe Billing** (hosted Checkout, customer portal, signed webhooks processed once) behind the `Payments` port · **plans**: a trial of 3 applications once per card (HMAC card fingerprint that survives deletion), Week $9.99 → 50 over 7 days, Month $29.99 → 250 over 30 days, renewing, no rollover; each paid period issues a grant, unused ones expire, failures are never charged · plan changes (trial upgrade at once, Week/Month switch at renewal, cancel at period end) · payment-failure and plan-end pause · admin refunds and a per-user billing view · daily Stripe↔ledger reconciliation · measured cost and margin per application, then final prices · **public landing and pricing**, prerendered, redrawn for the current product (you approve every send, the real prices, Greenhouse, Lever, Ashby, Personio and Workable, no Workday) · Terms and Privacy extended for billing · plan and billing on Profile → Billing · M3 ends with two owner tickets: "M3: owner setup" (Stripe account, two recurring prices, live keys, webhook, portal, tax, final prices) and "M3 close-out: open to the public" | first 20 paying users; Stripe reconciliation matches the ledger for 30 days. Users invited in M2 keep their admin grants and choose a plan when they run out |
 
 Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 
@@ -145,7 +145,7 @@ Ledger tables and plan limits exist from M1 so nothing is rewritten in M3.
 | reCAPTCHA v3, hCaptcha, Turnstile | synthetic lab challenge pages (§10.4) | `LAB_RECAPTCHA_SCRIPT_URL`, `LAB_HCAPTCHA_SCRIPT_URL`, `LAB_TURNSTILE_SCRIPT_URL`, `LAB_RECAPTCHA_SITE_KEY`, `LAB_HCAPTCHA_SITE_KEY`, `LAB_TURNSTILE_SITE_KEY`, `LAB_RECAPTCHA_VERIFY_URL`, `LAB_RECAPTCHA_SECRET` (all optional; the script and verify URLs default to the vendors') | same-origin `/__test__/lab-*.js` stubs and a local recorded siteverify; no challenge host is contacted (ADR 0016) |
 | Anthropic | LLM (prod) | `ANTHROPIC_API_KEY` | real adapter; API intercepted by the test interceptor with responses recorded by the daily live check |
 | Cloudflare Email Sending | outbound mail (magic links, live check, later notices) | `CLOUDFLARE_EMAIL_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (both or neither); `CLOUDFLARE_EMAIL_API_BASE_URL` (test-only override of the real API host) | real adapter; the send endpoint is intercepted by the test interceptor and the request body asserted (`test/e2e/cloudflare-email.test.ts`) |
-| Stripe (M3) | Managed Payments | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_WEEK`, `STRIPE_PRICE_MONTH`; `STRIPE_API_BASE_URL` (test-only override of the real API host) | stripe-mock (Stripe's own local server) + signed webhook fixtures |
+| Stripe (M3) | Regular Stripe Billing | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_WEEK`, `STRIPE_PRICE_MONTH`; `STRIPE_API_BASE_URL` (test-only override of the real API host) | stripe-mock (Stripe's own local server) + signed webhook fixtures |
 | Public sign-up (M3) | whether an unknown email may sign up without an invite; on from M3 | `PUBLIC_SIGNUP_ENABLED` (default `true`; `false` restores the M2 invite-only gate) | public-sign-up e2e with the Turnstile stub; the invite-only suites set it `false` |
 | Grafana Cloud | logs/metrics/traces | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | local LGTM docker |
 | Web Push | notifications | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | real adapter; push endpoints via the test interceptor |
@@ -169,10 +169,11 @@ bearer header; the research and the Beta terms are in `docs/research/cloudflare-
 `mail.sending` guard: unset, the check records `status: "gated"` and does not alert; set, it verifies the sending
 domain and alerts while a send to a non-owner recipient would be refused.
 Email Sending includes 3,000 emails a month and no Cloudflare limit covers it, so the app counts every send in
-`mail_usage` (one row per UTC month and kind) before the request leaves the machine. `mail.monthly_cap` (2,700)
-refuses further sends and `mail.sign_in_reserve` (270) keeps the last sends for magic links, verification, resets and
-the live check, so a Recap cannot starve them; a refused send fails closed like §8.6. The owner is alerted at 80% of
-the cap, once when notices pause at the reserve, and once when every kind of mail stops at the cap — the reserve
+`mail_usage` (one row per UTC month and kind) before the request leaves the machine. `mail.monthly_cap` (2,700) is the
+base cap and `mail.cap_per_subscriber` (250) adds one Month plan's allowance for every paying subscriber, so the cap
+follows paid growth (it counts the ledger's unexpired `period` grants, never admin or trial grants); `mail.sign_in_reserve` (270) keeps the last sends for magic links, verification, resets and
+the live check, so a Recap cannot starve them; a refused send fails closed like §8.6. The owner is alerted at
+`mail.warning_share` (80 %) of the cap, once when notices pause at the reserve, and once when every kind of mail stops at the cap — the reserve
 refusal is stamped in `reserve_refused_at` and the cap refusal in `refused_at`, so the first never hides the second.
 The admin overview shows the month's count and says which of the two stops is in force. Tests reach Cloudflare only
 through the fail-closed test interceptor (ADR 0013, 0016).
@@ -808,10 +809,12 @@ structured outputs (`output_config.format`), thinking disabled with `effort: "lo
 | tag_fallback (batch) | title + department + 300 words | tags | ~$0.00004 |
 | email_classify (fallback) | subject + first 1,000 chars | classification | ~$0.0001 |
 
-Caps (settings): `$0.25` per user per day, `$10` per day global, `$1` per day tagging. A capped call fails closed:
-scoring pauses until the next UTC day, preparation waits, the owner is alerted. The daily run bounds its scoring
-search at three times the daily cap (§8.2) and alerts `match.score_bound` when it stops there, so a strict threshold
-reaches that alert rather than the cap.
+Budgets (settings): `$0.25` per invited user a day, plus `llm.cap_subscriber_user_day_usd` (`$0.25`) while that person's
+paid period runs; a global `$10` a day base, plus `llm.cap_per_subscriber_day_usd` (`$0.30`) for every paying
+subscriber, so the ceiling grows with paid growth instead of halting it; `$1` a day for tagging. The owner is alerted at
+`llm.spend_alert_ratio` (80 %) of a budget. A call over a budget fails closed: scoring pauses until the next UTC day,
+preparation waits. The daily run bounds its scoring search at three times the daily cap (§8.2) and alerts
+`match.score_bound` when it stops there, so a strict threshold reaches that alert rather than the budget.
 
 An Anthropic batch is recorded in `llm_batches` before its id exists and keyed by the sha256 of the model and its
 request set, so the id, its status and the moment its results were stored survive a deploy or a crash. A producer
@@ -1299,8 +1302,9 @@ body, sender or attachment, so the admin never sees message content.
 | `limits.timezone_change_days` | 7 | — |
 | `match.auto_threshold_default` | 60 (user may pick 50) | 0011 |
 | `match.strong` | 80 | 0011 |
-| `llm.cap_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 10 / 1 | 0011, 0017 |
-| `mail.monthly_cap` / `mail.sign_in_reserve` | 2700 / 270 (sends a UTC month, and the share kept for sign-in mail and the live check) | 0033 |
+| `llm.cap_user_day_usd` / `llm.cap_subscriber_user_day_usd` / `llm.cap_global_day_usd` / `llm.cap_per_subscriber_day_usd` / `llm.cap_tagging_day_usd` | 0.25 / 0.25 / 10 / 0.30 / 1 (daily LLM budgets; the subscriber shares are added for every unexpired `period` grant) | 0011, 0017 |
+| `llm.spend_alert_ratio` | 0.8 (the share of an LLM budget at which the owner is alerted) | 0011, 0017 |
+| `mail.monthly_cap` / `mail.cap_per_subscriber` / `mail.warning_share` / `mail.sign_in_reserve` | 2700 base plus 250 per paying subscriber, 80 % warning, 270 kept for sign-in mail and the live check (sends a UTC month) | 0033 |
 | `browser.provider` | `browser_use` | 0003 |
 | `browser.max_concurrent_sessions` | 0, no cap (the browser semaphore and the dispatcher's in-flight send cap; a positive integer sets an optional cap) | 0003 |
 | `checkin.after_days` / `checkin.close_after_days` | 21 / 45 | 0012 |
@@ -1336,8 +1340,9 @@ body, sender or attachment, so the admin never sees message content.
   open): no LLM call, cloud browser session, preparation or send starts for a user with no Applications left. That covers
   preparation, Match score (daily and on open), manual Apply, resume text extraction, email classification and dispatch;
   each skips or stays rules-only until a verified trial card or a paid plan (or an admin grant) issues Applications. The
-  per-user and global LLM caps (`checkLlmCaps`) refuse the call and raise the `llm.cap` alert, and the daily `llm.spend`
-  live check alerts on the global cap; `invite.grant_quantity`/`invite.grant_days` still govern an admin grant. In
+  per-user and global LLM budgets (`checkLlmCaps`, a base plus a share per paying subscriber, §8.6) refuse the call and
+  raise the `llm.cap` alert, and the daily `llm.spend` live check alerts at the configured share of a budget;
+  `invite.grant_quantity`/`invite.grant_days` still govern an admin grant. In
   invite-only mode with billing off, nothing changes from M2.
 - **Demo account** (`DEMO_LOGIN_ENABLED=true`, off by default): entering `test@email.com` on the sign-in page signs in
   as the demo user with one click and sends no mail; with the flag off the same email is refused like any other. The
@@ -1473,7 +1478,7 @@ earlier rows and every Snapshot keep their version and wording. The business nam
 `admin@tryoverture.com` (it exists); the postal address is the literal placeholder `[POSTAL ADDRESS]` until the owner
 supplies one, and the pages say so plainly in the build, never invented.
 Sub-processors listed: Fly, Cloudflare (DNS, Email Routing and Sending, R2, Workers), Browser Use, Kernel (fallback),
-Anthropic, Grafana, Stripe (payments; also the merchant of record for each charge). AWS is not used. Vendors' standard
+Anthropic, Grafana, Stripe (payments; Overture is the seller and Stripe the payment processor and tax calculator). AWS is not used. Vendors' standard
 published DPAs are accepted as-is; no vendor outreach. Drafts for owner review, not legal advice, and the pages say
 so in their footer.
 Billing (M3, #252): the Terms cover the Week ($9.99, 50 applications over 7 days) and Month ($29.99, 250 over 30 days)
@@ -1604,7 +1609,7 @@ publishing version 2 leaves version 1 and an already sent Snapshot on version 1 
 
 Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038).
 
-### 16.2 Unit tests (sixty-six files, `bun:test`, beside their code)
+### 16.2 Unit tests (seventy-one files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1619,8 +1624,10 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/billing/admin-view.test.ts` | the owner's billing list filters and pages in SQL, and its stat counts agree with the page state |
 | `src/server/billing/checkout.test.ts` | concurrent double clicks share one Checkout Session and one Stripe idempotency key, and a linked Customer is reused |
 | `src/server/billing/ledger.test.ts` | balances, idempotency, FIFO expiry |
+| `src/server/billing/margin.test.ts` | regular Stripe Billing fees are 3.6 % + $0.30 domestic and 5.1 % + $0.30 international, the net baselines are $0.187 an Application on Week and $0.114 on Month, and a free price carries no fee (#564) |
 | `src/server/billing/pause.test.ts` | a plan end pauses once; a successful payment resumes only a billing pause; an in-flight send keeps its reservation across the period end |
 | `src/server/billing/stripe.test.ts` | a basil invoice reads its subscription from `parent.subscription_details`, a Week to Month proration reads the new plan's line, and a subscription event is not a customer event |
+| `src/server/billing/subscriptions.test.ts` | one running subscription blocks a second Checkout and a canceled one does not, one Stripe subscription updates one row, and an ended subscription is never resurrected (#564) |
 | `src/server/billing/summary.test.ts` | the three counters Home shows are answered in two reads rather than six, and a reservation counts against what is left exactly as the separate reads do (#430) |
 | `src/server/billing/webhooks.test.ts` | a pause notice and the jobs a resume queues commit with the Stripe event and roll back with it; a stale out-of-order failure cannot pause a paid user, a price Overture does not sell grants nothing, an older subscription event cannot regress a newer one, `invoice.paid` promotes a failed status and wakes Home |
 | `src/server/catalog/answer-derivations.test.ts` | answer derivations |
@@ -1634,6 +1641,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/fixtures/sanitise.test.ts` | a recorded page carries no script, event handler, personal data or token |
 | `src/server/inbox/linked-mail.test.ts` | an Application's linked mail is read in one query rather than one per message (#430) |
 | `src/server/inbox/threads.test.ts` | the Inbox Thread list reads its messages in one query rather than one per Thread, a page walks every Thread once even when timestamps tie, and the counts stay over every Thread rather than the page (#430, #506) |
+| `src/server/live-checks/alerts.test.ts` | the `llm.spend` soft alert fires at the configured share of the daily budget, a budget grown by paying subscribers no longer alerts at the old ceiling's share, and the admin sets the share (#564) |
 | `src/server/matching/applications.test.ts` | an Application copies the Posting's and Company's display fields onto its own row when it is created, keeps them after the catalog rows are deleted, and is not created for a Posting that has already left the catalog (#422) |
 | `src/server/pipeline/answer-plan.test.ts` | a salary Fact kept per currency is chosen only for the currency a question names |
 | `src/server/pipeline/approved-plan.test.ts` | the Ready cards open every approved plan in one query rather than one per card (#430) |
@@ -1659,6 +1667,8 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/platform/jobs/scheduler.test.ts` | a completed job-worker wait retains no abort listener |
 | `src/server/platform/llm/anthropic-batches.test.ts` | the api key is sent only to the configured api origin, never to another origin named by a provider response (#418) |
 | `src/server/platform/llm/batch-store.test.ts` | one request set is recorded once, its results are claimed by one conditional update so every later caller reads them back, and a failed record reopens for one resubmission (#418) |
+| `src/server/platform/llm/budget.test.ts` | the LLM budgets are a base plus a share for every distinct paying subscriber, admin/trial/ended grants never grow them, an admin sets the shares and the alert ratio, and a paying subscriber's own budget is raised (#564) |
+| `src/server/platform/llm/caps.test.ts` | spend above a static $10 does not halt preparation once subscribers raise the budget, a call over the scaled budget still fails closed, and the tagging budget stays its own ceiling (#564) |
 | `src/server/platform/llm/models.test.ts` | `ANTHROPIC_MODEL` defaults to the model SPEC §8.6 names, and a dated 5.5 id is priced from the exact 5.5 row (#387) |
 | `src/server/platform/mail/budget.test.ts` | one row per UTC month counts every send by kind and fails closed at each stop (#282) |
 | `src/server/platform/outbound-guard.test.ts` | in test and development, an outbound request to an ATS or paid-service host is refused |
@@ -1827,7 +1837,7 @@ v1 runs on Fly app `ai-auto-apply` (volume `data`, yyz). In order:
 | Workable's bulk feed is about 831 MiB and hourly | the daily off-box Action streams it once and writes only target-relevant postings to R2; the app never downloads it (ADR 0032). The exact hit is small: a broad tech envelope matched 0.6 % of a recorded sample as-is and 1.2 % with the experience fallback; three narrower target sets matched almost none. The app alerts on a snapshot older than 26 hours or a row count down more than 20 %, and the Action fails loudly rather than publishing a dropped snapshot |
 | Cloudflare refuses sends to non-owner recipients until Workers Paid and a sending domain exist | one idempotent operator script, a deploy and live-check guard that fails loudly while the switch is pending; the owner pays, then runs one command |
 | Friends and family hit the same ATS limits as the owner, with real names and emails | 10 a day each, true answers, every send approved; beta wave starts only after the security, scalability and cost reviews |
-| Stripe declines Managed Payments for the account | the `Payments` port; plain Stripe Billing with Stripe Tax behind it (ADR 0018); found early in "M3: owner setup" |
-| Public sign-up exposes spend (LLM, browser) before anyone pays | a spend gate stops preparation, scoring, resume extraction, email classification and sending for any account with no Applications left while billing or public sign-up is on (fail-closed); per-IP rate limits; Turnstile; `llm.cap_global_day_usd` and the `llm.cap`/`llm.spend` alerts |
+| Stripe is misconfigured, or a price or webhook id is stale | the `Payments` port; the owner's `setup-stripe` rerun creates or reuses the products, prices, webhook and portal and sets the secrets (ADR 0018, DEPLOY.md) |
+| Public sign-up exposes spend (LLM, browser) before anyone pays | a spend gate stops preparation, scoring, resume extraction, email classification and sending for any account with no Applications left while billing or public sign-up is on (fail-closed); per-IP rate limits; Turnstile; subscriber-scaled LLM budgets (`llm.cap_global_day_usd` plus `llm.cap_per_subscriber_day_usd`) and the `llm.cap`/`llm.spend` alerts |
 | Email-classification mistakes move cards wrongly | forward-only, undo, never over manual drags, confidence threshold |
 | Approval slows sending: Ready cards pile up while the user is away and fewer applications go out | one daily preparation run stops at the free slots to bound unapproved work (§8.2); one Recap email per run; Send all; measured against the 25-application M1 gate (ADR 0029) |

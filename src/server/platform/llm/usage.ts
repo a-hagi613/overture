@@ -4,6 +4,7 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 import { llmUsage } from "../db/schema.ts";
 import { getSetting } from "../settings/index.ts";
+import { llmDayBudget } from "./budget.ts";
 
 export const DAY_MS = 86_400_000;
 
@@ -247,9 +248,7 @@ export function readAdminLlmUsage(db: AppDatabase, clock: Clock, query: AdminLlm
     .orderBy(desc(sql`coalesce(sum(${llmUsage.costMicros}), 0)`), desc(sql`count(*)`))
     .all();
 
-  const dailySpendCapMicros =
-    parseMicrosSetting(db, "llm.daily_spend_cap_micros") ??
-    parseUsdSettingMicros(db, "llm.cap_global_day_usd");
+  const dailyBudget = llmDayBudget(db, now);
 
   const monthlySpendCapMicros = parseMicrosSetting(db, "llm.monthly_spend_cap_micros");
 
@@ -271,7 +270,10 @@ export function readAdminLlmUsage(db: AppDatabase, clock: Clock, query: AdminLlm
       unexpected: !isExpectedModel(row.model, query.expectedModel),
     })),
     caps: {
-      dailySpendCapMicros,
+      dailySpendCapMicros: dailyBudget.budgetMicros,
+      baseDailySpendCapMicros: dailyBudget.baseMicros,
+      perSubscriberDayMicros: dailyBudget.perSubscriberMicros,
+      subscribers: dailyBudget.subscribers,
       monthlySpendCapMicros,
       userDailyCapMicros: parseUsdSettingMicros(db, "llm.cap_user_day_usd"),
       taggingDailyCapMicros: parseUsdSettingMicros(db, "llm.cap_tagging_day_usd"),

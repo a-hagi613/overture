@@ -885,7 +885,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "Overture is a paid service after the free trial. The Week plan costs $9.99 and includes 50 applications over 7 days. The Month plan costs $29.99 and includes 250 applications over 30 days. Checkout shows the price in your local currency, and taxes are added where they apply. Stripe takes the payment and is the merchant of record for each charge.",
+              text: "Overture is a paid service after the free trial. The Week plan costs $9.99 and includes 50 applications over 7 days. The Month plan costs $29.99 and includes 250 applications over 30 days. Checkout shows the price in your local currency, and taxes are added where they apply. Stripe processes the payment for Overture.",
             },
             {
               kind: "paragraph",
@@ -1061,7 +1061,7 @@ export const copy = {
                 },
                 { does: "Service logs and health monitoring.", name: "Grafana Cloud" },
                 {
-                  does: "Takes payments, holds the card details and handles tax as merchant of record.",
+                  does: "Takes payments, holds the card details and calculates tax.",
                   name: "Stripe",
                 },
               ],
@@ -1073,7 +1073,7 @@ export const copy = {
           blocks: [
             {
               kind: "paragraph",
-              text: "Stripe processes payments for Overture as a sub-processor and is the merchant of record for each charge. Card details go from your browser to Stripe and are never stored by Overture. Stripe sends us the plan, the invoices, the payment status and the last four digits and expiry of the card, and we keep those records to run your allowance, answer questions and meet tax and accounting rules.",
+              text: "Stripe processes payments for Overture as a sub-processor; Overture is the seller and is responsible for the taxes on each charge. Card details go from your browser to Stripe and are never stored by Overture. Stripe sends us the plan, the invoices, the payment status and the last four digits and expiry of the card, and we keep those records to run your allowance, answer questions and meet tax and accounting rules.",
             },
             {
               kind: "paragraph",
@@ -1103,7 +1103,7 @@ export const copy = {
             },
             {
               kind: "paragraph",
-              text: "Deleting your account removes your billing records with it. Stripe keeps the invoices it must keep as merchant of record. The keyed card fingerprint used for the free trial is not linked to you and is kept so the same card cannot start a second trial.",
+              text: "Deleting your account removes your billing records with it. Stripe keeps the invoices it must keep for tax and accounting. The keyed card fingerprint used for the free trial is not linked to you and is kept so the same card cannot start a second trial.",
             },
           ],
         },
@@ -2625,7 +2625,7 @@ export const copy = {
     marginColumnPrice: "Price",
     marginColumnApplications: "Applications",
     marginColumnCost: "Cost per Application",
-    marginColumnRevenue: "Revenue per Application",
+    marginColumnRevenue: "Net revenue per Application",
     marginColumnMargin: "Margin per Application",
     marginColumnGate: "Margin and gate",
     marginPlanName: { trial: "Trial", week: "Week", month: "Month" },
@@ -2633,14 +2633,14 @@ export const copy = {
     marginNotMeasured: "n/a",
     marginSeparator: " · ",
     marginShortCost: "Cost",
-    marginShortRevenue: "Revenue",
+    marginShortRevenue: "Net revenue",
     marginShortMargin: "Margin",
     marginGateOver: (gate: string) => `Over ${gate}`,
     marginGateUnder: (gate: string) => `Under ${gate}`,
     marginNoData: "No Application has been sent in the last 30 days yet.",
     marginHowTitle: "How to read it",
     marginHowBody:
-      "Cost is the measured cost of one completed Application: browser time, proxy bytes and model calls, averaged over 30 days. Revenue is the plan price divided by its Applications. The trial has no revenue, so its margin is its full cost. The gate is the $0.03 target in the admin Overview.",
+      "Cost is the measured cost of one completed Application: browser time, proxy bytes and model calls, averaged over 30 days. Net revenue is the plan price minus Stripe's fee, divided by its Applications: 3.6 % + $0.30 on a domestic card (2.9 % card plus 0.7 % Stripe Billing), or 5.1 % + $0.30 on an international one. The trial has no revenue, so its margin is its full cost. The gate is the $0.03 target in the admin Overview.",
     marginBesideHeading: "Reported beside, not inside",
     marginBesideBody:
       "Fixed infrastructure, mail and the model calls for tagging, inbox and resumes sit outside cost per Application.",
@@ -2953,6 +2953,8 @@ export const copy = {
     llmOpenReport: "Open provider report",
     llmStatToday: "Spend today (UTC)",
     llmStatTodayCap: (cap: string) => `Daily cap ${cap}`,
+    llmStatTodayScaled: (cap: string, base: string, perSubscriber: string, subscribers: number) =>
+      `Daily budget ${cap}: ${base} base plus ${perSubscriber} for each of ${String(subscribers)} paying subscriber${subscribers === 1 ? "" : "s"}`,
     llmStatTodayOver: (cap: string) => `Over daily cap (${cap})`,
     llmStatMonth: "Spend this month (UTC)",
     llmStatMonthCap: (cap: string) => `Monthly cap ${cap}`,

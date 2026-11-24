@@ -248,4 +248,20 @@ describe("validateAdminSettingValue", () => {
 
     expect(validateAdminSettingValue("limits.send_spacing_minutes", "20")).toBe(true);
   });
+
+  test("validates the subscriber-scaled budget and alert share settings", () => {
+    expect(validateAdminSettingValue("llm.cap_per_subscriber_day_usd", "0.30")).toBe(true);
+    expect(validateAdminSettingValue("llm.cap_subscriber_user_day_usd", "0.25")).toBe(true);
+    expect(validateAdminSettingValue("llm.cap_per_subscriber_day_usd", "a lot")).toBe(false);
+
+    expect(validateAdminSettingValue("llm.spend_alert_ratio", "0.8")).toBe(true);
+    expect(validateAdminSettingValue("llm.spend_alert_ratio", "0")).toBe(false);
+    expect(validateAdminSettingValue("llm.spend_alert_ratio", "1.5")).toBe(false);
+
+    expect(validateAdminSettingValue("mail.cap_per_subscriber", "250")).toBe(true);
+    expect(validateAdminSettingValue("mail.cap_per_subscriber", "2.5")).toBe(false);
+
+    expect(validateAdminSettingValue("mail.warning_share", "0.8")).toBe(true);
+    expect(validateAdminSettingValue("mail.warning_share", "0")).toBe(false);
+  });
 });
