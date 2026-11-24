@@ -41,10 +41,12 @@ export function classifyTier1(item: AmbiguousClassificationItem) {
   const granular = granularRoleFor(text);
 
   if (granular !== null) {
+    const alias = classifyWithEsco(title);
+
     return {
       category: granular.category,
       role: granular.role,
-      escoCode: null,
+      escoCode: alias !== null && alias.category === granular.category ? alias.escoCode : null,
       secondaryRoles: [],
       confidence: 0.65,
       source: "esco",
