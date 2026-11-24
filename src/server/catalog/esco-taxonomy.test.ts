@@ -19,7 +19,7 @@ import {
 describe("the baked ESCO dataset", () => {
   test("is v1.2.1 and carries the full occupation list", () => {
     expect(ESCO_VERSION).toBe("1.2.1");
-    expect(ESCO_OCCUPATION_COUNT).toBeGreaterThan(2_900);
+    expect(ESCO_OCCUPATION_COUNT).toBeGreaterThan(2900);
     expect(escoOccupations()).toHaveLength(ESCO_OCCUPATION_COUNT);
   });
 
@@ -77,7 +77,7 @@ describe("the baked ESCO dataset", () => {
   });
 
   test("indexes every label for the alias lookup", () => {
-    const occupation = escoOccupations()[0];
+    const [occupation] = escoOccupations();
 
     if (occupation === undefined) {
       throw new Error("the dataset has no occupations");
@@ -103,7 +103,7 @@ describe("the baked ESCO dataset", () => {
     const occupations = escoPrototypes();
 
     expect(roles.length).toBeGreaterThan(100);
-    expect(occupations.length).toBeGreaterThan(2_000);
+    expect(occupations.length).toBeGreaterThan(2000);
     expect(new Set(occupations.map((prototype) => prototype.text)).size).toBe(occupations.length);
   });
 });

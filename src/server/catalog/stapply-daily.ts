@@ -211,11 +211,9 @@ export function buildStapplyIngestQuery(input: StapplyIngestQueryInput) {
     `${epochMsOf("posted_at")} AS posted_at_ms,`,
     `${epochMsOf("source_updated_at")} AS source_updated_at_ms,`,
     `${epochMsOf("application_deadline")} AS application_deadline_ms,`,
-    // Pass-2 keys: the exact title keeps seniority/level/track tokens, and the location keeps country plus the
-    // primary feed label, so two distinct openings never collapse.
-    "regexp_replace(trim(lower(title)), '[^\\p{L}\\p{N}]+', ' ', 'g') AS exact_title_norm,",
+    String.raw`regexp_replace(trim(lower(title)), '[^\p{L}\p{N}]+', ' ', 'g') AS exact_title_norm,`,
     "coalesce(CASE WHEN json_valid(locations) THEN json_extract_string(locations, '$[0].label') END, location) AS primary_location_label,",
-    "lower(coalesce(country_iso, '')) || '|' || regexp_replace(trim(lower(coalesce(CASE WHEN json_valid(locations) THEN json_extract_string(locations, '$[0].label') END, location, ''))), '[^\\p{L}\\p{N}]+', ' ', 'g') AS location_key",
+    String.raw`lower(coalesce(country_iso, '')) || '|' || regexp_replace(trim(lower(coalesce(CASE WHEN json_valid(locations) THEN json_extract_string(locations, '$[0].label') END, location, ''))), '[^\p{L}\p{N}]+', ' ', 'g') AS location_key`,
     "FROM board_rows",
     "),",
     "filtered AS (",
@@ -238,8 +236,6 @@ export function buildStapplyIngestQuery(input: StapplyIngestQueryInput) {
     "WHEN requisition_id IS NOT NULL AND length(trim(requisition_id)) > 0",
     "AND lower(trim(requisition_id)) NOT IN ('null','n/a','na','none','tbd','-','0','unknown','not specified')",
     "THEN 'req:' || lower(trim(requisition_id))",
-    // Pass 2 only collapses a group where every involved board contributed exactly one row; a board with two
-    // identical titles keeps both, because that is two openings, not a mirror.
     "WHEN group_max_board_count = 1 AND group_row_count > 1 THEN 'title:' || exact_title_norm || '|' || location_key",
     "ELSE 'keep:' || coalesce(global_id, '') || ':' || coalesce(ats_id, '')",
     "END",
@@ -407,7 +403,7 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
   const row = parsed.data;
   const applyUrl = blankToNull(row.apply_url);
   const experience = experienceText(row.experience);
-  const primaryLocation = parseStapplyLocations(row.locations)[0];
+  const [primaryLocation] = parseStapplyLocations(row.locations);
   const locationRaw = blankToNull(row.location) ?? primaryLocation?.label ?? null;
   const jobCategory = blankToNull(row.job_category);
   const skillRequirements = parseSkillRequirements(row.skill_requirements);
@@ -440,11 +436,13 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
   const titleNorm = normalizeTitle(row.title);
   const exactTitleNorm = normalizeExactTitle(row.title);
   const { countryCode, city } = tags;
+
   const locationKey = stapplyLocationKey({
     countryCode: countryCode ?? blankToNull(row.country_iso),
     location: locationRaw,
     locations: row.locations,
   });
+
   const region = tags.region ?? blankToNull(row.feed_region);
   const dedupeSuffix = `${titleNorm}|${countryCode ?? ""}|${city ?? ""}`;
 

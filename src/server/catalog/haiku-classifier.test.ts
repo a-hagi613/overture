@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-import type { CatalogFetch } from "./stapply-refresh.ts";
-
 import { createHaikuBatchClassifier } from "./haiku-classifier.ts";
 
 const BASE = "https://api.anthropic.test";
@@ -19,8 +17,10 @@ function resultLine(text: string) {
   });
 }
 
-function fakeFetch(lines: readonly string[]): CatalogFetch {
-  return async (url) => {
+function fakeFetch(lines: readonly string[]) {
+  return async (url: string) => {
+    await Promise.resolve();
+
     if (url.endsWith("/v1/messages/batches")) {
       return Response.json({ id: "batch-1", processing_status: "in_progress" });
     }
@@ -79,7 +79,6 @@ describe("createHaikuBatchClassifier", () => {
     expect(result.resolved.get("k1")?.escoCode).toBe("2512.1");
     expect(result.inputTokens).toBe(1000);
     expect(result.outputTokens).toBe(200);
-    // claude-haiku-5-5: 50,000 micros per input million and 250,000 per output million.
     expect(result.costMicros).toBeCloseTo((1000 * 50_000 + 200 * 250_000) / 1_000_000);
   });
 
@@ -115,7 +114,7 @@ describe("createHaikuBatchClassifier", () => {
     const classify = createHaikuBatchClassifier({
       apiKey: "test-key",
       baseUrl: BASE,
-      fetchImpl: async () => new Response("nope", { status: 500 }),
+      fetchImpl: async () => await Promise.resolve(new Response("nope", { status: 500 })),
       pollIntervalMs: 0,
     });
 

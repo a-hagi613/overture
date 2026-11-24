@@ -439,7 +439,9 @@ export interface CatalogRelayInput {
   readonly compressedBytes: Uint8Array<ArrayBuffer>;
   readonly nowMs: number;
   readonly fetchImpl?: CatalogFetch;
-} /**
+}
+
+/**
  * The relay path for a repository without R2 credentials. The compressed snapshot is uploaded to the app, which
  * archives it to R2 with its own credentials, and the signed refresh request then asks for the hot swap. A 404 or 501
  * means the runtime endpoint has not shipped yet, which is reported rather than treated as an outage.
@@ -450,6 +452,7 @@ export interface CatalogRelayInput {
  * @param input The origin, secret, artifacts and clock.
  * @returns Whether the endpoint accepted the snapshot.
  */
+
 export async function relayCatalogSnapshot(input: CatalogRelayInput) {
   const call: CatalogFetch = input.fetchImpl ?? fetch;
   const origin = input.origin.replace(/\/+$/u, "");
@@ -514,7 +517,7 @@ export async function fetchClassificationCacheRelay(input: ClassificationCacheRe
     );
   }
 
-  return new Uint8Array(await response.arrayBuffer()) as Uint8Array<ArrayBuffer>;
+  return new Uint8Array(await response.arrayBuffer());
 }
 
 export interface ClassificationCacheUploadInput extends ClassificationCacheRelayInput {

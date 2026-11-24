@@ -52,7 +52,29 @@ describe("classifyTier1", () => {
   });
 });
 
-function prototypes(): Tier2Prototypes {
+const haiku: HaikuBatchClassifier = async (items) => {
+  await Promise.resolve();
+
+  return {
+    costMicros: 120,
+    inputTokens: 1000,
+    outputTokens: 400,
+    resolved: new Map(
+      items.map((entry) => [
+        entry.key,
+        {
+          category: "Software Engineering" as const,
+          escoCode: null,
+          role: "Software Engineer",
+          secondaryRoles: [],
+          seniority: null,
+        },
+      ]),
+    ),
+  };
+};
+
+function prototypes() {
   return {
     occupations: [
       {
@@ -84,7 +106,7 @@ function prototypes(): Tier2Prototypes {
         vector: Float32Array.from([0, 1, 0]),
       },
     ],
-  };
+  } satisfies Tier2Prototypes;
 }
 
 describe("classifyWithEmbeddings", () => {
@@ -135,29 +157,13 @@ describe("runClassificationPipeline", () => {
       },
     });
 
-    const haiku: HaikuBatchClassifier = async (items) => ({
-      costMicros: 120,
-      inputTokens: 1000,
-      outputTokens: 400,
-      resolved: new Map(
-        items.map((entry) => [
-          entry.key,
-          {
-            category: "Software Engineering" as const,
-            escoCode: null,
-            role: "Software Engineer",
-            secondaryRoles: [],
-            seniority: null,
-          },
-        ]),
-      ),
-    });
+    const haikuClassifier = haiku;
 
     const output = await runClassificationPipeline({
       cache,
       crossBoardDupesRemoved: 7,
       embedder: null,
-      haiku,
+      haiku: haikuClassifier,
       items: [
         item("Content marketing manager", "cached"),
         item("Executive Assistant", "admin"),

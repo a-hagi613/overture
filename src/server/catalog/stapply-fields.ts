@@ -1,3 +1,21 @@
+import { z } from "zod";
+
+const locationEntrySchema = z.object({
+  label: z.string().optional(),
+  city: z.string().optional(),
+  region: z.string().optional(),
+  country_iso: z.string().optional(),
+  is_primary: z.boolean().optional(),
+});
+
+const skillObjectSchema = z.object({
+  name: z.string().optional(),
+  label: z.string().optional(),
+  skill: z.string().optional(),
+  title: z.string().optional(),
+  requirement: z.string().optional(),
+});
+
 /**
  * Requisition strings that carry no identity. A mirror board writes one of these when it has no requisition, so they
  * must not join Pass-1's `(company, requisition)` partition.
@@ -62,7 +80,7 @@ export interface StapplyLocation {
  * @param raw The `locations` column.
  * @returns The parsed locations, primary first.
  */
-export function parseStapplyLocations(raw: string | null | undefined): readonly StapplyLocation[] {
+export function parseStapplyLocations(raw: string | null | undefined) {
   if (raw === null || raw === undefined || raw.trim() === "") {
     return [];
   }
@@ -76,12 +94,13 @@ export function parseStapplyLocations(raw: string | null | undefined): readonly 
 
     return parsed
       .flatMap((entry) => {
-        if (typeof entry !== "object" || entry === null) {
+        const result = locationEntrySchema.safeParse(entry);
+
+        if (!result.success) {
           return [];
         }
 
-        const record = entry as Record<string, unknown>;
-        const label = typeof record.label === "string" ? record.label.trim() : "";
+        const label = result.data.label?.trim() ?? "";
 
         if (label === "") {
           return [];
@@ -90,13 +109,10 @@ export function parseStapplyLocations(raw: string | null | undefined): readonly 
         return [
           {
             label,
-            city: typeof record.city === "string" ? record.city.trim() : null,
-            region: typeof record.region === "string" ? record.region.trim() : null,
-            countryCode:
-              typeof record.country_iso === "string"
-                ? record.country_iso.trim().toUpperCase()
-                : null,
-            isPrimary: record.is_primary === true,
+            city: result.data.city?.trim() ?? null,
+            region: result.data.region?.trim() ?? null,
+            countryCode: result.data.country_iso?.trim().toUpperCase() ?? null,
+            isPrimary: result.data.is_primary === true,
           },
         ];
       })
@@ -117,7 +133,7 @@ export function stapplyLocationKey(input: {
   readonly location: string | null;
   readonly locations: string | null;
 }) {
-  const primary = parseStapplyLocations(input.locations)[0];
+  const [primary] = parseStapplyLocations(input.locations);
   const label = primary?.label ?? input.location ?? "";
   const country = (primary?.countryCode ?? input.countryCode ?? "").toUpperCase();
 
@@ -130,7 +146,7 @@ export function stapplyLocationKey(input: {
  * @param raw The `skill_requirements` column.
  * @returns The skill names, capped at 40.
  */
-export function parseSkillRequirements(raw: string | null | undefined): readonly string[] {
+export function parseSkillRequirements(raw: string | null | undefined) {
   if (raw === null || raw === undefined || raw.trim() === "") {
     return [];
   }
@@ -142,19 +158,28 @@ export function parseSkillRequirements(raw: string | null | undefined): readonly
 
     if (Array.isArray(parsed)) {
       for (const entry of parsed) {
-        if (typeof entry === "string") {
-          values.push(entry);
-        } else if (typeof entry === "object" && entry !== null) {
-          const record = entry as Record<string, unknown>;
+        const text = z.string().safeParse(entry);
 
-          for (const key of ["name", "label", "skill", "title", "requirement"]) {
-            const value = record[key];
+        if (text.success) {
+          values.push(text.data);
+          continue;
+        }
 
-            if (typeof value === "string") {
-              values.push(value);
-              break;
-            }
-          }
+        const object = skillObjectSchema.safeParse(entry);
+
+        if (!object.success) {
+          continue;
+        }
+
+        const value =
+          object.data.name ??
+          object.data.label ??
+          object.data.skill ??
+          object.data.title ??
+          object.data.requirement;
+
+        if (value !== undefined) {
+          values.push(value);
         }
       }
     }
@@ -162,8 +187,13 @@ export function parseSkillRequirements(raw: string | null | undefined): readonly
     values.push(...raw.split(/[,;\n]/u));
   }
 
-  return [...new Set(values.map((value) => value.trim()).filter((value) => value !== ""))].slice(
-    0,
-    40,
-  );
+  return [
+    ...new Set(
+      values.flatMap((value) => {
+        const trimmed = value.trim();
+
+        return trimmed === "" ? [] : [trimmed];
+      }),
+    ),
+  ].slice(0, 40);
 }

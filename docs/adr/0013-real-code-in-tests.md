@@ -118,7 +118,12 @@ split (`catalog-split.test.ts`: `litestream.yml` replicates only `/data/app.sqli
 holds `app.sqlite`'s write lock, deleting and recreating `catalog.sqlite` leaves every user and Application row intact,
 and a closed Posting a crashed sweep never reported is still reconciled; the browser half is
 `test/e2e/catalog-split.test.ts`, where an approval and `/api/health` answer while a real catalog write lock is held,
-#423), the admin gate's
+#423), the Stapply classifier (`classification-key.test.ts`, `stapply-fields.test.ts`,
+`esco-taxonomy.test.ts`, `classifier.test.ts`, `haiku-classifier.test.ts` and `classification-cache.test.ts`: the
+classification key preserves seniority and level while dropping gender markers and a trailing location, the Pass-2
+dedupe never collapses two same-board openings, the baked ESCO v1.2.1 dataset carries the Administrative roles, the
+three tiers and the Haiku strict-JSON contract behave, and a corrupt, missing or version-mismatched cache is an empty
+cache, #628), the admin gate's
 fail-closed parsing (a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented
 issuer), the capped request-body reader (an unauthenticated webhook body stops at its byte cap and is never buffered
 whole, so a sender cannot choose how much memory it costs), the unhandled-rejection alert (a public alert carries the

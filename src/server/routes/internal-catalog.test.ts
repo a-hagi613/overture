@@ -438,30 +438,30 @@ describe("PUT /internal/catalog/snapshot", () => {
   });
 });
 
+async function signedGet(app: Hono, timestampMs: number, secret = SECRET) {
+  return await app.request(CLASSIFICATION_CACHE_PATH, {
+    headers: catalogRefreshHeaders(secret, timestampMs, ""),
+    method: "GET",
+  });
+}
+
+async function signedPut(
+  app: Hono,
+  body: Uint8Array<ArrayBuffer>,
+  timestampMs: number,
+  secret = SECRET,
+) {
+  return await app.request(CLASSIFICATION_CACHE_PATH, {
+    body,
+    headers: {
+      "content-type": "application/zstd",
+      ...catalogRefreshHeaders(secret, timestampMs, catalogSha256(body)),
+    },
+    method: "PUT",
+  });
+}
+
 describe("/internal/catalog/classification-cache", () => {
-  function signedGet(app: Hono, timestampMs: number, secret = SECRET) {
-    return app.request(CLASSIFICATION_CACHE_PATH, {
-      headers: catalogRefreshHeaders(secret, timestampMs, ""),
-      method: "GET",
-    });
-  }
-
-  function signedPut(
-    app: Hono,
-    body: Uint8Array<ArrayBuffer>,
-    timestampMs: number,
-    secret = SECRET,
-  ) {
-    return app.request(CLASSIFICATION_CACHE_PATH, {
-      body,
-      headers: {
-        "content-type": "application/zstd",
-        ...catalogRefreshHeaders(secret, timestampMs, catalogSha256(body)),
-      },
-      method: "PUT",
-    });
-  }
-
   test("round-trips a signed cache and 404s on the first day", async () => {
     const { app, objects, hotSwap } = setup();
 

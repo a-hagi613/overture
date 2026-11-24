@@ -246,9 +246,6 @@ const GENERIC_REQUISITION_SQL = [...GENERIC_REQUISITION_IDS]
   .join(", ");
 
 function dedupeStaging(db: CatalogDatabase) {
-  const before = countOf(db, `SELECT count(*) AS n FROM ${STAGING}`);
-
-  // Pass 1: a real requisition id joins `(company, requisition)`. Junk strings such as `n/a` are not identities.
   db.$client.run(`CREATE TEMP TABLE stapply_duplicates AS
     SELECT rowid AS rowid FROM (
       SELECT rowid, row_number() OVER (
@@ -260,11 +257,13 @@ function dedupeStaging(db: CatalogDatabase) {
       WHERE requisition_id IS NOT NULL AND trim(requisition_id) <> ''
         AND lower(trim(requisition_id)) NOT IN (${GENERIC_REQUISITION_SQL})
     ) WHERE position > 1`);
-  db.$client.run(`DELETE FROM ${STAGING} WHERE rowid IN (SELECT rowid FROM stapply_duplicates)`);
+
+  const pass1 = db.$client.run(
+    `DELETE FROM ${STAGING} WHERE rowid IN (SELECT rowid FROM stapply_duplicates)`,
+  ).changes;
+
   db.$client.run("DROP TABLE stapply_duplicates");
 
-  // Pass 2: only when the requisition is absent or junk. A group is eligible when every involved board contributed
-  // exactly one row; a board with two identical titles keeps both, because that is two openings, not a mirror.
   db.$client.run(`CREATE TEMP TABLE stapply_pass2_keys AS
     SELECT company_norm, exact_title_norm, location_key FROM (
       SELECT company_norm, exact_title_norm, location_key, source_key, count(*) AS per_board
@@ -289,7 +288,11 @@ function dedupeStaging(db: CatalogDatabase) {
       WHERE s.requisition_id IS NULL OR trim(s.requisition_id) = ''
         OR lower(trim(s.requisition_id)) IN (${GENERIC_REQUISITION_SQL})
     ) WHERE position > 1`);
-  db.$client.run(`DELETE FROM ${STAGING} WHERE rowid IN (SELECT rowid FROM stapply_duplicates)`);
+
+  const pass2 = db.$client.run(
+    `DELETE FROM ${STAGING} WHERE rowid IN (SELECT rowid FROM stapply_duplicates)`,
+  ).changes;
+
   db.$client.run("DROP TABLE stapply_duplicates");
   db.$client.run("DROP TABLE stapply_pass2_keys");
 
@@ -303,7 +306,7 @@ function dedupeStaging(db: CatalogDatabase) {
   );
   db.$client.run("DROP TABLE stapply_job_duplicates");
 
-  return before - countOf(db, `SELECT count(*) AS n FROM ${STAGING}`);
+  return pass1 + pass2;
 }
 
 function placeholders(values: readonly string[]) {
@@ -788,9 +791,11 @@ export function writePostingClassifications(
   }
 
   const client = db.$client;
+
   const insert = client.prepare(
     "INSERT OR IGNORE INTO posting_tags (posting_id, dimension, value, source, weight) VALUES (?, ?, ?, ?, ?)",
   );
+
   const update = client.prepare(
     `UPDATE postings SET primary_category = ?, primary_role = ?, esco_code = ?,
        tag_source = ?, tagged_at = ?, classified_at = ? WHERE id = ?`,
@@ -800,10 +805,11 @@ export function writePostingClassifications(
     for (const write of writes) {
       const source = tagSourceFor(write.classification);
 
-      client.run(
-        `DELETE FROM posting_tags WHERE posting_id = ? AND dimension IN (${TAG_DIMENSIONS_TO_REPLACE})`,
-        write.postingId,
-      );
+      client
+        .prepare(
+          `DELETE FROM posting_tags WHERE posting_id = ? AND dimension IN (${TAG_DIMENSIONS_TO_REPLACE})`,
+        )
+        .run(write.postingId);
       insert.run(write.postingId, "role", write.classification.category, source, 1);
       insert.run(write.postingId, "granular_role", write.classification.role, source, 1);
 
@@ -886,32 +892,27 @@ export function writeStagedSkills(db: CatalogDatabase) {
 
   let tagged = 0;
 
-  for (let offset = 0; offset < targets.length; offset += 500) {
-    const chunk = targets.slice(offset, offset + 500);
+  const write = db.$client.transaction(() => {
+    for (const target of targets) {
+      const skills = parseSkillRequirements(target.skillRequirements);
 
-    const write = db.$client.transaction(() => {
-      for (const target of chunk) {
-        const skills = parseSkillRequirements(target.skillRequirements);
-
-        if (skills.length === 0) {
-          continue;
-        }
-
-        db.$client.run(
-          "DELETE FROM posting_tags WHERE posting_id = ? AND dimension = 'skill'",
-          target.id,
-        );
-
-        for (const skill of skills) {
-          insert.run(target.id, skill);
-        }
-
-        tagged += 1;
+      if (skills.length === 0) {
+        continue;
       }
-    });
 
-    write();
-  }
+      db.$client
+        .prepare("DELETE FROM posting_tags WHERE posting_id = ? AND dimension = 'skill'")
+        .run(target.id);
+
+      for (const skill of skills) {
+        insert.run(target.id, skill);
+      }
+
+      tagged += 1;
+    }
+  });
+
+  write();
 
   return tagged;
 }

@@ -384,7 +384,6 @@ describe("streamStapplyIngest", () => {
       board("greenhouse", join(directory, "greenhouse", "jobs.parquet"), true),
     ]);
 
-    // The native board wins even though the mirror updated later.
     expect(rows.map((row) => row.atsJobId)).toEqual(["gh-1"]);
   });
 

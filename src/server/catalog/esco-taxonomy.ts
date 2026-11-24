@@ -6,11 +6,8 @@ import { aliasLookupTitle, normalizeClassificationText } from "./classification-
 import { granularRoleFor } from "./esco-mapping.ts";
 import escoOccupationsJson from "./tag-data/esco-occupations.json";
 
-/**
- * The compact ESCO v1.2.1 slice committed under `tag-data/`. Preferred labels are kept for every language ESCO
- * publishes and alternative labels for the languages the daily pass meets most often. Level 1 and Level 2 are baked
- * by `scripts/build-esco-dataset.ts`, so the runtime only reads them.
- */
+const ROLE_GROUP_NAMES: readonly string[] = ROLE_GROUPS;
+
 interface RawEscoOccupation {
   readonly ec: string;
   readonly u: string;
@@ -46,10 +43,10 @@ export interface EscoOccupation {
 }
 
 function isRoleGroup(value: string): value is RoleGroup {
-  return (ROLE_GROUPS as readonly string[]).includes(value);
+  return ROLE_GROUP_NAMES.includes(value);
 }
 
-function toOccupation(raw: RawEscoOccupation): EscoOccupation {
+function toOccupation(raw: RawEscoOccupation) {
   return {
     code: raw.ec,
     uri: raw.u,
@@ -115,19 +112,27 @@ export function escoAliasIndex() {
 
   const index = new Map<string, EscoOccupation>();
 
-  for (const occupation of occupations) {
-    for (const label of allLabels(occupation)) {
-      // ESCO writes a gendered pair as one label (`Datenbankadministrator/Datenbankadministratorin`, `3D
-      // animator/3D animatrice`), so each half is indexed on its own as well as the whole phrase.
-      for (const variant of [label, ...label.split(/\s*[/|]\s*/u)]) {
-        const normalized = normalizeClassificationText(variant);
+  function addLabel(occupation: EscoOccupation, label: string) {
+    for (const variant of [label, ...label.split(/\s*[/|]\s*/u)]) {
+      const normalized = normalizeClassificationText(variant);
 
-        if (normalized.length < 2 || index.has(normalized)) {
-          continue;
-        }
-
-        index.set(normalized, occupation);
+      if (normalized.length < 2 || index.has(normalized)) {
+        continue;
       }
+
+      index.set(normalized, occupation);
+    }
+  }
+
+  for (const occupation of occupations) {
+    for (const label of Object.values(occupation.labels)) {
+      addLabel(occupation, label);
+    }
+  }
+
+  for (const occupation of occupations) {
+    for (const label of Object.values(occupation.altLabels).flat()) {
+      addLabel(occupation, label);
     }
   }
 
@@ -172,7 +177,7 @@ export interface EscoClassification {
  * @param title The classification title.
  * @returns The baked category, role and code.
  */
-export function classifyWithEsco(title: string): EscoClassification | null {
+export function classifyWithEsco(title: string) {
   const occupation = lookupEscoOccupations(title);
 
   return occupation === null
@@ -186,7 +191,7 @@ export function classifyWithEsco(title: string): EscoClassification | null {
  * @param value The department or category text, or null.
  * @returns The category, or null.
  */
-export function categoryHintFromText(value: string | null | undefined): RoleGroup | null {
+export function categoryHintFromText(value: string | null | undefined) {
   if (value === null || value === undefined) {
     return null;
   }

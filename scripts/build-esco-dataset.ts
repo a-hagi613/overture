@@ -9,20 +9,6 @@ import {
   iscoFromEscoCode,
 } from "../src/server/catalog/esco-mapping.ts";
 
-/**
- * Builds the committed ESCO v1.2.1 dataset from the public ESCO API. Run it by hand when the upstream vocabulary or
- * the mapping rules change; the generated file is what the catalog ships, so a run never depends on the network.
- *
- *   bun run scripts/build-esco-dataset.ts
- *
- * The compact shape keeps the multilingual preferred labels (28 languages) and, where the upstream search endpoint
- * can answer, the alternative labels for the languages the daily pass meets most often. Level 1 and Level 2 are baked
- * so the runtime never recomputes them differently.
- *
- * The search endpoint returns HTTP 500 for some pages and times out on others ("More than one value found for field
- * 'hasSkillType'"). Those pages are enumerated without skills, which still carries all 28 preferred labels, and the
- * alternative-label pass simply skips them instead of issuing ~100 single-occupation requests.
- */
 const OUTPUT = join(
   import.meta.dir,
   "..",
@@ -32,9 +18,9 @@ const OUTPUT = join(
   "tag-data",
   "esco-occupations.json",
 );
+
 const PAGE_SIZE = 100;
 
-/** Languages whose alternative labels are kept; preferred labels are kept for every language ESCO publishes. */
 const ALT_LANGUAGES = ["en", "de", "fr", "es", "ja", "it", "nl", "pl", "pt", "zh"] as const;
 
 const searchSchema = z.object({
@@ -50,6 +36,10 @@ const searchSchema = z.object({
       }),
     ),
   }),
+});
+
+const detailSchema = z.object({
+  alternativeLabel: z.record(z.string(), z.array(z.string())).default({}),
 });
 
 type EscoResult = z.infer<typeof searchSchema>["_embedded"]["results"][number];
@@ -68,31 +58,49 @@ function pageUrl(offset: number, full: boolean) {
   return `https://ec.europa.eu/esco/api/search?type=occupation&language=en&limit=${String(PAGE_SIZE)}&offset=${String(offset)}&full=${String(full)}&viewObsolete=false`;
 }
 
-async function fetchPage(offset: number, full: boolean, attempts = 3, timeoutMs = 45_000) {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      const response = await fetch(pageUrl(offset, full), {
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-
-      if (response.ok) {
-        return searchSchema.parse(await response.json());
-      }
-
-      if (response.status < 500) {
-        break;
-      }
-    } catch {
-      // A timeout is retried while attempts remain; a deterministic 500 is not.
-    }
-
-    await Bun.sleep(1_000);
+const attemptPage: (
+  offset: number,
+  full: boolean,
+  attempt: number,
+  attempts: number,
+  timeoutMs: number,
+) => Promise<z.infer<typeof searchSchema> | null> = async (
+  offset,
+  full,
+  attempt,
+  attempts,
+  timeoutMs,
+) => {
+  if (attempt >= attempts) {
+    return null;
   }
 
-  return null;
+  try {
+    const response = await fetch(pageUrl(offset, full), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (response.ok) {
+      return searchSchema.parse(await response.json());
+    }
+
+    if (response.status < 500) {
+      return null;
+    }
+  } catch {
+    return attemptPage(offset, full, attempt + 1, attempts, timeoutMs);
+  }
+
+  await Bun.sleep(1000);
+
+  return attemptPage(offset, full, attempt + 1, attempts, timeoutMs);
+};
+
+async function fetchPage(offset: number, full: boolean, attempts = 3, timeoutMs = 45_000) {
+  return attemptPage(offset, full, 0, attempts, timeoutMs);
 }
 
-function compact(result: EscoResult): CompactOccupation | null {
+function compact(result: EscoResult) {
   if (result.code === null || result.code.trim() === "") {
     return null;
   }
@@ -128,32 +136,32 @@ function compact(result: EscoResult): CompactOccupation | null {
   };
 }
 
-const detailSchema = z.object({
-  alternativeLabel: z.record(z.string(), z.array(z.string())).default({}),
-});
-
 async function mapWithConcurrency<T, R>(
   items: readonly T[],
   limit: number,
   mapper: (item: T) => Promise<R>,
 ) {
-  const results = new Array<R>(items.length);
+  const results: R[] = [];
   let next = 0;
 
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    for (;;) {
-      const index = next;
-      next += 1;
+  const runWorker: () => Promise<void> = async () => {
+    const index = next;
+    next += 1;
 
-      if (index >= items.length) {
-        return;
-      }
+    const item = items[index];
 
-      results[index] = await mapper(items[index] as T);
+    if (item === undefined) {
+      return;
     }
-  });
 
-  await Promise.all(workers);
+    results[index] = await mapper(item);
+
+    return runWorker();
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => await runWorker()),
+  );
 
   return results;
 }
@@ -179,6 +187,7 @@ function writeDataset(byCode: Map<string, CompactOccupation>) {
   const occupations = [...byCode.values()].toSorted((left, right) =>
     left.ec.localeCompare(right.ec, "en"),
   );
+
   const categories = new Map<string, number>();
   const roles = new Set<string>();
 
@@ -202,7 +211,9 @@ function writeDataset(byCode: Map<string, CompactOccupation>) {
     occupations: occupations.length,
     roles: roles.size,
     withAltLabels: occupations.filter((occupation) => Object.keys(occupation.a).length > 0).length,
-    categories: Object.fromEntries([...categories].toSorted()),
+    categories: Object.fromEntries(
+      [...categories].toSorted(([left], [right]) => left.localeCompare(right, "en")),
+    ),
   };
 
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
@@ -210,70 +221,84 @@ function writeDataset(byCode: Map<string, CompactOccupation>) {
   return summary;
 }
 
+const collectPages: (
+  byCode: Map<string, CompactOccupation>,
+  offset: number,
+  total: number,
+) => Promise<void> = async (byCode, offset, total) => {
+  if (byCode.size >= total) {
+    return;
+  }
+
+  const page = await fetchPage(offset, false);
+
+  if (page === null) {
+    return;
+  }
+
+  const { results } = page._embedded;
+
+  if (results.length === 0) {
+    return;
+  }
+
+  for (const result of results) {
+    const entry = compact(result);
+
+    if (entry !== null && !byCode.has(entry.ec)) {
+      byCode.set(entry.ec, entry);
+    }
+  }
+
+  process.stderr.write(
+    `esco: page ${String(offset)} (${String(byCode.size)}/${String(page.total)})\n`,
+  );
+
+  await Bun.sleep(300);
+
+  return collectPages(byCode, offset + 1, page.total);
+};
+
 async function main() {
   const byCode = new Map<string, CompactOccupation>();
-  let total = Number.POSITIVE_INFINITY;
 
-  // Pass 1: enumerate every occupation without the skills payload. This is the reliable read, and it is written to
-  // disk before the enrichment pass so a flaky upstream can never leave the repository without a dataset.
-  for (let offset = 0; byCode.size < total; offset += 1) {
-    const page = await fetchPage(offset, false);
-
-    if (page === null || page._embedded.results.length === 0) {
-      break;
-    }
-
-    total = page.total;
-
-    for (const result of page._embedded.results) {
-      const entry = compact(result);
-
-      if (entry !== null && !byCode.has(entry.ec)) {
-        byCode.set(entry.ec, entry);
-      }
-    }
-
-    process.stderr.write(
-      `esco: page ${String(offset)} (${String(byCode.size)}/${String(total)})\n`,
-    );
-  }
+  await collectPages(byCode, 0, Number.POSITIVE_INFINITY);
 
   writeDataset(byCode);
 
-  // Pass 2: add alternative labels from each occupation's own resource endpoint. The search endpoint's full payload
-  // is broken for some pages ("More than one value found for field 'hasSkillType'"), so the detail endpoint is the
-  // reliable source. A failed detail read leaves the occupation with its 28 preferred labels.
-  if (!process.argv.includes("--no-enrich")) {
-    const occupations = [...byCode.values()];
-    let done = 0;
-    let enriched = 0;
+  if (process.argv.includes("--no-enrich")) {
+    return;
+  }
 
-    await mapWithConcurrency(occupations, 24, async (occupation) => {
-      const altLabels = await fetchAltLabels(occupation.u);
+  const occupations = [...byCode.values()];
+  let done = 0;
+  let enriched = 0;
 
-      if (altLabels !== null) {
-        for (const language of ALT_LANGUAGES) {
-          const labels = altLabels[language];
+  await mapWithConcurrency(occupations, 24, async (occupation) => {
+    const altLabels = await fetchAltLabels(occupation.u);
 
-          if (labels !== undefined && labels.length > 0) {
-            occupation.a[language] = [
-              ...new Set(labels.map((label) => label.trim()).filter((label) => label !== "")),
-            ];
-            enriched += 1;
-          }
+    if (altLabels !== null) {
+      for (const language of ALT_LANGUAGES) {
+        const labels = altLabels[language];
+
+        if (labels !== undefined && labels.length > 0) {
+          occupation.a[language] = [
+            ...new Set(labels.map((label) => label.trim()).filter((label) => label !== "")),
+          ];
+          enriched += 1;
         }
       }
+    }
 
-      done += 1;
+    done += 1;
 
-      if (done % 500 === 0) {
-        process.stderr.write(`esco: alt labels ${String(done)}/${String(occupations.length)}\n`);
-      }
-    });
+    if (done % 500 === 0) {
+      process.stderr.write(`esco: alt labels ${String(done)}/${String(occupations.length)}\n`);
+    }
+  });
 
-    writeDataset(byCode);
-    process.stderr.write(`esco: enriched ${String(enriched)} language label sets\n`);
-  }
+  writeDataset(byCode);
+  process.stderr.write(`esco: enriched ${String(enriched)} language label sets\n`);
 }
 
 await main();

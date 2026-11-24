@@ -1,5 +1,3 @@
-import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
-
 import type { RoleGroup } from "../../shared/tag-taxonomy.ts";
 
 /**
@@ -19,7 +17,6 @@ export interface GranularRoleRule {
  * role strings.
  */
 export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
-  // Administrative — the gap this work closes.
   {
     role: "Executive Assistant",
     category: "Administrative",
@@ -59,7 +56,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:secretary|secretarial|transcriptionist|medical secretary|legal secretary)\b/iu,
   },
 
-  // Software engineering and adjacent technical roles.
   {
     role: "Full-stack Engineer",
     category: "Software Engineering",
@@ -200,7 +196,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:developer|programmer)\b/iu,
   },
 
-  // Data & analytics.
   {
     role: "Data Analyst",
     category: "Data & Analytics",
@@ -224,7 +219,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:statistician|actuar|biostatistician|demographer|quantitative analyst)\b/iu,
   },
 
-  // Product, project and programme.
   {
     role: "Product Manager",
     category: "Product Management",
@@ -249,7 +243,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
       /\b(?:project (?:manager|coordinator|lead|engineer|officer)|project management|scrum master|agile coach|pmo)\b/iu,
   },
 
-  // Design.
   {
     role: "Design Manager",
     category: "Design",
@@ -310,7 +303,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:instructional designer|curriculum (?:developer|designer)|learning designer)\b/iu,
   },
 
-  // Marketing and communications.
   {
     role: "Marketing Manager",
     category: "Marketing",
@@ -386,7 +378,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:translator|interpreter|translat|localisation|localization)\b/iu,
   },
 
-  // Sales and business development.
   {
     role: "Sales Manager",
     category: "Sales",
@@ -438,7 +429,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
       /\b(?:partner(?:ship)? (?:manager|director|lead)|strategic alliances|channel (?:manager|sales)|partner development)\b/iu,
   },
 
-  // Customer-facing roles.
   {
     role: "Customer Success Manager",
     category: "Customer Success",
@@ -467,7 +457,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:client relationship|relationship manager|client advisor)\b/iu,
   },
 
-  // Finance and accounting.
   {
     role: "Accountant",
     category: "Accounting",
@@ -541,7 +530,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:economist|economic analyst|econometrics)\b/iu,
   },
 
-  // Legal.
   {
     role: "Lawyer",
     category: "Legal",
@@ -571,7 +559,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:judge|magistrate|tribunal)\b/iu,
   },
 
-  // People, HR and recruiting.
   {
     role: "HR Manager",
     category: "People & HR",
@@ -603,7 +590,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
       /\b(?:training (?:manager|specialist|coordinator|officer)|learning and development|l&d|talent development)\b/iu,
   },
 
-  // Operations, supply chain and facilities.
   {
     role: "Operations Manager",
     category: "Operations",
@@ -721,7 +707,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:soldier|military|armed forces|army|navy|air force)\b/iu,
   },
 
-  // Healthcare.
   {
     role: "Registered Nurse",
     category: "Healthcare",
@@ -782,7 +767,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:social worker|social care|youth worker|community health worker)\b/iu,
   },
 
-  // Education.
   {
     role: "Education Manager",
     category: "Education",
@@ -806,7 +790,6 @@ export const GRANULAR_ROLE_RULES: readonly GranularRoleRule[] = [
     pattern: /\b(?:librarian|archivist|library (?:assistant|manager)|curator)\b/iu,
   },
 
-  // Research and science.
   {
     role: "Research Scientist",
     category: "Research & Science",
@@ -941,10 +924,6 @@ export function granularRoleFor(text: string) {
   return GRANULAR_ROLE_RULES.find((rule) => rule.pattern.test(text)) ?? null;
 }
 
-/**
- * ISCO-08 roll-up for the occupations no granular rule recognizes. The list is ordered by prefix length so the most
- * specific code wins; the last entries are the ten major groups.
- */
 const ISCO_CATEGORY_RULES: readonly (readonly [string, RoleGroup])[] = [
   ["1221", "Sales"],
   ["1222", "Marketing"],
@@ -1060,6 +1039,3 @@ export function iscoFromEscoCode(escoCode: string) {
 export function granularRoleNameFor(input: { readonly en: string; readonly category: RoleGroup }) {
   return granularRoleFor(input.en)?.role ?? input.category;
 }
-
-export { ROLE_GROUPS };
-export type { RoleGroup };

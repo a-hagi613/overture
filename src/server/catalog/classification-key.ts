@@ -1,21 +1,10 @@
 import { isRemoteLocationText, normalizePlaceName, resolveLocation } from "./geo.ts";
 
-/**
- * The EU gender markers a posting title carries, such as `(m/w/d)`, `(f/m/x)`, `(w/m/d)` and `m/f/d`.
- * The separator has to appear between at least two tokens, so an ordinary word or a range such as `R&D` is never
- * mistaken for one.
- */
 const GENDER_MARKER =
   /[([{]?\s*\b(?:m|w|f|d|x|h|gn|divers)(?:\s*[/|]\s*(?:m|w|f|d|x|h|gn|divers))+\b\s*[)\]}]?/giu;
 
-/** A bare `(gn)` or `(all genders)` marker carries no separators, so it is removed on its own. */
 const BARE_GENDER_MARKER = /[([{]?\s*(?:gn|all genders|any gender|m\/f\/d\/x|divers)\s*[)\]}]?/giu;
 
-/**
- * The separators a title uses between the role and a trailing location. The last one in the title is the boundary
- * that is tested, so a role that itself contains a comma or a slash is only shortened when the final segment is a
- * place.
- */
 const TRAILING_SEPARATOR = /[-–—•·|/,;:()[\]]|\s+(?:in|at)\s+/giu;
 
 const SENIORITY_QUALIFIERS =
@@ -58,7 +47,6 @@ function isLocationSegment(segment: string) {
     return true;
   }
 
-  // A bare two-letter country/state code, or `City, ST`, is a location even when the city is not in the dataset.
   return (
     EU_COUNTRY_CODE.test(normalizePlaceName(trimmed)) ||
     /^[A-Za-z .'-]+,\s*[A-Z]{2}$/u.test(trimmed)

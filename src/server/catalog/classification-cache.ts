@@ -37,8 +37,10 @@ export interface ClassificationCache {
  * @param taxonomyVersion The ESCO dataset version, so a vocabulary change invalidates every entry.
  * @returns An empty cache.
  */
-export function emptyClassificationCache(taxonomyVersion: string): ClassificationCache {
-  return { taxonomyVersion, entries: {} };
+export function emptyClassificationCache(taxonomyVersion: string) {
+  const cache: ClassificationCache = { taxonomyVersion, entries: {} };
+
+  return cache;
 }
 
 /**
@@ -113,7 +115,7 @@ export function parseClassificationCache(bytes: Uint8Array | null, taxonomyVersi
 export function serializeClassificationCache(cache: ClassificationCache) {
   const json = new TextEncoder().encode(`${JSON.stringify(cache)}\n`);
 
-  return new Uint8Array(Bun.zstdCompressSync(json, { level: 12 })) as Uint8Array<ArrayBuffer>;
+  return new Uint8Array(Bun.zstdCompressSync(json, { level: 12 }));
 }
 
 /**

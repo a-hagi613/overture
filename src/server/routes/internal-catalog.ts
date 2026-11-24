@@ -22,13 +22,13 @@ import {
   catalogRefreshHeaderRefusal,
   catalogSnapshotKey,
   createCatalogRefreshVerifier,
+  catalogSha256,
 } from "../catalog/stapply-refresh.ts";
 import { readBodyCapped } from "../platform/http-body.ts";
 import { logError, logInfo } from "../platform/log.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import { CLASSIFICATION_CACHE_KEY } from "../catalog/classification-cache.ts";
-import { catalogSha256 } from "../catalog/stapply-refresh.ts";
 
 /** The producer's signed "a new catalog is published" call (WS-3a, issue #568). */
 export const CATALOG_REFRESH_PATH = "/internal/catalog/refresh";

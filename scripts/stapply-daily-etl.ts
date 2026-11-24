@@ -134,10 +134,6 @@ if (!Number.isFinite(acceptTop1) || !Number.isFinite(acceptMargin)) {
   throw new TypeError("--accept-top1 and --accept-margin must be numbers");
 }
 
-/**
- * Every signed request in the run has to carry a strictly newer timestamp than the last one the runtime accepted, so
- * the cache read, the cache write and the publish calls take turns from one monotonic counter.
- */
 let lastSignedMs = 0;
 
 function nextSignedMs() {
@@ -216,21 +212,16 @@ function relayCredentials() {
   return secret === undefined ? null : { origin, secret };
 }
 
-/**
- * Reads the classification cache through R2 when the runner has the repository's R2 secrets, or through the signed
- * Fly relay otherwise. A missing object (Day 1's 404) and a read failure both mean an empty cache.
- * @returns The cache for this taxonomy version.
- */
-async function loadClassificationCache(): Promise<ClassificationCache> {
+async function loadClassificationCache() {
   try {
     let compressed: Uint8Array<ArrayBuffer> | null = null;
 
-    if (objects !== null) {
+    if (objects) {
       compressed = await readClassificationCacheObject(objects, CLASSIFICATION_CACHE_KEY);
     } else {
       const relay = relayCredentials();
 
-      if (relay !== null) {
+      if (relay) {
         compressed = await fetchClassificationCacheRelay({
           ...relay,
           nowMs: nextSignedMs(),
@@ -250,11 +241,6 @@ async function loadClassificationCache(): Promise<ClassificationCache> {
   }
 }
 
-/**
- * Writes the Tier-2 and Tier-3 classifications back as the run's last network step.
- * @param cache The merged cache.
- * @returns The write mode.
- */
 async function saveClassificationCache(cache: ClassificationCache) {
   if (args.values["dry-run"] === true) {
     return "dry_run";
@@ -443,6 +429,7 @@ async function main() {
 
   for (const target of targets) {
     const key = classifierCacheKey(target.title, target.department);
+
     const entry = byKey.get(key) ?? {
       item: {
         key,
@@ -478,6 +465,7 @@ async function main() {
       acceptTop1,
       escoMin: 0.74,
       secondaryMin: 0.74,
+      strongTop1: 0.86,
     },
     totalPostings: rowCount,
   });

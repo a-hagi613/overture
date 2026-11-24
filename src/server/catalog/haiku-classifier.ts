@@ -181,12 +181,12 @@ export interface HaikuClassifierConfig {
  * @param config The key, model, fetch and polling settings.
  * @returns The batch classifier.
  */
-export function createHaikuBatchClassifier(config: HaikuClassifierConfig): HaikuBatchClassifier {
+export function createHaikuBatchClassifier(config: HaikuClassifierConfig) {
   const model = config.model ?? DEFAULT_ANTHROPIC_MODEL;
   const baseUrl = (config.baseUrl ?? "https://api.anthropic.com").replace(/\/+$/u, "");
   const call: CatalogFetch = config.fetchImpl ?? fetch;
   const promptSize = config.promptSize ?? HAIKU_BATCH_PROMPT_SIZE;
-  const pollIntervalMs = config.pollIntervalMs ?? 5_000;
+  const pollIntervalMs = config.pollIntervalMs ?? 5000;
   const maxPolls = config.maxPolls ?? 120;
   const prices = batchPricesFor(model);
 
@@ -226,28 +226,33 @@ export function createHaikuBatchClassifier(config: HaikuClassifierConfig): Haiku
     return batchCreateSchema.parse(await response.json());
   }
 
-  async function waitForBatch(id: string) {
-    for (let poll = 0; poll < maxPolls; poll += 1) {
-      const response = await call(`${baseUrl}/v1/messages/batches/${id}`, {
-        method: "GET",
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Anthropic batch poll failed: HTTP ${String(response.status)}`);
-      }
-
-      const batch = batchCreateSchema.parse(await response.json());
-
-      if (batch.processing_status === "ended") {
-        return batch;
-      }
-
-      await Bun.sleep(pollIntervalMs);
+  const waitForBatch: (
+    id: string,
+    poll: number,
+  ) => Promise<z.infer<typeof batchCreateSchema>> = async (id, poll) => {
+    if (poll >= maxPolls) {
+      throw new Error(`Anthropic batch ${id} did not end within ${String(maxPolls)} polls`);
     }
 
-    throw new Error(`Anthropic batch ${id} did not end within ${String(maxPolls)} polls`);
-  }
+    const response = await call(`${baseUrl}/v1/messages/batches/${id}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic batch poll failed: HTTP ${String(response.status)}`);
+    }
+
+    const batch = batchCreateSchema.parse(await response.json());
+
+    if (batch.processing_status === "ended") {
+      return batch;
+    }
+
+    await Bun.sleep(pollIntervalMs);
+
+    return waitForBatch(id, poll + 1);
+  };
 
   async function downloadResults(batch: z.infer<typeof batchCreateSchema>) {
     const url = batch.results_url ?? `${baseUrl}/v1/messages/batches/${batch.id}/results`;
@@ -267,7 +272,7 @@ export function createHaikuBatchClassifier(config: HaikuClassifierConfig): Haiku
 
     try {
       const batch = await submit(items);
-      const ended = await waitForBatch(batch.id);
+      const ended = await waitForBatch(batch.id, 0);
       const lines = (await downloadResults(ended)).split("\n").filter((line) => line.trim() !== "");
 
       const resolved = new Map<string, HaikuClassification>();
@@ -281,7 +286,7 @@ export function createHaikuBatchClassifier(config: HaikuClassifierConfig): Haiku
           continue;
         }
 
-        const message = parsed.data.result.message;
+        const { message } = parsed.data.result;
 
         if (message === undefined) {
           continue;
@@ -291,6 +296,7 @@ export function createHaikuBatchClassifier(config: HaikuClassifierConfig): Haiku
         outputTokens += message.usage?.output_tokens ?? 0;
 
         const requestIndex = Number(parsed.data.custom_id.replace("classify-", ""));
+
         const chunk = items.slice(
           requestIndex * promptSize,
           requestIndex * promptSize + promptSize,
