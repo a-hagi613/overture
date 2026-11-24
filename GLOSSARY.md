@@ -67,8 +67,8 @@ The Status after Approval and before sending: the Application waits for its time
 _Avoid_: scheduled, queued
 
 **Daily run**:
-The one preparation pass each running user gets per local day (07:00 by default). It matches, prepares and stops at
-the free Ready slots; it never sends.
+The one preparation pass each running user gets per local day (a deterministic slot between 05:00 and 07:30 by
+default, or the stored `prep.run_local_time`). It matches, prepares and stops at the free Ready slots; it never sends.
 _Avoid_: match fill, hourly run, batch
 
 **Skip**:

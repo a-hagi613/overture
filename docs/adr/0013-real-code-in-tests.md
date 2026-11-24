@@ -31,7 +31,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the seventy-five files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the seventy-eight files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -52,7 +52,11 @@ points at is held and no Application row or snapshot changes, #424), the browser
 (`session-slots.test.ts`: the dispatcher's free-send count comes from the same process-wide semaphore every browser
 user holds a slot from, so a capture holding the last session offers a send no slot and no Application waits in
 `sending`, and an unset, zero or negative `browser.max_concurrent_sessions` caps nothing while a positive value still
-queues, #425, #515), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
+queues, #425, #515), the browser provider's Kernel mode and cleanup and its image trim (`kernel.test.ts`,
+`proxy-trim.test.ts`: a session is headless unless a bot block escalates it to stealth, every close deletes the
+session even when the usage read fails, a generic image is aborted while a CAPTCHA host's image still loads, and the
+font, media and tracker blocks stay), the daily preparation stagger (`daily-prep.test.ts`: each user's slot is
+deterministic inside 05:00-07:30 local time and a stored `prep.run_local_time` overrides it), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
 `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the signed-in event stream

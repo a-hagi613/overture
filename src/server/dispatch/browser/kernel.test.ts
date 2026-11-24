@@ -1,67 +1,106 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
+import { z } from "zod";
 
-import type { BrowserProfileStore } from "./profiles.ts";
-import type { CreateKernelBrowserInput, KernelBrowser, KernelClient } from "./kernel.ts";
+import type { KernelBrowser } from "./kernel.ts";
 
 import { createKernelBrowserProvider } from "./kernel-provider.ts";
-import { kernelCreateBrowserBody } from "./kernel.ts";
+import { KernelClient, kernelCreateBrowserBody } from "./kernel.ts";
+import { createBrowserProfileStore } from "./profiles.ts";
 import { browserModeForAttempt } from "./provider.ts";
+import { openDatabase } from "../../platform/db/client.ts";
+import { migrateDatabase } from "../../platform/db/migrate.ts";
 
 const NOW = 2000;
 
 const clock = { now: () => NOW };
 
-const browserView: KernelBrowser = {
+const browserView = {
   cdp_ws_url: "wss://kernel.test/session-1",
+  cost: { estimated_usage_spend_usd: "0.01", status: "pending" },
   created_at: "2026-11-22T09:00:00.000Z",
   session_id: "session-1",
   usage: { uptime_ms: 500 },
-  cost: { estimated_usage_spend_usd: "0.01", status: "pending" },
-};
+} satisfies KernelBrowser;
 
-const profiles = {
-  find: () => undefined,
-  forget: () => undefined,
-  remember: (input: { providerProfileId: string }) => input.providerProfileId,
-  touch: () => undefined,
-} satisfies BrowserProfileStore;
+const createBodySchema = z.object({
+  headless: z.boolean().optional(),
+  stealth: z.boolean().optional(),
+});
 
-function fakeClient(options: { deleteFails?: boolean; readFails?: boolean } = {}) {
-  const deleted: string[] = [];
-  const modes: (string | undefined)[] = [];
+const { db, sqlite } = openDatabase(":memory:");
 
-  const client = {
-    createBrowser: async (input: CreateKernelBrowserInput) => {
-      modes.push(input.mode);
+migrateDatabase(db, "drizzle");
 
-      return await Promise.resolve(browserView);
-    },
-    createProfile: async (name: string) =>
-      await Promise.resolve({ created_at: browserView.created_at, id: name }),
-    deleteBrowser: async (sessionId: string) => {
-      deleted.push(sessionId);
+const profiles = createBrowserProfileStore(db, clock);
 
-      if (options.deleteFails === true) {
-        throw new Error("the session was already gone");
+afterAll(() => {
+  sqlite.close();
+});
+
+function startKernelApi() {
+  const sessions: { headless: boolean; stealth: boolean }[] = [];
+  const reads: string[] = [];
+  const deletes: string[] = [];
+  const state = { failDeletes: false, failReads: false };
+
+  const server = Bun.serve({
+    port: 0,
+    async fetch(request) {
+      const url = new URL(request.url);
+
+      if (request.method === "POST" && url.pathname === "/browsers") {
+        const body = createBodySchema.parse(await request.json());
+
+        sessions.push({ headless: body.headless ?? false, stealth: body.stealth ?? false });
+
+        return Response.json(browserView);
       }
 
-      await Promise.resolve();
-    },
-    deleteProfile: async () => {
-      await Promise.resolve();
-    },
-    getBrowser: async () => {
-      if (options.readFails === true) {
-        throw new Error("the usage read failed");
+      const match = /^\/browsers\/(?<id>[^/]+)$/u.exec(url.pathname);
+      const sessionId = match?.groups?.["id"];
+
+      if (sessionId === undefined) {
+        return new Response("not found", { status: 404 });
       }
 
-      return await Promise.resolve(browserView);
-    },
-    listBrowsers: async () => await Promise.resolve([browserView]),
-    listReplays: async () => await Promise.resolve([]),
-  } satisfies ReturnType<typeof KernelClient>;
+      if (request.method === "GET") {
+        reads.push(sessionId);
 
-  return { client, deleted, modes };
+        return state.failReads
+          ? Response.json({ error: "read failed" }, { status: 500 })
+          : Response.json(browserView);
+      }
+
+      if (request.method === "DELETE") {
+        deletes.push(sessionId);
+
+        return state.failDeletes
+          ? Response.json({ error: "delete failed" }, { status: 500 })
+          : new Response(null, { status: 204 });
+      }
+
+      return new Response("not found", { status: 404 });
+    },
+  });
+
+  return {
+    close: () => {
+      void server.stop(true);
+    },
+    deletes,
+    reads,
+    sessions,
+    state,
+    url: `http://127.0.0.1:${String(server.port)}`,
+  };
+}
+
+function providerFor(api: ReturnType<typeof startKernelApi>) {
+  return createKernelBrowserProvider({
+    client: KernelClient("test-key", api.url),
+    clock,
+    profiles,
+  });
 }
 
 describe("the Kernel session body", () => {
@@ -108,80 +147,80 @@ describe("the Kernel mode escalation", () => {
 
 describe("the Kernel provider", () => {
   test("passes the requested mode to the control API and defaults to headless", async () => {
-    const fake = fakeClient();
+    const api = startKernelApi();
 
-    const provider = createKernelBrowserProvider({
-      client: fake.client,
-      clock,
-      profiles,
-    });
+    try {
+      const provider = providerFor(api);
 
-    await provider.open({
-      attemptId: "attempt-default",
-      country: "ca",
-      profileId: null,
-      timeoutMinutes: 15,
-    });
-    await provider.open({
-      attemptId: "attempt-escalated",
-      country: "ca",
-      mode: "stealth",
-      profileId: null,
-      timeoutMinutes: 15,
-    });
+      await provider.open({
+        attemptId: "attempt-default",
+        country: "ca",
+        profileId: null,
+        timeoutMinutes: 15,
+      });
+      await provider.open({
+        attemptId: "attempt-escalated",
+        country: "ca",
+        mode: "stealth",
+        profileId: null,
+        timeoutMinutes: 15,
+      });
 
-    expect(fake.modes).toEqual(["headless", "stealth"]);
+      expect(api.sessions).toEqual([
+        { headless: true, stealth: false },
+        { headless: false, stealth: true },
+      ]);
+    } finally {
+      api.close();
+    }
   });
 
   test("deletes the session in a finally block even when the usage read fails", async () => {
-    const fake = fakeClient({ readFails: true });
+    const api = startKernelApi();
 
-    const provider = createKernelBrowserProvider({
-      client: fake.client,
-      clock,
-      profiles,
-    });
+    try {
+      const provider = providerFor(api);
 
-    const remote = await provider.open({
-      attemptId: "attempt-read-failed",
-      country: "ca",
-      profileId: null,
-      timeoutMinutes: 15,
-    });
+      const remote = await provider.open({
+        attemptId: "attempt-read-failed",
+        country: "ca",
+        profileId: null,
+        timeoutMinutes: 15,
+      });
 
-    const usage = await remote.close();
+      api.state.failReads = true;
 
-    expect(usage).toEqual({
-      browserMs: 500,
-      costMicros: 10_000,
-      proxyBytes: null,
-    });
-    expect(fake.deleted).toEqual(["session-1"]);
+      const usage = await remote.close();
+
+      expect(usage).toEqual({ browserMs: 500, costMicros: 10_000, proxyBytes: null });
+      expect(api.reads).toEqual(["session-1"]);
+      expect(api.deletes).toEqual(["session-1"]);
+    } finally {
+      api.close();
+    }
   });
 
   test("swallows a delete failure but still reports the session usage", async () => {
-    const fake = fakeClient({ deleteFails: true });
+    const api = startKernelApi();
 
-    const provider = createKernelBrowserProvider({
-      client: fake.client,
-      clock,
-      profiles,
-    });
+    try {
+      const provider = providerFor(api);
 
-    const remote = await provider.open({
-      attemptId: "attempt-delete-failed",
-      country: "ca",
-      profileId: null,
-      timeoutMinutes: 15,
-    });
+      const remote = await provider.open({
+        attemptId: "attempt-delete-failed",
+        country: "ca",
+        profileId: null,
+        timeoutMinutes: 15,
+      });
 
-    const usage = await remote.close();
+      api.state.failDeletes = true;
 
-    expect(usage).toEqual({
-      browserMs: 500,
-      costMicros: 10_000,
-      proxyBytes: null,
-    });
-    expect(fake.deleted).toEqual(["session-1"]);
+      const usage = await remote.close();
+
+      expect(usage).toEqual({ browserMs: 500, costMicros: 10_000, proxyBytes: null });
+      expect(api.deletes).toEqual(["session-1"]);
+    } finally {
+      api.close();
+    }
   });
 });

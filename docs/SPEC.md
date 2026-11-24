@@ -1100,8 +1100,9 @@ until #232 releases it after the 20-form probe, and Workable's until #235 does t
 - **Kernel** (emergency fallback): headless browser (1 GiB) by default, stealth on only after a bot block, ISP proxy,
   per-user profile. Its control API reports uptime and estimated cost but no proxy volume, so its attempts keep
   `proxy_bytes` NULL (unknown) rather than a misleading 0, and the admin report totals only the bytes providers
-  actually measured. Every session is deleted through `deleteBrowser` in a `finally` block, with the cleanup error
-  swallowed and logged, so a failed attempt never leaves a paid session in standby. Its acceptable-use policy bans
+  actually measured. Every session is deleted through `deleteBrowser` in a `finally` block even when its usage read
+  fails; a delete that fails is swallowed and logged, leaving the recovery sweep (§9.4) to stop the lingering session,
+  so a cleanup failure is visible and does not block the attempt's usage record. Its acceptable-use policy bans
   "bulk unsolicited form submission" (ADR 0003), so it is exercised only against the synthetic lab and fixtures, never
   sent real applications by default; the owner switches real traffic to it only if Browser Use's provider kill switch
   trips and the owner chooses to.
@@ -1641,7 +1642,7 @@ publishing version 2 leaves version 1 and an already sent Snapshot on version 1 
 
 Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038).
 
-### 16.2 Unit tests (seventy-five files, `bun:test`, beside their code)
+### 16.2 Unit tests (seventy-eight files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1666,6 +1667,8 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/catalog/companies-parquet.test.ts` | the pinned `companies.parquet` and manifest sha256 pairs are verified before a seed loads, and a tampered file or manifest is refused |
 | `src/server/catalog/question-normalize.test.ts` | question normalisation |
 | `src/server/catalog/tag-rules.test.ts` | tag rules |
+| `src/server/dispatch/browser/kernel.test.ts` | Kernel opens headless by default and escalates to headful stealth only after a block or CAPTCHA, and every session is deleted through the control API even when its usage read fails |
+| `src/server/dispatch/browser/proxy-trim.test.ts` | a generic image is aborted while a CAPTCHA host's image still loads, and the font, media and tracker blocks are unchanged |
 | `src/server/dispatch/browser/session-slots.test.ts` | the dispatcher's free-send count comes from the same process-wide semaphore every browser user holds a slot from, so a capture holding the last session offers a send no slot (#425); an unset, zero or negative `browser.max_concurrent_sessions` caps nothing, so concurrent sessions run without queueing, while a positive value still queues (#515) |
 | `src/server/dispatch/outcomes.test.ts` | a Confirming Application is charged only by the one unambiguous receipt; a replayed message never commits a second credit (#413) |
 | `src/server/dispatch/planner.test.ts` | window, spacing, DST |
@@ -1677,6 +1680,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/matching/applications.test.ts` | an Application copies the Posting's and Company's display fields onto its own row when it is created, keeps them after the catalog rows are deleted, and is not created for a Posting that has already left the catalog (#422) |
 | `src/server/pipeline/answer-plan.test.ts` | a salary Fact kept per currency is chosen only for the currency a question names |
 | `src/server/pipeline/approved-plan.test.ts` | the Ready cards open every approved plan in one query rather than one per card (#430) |
+| `src/server/pipeline/daily-prep.test.ts` | each user gets a stable deterministic 05:00-07:30 preparation slot, and a stored `prep.run_local_time` overrides it |
 | `src/server/pipeline/email-notes.test.ts` | a Board's email notes are read in one query rather than one per Application (#430) |
 | `src/server/pipeline/personio-form.test.ts` | a Personio form's fields, required stars, documents and unsupported controls are read from its HTML |
 | `src/server/pipeline/prepare-status.test.ts` | a preparation result written after the user approved the Application matches no row, so it never overwrites approved/sending/sent |
