@@ -56,7 +56,7 @@ export function parsePrepDailyPayload(payload: string) {
 /**
  * Minutes after local midnight for `prep.run_local_time`.
  * @param raw The stored setting, or null when it is unset.
- * @returns Minutes after local midnight, 07:00 by default.
+ * @returns Minutes after local midnight; 07:00 when the stored value is invalid or missing.
  */
 export function parsePrepRunMinutes(raw: string | null) {
   if (raw === null) {

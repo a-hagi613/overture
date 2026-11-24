@@ -109,7 +109,7 @@ async function tickAndStart(page: Page) {
   await expect(page).toHaveURL(/\/home$/u);
 }
 
-test("forwarded mail arrives, consent gates Start, and the first run waits for 07:00", async ({
+test("forwarded mail arrives, consent gates Start, and the first run waits for the staggered morning slot", async ({
   browser,
   onboardingServer,
 }) => {
@@ -151,7 +151,7 @@ test("skipping the filter never blocks Start", async ({ browser, onboardingServe
   await request.dispose();
 });
 
-test("a restart after Start past 07:00 queues no same-day catch-up run", async ({
+test("a restart after Start past the morning slot queues no same-day catch-up run", async ({
   onboardingServer,
 }) => {
   const request = await apiRequest.newContext({ baseURL: onboardingServer.url });

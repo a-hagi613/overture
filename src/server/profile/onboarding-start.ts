@@ -9,7 +9,7 @@ import { ONBOARDING_STEP_COUNT } from "../../shared/onboarding.ts";
 
 /**
  * Finish onboarding in one transaction: mark it done, clear the `onboarding` pause
- * reason (any other reason stays), start running and queue only the next 07:00 run.
+ * reason (any other reason stays), start running and queue only the next staggered morning run.
 
  * The database is one synchronous connection, so the helpers that take `db` run inside the transaction too.
  * Pressing Start again changes nothing and queues nothing new.

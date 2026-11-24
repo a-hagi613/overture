@@ -2371,7 +2371,7 @@ export const copy = {
       agreeAfter:
         ". Overture prepares applications from my facts and sends only the ones I approve.",
       firstRun:
-        "Overture prepares your first applications at 07:00 tomorrow. Nothing is sent until you approve.",
+        "Overture prepares your first applications tomorrow morning. Nothing is sent until you approve.",
       tickToStart: "Tick the box to start.",
       start: "Start",
       starting: "Starting",
