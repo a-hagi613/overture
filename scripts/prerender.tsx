@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
@@ -15,8 +16,18 @@ const dist = join(process.cwd(), "dist");
 const marketingRoot = join(process.cwd(), MARKETING_BUILD_ROOT);
 const shellPath = join(dist, "index.html");
 
+const prerenderQueryClient = new QueryClient();
+
 const renderers = new Map<string, () => string>([
-  ["/", () => renderToStaticMarkup(<LandingPage />)],
+  [
+    "/",
+    () =>
+      renderToStaticMarkup(
+        <QueryClientProvider client={prerenderQueryClient}>
+          <LandingPage />
+        </QueryClientProvider>,
+      ),
+  ],
 ]);
 
 if (!existsSync(shellPath)) {

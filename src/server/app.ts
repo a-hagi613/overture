@@ -27,6 +27,7 @@ import type { MailSender } from "./platform/mail/port.ts";
 
 import { readSession } from "./auth/session.ts";
 import { createHealthRoutes } from "./routes/health.ts";
+import { createSupplyRoutes } from "./routes/supply.ts";
 import { createLabRoutes } from "./routes/lab.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createApiRoutes } from "./routes/api.ts";
@@ -406,6 +407,15 @@ export function createApp(deps: AppDependencies) {
     }),
   );
   app.route("/api", createHealthRoutes(deps.db, deps.backups));
+  app.route(
+    "/api",
+    createSupplyRoutes({
+      catalogDb: deps.catalogDb,
+      clientIpConfig,
+      clock: deps.clock,
+      db: deps.db,
+    }),
+  );
   app.route("/api", createMeRoutes(deps.auth));
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
   app.route(
