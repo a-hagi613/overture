@@ -183,11 +183,14 @@ test("the proxy network policy blocks trackers and never a CAPTCHA host", () => 
   }
 });
 
-test("images, scripts and XHR are never trimmed, and a CAPTCHA script is kept", () => {
-  for (const resourceType of ["image", "script", "xhr", "fetch", "document"]) {
+test("a generic image is trimmed while scripts, XHR and CAPTCHA images are kept", () => {
+  for (const resourceType of ["script", "xhr", "fetch", "document"]) {
     expect(shouldTrimRequest("https://job-boards.greenhouse.io/app.js", resourceType)).toBe(false);
   }
 
+  expect(shouldTrimRequest("https://job-boards.greenhouse.io/logo.png", "image")).toBe(true);
+  expect(shouldTrimRequest("https://challenges.cloudflare.com/challenge.png", "image")).toBe(false);
+  expect(shouldTrimRequest("https://hcaptcha.com/captcha.png", "image")).toBe(false);
   expect(shouldTrimRequest("https://challenges.cloudflare.com/turnstile.js", "script")).toBe(false);
   expect(shouldTrimRequest("https://hcaptcha.com/captcha.js", "script")).toBe(false);
 });

@@ -1,6 +1,6 @@
 import type { BrowserContext } from "playwright-core";
 
-const TRIMMED_RESOURCE_TYPES = new Set(["font", "media"]);
+const TRIMMED_RESOURCE_TYPES = new Set(["font", "image", "media"]);
 
 export const CAPTCHA_HOSTS = [
   "arkoselabs.com",

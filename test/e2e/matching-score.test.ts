@@ -263,6 +263,7 @@ test("a run after the daily time schedules only tomorrow, never a second run tod
   await configureMatching(owner);
 
   await owner.put("/__test__/settings/match.auto_threshold_default", { data: { value: "95" } });
+  await owner.put("/__test__/settings/prep.run_local_time", { data: { value: "07:00" } });
 
   const { now: before } = await clockState(owner);
   const dayMs = 86_400_000;

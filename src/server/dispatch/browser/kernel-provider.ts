@@ -1,8 +1,9 @@
 import type { Clock } from "../../platform/ports/clock.ts";
 import type { BrowserProfileStore } from "./profiles.ts";
 import type { BrowserProvider, OpenBrowserInput } from "./provider.ts";
-
 import type { KernelClient } from "./kernel.ts";
+
+import { logInfo } from "../../platform/log.ts";
 
 const toMicros = (raw: string | undefined) => {
   const parsed = Number(raw ?? 0);
@@ -22,6 +23,7 @@ export function createKernelBrowserProvider(config: KernelProviderConfig) {
   async function open(input: OpenBrowserInput) {
     const browser = await client.createBrowser({
       attemptId: input.attemptId,
+      mode: input.mode ?? "headless",
       profileId: input.profileId,
       timeoutSeconds: input.timeoutMinutes * 60,
     });
@@ -31,15 +33,32 @@ export function createKernelBrowserProvider(config: KernelProviderConfig) {
     return {
       cdpUrl: browser.cdp_ws_url,
       close: async () => {
-        const detail = await client.getBrowser(browser.session_id).catch(() => browser);
-
-        await client.deleteBrowser(browser.session_id);
-
-        return {
-          browserMs: detail.usage?.uptime_ms ?? Math.max(0, clock.now() - startedAt),
-          costMicros: toMicros(detail.cost?.estimated_usage_spend_usd),
+        let usage = {
+          browserMs: Math.max(0, clock.now() - startedAt),
+          costMicros: 0,
           proxyBytes: null,
         };
+
+        try {
+          const detail = await client.getBrowser(browser.session_id).catch(() => browser);
+
+          usage = {
+            browserMs: detail.usage?.uptime_ms ?? usage.browserMs,
+            costMicros: toMicros(detail.cost?.estimated_usage_spend_usd),
+            proxyBytes: null,
+          };
+        } finally {
+          try {
+            await client.deleteBrowser(browser.session_id);
+          } catch (error) {
+            logInfo(
+              "browser.kernel_cleanup",
+              `session=${browser.session_id} action=delete failed=${String(error)}`,
+            );
+          }
+        }
+
+        return usage;
       },
       liveViewUrl: browser.browser_live_view_url ?? null,
       sessionId: browser.session_id,

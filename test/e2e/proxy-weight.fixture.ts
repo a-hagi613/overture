@@ -12,6 +12,7 @@ const weights = {
 const bodies = new Map<string, { bytes: number; type: string }>([
   ["/analytics.js", { bytes: weights.analytics, type: "text/javascript" }],
   ["/app.js", { bytes: weights.app, type: "text/javascript" }],
+  ["/captcha.png", { bytes: weights.image, type: "image/png" }],
   ["/data.json", { bytes: weights.data, type: "application/json" }],
   ["/font.woff2", { bytes: weights.font, type: "font/woff2" }],
   ["/image.png", { bytes: weights.image, type: "image/png" }],
@@ -20,12 +21,20 @@ const bodies = new Map<string, { bytes: number; type: string }>([
   ["/turnstile.js", { bytes: weights.turnstile, type: "text/javascript" }],
 ]);
 
-export const ALLOWED_WEIGHT_PATHS = ["/", "/app.js", "/data.json", "/image.png", "/turnstile.js"];
-export const TRIMMED_WEIGHT_PATHS = ["/analytics.js", "/font.woff2", "/media.mp4", "/pixel.gif"];
+export const ALLOWED_WEIGHT_PATHS = ["/", "/app.js", "/captcha.png", "/data.json", "/turnstile.js"];
+
+export const TRIMMED_WEIGHT_PATHS = [
+  "/analytics.js",
+  "/font.woff2",
+  "/image.png",
+  "/media.mp4",
+  "/pixel.gif",
+];
 
 export const allowedWeightBytes = weights.app + weights.data + weights.image + weights.turnstile;
 
-export const trimmedWeightBytes = weights.analytics + weights.font + weights.media + weights.pixel;
+export const trimmedWeightBytes =
+  weights.analytics + weights.font + weights.image + weights.media + weights.pixel;
 
 export interface ProxyWeightRequest {
   host: string;
@@ -47,6 +56,7 @@ body { font-family: Weight, sans-serif; }
 </style></head><body>
 <h1>Weight page</h1>
 <img src="/image.png" alt="">
+<img src="http://hcaptcha.com:${String(port)}/captcha.png" alt="">
 <script src="/app.js"></script>
 <script src="http://www.doubleclick.net:${String(port)}/analytics.js"></script>
 <img src="http://clarity.ms:${String(port)}/pixel.gif" alt="">

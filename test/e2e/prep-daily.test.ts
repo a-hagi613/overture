@@ -137,6 +137,14 @@ async function pauseSchedulerPolling(owner: APIRequestContext) {
   expect(response.ok()).toBe(true);
 }
 
+async function pinPrepRunTime(owner: APIRequestContext) {
+  const response = await owner.put("/__test__/settings/prep.run_local_time", {
+    data: { value: "07:00" },
+  });
+
+  expect(response.ok()).toBe(true);
+}
+
 async function waitForRecapMail(owner: APIRequestContext) {
   await expect
     .poll(
@@ -212,11 +220,12 @@ async function nextRunTarget(owner: APIRequestContext) {
   return target;
 }
 
-test("a 07:00 run fills exactly the free Ready slots, sends one recap, and does nothing before 07:00", async ({
+test("a 07:00 admin override fills exactly the free Ready slots, sends one recap, and does nothing before 07:00", async ({
   prep,
 }) => {
   const { owner, userId } = await ownerContextFor(prep.server.url);
 
+  await pinPrepRunTime(owner);
   await owner.post("/__test__/mail/clear", { data: {} });
   await clearCatalog(owner);
   await grantApplications(owner, 70);
@@ -394,11 +403,12 @@ test("ready.notify lists the run's work, sends once a local day, and sends nothi
   await owner.dispose();
 });
 
-test("the next day's run stops at the unapproved Ready Applications and sends no second recap", async ({
+test("the next day's 07:00 override run stops at the unapproved Ready Applications and sends no second recap", async ({
   prep,
 }) => {
   const { owner, userId } = await ownerContextFor(prep.server.url);
 
+  await pinPrepRunTime(owner);
   await owner.post("/__test__/mail/clear", { data: {} });
   await clearCatalog(owner);
   await grantApplications(owner, 70);

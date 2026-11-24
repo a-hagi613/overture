@@ -31,11 +31,33 @@ export interface RemoteBrowser {
   close: () => Promise<BrowserUsage>;
 }
 
+export type BrowserMode = "headless" | "stealth";
+
+const BOT_BLOCKED_OUTCOMES = new Set(["blocked", "captcha_blocked"]);
+
+/**
+ * The Kernel mode for an attempt: headless unless the previous attempt on this
+ * Application ended in a bot block or CAPTCHA, which is the only case that
+ * spends the eight-times-pricier headful session.
+ * @param providerId The provider that will open the session.
+ * @param previousOutcome The outcome of this Application's last finished attempt.
+ * @returns The mode to request, which non-Kernel providers ignore.
+ */
+export function browserModeForAttempt(
+  providerId: BrowserProvider["id"],
+  previousOutcome: string | null,
+) {
+  const blocked = previousOutcome !== null && BOT_BLOCKED_OUTCOMES.has(previousOutcome);
+
+  return blocked && providerId === "kernel" ? ("stealth" as const) : ("headless" as const);
+}
+
 export interface OpenBrowserInput {
   profileId: string | null;
   country: string;
   timeoutMinutes: number;
   attemptId: string;
+  mode?: BrowserMode;
 }
 
 export interface OpenSession {

@@ -60,7 +60,9 @@ the user presses Send in the app. M2 adds push. There is no per-application emai
 crowd limits or the caps; approved Applications are sent in approval order within the send window.
 
 **Amendment of 2026-11-21: one daily preparation run.** Preparation stops trickling through the day. One run per
-running user per local day, at the admin setting `prep.run_local_time` (default 07:00), matches, prepares and stops
+running user per local day, at a deterministic per-user slot between 05:00 and 07:30
+(`05:00 + stableSlotHash(userId) % 150` minutes) unless `prep.run_local_time` is stored as an explicit override,
+matches, prepares and stops
 at the free Ready slots: the daily cap minus the Applications already preparing, ready or approved (so a retried run
 cannot overfill the day). The Ready list therefore never holds more than one day's work, and unapproved cards reduce
 the next day's run instead of piling up. Lever and

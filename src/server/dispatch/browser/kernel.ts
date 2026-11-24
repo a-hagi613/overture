@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { BrowserMode } from "./provider.ts";
+
 export const kernelBrowserSchema = z.object({
   session_id: z.string().min(1),
   cdp_ws_url: z.string().min(1),
@@ -37,6 +39,35 @@ export const kernelProfileSchema = z.object({
   last_used_at: z.string().nullish(),
 });
 
+export interface CreateKernelBrowserInput {
+  timeoutSeconds: number;
+  profileId: string | null;
+  attemptId: string;
+  mode?: BrowserMode;
+}
+
+/**
+ * The create-session body. Kernel charges $0.06/h headless against $0.48/h
+ * headful, so only a bot-block escalation asks for stealth, and the flag is
+ * always explicit rather than left to the vendor default.
+ * @param input The session's timeout, profile, attempt tag and mode.
+ * @returns The JSON body Kernel expects.
+ */
+export function kernelCreateBrowserBody(input: CreateKernelBrowserInput) {
+  const stealth = input.mode === "stealth";
+
+  return {
+    captcha_solver: { enabled: true },
+    headless: !stealth,
+    profile: input.profileId === null ? undefined : { id: input.profileId, save_changes: true },
+    proxy: { mode: "default" },
+    start_replay: true,
+    stealth,
+    tags: { attemptId: input.attemptId, purpose: "application" },
+    timeout_seconds: input.timeoutSeconds,
+  };
+}
+
 const apiBase = "https://api.onkernel.com";
 
 const errors = {
@@ -65,22 +96,9 @@ export function KernelClient(apiKey: string, baseUrl: string | undefined) {
   };
 
   return {
-    createBrowser: async (input: {
-      timeoutSeconds: number;
-      profileId: string | null;
-      attemptId: string;
-    }) => {
+    createBrowser: async (input: CreateKernelBrowserInput) => {
       const response = await call("/browsers", {
-        body: JSON.stringify({
-          captcha_solver: { enabled: true },
-          headless: false,
-          profile:
-            input.profileId === null ? undefined : { id: input.profileId, save_changes: true },
-          proxy: { mode: "default" },
-          start_replay: true,
-          tags: { attemptId: input.attemptId, purpose: "application" },
-          timeout_seconds: input.timeoutSeconds,
-        }),
+        body: JSON.stringify(kernelCreateBrowserBody(input)),
         method: "POST",
       });
 
