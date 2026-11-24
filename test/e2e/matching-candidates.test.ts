@@ -126,10 +126,10 @@ test("an unsupported or closed posting never reaches the Board", async ({
 
   const guestCompanyId = await seedCompany(owner, "Guest Guild", "guest-guild.example");
 
-  const guestBoardId = await seedBoard(owner, guestCompanyId, "smartrecruiters", "guest-guild");
+  const guestBoardId = await seedBoard(owner, guestCompanyId, "hiringthing", "guest-guild");
 
   const unsupported = await seedPosting(owner, {
-    ats: "smartrecruiters",
+    ats: "hiringthing",
     atsJobId: "unsupported",
     boardId: guestBoardId,
     companyId: guestCompanyId,

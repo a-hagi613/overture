@@ -5,8 +5,8 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { FormQuestion } from "./send-plan.ts";
 import type { FormReadPath } from "./form-read.ts";
-import type { QuestionFieldType } from "../../shared/questions.ts";
 import type { ApplySupportedAts } from "../../shared/ats.ts";
+import type { QuestionFieldType } from "../../shared/questions.ts";
 
 import { planCache } from "../platform/db/schema.ts";
 import { FORM_READ_PATHS } from "./form-read.ts";

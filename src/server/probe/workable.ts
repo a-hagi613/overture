@@ -11,11 +11,8 @@ import {
   submitButton,
 } from "../dispatch/forms/engine.ts";
 import type { FormScope } from "../dispatch/forms/engine.ts";
-import {
-  WORKABLE_FORM_SELECTOR,
-  findResumeFileInput,
-  workableConfirmationSeen,
-} from "../dispatch/ats/workable.ts";
+import { WORKABLE_FORM_SELECTOR, workableConfirmationSeen } from "../dispatch/ats/workable.ts";
+import { findResumeFileInput } from "../dispatch/ats/hosted.ts";
 
 export interface WorkableAttempt {
   outcome: "dry_run_filled" | "fill_failed" | "sent" | "unconfirmed" | "blocked" | "form_missing";
