@@ -3,7 +3,7 @@ import { request as apiRequest } from "@playwright/test";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
-import type { APIRequestContext } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 
 import { copy } from "../../src/shared/copy.ts";
@@ -44,6 +44,14 @@ const WAITING_LABEL = TRACKER_LANES.find((lane) => lane.key === "waiting")?.labe
 
 function laneLabel(key: string) {
   return TRACKER_LANES.find((lane) => lane.key === key)?.label ?? key;
+}
+
+async function openPhoneBoard(page: Page) {
+  await page
+    .getByRole("group", { name: copy.board.views.label })
+    .getByRole("button", { name: copy.board.views.board })
+    .click();
+  await expect(page.getByRole("group", { name: copy.board.stagesLabel })).toBeVisible();
 }
 
 async function storedStage(request: APIRequestContext, id: string) {
@@ -138,7 +146,7 @@ test("view switches are segmented controls and the detail sheet has real tab pan
 
   await page.goto(`${uiServer.url}/board`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByRole("group", { name: copy.board.stagesLabel })).toBeVisible();
+  await openPhoneBoard(page);
 
   const card = page.locator('section[aria-label="Applied"] button[data-card]').first();
 
@@ -188,6 +196,10 @@ test("the Board card and phone lane live in the URL through refresh and Back", a
   const page = await context.newPage();
 
   await page.goto(`${uiServer.url}/board`);
+  await page
+    .getByRole("group", { name: "Application views" })
+    .getByRole("button", { name: "Board" })
+    .click();
   await expect(page.locator('section[aria-label="Applied"]')).toBeVisible();
 
   await page.getByRole("button", { name: WAITING_LABEL }).click();
@@ -198,7 +210,7 @@ test("the Board card and phone lane live in the URL through refresh and Back", a
   );
 
   await page.reload();
-  await expect(page.locator('section[aria-label="Waiting"]')).toBeVisible();
+  await expect(page.locator(`section[aria-label="${WAITING_LABEL}"]`)).toBeVisible();
   await expect(page.getByRole("button", { name: WAITING_LABEL })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -294,6 +306,8 @@ test("the phone stage tabs move lanes with Arrow, Home and End when each tab is 
   const page = await context.newPage();
 
   await page.goto(`${uiServer.url}/board`);
+  await openPhoneBoard(page);
+  await page.getByRole("button", { name: /Show closed/u }).click();
 
   const lanes = page.getByRole("group", { name: copy.board.stagesLabel });
   const lane = (key: string) => lanes.getByRole("button", { name: laneLabel(key), exact: true });
@@ -365,6 +379,7 @@ test("closing the card sheet through history gives scrolling back to the page", 
   const page = await context.newPage();
 
   await page.goto(`${uiServer.url}/applications`);
+  await openPhoneBoard(page);
 
   const card = page.locator('section[aria-label="Applied"] button[data-card]').first();
 
@@ -414,6 +429,7 @@ test("a toast raised while the board sheet is open stays in the top layer and it
 
   await page.goto(`${uiServer.url}/board`);
   await eventsConnected;
+  await openPhoneBoard(page);
 
   const card = page.locator('section[aria-label="Applied"] button[data-card]').first();
   const id = await card.getAttribute("data-card");
@@ -575,6 +591,7 @@ test("a sheet is truly modal, keeps focus inside, and returns it on Escape", asy
   const page = await context.newPage();
 
   await page.goto(`${uiServer.url}/applications`);
+  await openPhoneBoard(page);
   const card = page.locator('section[aria-label="Applied"] button[data-card]').first();
   const id = await card.getAttribute("data-card");
 

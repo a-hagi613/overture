@@ -76,9 +76,16 @@ const reviewViewSchema = z.object({
       scope: z.string(),
       factLabel: z.string().nullable(),
       unlocked: z.number(),
+      saveForFutureDefault: z.boolean(),
     }),
   ),
   totalApplications: z.number(),
+});
+
+const answerResultSchema = z.object({
+  applicationIds: z.array(z.string()),
+  readyCount: z.number(),
+  saveForFuture: z.boolean(),
 });
 
 const factRowSchema = z.object({
@@ -428,6 +435,105 @@ test("one Review unlocks every Application waiting on its question", async ({ pr
   const remaining = reviewViewSchema.parse(await (await owner.get("/api/reviews")).json());
 
   expect(remaining.totalApplications).toBe(0);
+});
+
+test("an answer saved for these Applications only leaves global facts untouched", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  const question = {
+    answerKind: "unknown" as const,
+    fieldType: "text" as const,
+    required: true,
+    text: "Why do you want to work at this company?",
+  };
+
+  const firstPosting = await seedQuestions(owner, {
+    atsJobId: "scoped-1",
+    boardToken: "northwind",
+    companyName: "Northwind Labs",
+    domain: "northwind.example",
+    questions: [question],
+    title: "Platform Engineer",
+  });
+
+  const secondPosting = await seedQuestions(owner, {
+    atsJobId: "scoped-2",
+    boardToken: "ferro",
+    companyName: "Ferro Cloud",
+    domain: "ferro.example",
+    questions: [question],
+    title: "Senior DevOps Engineer",
+  });
+
+  const firstApplication = await seedApplication(owner, {
+    postingId: firstPosting,
+    status: "preparing",
+    userId,
+  });
+
+  const secondApplication = await seedApplication(owner, {
+    postingId: secondPosting,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, firstApplication);
+  await prepare(owner, secondApplication);
+
+  const [review] = (await reviewsFor(owner, userId)).reviews;
+
+  if (review === undefined) {
+    throw new Error("no Review was opened");
+  }
+
+  expect(review.prompt).toBe(question.text);
+
+  const answered = await owner.post(`/api/reviews/${review.id}/answer`, {
+    data: { saveForFuture: false, value: "I have used your platform for years." },
+  });
+
+  expect(answered.ok()).toBe(true);
+
+  const result = answerResultSchema.parse(await answered.json());
+
+  expect(result).toMatchObject({ readyCount: 2, saveForFuture: false });
+
+  const rows = await applicationsFor(owner, userId);
+
+  expect(rows.find((row) => row.id === firstApplication)?.status).toBe("ready");
+  expect(rows.find((row) => row.id === secondApplication)?.status).toBe("ready");
+
+  const facts = await factsFor(owner);
+
+  expect(facts.find((fact) => fact.key === `q:${review.questionId}`)).toBeUndefined();
+
+  const thirdPosting = await seedQuestions(owner, {
+    atsJobId: "scoped-3",
+    boardToken: "larkspur",
+    companyName: "Larkspur Health",
+    domain: "larkspur.example",
+    questions: [question],
+    title: "Infrastructure Engineer",
+  });
+
+  const thirdApplication = await seedApplication(owner, {
+    postingId: thirdPosting,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, thirdApplication);
+
+  const reopened = await reviewsFor(owner, userId);
+
+  expect(
+    reopened.reviews.filter(
+      (candidate) => candidate.prompt === question.text && candidate.status === "open",
+    ),
+  ).toHaveLength(1);
+  expect(reopened.applications.some((row) => row.applicationId === thirdApplication)).toBe(true);
 });
 
 test("dismissing a Review skips every Application waiting on it", async ({ preparation }) => {

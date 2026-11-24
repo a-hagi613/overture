@@ -22,6 +22,7 @@ const reviewSchema = z.object({
   unlocked: z.number(),
   companies: z.number(),
   applications: z.array(reviewApplicationSchema),
+  saveForFutureDefault: z.boolean(),
   createdAt: z.number(),
 });
 
@@ -33,6 +34,17 @@ export const reviewsResponseSchema = z.object({
 export type Review = z.infer<typeof reviewSchema>;
 
 export type ReviewsResponse = z.infer<typeof reviewsResponseSchema>;
+
+const answerResponseSchema = z.object({
+  reviewId: z.string(),
+  applicationIds: z.array(z.string()),
+  readyCount: z.number(),
+  saveForFuture: z.boolean(),
+  factKey: z.string().nullable(),
+  scope: z.string(),
+});
+
+export type ReviewAnswerResult = z.infer<typeof answerResponseSchema>;
 
 async function jsonFrom(response: Response) {
   if (!response.ok) {
@@ -48,13 +60,15 @@ export async function fetchReviews() {
   return reviewsResponseSchema.parse(await jsonFrom(await fetch("/api/reviews")));
 }
 
-export async function answerReview(reviewId: string, value: string) {
-  return jsonFrom(
-    await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/answer`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value }),
-    }),
+export async function answerReview(reviewId: string, value: string, saveForFuture: boolean) {
+  return answerResponseSchema.parse(
+    await jsonFrom(
+      await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/answer`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ saveForFuture, value }),
+      }),
+    ),
   );
 }
 

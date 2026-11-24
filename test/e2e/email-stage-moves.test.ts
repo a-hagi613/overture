@@ -297,6 +297,8 @@ test("a rejection and an interview move the card, Undo restores it, and a hand m
   );
   await runMailJobs(owner);
 
+  await page.getByRole("button", { name: /Show closed/u }).click();
+
   await expect(
     page.locator(`section[aria-label="Closed"] button[data-card="${applicationId}"]`),
   ).toBeVisible();
@@ -330,7 +332,7 @@ test("a rejection and an interview move the card, Undo restores it, and a hand m
   await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
   await expect(
     page
-      .locator(`section[aria-label="Waiting"] button[data-card="${applicationId}"]`)
+      .locator(`section[aria-label="Interviews"] button[data-card="${applicationId}"]`)
       .getByText("Interviewing", { exact: true }),
   ).toBeVisible();
 
@@ -343,12 +345,12 @@ test("a rejection and an interview move the card, Undo restores it, and a hand m
     (candidate) => candidate.request().method() === "PATCH" && candidate.url().includes("/stage"),
   );
 
-  await moved.dragTo(page.locator('section[aria-label="Waiting"]'));
+  await moved.dragTo(page.locator('section[aria-label="Interviews"]'));
   await drag;
 
   await expect(
     page
-      .locator(`section[aria-label="Waiting"] button[data-card="${applicationId}"]`)
+      .locator(`section[aria-label="Interviews"] button[data-card="${applicationId}"]`)
       .getByText("Screening", { exact: true }),
   ).toBeVisible();
 

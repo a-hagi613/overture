@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import type { Review } from "../lib/review-api";
@@ -14,6 +15,7 @@ import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsEyebrow } from "./ui/ds.ts";
 import { Separator } from "./ui/separator.tsx";
+import { Switch } from "./ui/switch.tsx";
 
 export function ReviewDetail({
   hiddenOnMobile = false,
@@ -31,8 +33,10 @@ export function ReviewDetail({
   onResolved: (id: string) => void;
 }) {
   const [value, setValue] = useState("");
+  const [saveForFuture, setSaveForFuture] = useState(review.saveForFutureDefault);
   const [pending, setPending] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   async function refresh() {
     onResolved(review.id);
@@ -53,11 +57,22 @@ export function ReviewDetail({
 
     setPending(true);
 
-    const companyNames = review.applications.map((app) => app.company).join(" & ");
-
     try {
-      await answerReview(review.id, value.trim());
-      toast.success(`Answer saved — ${companyNames} unblocked.`);
+      const result = await answerReview(review.id, value.trim(), saveForFuture);
+
+      if (result.readyCount > 0) {
+        toast.success(copy.review.savedToReady(result.readyCount), {
+          action: {
+            label: copy.review.openReady,
+            onClick: () => {
+              void navigate("/ready");
+            },
+          },
+        });
+      } else {
+        toast.success(copy.review.savedScoped(review.applications.length));
+      }
+
       await refresh();
     } catch {
       toast.error(copy.review.saveFailed);
@@ -161,6 +176,36 @@ export function ReviewDetail({
           {copy.review.yourAnswer}
         </p>
         <ReviewAnswer field={review} onChange={setValue} value={value} />
+
+        <div className="mt-4 rounded-lg border border-border bg-background p-3.5">
+          <div className="flex items-start gap-3">
+            <Switch
+              ariaLabel={copy.review.saveForFuture.label}
+              checked={saveForFuture}
+              id="review-save-for-future"
+              onCheckedChange={setSaveForFuture}
+            />
+            <div className="min-w-0">
+              <label
+                className="block cursor-pointer text-sm font-semibold text-foreground"
+                htmlFor="review-save-for-future"
+              >
+                {copy.review.saveForFuture.label}
+              </label>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {saveForFuture
+                  ? copy.review.saveForFuture.onNote
+                  : copy.review.saveForFuture.offNote}
+              </p>
+            </div>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            {review.saveForFutureDefault
+              ? copy.review.saveForFuture.reusableNote
+              : copy.review.saveForFuture.specificNote}
+          </p>
+        </div>
+
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
           {copy.review.answerNote}
         </p>

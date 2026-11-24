@@ -8,7 +8,10 @@ import type { ReviewService } from "../pipeline/reviews.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
-const answerBody = z.object({ value: z.string().trim().min(1).max(2000) });
+const answerBody = z.object({
+  value: z.string().trim().min(1).max(2000),
+  saveForFuture: z.boolean().optional(),
+});
 
 export function createReviewRoutes(deps: { auth: Auth; reviews: ReviewService }) {
   const { auth, reviews } = deps;
@@ -44,8 +47,11 @@ export function createReviewRoutes(deps: { auth: Auth; reviews: ReviewService })
     }
 
     const { id } = context.req.param();
-    const { value } = context.req.valid("json");
-    const answered = await reviews.answer(account.id, id, value);
+    const { saveForFuture, value } = context.req.valid("json");
+
+    const answered = await reviews.answer(account.id, id, value, {
+      saveForFuture: saveForFuture ?? true,
+    });
 
     if (answered === null) {
       return context.json({ error: API_ERRORS.notFound }, 404);

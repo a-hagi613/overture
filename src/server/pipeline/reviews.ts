@@ -42,7 +42,16 @@ export interface ReviewView {
   unlocked: number;
   companies: number;
   applications: ReviewApplicationView[];
+  saveForFutureDefault: boolean;
   createdAt: number;
+}
+
+function isFreeTextQuestion(fieldType: QuestionFieldType) {
+  return fieldType === "text" || fieldType === "textarea";
+}
+
+function saveForFutureDefaultFor(fieldType: QuestionFieldType, category: ReviewCategory) {
+  return !isFreeTextQuestion(fieldType) || category !== "other";
 }
 
 function openReviewRows(db: AppDatabase, userId: string) {
@@ -221,6 +230,7 @@ export function listReviews(input: {
     const companiesUnlocked = new Set(reviewAttachments.map((attachment) => attachment.company));
     const label = review.factKey === null ? null : factLabelFor(review.factKey);
     const country = review.scope === "" ? null : countryNameFor(review.scope);
+    const category = reviewCategory(review.prompt, review.factKey);
 
     let factLabel = label;
 
@@ -237,10 +247,11 @@ export function listReviews(input: {
       scope: review.scope,
       factLabel,
       reason: review.reason,
-      category: reviewCategory(review.prompt, review.factKey),
+      category,
       unlocked: reviewAttachments.length,
       companies: companiesUnlocked.size,
       applications: reviewAttachments,
+      saveForFutureDefault: saveForFutureDefaultFor(review.fieldType, category),
       createdAt: review.createdAt,
     };
   });
@@ -269,6 +280,7 @@ export function createReviewService(deps: {
     options: {
       fact?: { key: string; scope: string };
       prepare?: "await" | "enqueue";
+      saveForFuture?: boolean;
     } = {},
   ) {
     const review = db
@@ -284,16 +296,30 @@ export function createReviewService(deps: {
     const target = options.fact ?? null;
     const factKey = target?.key ?? review.factKey ?? `q:${review.questionId}`;
     const scope = target?.scope ?? review.scope;
-
-    if (target === null) {
-      await factsService.saveFromReview(userId, factKey, value, review.scope);
-    } else {
-      await factsService.save(userId, factKey, value, scope);
-    }
-
-    catalog.setMapping(review.questionId, { answerKind: "fact", factKey, mappedBy: "owner" });
-
+    const saveForFuture = options.saveForFuture ?? true;
     const applicationIds = applicationIdsForReview(db, reviewId);
+
+    if (saveForFuture) {
+      if (target === null) {
+        await factsService.saveFromReview(userId, factKey, value, review.scope);
+      } else {
+        await factsService.save(userId, factKey, value, scope);
+      }
+
+      catalog.setMapping(review.questionId, { answerKind: "fact", factKey, mappedBy: "owner" });
+    } else {
+      await Promise.all(
+        applicationIds.map(async (applicationId) =>
+          preparation.saveApplicationAnswer({
+            applicationId,
+            kind: "fact",
+            questionId: review.questionId,
+            userId,
+            value,
+          }),
+        ),
+      );
+    }
 
     db.update(reviews)
       .set({ status: "answered", resolvedAt: clock.now() })
@@ -317,10 +343,33 @@ export function createReviewService(deps: {
       await preparation.prepareMany(applicationIds);
     }
 
+    let readyCount = 0;
+
+    if (applicationIds.length > 0) {
+      const statuses = db
+        .select({ status: applications.status })
+        .from(applications)
+        .where(inArray(applications.id, [...applicationIds]))
+        .all();
+
+      for (const row of statuses) {
+        if (row.status === "ready") {
+          readyCount += 1;
+        }
+      }
+    }
+
     publishEvent(db, clock, "review.resolved", JSON.stringify({ reviewId }), userId);
     publishEvent(db, clock, "home.updated", JSON.stringify({ reviewId }), userId);
 
-    return { reviewId, factKey, scope, applicationIds };
+    return {
+      reviewId,
+      factKey: saveForFuture ? factKey : null,
+      scope: saveForFuture ? scope : "",
+      applicationIds,
+      readyCount,
+      saveForFuture,
+    };
   }
 
   function dismiss(userId: string, reviewId: string) {
