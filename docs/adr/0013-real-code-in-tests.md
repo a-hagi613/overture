@@ -31,7 +31,7 @@ round trip. Each check alerts on failure and refreshes the saved forms and recor
 an application or touches a user.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
-exist only for the sixty-five files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
+exist only for the sixty-six files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
 as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key,
 and a "did not happen" line appears only when the stored data proves it), ledger, crypto, planner, the
 restored-database check (a restored file is read
@@ -147,13 +147,17 @@ subject sanitiser (`cloudflare.test.ts`: a support subject with line breaks is f
 mode (`report.test.ts`: a restricted `rk_live_`/`rk_test_` key names the same live/test mode as an `sk_` key, and any
 other key is unconfigured), and
 the interception canary (`outbound-interception.test.ts`: a fetch or node `https` request to an unmocked host rejects with
-the interceptor's own error while a mocked host still answers, so a request that leaks fails instead of reaching DNS). They
+the interceptor's own error while a mocked host still answers, so a request that leaks fails instead of reaching DNS),
+and the OTel bounds and redaction (`telemetry/otel.test.ts`: an `http.url` loses its query string and fragment, metrics
+export every 60 s, the span and log queues carry fixed bounds, and no metric instrument names a high-cardinality
+identifier, #580). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: six shards balanced by
 per-file time, and a pull request runs only the e2e files its committed reach map says its diff can reach, with
-everything unclassified running the full suite. Main always runs all of them. No sleeps, no retries, no lowered
-timeouts.
+everything unclassified running the full suite. Main always runs all of them. No sleeps and no lowered timeouts; CI
+retries a failed Playwright test once with its trace recorded on the first retry and stops a shard after ten failures,
+while a local run never retries and keeps the trace of a failure.
 
 ## Considered Options
 

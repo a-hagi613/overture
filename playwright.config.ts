@@ -1,13 +1,17 @@
 import { defineConfig } from "@playwright/test";
 
+const ci = Bun.env.CI === "true";
+
 export default defineConfig({
   testDir: "test/e2e",
   fullyParallel: true,
   workers: 2,
+  maxFailures: ci ? 10 : 0,
+  retries: ci ? 1 : 0,
   reporter: [["list"], ["json", { outputFile: "test-results/e2e.json" }]],
   globalSetup: "./test/e2e/global-setup.ts",
   use: {
-    trace: "retain-on-failure",
+    trace: ci ? "on-first-retry" : "retain-on-failure",
   },
   projects: [
     {

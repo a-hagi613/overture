@@ -229,7 +229,7 @@ src/
 drizzle/             generated migrations
 scripts/             fetch-seed.ts, load-discovered-boards.ts, enqueue-backfill.ts, census.ts, record-feeds.ts, capture-forms.ts, pull-forms.ts, restore-drill.ts
 test/e2e/           Playwright `*.test.ts` flows, fixture server, interceptor handlers and recordings, `*.test-utils.ts`
-                     (the fifty-eight unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
+                     (the fifty-nine unit tests sit beside their code as `*.test.ts`, per Landmines `colocated-tests`)
 tools/oxlint/        vendored anti-slop plugin
 ```
 
@@ -1398,7 +1398,7 @@ body, sender or attachment, so the admin never sees message content.
   decrypts the archive in the browser. The link is valid 24 h; then the archive is deleted, and a new request replaces a
   ready one. Built in the background one page of rows at a time, so its memory does not grow with the mailbox.
 - Logs/traces never contain names, emails, phone numbers, answers, letters or mail content; a redaction processor in
-  the OTel pipeline drops attributes outside an allowlist.
+  the OTel pipeline drops attributes outside an allowlist and strips a URL's query string and fragment.
 
 ### 13.3 Admin
 
@@ -1604,7 +1604,7 @@ publishing version 2 leaves version 1 and an already sent Snapshot on version 1 
 
 Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038).
 
-### 16.2 Unit tests (sixty-five files, `bun:test`, beside their code)
+### 16.2 Unit tests (sixty-six files, `bun:test`, beside their code)
 
 | File | Invariant |
 |---|---|
@@ -1664,6 +1664,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/platform/outbound-guard.test.ts` | in test and development, an outbound request to an ATS or paid-service host is refused |
 | `src/server/platform/outbound-interception.test.ts` | a fetch or node `https` request to an unmocked non-loopback host rejects with `UnhandledRequestError`, while a mocked host still answers, so the test interceptor fails closed |
 | `src/server/platform/ports/replica-listing.test.ts` | the newest replica transaction is read from the first non-empty Litestream level (#281) |
+| `src/server/platform/telemetry/otel.test.ts` | `http.url` loses its query string and fragment, metrics export every 60 s, span and log batches carry the 2048/512/5 s bounds, and no metric instrument attaches `http.url`, `job.id`, `sse.user_id` or `admin.target_user_id` (#580) |
 | `src/server/profile/facts.test.ts` | a Fact's scope is validated against its key |
 | `src/server/profile/onboarding-step.test.ts` | the onboarding step's salary and EEO reading |
 | `src/server/profile/pdf.test.ts` | only the `%PDF-` header in the first kilobyte is accepted, so a spoofed MIME type cannot pass HTML as a resume |
@@ -1687,7 +1688,9 @@ locally by `bun run verify`. E2E runs inside the pinned `mcr.microsoft.com/playw
 `dist` artifact is handed to six shards balanced by recorded per-file time (`test/e2e/timings.json`, refreshed from
 main runs); every shard starts one server per Playwright worker (template SQLite copy, API-seeded auth, a Bun-native test
 interceptor that refuses every unmocked non-loopback host, a canary test that fails if a request leaks, a test-only
-route that runs due jobs, no sleeps, zero retries).
+route that runs due jobs with no sleeps and no job retries). CI retries a failed Playwright test once with a trace
+recorded on that first retry, and a shard stops after ten failures so a broken pull request fails fast; a local run
+never retries and keeps the trace of a failure.
 
 A pull request runs only the e2e files its diff can reach. `test/e2e/reach-map.json`, regenerated on main, maps each
 test file to the source modules it exercises, derived from the test's import graph and the routes it calls. A changed
@@ -1726,8 +1729,13 @@ returned.
 OTel is started at boot with the `overture` service resource and OTLP trace, log and metric exporters; the endpoint and
 headers come from `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS`, and exported spans, log records and
 metric attributes pass through a fixed attribute allowlist (`platform/telemetry/otel.ts`) so an email, token or message
-body never leaves the process. Manual spans cover the admin audit write (`admin.audit`) and the test-only OTel route.
-The app does not emit request, job or business metric series, and registers no auto-instrumentation: dashboard
+body never leaves the process. `http.url` keeps its origin and path but loses its query string and fragment, so a
+magic-link token or search term never reaches a trace or log. Metrics export once a minute, and the span and log queues
+are bounded (`maxQueueSize` 2048, `maxExportBatchSize` 512, 5 s schedule and export timeout), so an OTLP outage drops
+telemetry instead of growing memory. High-cardinality identifiers (`http.url`, `job.id`, `sse.user_id`,
+`admin.target_user_id`) are never attached as metric attributes, and `platform/telemetry/otel.test.ts` scans every
+metric instrument to keep it that way. Manual spans cover the admin audit write (`admin.audit`) and the test-only OTel
+route. The app does not emit request, job or business metric series, and registers no auto-instrumentation: dashboard
 numbers come from the database, and the `live.check` job computes them there (§16.4). Alerts to the owner: ATS success < 70 % over the last hour (at least five
 attempts), provider success < 60 %, code or CAPTCHA rate > 20 %, queue age > 30 min, LLM spend > 80 % of the global
 or tagging cap, a daily scoring run that stops at its bound (3 × the daily cap, §8.2), Litestream lag > 5 min, backup failure, health check failing, disk > 80 %, a catalog sweep worker crash,

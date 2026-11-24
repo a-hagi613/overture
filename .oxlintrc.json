@@ -251,6 +251,7 @@
           "src/server/platform/rate-limit.test.ts",
           "src/server/platform/sse/hub.test.ts",
           "src/server/platform/sse/stream.test.ts",
+          "src/server/platform/telemetry/otel.test.ts",
           "src/server/profile/facts.test.ts",
           "src/server/profile/onboarding-step.test.ts",
           "src/server/profile/pdf.test.ts",
