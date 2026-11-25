@@ -6,6 +6,7 @@ import { postings, postingTags } from "../platform/db/catalog-schema.ts";
 import type { PostingTags, SalaryPeriod, TagSource } from "../../shared/tag-taxonomy.ts";
 
 import { TAG_SOURCE_PRECEDENCE } from "../../shared/tag-taxonomy.ts";
+import { committedRoleLabels, retagPosting } from "./taxonomy-tags.ts";
 
 interface StoredTagRow {
   dimension: "role" | "subrole" | "seniority";
@@ -24,6 +25,15 @@ export function salaryPeriodForColumn(period: SalaryPeriod | null) {
   return period;
 }
 
+/**
+ * Writes a Posting's tags, keeping a stronger source's tag over a weaker one. When the writes touch the role, the
+ * Posting is then retagged in the role taxonomy (issue #660), so a writer that still speaks the retired labels (the
+ * board poll's title rules) never leaves an old label for matching to miss.
+ * @param db The catalog database or an open transaction on it.
+ * @param postingId The Posting.
+ * @param writes The tags to write.
+ * @param now The clock reading stored as `taggedAt`.
+ */
 export function writePostingTags(
   db: DatabaseWriter,
   postingId: string,
@@ -53,6 +63,10 @@ export function writePostingTags(
       .values({ postingId, dimension: write.dimension, value: write.value, source: write.source })
       .onConflictDoNothing()
       .run();
+  }
+
+  if (writes.some((write) => write.dimension === "role" || write.dimension === "subrole")) {
+    retagPosting(db, postingId, committedRoleLabels());
   }
 
   const rows = db.select().from(postingTags).where(eq(postingTags.postingId, postingId)).all();

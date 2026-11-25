@@ -134,7 +134,7 @@ function fresh() {
   catalog.db
     .insert(postingTags)
     .values([
-      { dimension: "role", postingId: "posting-1", source: "rules", value: "Software Engineer" },
+      { dimension: "granular_role", postingId: "posting-1", source: "rules", value: "sw.general" },
       { dimension: "seniority", postingId: "posting-1", source: "rules", value: "senior" },
     ])
     .run();
@@ -229,7 +229,12 @@ describe("runtime posting flags", () => {
     catalog.db
       .insert(postingTags)
       .values([
-        { dimension: "role", postingId: "posting-2", source: "rules", value: "Software Engineer" },
+        {
+          dimension: "granular_role",
+          postingId: "posting-2",
+          source: "rules",
+          value: "sw.general",
+        },
         { dimension: "seniority", postingId: "posting-2", source: "rules", value: "senior" },
       ])
       .run();

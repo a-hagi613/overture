@@ -1226,18 +1226,27 @@ clone does not turn `main` red every day:
 
 `ANTHROPIC_API_KEY` is optional: with it, up to 500 newly inserted apply-supported postings whose role the rules could
 not classify go to Haiku 5.5 in batches of 25 (`CATALOG_LLM_MODEL` overrides the model, `--max-llm-rows` the ceiling);
-without it the pass is skipped and the run still publishes. `STAPPLY_ALERT_NTFY_URL` is optional and only pushes a
+without it the pass is skipped and the run still publishes. The classifier's own Haiku tier (titles the ESCO rules
+and the local embeddings leave unsure) additionally needs the repository variable `CATALOG_LLM_MAX_ITEMS` set to a
+positive cap on how many titles one run may send; it defaults to `0`, so no daily AI spend happens until the owner
+sets both (#660, ADR 0043). Role labels for known title templates come from the committed seed
+`src/server/catalog/tag-data/role-labels.json` and cost nothing per run. `STAPPLY_ALERT_NTFY_URL` is optional and only pushes a
 failed run to the owner's phone. The run uploads `stapply-daily.json` (counters, per-board rows, tag sources, the
 manifest) as an artifact and writes it to the step summary.
 
 **What it does.** `scripts/stapply-daily-etl.ts` reads the 28 `<source_key>/jobs.parquet` files over HTTP with DuckDB,
-one board at a time (column projection; `description` and `raw` are never selected and `all.parquet` is never read),
+one board at a time (column projection; `raw` is never selected, `description` is read capped at 4,000 characters and
+stored as 2,000 characters of plain text for the scorer, and `all.parquet` is never read),
 streams the mapped rows into a temporary SQLite staging table, filters non-empty
-titles, `https://` apply links, unexpired deadlines and — on the first run — a 30-day `posted_at` horizon, and collapses
+titles, `https://` apply links, unexpired deadlines and — on the first run — a `posted_at` horizon of the
+`freshness_days` input (default 7; `0` keeps every date), leaving out rows with no posting date unless
+`include_undated` is set, and collapses
 `(company_norm, requisition_id)` duplicates preferring a board with an apply adapter. It downloads
 `catalog/latest.sqlite.zst` and verifies it against `catalog/latest.json` first, so unchanged `content_hash` rows keep
 their `role`/`seniority`/`skills_json` tags; new rows are inserted, changed rows rewritten, missing listings closed at
-once, and closed rows older than 30 days deleted. It then runs `PRAGMA optimize`, `VACUUM` and
+once, and closed rows older than 30 days deleted. Every open Posting's role tags are then rewritten in the role
+taxonomy (`taxonomy-tags.ts`: the seed label, else the retired-tag bridge) before the `/api/supply` rollup is rebuilt.
+It then runs `PRAGMA optimize`, `VACUUM` and
 `PRAGMA integrity_check`, zstd-compresses the file at level 12 (level 19 took over ten minutes on a 1.1 GB seed
 artifact for about 2 % smaller output), and computes the manifest's SHA-256 over the **uncompressed** SQLite bytes.
 

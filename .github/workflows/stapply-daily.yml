@@ -17,6 +17,14 @@ on:
         description: "Skip the local ONNX embedding pass (Tier 2)"
         type: boolean
         default: false
+      freshness_days:
+        description: "Keep Postings posted within this many days (0 keeps every date)"
+        type: string
+        default: "7"
+      include_undated:
+        description: "Also keep Postings the feed gives no posting date"
+        type: boolean
+        default: false
 
 concurrency:
   group: stapply-daily
@@ -99,6 +107,8 @@ jobs:
           ALLOW_ROW_DROP: ${{ inputs.allow_row_drop == true && '1' || '' }}
           SKIP_LLM: ${{ inputs.skip_llm == true && '1' || '' }}
           SKIP_EMBEDDINGS: ${{ inputs.skip_embeddings == true && '1' || '' }}
+          FRESHNESS_DAYS: ${{ inputs.freshness_days || '7' }}
+          INCLUDE_UNDATED: ${{ inputs.include_undated == true && '1' || '' }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -109,6 +119,7 @@ jobs:
           CATALOG_EMBEDDING_MODEL: ${{ vars.CATALOG_EMBEDDING_MODEL || '' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CATALOG_LLM_MODEL: ${{ vars.CATALOG_LLM_MODEL || '' }}
+          CATALOG_LLM_MAX_ITEMS: ${{ vars.CATALOG_LLM_MAX_ITEMS || '0' }}
         run: |
           set -o pipefail
           flags=()
@@ -121,6 +132,10 @@ jobs:
           if [ "$SKIP_EMBEDDINGS" = "1" ]; then
             flags+=(--skip-embeddings)
           fi
+          if [ "$INCLUDE_UNDATED" = "1" ]; then
+            flags+=(--include-undated)
+          fi
+          flags+=(--freshness-days "$FRESHNESS_DAYS")
           bun run scripts/stapply-daily-etl.ts "${flags[@]}" | tee stapply-daily.json
       - name: Report the run outcome
         if: always()

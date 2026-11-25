@@ -565,8 +565,15 @@ function seedPostingTags(input: {
 }) {
   const { catalogDb, companyIndex, postingId } = input;
 
+  const backend = companyIndex % 2 === 0;
+
   const tags = [
-    { dimension: "role" as const, value: companyIndex % 2 === 0 ? "Backend" : "Platform" },
+    { dimension: "role" as const, value: "software-it" },
+    {
+      dimension: "subrole" as const,
+      value: backend ? "software-it/software-engineering" : "software-it/infrastructure",
+    },
+    { dimension: "granular_role" as const, value: backend ? "sw.backend" : "infra.devops" },
     { dimension: "seniority" as const, value: companyIndex % 3 === 0 ? "staff" : "senior" },
   ];
 

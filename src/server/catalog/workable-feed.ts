@@ -7,7 +7,8 @@ import {
   WORKPLACES,
   postingTagsSchema,
 } from "../../shared/tag-taxonomy.ts";
-import { roleTargetMatches } from "../profile/targets.ts";
+import { committedRoleLabels, taxonomyRoleTags } from "./taxonomy-tags.ts";
+import { planRoleTargets, roleMatchScore } from "../matching/role-targets.ts";
 import { resolveLocation } from "./geo.ts";
 import { DESCRIPTION_CAP, htmlToText } from "./html-to-text.ts";
 import { normalizeTitle } from "./normalize.ts";
@@ -168,22 +169,48 @@ function locationMatches(place: string, tags: PostingTags, locationRaw: string) 
   return true;
 }
 
+/**
+ * Whether one Workable job's role meets any of the targets, in the role taxonomy: the seed label for its title, else
+ * its rule tags through the retired-tag bridge, scored the way catalog matching scores a Posting.
+ * @param job The job's title, department and rule tags.
+ * @param roles The saved role targets.
+ * @returns True when the role matches.
+ */
+export function workableRoleMatches(
+  job: { title: string; department: string | null; tags: PostingTags },
+  roles: readonly string[],
+) {
+  const roleTags = taxonomyRoleTags(
+    { title: job.title, department: job.department, primaryCategory: null, primaryRole: null },
+    { role: job.tags.role, subrole: job.tags.subrole, granularRole: null },
+    committedRoleLabels(),
+  );
+
+  return (
+    roleMatchScore(planRoleTargets(roles), {
+      titleNorm: normalizeTitle(job.title),
+      tags: roleTags,
+    }) > 0
+  );
+}
+
+/**
+ * Whether one Workable job meets the off-box pass's targets, read the way catalog matching reads them: its role in
+ * the role taxonomy (the seed label for its title, else its rule tags through the retired-tag bridge), then
+ * seniority, workplace and location.
+ * @param job The job's title, department and rule tags.
+ * @param locationRaw The job's location text.
+ * @param targets The targets the pass keeps jobs for.
+ * @returns True when the job should be kept.
+ */
 export function workableTargetMatches(
-  tags: PostingTags,
+  job: { title: string; department: string | null; tags: PostingTags },
   locationRaw: string,
   targets: WorkableTargets,
 ) {
-  if (targets.roles.length === 0) {
-    return false;
-  }
+  const { tags } = job;
 
-  const roleValues = [tags.role, tags.subrole].filter((value) => value !== null);
-
-  const roleMatches = targets.roles.some((role) =>
-    roleValues.some((value) => roleTargetMatches(role, [value])),
-  );
-
-  if (!roleMatches) {
+  if (targets.roles.length === 0 || !workableRoleMatches(job, targets.roles)) {
     return false;
   }
 
@@ -313,7 +340,7 @@ export async function streamWorkablePass(deps: WorkablePassDeps) {
       return;
     }
 
-    if (workableTargetMatches(row.tags, row.locationRaw ?? "", deps.targets)) {
+    if (workableTargetMatches(row, row.locationRaw ?? "", deps.targets)) {
       pending.push(row);
     }
   }

@@ -165,7 +165,7 @@ describe("applyStapplyDelta", () => {
     expect(report.tagged).toBe(2);
     expect(countPostings(db)).toBe(2);
     expect(countSupportedPostings(db)).toBe(2);
-    expect(tagSourceSummary(db)).toEqual([{ source: "rules", count: 2 }]);
+    expect(tagSourceSummary(db)).toEqual([{ source: "llm", count: 2 }]);
 
     const company = db.$client.query("SELECT name, name_norm FROM companies").get();
 
@@ -196,12 +196,13 @@ describe("applyStapplyDelta", () => {
     const posting = postingFor(db, "job-1");
 
     expect(posting?.status).toBe("open");
-    expect(posting?.tag_source).toBe("rules");
+    expect(posting?.tag_source).toBe("llm");
     expect(posting?.content_hash).toMatch(/^[0-9a-f]{64}$/u);
     expect(tagsFor(db, posting?.id ?? "")).toEqual([
-      { dimension: "role", value: "Software Engineering", source: "rules" },
-      { dimension: "seniority", value: "senior", source: "rules" },
-      { dimension: "subrole", value: "Backend", source: "rules" },
+      { dimension: "granular_role", value: "sw.backend", source: "llm" },
+      { dimension: "role", value: "software-it", source: "llm" },
+      { dimension: "seniority", value: "senior", source: "llm" },
+      { dimension: "subrole", value: "software-it/software-engineering", source: "llm" },
     ]);
   });
 
@@ -223,6 +224,7 @@ describe("applyStapplyDelta", () => {
       NOW,
     );
 
+    const tagsBefore = tagsFor(db, posting?.id ?? "");
     const second = [ingestRow({ ats_id: "job-1" })];
 
     stage(db, second);
@@ -233,12 +235,7 @@ describe("applyStapplyDelta", () => {
     expect(report.unchanged).toBe(1);
     expect(report.tagged).toBe(0);
     expect(postingFor(db, "job-1")?.id).toBe(posting?.id);
-    expect(tagsFor(db, posting?.id ?? "")).toContainEqual({
-      dimension: "role",
-      value: "Legal",
-      source: "import",
-    });
-    expect(postingFor(db, "job-1")?.tag_source).toBe("import");
+    expect(tagsFor(db, posting?.id ?? "")).toEqual(tagsBefore);
   });
 
   test("a changed content hash rewrites the row and re-tags it", () => {
@@ -269,11 +266,9 @@ describe("applyStapplyDelta", () => {
 
     const tags = tagsFor(db, before?.id ?? "");
 
-    expect(tags).toContainEqual({
-      dimension: "role",
-      value: "Software Engineering",
-      source: "rules",
-    });
+    expect(tags.filter((tag) => tag.dimension === "role").map((tag) => tag.value)).toEqual([
+      "software-it",
+    ]);
     expect(tags).not.toContainEqual({ dimension: "role", value: "Legal", source: "llm" });
   });
 
@@ -538,7 +533,7 @@ describe("runStapplyLlmTagging", () => {
       classifier: async (items) => {
         await Promise.resolve();
 
-        return items.map((item) => ({ id: item.id, role: "Operations", subrole: null }));
+        return items.map((item) => ({ id: item.id, role: "Legal", subrole: null }));
       },
       now: NOW,
       limit: 10,
@@ -555,11 +550,10 @@ describe("runStapplyLlmTagging", () => {
 
     const tagged = postingFor(db, "job-2");
 
-    expect(tagged?.tag_source).toBe("llm");
     expect(tagsFor(db, tagged?.id ?? "")).toContainEqual({
       dimension: "role",
-      value: "Operations",
-      source: "llm",
+      value: "legal",
+      source: "rules",
     });
   });
 

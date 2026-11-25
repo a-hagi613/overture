@@ -8,6 +8,7 @@ import { postings, postingTags } from "../platform/db/catalog-schema.ts";
 import { logError } from "../platform/log.ts";
 import { countryNameFor } from "../catalog/geo.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES } from "../../shared/tag-taxonomy.ts";
+import { roleTaxonomyName } from "../../shared/role-taxonomy.ts";
 
 const MAX_ROLE_CHOICES = 12;
 const MAX_LOCATION_CHOICES = 8;
@@ -83,7 +84,7 @@ export function targetChoices(db: CatalogDatabase) {
   return {
     employmentTypes: shownEmploymentTypes.filter((value) => hasEmploymentType(value)),
     locations: locationChoices(db),
-    roles: roleCandidates.map((row) => row.value),
+    roles: [...new Set(roleCandidates.map((row) => roleTaxonomyName(row.value)))],
     seniorities: SENIORITIES.filter(
       (value) => seniorityPresent.has(value) && hasOpenSeniority(value),
     ),

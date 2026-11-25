@@ -1,5 +1,3 @@
-import { gunzipSync } from "node:zlib";
-
 import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -11,7 +9,7 @@ import type { RankedCandidate } from "./candidates.ts";
 import type { Targets } from "../../shared/targets.ts";
 
 import { applications, matches, postingUserState, resumes } from "../platform/db/schema.ts";
-import { companies, postings } from "../platform/db/catalog-schema.ts";
+import { companies, postingTags, postings } from "../platform/db/catalog-schema.ts";
 
 import { applicationsLeft } from "../billing/ledger.ts";
 import type { SpendGate } from "../billing/spend.ts";
@@ -25,6 +23,7 @@ import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService } from "../profile/targets.ts";
 import { activeApplicationCompanies, applicationFor, createApplication } from "./applications.ts";
 import { createCandidateService } from "./candidates.ts";
+import { descriptionSummary, postingRoleName, scoreTagsLine, targetsLine } from "./judge-input.ts";
 
 export const SCORE_PURPOSE = "score";
 
@@ -33,8 +32,6 @@ const WAITING_STATUSES = ["preparing", "ready", "approved"] as const;
 const CHUNK_SIZE = 5;
 const SCORE_ATTEMPT_MULTIPLE = 3;
 const RESUME_DIGEST_CHARS = 1500;
-const SUMMARY_WORDS = 200;
-const SUMMARY_CHARS = 2000;
 
 const OUTPUT_SCHEMA: LlmOutputSchema = {
   type: "object",
@@ -75,6 +72,7 @@ interface ScoreContext {
   resumeId: string | null;
   resumeDigest: string;
   targetsVersion: number;
+  targetsLine: string;
   threshold: number;
 }
 
@@ -90,10 +88,10 @@ function titleCase(value: string) {
 
 function whyBullets(candidate: RankedCandidate, targets: Targets) {
   const bullets: string[] = [];
-  const role = candidate.tags.find((tag) => tag.dimension === "role")?.value;
+  const role = postingRoleName(candidate.tags);
   const seniority = candidate.tags.find((tag) => tag.dimension === "seniority")?.value;
 
-  if (role !== undefined) {
+  if (role !== null) {
     bullets.push(`Matches your ${role} target`);
   }
 
@@ -116,18 +114,6 @@ function whyBullets(candidate: RankedCandidate, targets: Targets) {
   return bullets.slice(0, 3);
 }
 
-function descriptionText(descriptionGz: Buffer | null) {
-  if (descriptionGz === null) {
-    return "";
-  }
-
-  try {
-    return gunzipSync(descriptionGz).toString("utf8");
-  } catch {
-    return "";
-  }
-}
-
 function scoreRequest(input: {
   customId: string;
   title: string;
@@ -138,6 +124,7 @@ function scoreRequest(input: {
   salary: string;
   tags: string;
   summary: string;
+  targets: string;
   resumeDigest: string;
 }) {
   const user = [
@@ -149,6 +136,7 @@ function scoreRequest(input: {
     `salary: ${input.salary}`,
     `tags: ${input.tags}`,
     `summary: ${input.summary}`,
+    `targets: ${input.targets}`,
     `resume: ${input.resumeDigest}`,
   ].join("\n");
 
@@ -192,8 +180,19 @@ export function createMatchingService(deps: MatchDeps) {
       resumeDigest,
       resumeId: resume?.id ?? null,
       targetsVersion: targets.version,
+      targetsLine: targetsLine(targets.targets),
       threshold: getSettingNumber(db, "match.auto_threshold_default"),
     };
+  }
+
+  function descriptionsFor(postingIds: readonly string[]) {
+    const rows = catalogDb
+      .select({ id: postings.id, descriptionGz: postings.descriptionGz })
+      .from(postings)
+      .where(inArray(postings.id, [...postingIds]))
+      .all();
+
+    return new Map(rows.map((row) => [row.id, row.descriptionGz]));
   }
 
   function cachedMatch(userId: string, postingId: string, context: ScoreContext) {
@@ -347,11 +346,11 @@ export function createMatchingService(deps: MatchDeps) {
       return cached;
     }
 
-    const summary = descriptionText(row.descriptionGz)
-      .split(/\s+/u)
-      .slice(0, SUMMARY_WORDS)
-      .join(" ")
-      .slice(0, SUMMARY_CHARS);
+    const tags = catalogDb
+      .select({ dimension: postingTags.dimension, value: postingTags.value })
+      .from(postingTags)
+      .where(eq(postingTags.postingId, postingId))
+      .all();
 
     const salary =
       row.salaryMinMinor === null || row.salaryCurrency === null
@@ -367,8 +366,9 @@ export function createMatchingService(deps: MatchDeps) {
         workplace: row.workplace,
         employmentType: row.employmentType,
         salary,
-        tags: "",
-        summary,
+        tags: scoreTagsLine(tags),
+        summary: descriptionSummary(row.descriptionGz),
+        targets: context.targetsLine,
         resumeDigest: context.resumeDigest,
       }),
     ];
@@ -555,6 +555,7 @@ export function createMatchingService(deps: MatchDeps) {
       }
 
       const chunk = unscored.slice(start, start + Math.min(CHUNK_SIZE, need, budget));
+      const descriptions = descriptionsFor(chunk.map((candidate) => candidate.id));
 
       const requests = chunk.map((candidate, index) =>
         scoreRequest({
@@ -568,8 +569,9 @@ export function createMatchingService(deps: MatchDeps) {
             candidate.salaryMinMinor === null || candidate.salaryCurrency === null
               ? "none listed"
               : `${candidate.salaryCurrency} ${String(Math.round(candidate.salaryMinMinor / 100))} per ${candidate.salaryPeriod ?? "year"}`,
-          tags: candidate.tags.map((tag) => `${tag.dimension}:${tag.value}`).join(" "),
-          summary: "",
+          tags: scoreTagsLine(candidate.tags),
+          summary: descriptionSummary(descriptions.get(candidate.id) ?? null),
+          targets: context.targetsLine,
           resumeDigest: context.resumeDigest,
         }),
       );

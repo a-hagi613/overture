@@ -502,12 +502,13 @@ workflow (`.github/workflows/stapply-daily.yml`) runs at **15:30 UTC** and on `w
 
 - **Read:** DuckDB reads one board at a time with column projection and streams the mapped rows into a temporary
   staging table, so a 2-million-row run never holds the snapshot in memory and each board's progress is visible in the
-  job log. `description` and `raw` are never selected. The 28 URLs are the registry's source keys, so a board that is
+  job log. `raw` is never selected; `description` is read capped at 4,000 characters, turned into plain text and stored
+  as `description_gz` (first 2,000 characters) so the scorer can read a Posting's requirements (§8.2). The 28 URLs are the registry's source keys, so a board that is
   added to `ATS_REGISTRY` joins the run without a second list.
 - **Filter:** a non-empty `title`; an `https://` apply link (`apply_url`, or the posting `url` when the feed has no
   apply link, which is normal for Greenhouse and Personio); an `application_deadline` that is absent or not past; and on
-  the first run a 30-day `posted_at` horizon. Rows whose timestamp is missing stay in, because the feed cannot prove
-  they are old.
+  the first run a `posted_at` horizon of `--freshness-days` (default 7, issue #660). Rows with no `posted_at` are left
+  out unless `--include-undated` is passed, because the feed cannot prove they are recent.
 - **Dedupe:** one row per `(company_norm, requisition_id)` across all 28 boards, preferring a board with an apply
   adapter, then the newest source update, then the feed's job id; DuckDB applies it within a board and SQLite applies
   it again across boards. Rows without a requisition id are never collapsed against each other.
@@ -520,7 +521,8 @@ workflow (`.github/workflows/stapply-daily.yml`) runs at **15:30 UTC** and on `w
   The rules path skips the O*NET title-similarity fallback in this pass: it costs about 18 ms per distinct title, which
   is hours across a full snapshot. Newly inserted rows whose role the rules leave unresolved go to `claude-haiku-5-5`
   in batches of 25 (500 rows a run by default); a missing key or a failed batch ends the pass cleanly and the run
-  still publishes.
+  still publishes. The classifier's own Haiku tier runs only when `CATALOG_LLM_MAX_ITEMS` is a positive cap, so no
+  daily AI spend happens by default. Last, every open Posting's role tags are rewritten in the role taxonomy (§6.4).
 - **Publish:** `VACUUM`, `PRAGMA optimize` and `PRAGMA integrity_check` run before the file leaves the runner. The
   workflow publishes `catalog/snapshots/YYYY-MM-DD.sqlite.zst`, `catalog/latest.sqlite.zst` and `catalog/latest.json`
   (`{version, sha256, builtAt, rowCount, supportedCount}`, SHA-256 of the **uncompressed** SQLite) to R2, newest seven
@@ -659,12 +661,16 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
 
 ### 6.4 Taxonomy (starting lists; the census finalises them)
 
-- **Role groups**: Software Engineering, Data & Analytics, Machine Learning & AI, Product Management, Design, DevOps
-  & Infrastructure, Security, IT & Support Engineering, QA & Test, Hardware & Embedded, Sales, Customer Success,
-  Customer Support, Marketing, Communications & PR, Finance, Accounting, Legal, People & HR, Recruiting, Operations,
-  Supply Chain & Logistics, Project & Program Management, Business Development & Partnerships, Healthcare,
-  Education, Research & Science, Administrative. Subroles for the largest groups (e.g. Software Engineering:
-  Frontend, Backend, Full-stack, Mobile, Platform, Embedded).
+- **Roles** (issue #660, ADR 0043): `src/shared/role-taxonomy.ts` holds 29 categories → subcategories → 272 roles,
+  each with a stable id. A Posting's role tags store ids: `role` = category id (`healthcare`), `subrole` =
+  subcategory id (`healthcare/nursing`), `granular_role` = role id (`health.rn`). The label comes from a one-time
+  Claude Haiku pass over the catalog's title templates (title + department, `classificationKey`), committed as
+  `src/server/catalog/tag-data/role-labels.json`: a high- or medium-confidence label sets all three ids, a
+  low-confidence one only the category, and `JUNK` (talent pool, open application, test posting) clears the role so
+  the Posting matches no one. A title with no label goes through the retired-tag bridge (`legacy-roles.ts`), which
+  keeps only what the old tags say safely. Every writer ends in the same rewrite (`taxonomy-tags.ts`), so no stored
+  role tag uses a retired label. The 28 retired role groups and 134 ESCO roles are still read as input: a saved
+  target or a filter that names one resolves to its ids.
 - **Seniority**: Intern, Entry, Mid, Senior, Staff/Principal, Manager, Director+.
 - **Workplace**: Remote, Hybrid, On-site. **Employment**: Full-time, Part-time, Contract, Internship, Temporary.
 - Onboarding offers only values that have ≥ 1 open posting; the live count applies the user's locations.
@@ -764,8 +770,8 @@ answers snapshot records the derivation key next to the value.
 ### 8.1 Candidates (code, free)
 
 A posting is a candidate for a user when all hold: open (`status='open'` and `closed_at IS NULL`) and
-`apply_supported=1` (a board without a deterministic apply adapter never matches; issue #563); tags intersect
-`targets.roles` (or subroles); its seniority tag, when it has one, is fewer than three levels from a wanted
+`apply_supported=1` (a board without a deterministic apply adapter never matches; issue #563); its role meets a
+target role (below); its seniority tag, when it has one, is fewer than three levels from a wanted
 seniority (levels: intern 0, entry 1, mid 2, senior 3, staff and manager 4, principal and director 5; a title with
 no seniority word is not excluded, and an exact seniority ranks above one level away); workplace ∈ targets (an unknown workplace passes for a user open to on-site or hybrid work,
 never for a remote-only user); location matches a target location (a remote posting matches when its country
@@ -779,9 +785,12 @@ no sent application to the same `dedupe_key` in the last 60 days; crowd limits n
 flagged by a runtime form failure (`catalog_posting_flags`, §5.4); no kill switch on its ATS/employer.
 
 **Live Targets count.** `POST /api/profile/targets/match-count` counts open, apply-supported Postings that pass the
-candidate filters above that depend on the catalog: role and subrole tags, seniority tags, workplace, employment
-type, location and the profile's posting languages. A role target matches when its words intersect the words of a role
-or subrole tag (`Backend` matches `Senior Backend Engineer`); a location target is resolved with the geo dataset
+candidate filters above that depend on the catalog: role tags, seniority tags, workplace, employment
+type, location and the profile's posting languages. A saved role target is read as taxonomy ids (an id, a current
+name, a retired category or ESCO name, or one clear part of a combined name such as `Nurse Practitioner`): a role
+target matches only that role, never a neighbour in its subcategory (a nurse practitioner job needs another licence
+than a registered nurse's), a subcategory or category target matches every role inside it, and any other text is
+free text that matches a title holding every one of its words; a location target is resolved with the geo dataset
 (§6.1) and matched on country with city or region. The salary floor is applied only when the posting's currency
 equals the floor's; a posting without a salary always counts. FX conversion arrives with matching (M1-16). The
 count is cached per normalized filters and catalog revision (`PRAGMA data_version` plus `total_changes()`), so a
@@ -794,7 +803,7 @@ these match a `skip_companies` row: same `company_id`; same registrable domain; 
 `plc`, `limited`, `corporation` removed). A near match (token similarity ≥ 0.85 but not equal) also skips and is
 logged for the owner: when unsure, Overture does not apply.
 
-`code_rank` = weighted sum: role/subrole match 40, seniority exact 20 / adjacent 10, location exact city 15 / region
+`code_rank` = weighted sum: role match exact role 40 / subcategory 30 / free-text title 30 / category 20, seniority exact 20 / adjacent 10, location exact city 15 / region
 10 / country 5 / remote 15, salary known and ≥ floor 10, recency (posted ≤ 3 days 10, ≤ 14 days 5). Candidate rows
 are refreshed by job `match.refresh` when a posting is created/changed or a user's targets change.
 
@@ -961,7 +970,7 @@ structured outputs (`output_config.format`), thinking disabled with `effort: "lo
 
 | Purpose | Input | Output | Est. cost |
 |---|---|---|---|
-| score | resume digest (cached) + posting summary | `{score 0–100, reason ≤ 140 chars}` | ~$0.0001 |
+| score | resume digest (cached) + posting title, place, pay, role name and seniority + first 200 words of its description + the user's targets (role names, levels, places, workplaces, pay floor; issue #660) | `{score 0–100, reason ≤ 140 chars}` | ~$0.0001 |
 | open_text | resume + posting + question | text | ~$0.0002 |
 | cover_letter | resume + posting + voice sample | sentences with resume-line ids | ~$0.0005 |
 | resume_pdf_fallback | PDF | text | ~$0.003 once |
@@ -1827,7 +1836,10 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/catalog/companies-parquet.test.ts` | the pinned `companies.parquet` and manifest sha256 pairs are verified before a seed loads, and a tampered file or manifest is refused |
 | `src/server/catalog/hot-swap.test.ts` | cold boot adopts a verified local file or hydrates from R2, a checksum or integrity failure keeps the active catalog serving, a swap keeps the stable handle and drains the previous one, and reads keep working while a swap is in flight (#576) |
 | `src/server/catalog/question-normalize.test.ts` | question normalisation |
-| `src/server/catalog/stapply-daily.test.ts` | the 28-board DuckDB query projects only catalog columns and never `all.parquet`, applies the https/title/deadline/freshness filters, dedupes by `(company_norm, requisition_id)` preferring an apply-supported board, and maps the feed's salary and employment spellings |
+| `src/server/catalog/stapply-daily.test.ts` | the 28-board DuckDB query projects only catalog columns and a capped description and never `all.parquet`, applies the https/title/deadline/freshness filters (7 days by default, undated rows only on request), dedupes by `(company_norm, requisition_id)` preferring an apply-supported board, stores the description as plain text, and maps the feed's salary and employment spellings |
+| `src/server/catalog/taxonomy-tags.test.ts` | a confident AI label writes the category, subcategory and role ids and its seniority, a low-confidence one only the category, `JUNK` clears the role, the department is part of the label key, an unlabelled Posting goes through the retired-tag bridge, a second pass changes nothing, one Posting retags exactly as the whole catalog does, and the committed seed parses with known roles (#660) |
+| `src/server/matching/role-targets.test.ts` | saved targets read as ids, names, retired names or free text; a role target scores only that role and never a neighbour; the closest match wins (exact 40, subcategory 30, free text 30, category 20); free text needs whole title words (#660) |
+| `src/server/matching/judge-input.test.ts` | the scorer reads role names rather than ids, the first 200 words (≤ 2,000 characters) of the description, and a targets line naming roles, levels, places, workplaces and the pay floor (#660) |
 | `src/server/catalog/stapply-delta.test.ts` | a rerun with the same `content_hash` inserts nothing and keeps its tags (including an import tag), a changed hash rewrites and re-tags, a missing posting closes at once, a closed row older than 30 days is pruned, a returned posting reopens, and an ingest-only posting is not tag-written |
 | `src/server/catalog/stapply-refresh.test.ts` | the zstd round trip, the manifest SHA-256 over the uncompressed file, the HMAC timestamp+body signature, tamper/stale/replay rejection, the publish keys with seven-snapshot retention, and the two signed relay requests |
 | `src/server/catalog/stapply-tagging.test.ts` | only leftovers the rules could not classify reach the LLM, the batched request carries the taxonomy prompt, and an answer outside the taxonomy is dropped |

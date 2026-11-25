@@ -182,6 +182,60 @@ const legacyRoleByName = new Map<string, string>(
   Object.entries(LEGACY_ROLES).map(([name, id]) => [name.toLowerCase(), id]),
 );
 
+function nameKey(name: string) {
+  return name
+    .toLowerCase()
+    .replaceAll("(general)", " ")
+    .replaceAll(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+const PERSON_WORD = /(?:er|or|ist|ian|ic)$/u;
+
+function isAliasPart(part: string) {
+  if (part.includes(" ")) {
+    return true;
+  }
+
+  return PERSON_WORD.test(part) || /^[A-Z]{3,}$/u.test(part);
+}
+
+function roleNameAliases() {
+  const owners = new Map<string, Set<string>>();
+
+  for (const role of ROLES) {
+    const parts = role.name.split("/").map((part) => part.trim());
+
+    if (parts.length < 2) {
+      continue;
+    }
+
+    for (const part of parts.filter((candidate) => isAliasPart(candidate))) {
+      const ids = owners.get(nameKey(part)) ?? new Set<string>();
+
+      ids.add(role.id);
+      owners.set(nameKey(part), ids);
+    }
+  }
+
+  return [...owners].flatMap(([key, ids]) =>
+    ids.size === 1 && key.length > 1 ? [[key, [...ids][0] ?? ""] as const] : [],
+  );
+}
+
+const wholeNames = [
+  ...ROLE_CATEGORIES.map((category) => [nameKey(category.name), category.id] as const),
+  ...ROLE_SUBCATEGORIES.map((sub) => [nameKey(sub.name), sub.id] as const),
+  ...ROLES.map((role) => [nameKey(role.name), role.id] as const),
+];
+
+const wholeNameKeys = new Set(wholeNames.map(([key]) => key));
+
+const taxonomyIdByName = new Map<string, string>([
+  ...roleNameAliases().filter(([key]) => !wholeNameKeys.has(key)),
+  ...wholeNames,
+]);
+
 /**
  * Converts one Posting's retired tags (28 tech-leaning categories, 134 ESCO Level-2 roles, six software subroles) to
  * the role taxonomy. A vague old role maps to a broad role so it only answers category searches; an old category that
@@ -213,8 +267,10 @@ export function legacyTagToTaxonomy(tags: {
 }
 
 /**
- * Converts one saved target value to taxonomy ids. A value that is already an id passes through, an old category or
- * role name becomes its ids, and anything else is free text the person typed and is kept as typed.
+ * Converts one saved target value to taxonomy ids. A value that is already an id passes through; an old category,
+ * role or subrole name becomes its ids; a current category, subcategory or role name becomes its id; anything else is
+ * free text the person typed and is kept as typed. An old name wins over a current one spelled the same, so a target
+ * saved before the switch keeps its meaning.
  * @param value One saved target role.
  * @returns The ids (or the original free text) the target now means.
  */
@@ -240,5 +296,11 @@ export function legacyTargetToTaxonomy(value: string) {
 
   const category = legacyCategoryByName.get(folded);
 
-  return category === undefined ? [trimmed] : [...category.target];
+  if (category !== undefined) {
+    return [...category.target];
+  }
+
+  const current = taxonomyIdByName.get(nameKey(trimmed));
+
+  return current === undefined ? [trimmed] : [current];
 }
