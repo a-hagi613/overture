@@ -8,6 +8,7 @@ import type { Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
 import type { DuckDBConnection, DuckDBValue } from "@duckdb/node-api";
 
 import { contentHash } from "./content-hash.ts";
+import { htmlToText } from "./html-to-text.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
 import {
   normalizeExactTitle,
@@ -49,8 +50,9 @@ export function assertCatalogSizeWithinBudget(bytes: number) {
 export const STAPPLY_JOBS_BASE_URL = "https://storage.stapply.ai/jobs/v1";
 
 /**
- * The parquet columns the pass projects. `description` and `raw` are deliberately absent: they are the bulk of the
- * snapshot bytes and the catalog does not store Stapply descriptions.
+ * The parquet columns the pass projects. `raw` is deliberately absent: it is the bulk of the snapshot bytes. The
+ * `description` is read but cut to its first `STAPPLY_DESCRIPTION_READ_CHARS` characters in SQL, and the catalog keeps
+ * only the opening `STAPPLY_DESCRIPTION_KEEP_CHARS` characters, gzipped, so the rules and the fit score can read it.
  */
 export const STAPPLY_PROJECTED_COLUMNS = [
   "global_id",
@@ -82,7 +84,14 @@ export const STAPPLY_PROJECTED_COLUMNS = [
   "salary_currency",
   "salary_period",
   "salary_summary",
+  "description",
 ] as const;
+
+/** How much of a feed description the ingest query reads. */
+export const STAPPLY_DESCRIPTION_READ_CHARS = 4000;
+
+/** How much of a description, as text, a catalog Posting keeps. */
+export const STAPPLY_DESCRIPTION_KEEP_CHARS = 2000;
 
 /**
  * The ATSes whose own board is the source of truth. When the same opening appears on one of these and on a mirror or
@@ -151,6 +160,8 @@ export function stapplyBoardSources(baseUrl: string = STAPPLY_JOBS_BASE_URL) {
 export interface StapplyIngestQueryInput {
   readonly boards: readonly StapplyBoardSource[];
   readonly freshnessCutoffMs: number | null;
+  /** Whether a Posting the feed gives no date passes the freshness horizon. Defaults to true. */
+  readonly includeUndated?: boolean;
 }
 
 function quote(value: string) {
@@ -162,6 +173,18 @@ function epochMsOf(column: string) {
 }
 
 const BOARD_SELECT_COLUMNS = STAPPLY_PROJECTED_COLUMNS.join(", ");
+
+function freshnessFilter(cutoffMs: number | null, includeUndated: boolean) {
+  if (cutoffMs === null) {
+    return null;
+  }
+
+  const cutoff = String(Math.trunc(cutoffMs));
+
+  return includeUndated
+    ? `(posted_at_ms IS NULL OR posted_at_ms >= ${cutoff})`
+    : `posted_at_ms >= ${cutoff}`;
+}
 
 /**
  * Builds the single DuckDB query that reads every board, applies the pre-ingest filters and collapses duplicates.
@@ -185,10 +208,7 @@ export function buildStapplyIngestQuery(input: StapplyIngestQueryInput) {
     ].join(" "),
   );
 
-  const freshness =
-    input.freshnessCutoffMs === null
-      ? null
-      : `(posted_at_ms IS NULL OR posted_at_ms >= ${String(Math.trunc(input.freshnessCutoffMs))})`;
+  const freshness = freshnessFilter(input.freshnessCutoffMs, input.includeUndated ?? true);
 
   const filters = [
     "nullif(trim(title), '') IS NOT NULL",
@@ -208,6 +228,7 @@ export function buildStapplyIngestQuery(input: StapplyIngestQueryInput) {
     "region AS feed_region, locations, job_category, skill_requirements,",
     "is_remote, workplace_type, employment_type, commitment, experience,",
     "salary_min, salary_max, salary_currency, salary_period, salary_summary,",
+    `left(description, ${String(STAPPLY_DESCRIPTION_READ_CHARS)}) AS description,`,
     `${epochMsOf("posted_at")} AS posted_at_ms,`,
     `${epochMsOf("source_updated_at")} AS source_updated_at_ms,`,
     `${epochMsOf("application_deadline")} AS application_deadline_ms,`,
@@ -249,7 +270,7 @@ export function buildStapplyIngestQuery(input: StapplyIngestQueryInput) {
     "title, department, team, location, country_iso, language, feed_region, locations, job_category,",
     "skill_requirements, is_remote, workplace_type, employment_type,",
     "commitment, experience, posted_at_ms, source_updated_at_ms, application_deadline_ms,",
-    "salary_min, salary_max, salary_currency, salary_period, salary_summary",
+    "salary_min, salary_max, salary_currency, salary_period, salary_summary, description",
     "FROM unique_jobs",
   ].join("\n");
 }
@@ -289,6 +310,7 @@ const parquetRowSchema = z.object({
   salary_currency: z.string().nullable(),
   salary_period: z.string().nullable(),
   salary_summary: z.string().nullable(),
+  description: z.string().nullable().default(null),
 });
 
 /**
@@ -332,6 +354,8 @@ export interface StapplyIngestRow {
   readonly salaryCurrency: string | null;
   readonly salaryPeriod: "year" | "month" | "hour" | null;
   readonly salarySummary: string | null;
+  /** The opening of the description as text, gzipped; null when the feed gives none. */
+  readonly descriptionGz: Uint8Array | null;
   readonly applySupported: boolean;
   readonly dedupeSuffix: string;
   readonly contentHash: string;
@@ -407,6 +431,7 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
   const locationRaw = blankToNull(row.location) ?? primaryLocation?.label ?? null;
   const jobCategory = blankToNull(row.job_category);
   const skillRequirements = parseSkillRequirements(row.skill_requirements);
+  const descriptionText = htmlToText(row.description, STAPPLY_DESCRIPTION_KEEP_CHARS);
 
   const salaryPeriod =
     row.salary_period === null
@@ -428,7 +453,7 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
         maxMinor: minorUnits(row.salary_max),
         period: salaryPeriod,
       },
-      descriptionText: null,
+      descriptionText,
     },
     { titleSimilarity: false },
   );
@@ -514,6 +539,7 @@ export function mapStapplyRecord(record: Readonly<Record<string, DuckDBValue>>) 
     salaryCurrency: tags.salaryCurrency,
     salaryPeriod: salaryPeriodForColumn(tags.salaryPeriod),
     salarySummary: blankToNull(row.salary_summary),
+    descriptionGz: descriptionText === null ? null : Bun.gzipSync(descriptionText),
     applySupported: row.apply_supported,
     dedupeSuffix,
     contentHash: rowContentHash,
@@ -612,14 +638,18 @@ export function isRowDrop(previousRows: number | null, rowCount: number, allowRo
   return rowCount < previousRows * 0.8;
 }
 
+/** How many days back a seed run reaches when the caller does not say. */
+export const DEFAULT_SEED_FRESHNESS_DAYS = 7;
+
 /**
- * The seed horizon for a first run: postings whose newest source timestamp is within 30 days. Later runs compare the
- * whole snapshot against the previous catalog instead.
+ * The seed horizon for a first run: postings posted within `days`. Later runs compare the whole snapshot against the
+ * previous catalog instead.
  * @param nowMs The run's clock reading.
+ * @param days How many days back the horizon sits.
  * @returns The epoch-millisecond cutoff.
  */
-export function seedFreshnessCutoffMs(nowMs: number) {
-  return nowMs - 30 * DAY_MS;
+export function seedFreshnessCutoffMs(nowMs: number, days: number = DEFAULT_SEED_FRESHNESS_DAYS) {
+  return nowMs - days * DAY_MS;
 }
 
 export interface StapplyStreamInput {

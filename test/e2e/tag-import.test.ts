@@ -92,7 +92,7 @@ async function importTags(harness: CatalogHarness, content: string) {
   return importResponseSchema.parse(await response.json());
 }
 
-test("a tag import applies to matched Postings, wins over rules tags and is recorded", async () => {
+test("a tag import applies to matched Postings, wins over the AI label and is recorded", async () => {
   const boardToken = "tagimport-c";
   const harness = await startCatalogHarness([boardToken]);
 
@@ -109,15 +109,12 @@ test("a tag import applies to matched Postings, wins over rules tags and is reco
       throw new Error("the posting was not ingested");
     }
 
-    expect(posting.tagSource).toBe("rules");
+    const labelRows = await tagRowsFor(harness, posting.id);
+    const labelRole = labelRows.find((row) => row.dimension === "granular_role");
 
-    const rulesRows = await tagRowsFor(harness, posting.id);
-    const rulesRole = rulesRows.find((row) => row.dimension === "role");
-    const rulesSubrole = rulesRows.find((row) => row.dimension === "subrole");
-
-    expect(rulesRole?.value).toBe("Software Engineering");
-    expect(rulesRole?.source).toBe("rules");
-    expect(rulesSubrole?.value).toBe("Full-stack");
+    expect(labelRows.find((row) => row.dimension === "role")?.value).toBe("software-it");
+    expect(labelRole?.value).toBe("sw.fullstack");
+    expect(labelRole?.source).toBe("llm");
 
     const content = [
       JSON.stringify({
@@ -153,19 +150,12 @@ test("a tag import applies to matched Postings, wins over rules tags and is reco
 
     const rows = await tagRowsFor(harness, posting.id);
 
-    expect(rows.length).toBe(3);
-
-    for (const row of rows) {
-      expect(row.source).toBe("import");
-    }
-
-    const role = rows.find((row) => row.dimension === "role");
-    const subrole = rows.find((row) => row.dimension === "subrole");
-    const seniority = rows.find((row) => row.dimension === "seniority");
-
-    expect(role?.value).toBe("Software Engineering");
-    expect(subrole?.value).toBe("Backend");
-    expect(seniority?.value).toBe("senior");
+    expect(rows.map((row) => `${row.dimension}=${row.value}:${row.source}`).toSorted()).toEqual([
+      "granular_role=sw.backend:import",
+      "role=software-it:import",
+      "seniority=senior:import",
+      "subrole=software-it/software-engineering:import",
+    ]);
 
     const importsResponse = await fetch(`${harness.app.url}/__test__/tag-imports`);
     const imports = tagImportsResponseSchema.parse(await importsResponse.json());

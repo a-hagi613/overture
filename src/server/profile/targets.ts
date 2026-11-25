@@ -1,4 +1,4 @@
-import { and, count, eq, exists, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, count, eq, gte, isNull, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
@@ -6,17 +6,13 @@ import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { targets } from "../platform/db/schema.ts";
-import { postings, postingTags } from "../platform/db/catalog-schema.ts";
-import { normalizeTitle } from "../catalog/normalize.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
 import { resolveLocation } from "../catalog/geo.ts";
 import { resolvedLocationCondition } from "../catalog/location-filter.ts";
 import { catalogRevision } from "../catalog/revision.ts";
 import { optionalFieldConditions } from "../matching/optional-fields.ts";
-import { ESCO_ROLE_NAMES } from "../../shared/esco-roles.ts";
-import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
+import { planRoleTargets, roleTargetCondition } from "../matching/role-targets.ts";
 import { emptyTargets, targetsInputSchema } from "../../shared/targets.ts";
-
-const roleTagSchema = z.object({ value: z.string() });
 
 const storedSchema = z.object({
   roles: z.string(),
@@ -29,8 +25,6 @@ const storedSchema = z.object({
   salaryPeriod: z.enum(["year", "month", "hour"]),
   version: z.number(),
 });
-
-const STOP_WORDS = new Set(["and", "or", "the", "of", "at", "in", "on", "for", "to", "a", "an"]);
 
 const MATCH_COUNT_CACHE_MAX = 512;
 
@@ -61,36 +55,6 @@ function stringArrayFromColumn(value: string) {
   const parsed: unknown = JSON.parse(value);
 
   return z.array(z.string()).parse(parsed);
-}
-
-function wordsOf(value: string) {
-  return normalizeTitle(value)
-    .split(" ")
-    .filter((word) => word.length > 0 && !STOP_WORDS.has(word));
-}
-
-const KNOWN_LABELS = new Set(
-  [...ROLE_GROUPS, ...ESCO_ROLE_NAMES].map((label) => label.toLowerCase()),
-);
-
-/**
- * Whether one target role names one of a Posting's role tags. A target that is a known Level-1 category or Level-2
- * ESCO role must match that exact label, case-insensitively, so `Software Engineering` never picks up
- * `Civil Engineering` (WS-17b). A free-text target keeps the original word-overlap behaviour.
- * @param target The target role.
- * @param tagValues The Posting's role tags.
- * @returns True when the target names one of them.
- */
-export function roleTargetMatches(target: string, tagValues: readonly string[]) {
-  const normalized = target.trim().toLowerCase();
-
-  if (KNOWN_LABELS.has(normalized)) {
-    return tagValues.some((tag) => tag.trim().toLowerCase() === normalized);
-  }
-
-  const targetWords = new Set(wordsOf(target));
-
-  return tagValues.some((tag) => wordsOf(tag).some((word) => targetWords.has(word)));
 }
 
 function sortedUnique<T extends string>(values: readonly T[]) {
@@ -177,48 +141,10 @@ function salaryCondition(floorMinor: number | null, currency: string | null) {
   );
 }
 
-/**
- * The role tags a candidate's target roles match. A target that is a known Level-1 category or a known Level-2
- * ESCO role must match that exact label (WS-17b), so choosing `Software Engineering` never picks up every posting
- * whose granular role merely shares a word. A free-text target keeps the original word-overlap behaviour.
- * @param db The catalog database.
- * @param roles The candidate's target roles, as typed or picked.
- * @returns The tag values that should be searched.
- */
-export function matchedRoleTags(db: CatalogDatabase, roles: readonly string[]) {
-  if (roles.length === 0) {
-    return [];
-  }
-
-  const tagRows = db
-    .selectDistinct({ value: postingTags.value })
-    .from(postingTags)
-    .where(inArray(postingTags.dimension, ["role", "subrole", "granular_role"]))
-    .all();
-
-  const values = tagRows.map((row) => roleTagSchema.parse(row).value);
-  const wanted = new Set(roles.map((role) => role.toLowerCase()));
-  const exact = values.filter((value) => wanted.has(value.toLowerCase()));
-
-  const freeTextWords = new Set(
-    roles.filter((role) => !KNOWN_LABELS.has(role.toLowerCase())).flatMap((role) => wordsOf(role)),
-  );
-
-  if (freeTextWords.size === 0) {
-    return [...new Set(exact)];
-  }
-
-  const fuzzy = values.filter(
-    (value) => !exact.includes(value) && wordsOf(value).some((word) => freeTextWords.has(word)),
-  );
-
-  return [...new Set([...exact, ...fuzzy])];
-}
-
 function countMatches(db: CatalogDatabase, filters: MatchFilters) {
-  const roleTags = matchedRoleTags(db, filters.roles);
+  const roleCondition = roleTargetCondition(planRoleTargets(filters.roles));
 
-  if (roleTags.length === 0) {
+  if (roleCondition === null) {
     return 0;
   }
 
@@ -227,18 +153,7 @@ function countMatches(db: CatalogDatabase, filters: MatchFilters) {
     eq(postings.status, "open"),
     eq(postings.applySupported, true),
     ...optionalFieldConditions(db, filters),
-    exists(
-      db
-        .select({ one: sql`1` })
-        .from(postingTags)
-        .where(
-          and(
-            eq(postingTags.postingId, postings.id),
-            inArray(postingTags.dimension, ["role", "subrole", "granular_role"]),
-            inArray(postingTags.value, roleTags),
-          ),
-        ),
-    ),
+    roleCondition,
     or(...filters.locations.map((location) => location.condition)),
     salaryCondition(filters.salaryFloorMinor, filters.salaryCurrency),
   ];

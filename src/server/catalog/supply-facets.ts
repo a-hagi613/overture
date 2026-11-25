@@ -5,6 +5,7 @@ import type { CatalogDatabase } from "../platform/db/client.ts";
 import type { SupplyFilters } from "../../shared/supply.ts";
 
 import { supplyFacets } from "../platform/db/catalog-schema.ts";
+import { planRoleTargets, roleFilterTagValues } from "../matching/role-targets.ts";
 import { resolveLocationQuery } from "./geo.ts";
 
 /**
@@ -93,6 +94,20 @@ function hasRoleFacet(db: CatalogDatabase, role: string) {
   );
 }
 
+function facetRoleOf(db: CatalogDatabase, value: string | null) {
+  if (value === null) {
+    return ANY_ROLE_FACET;
+  }
+
+  if (planRoleTargets([value]).freeTextWords.length > 0) {
+    return null;
+  }
+
+  const present = roleFilterTagValues(value).filter((tag) => hasRoleFacet(db, tag));
+
+  return present.length === 1 ? (present[0] ?? null) : null;
+}
+
 function facetLocation(raw: string | null, radiusKm: number | null) {
   if (raw === null || radiusKm !== null) {
     return null;
@@ -149,9 +164,9 @@ function facetLocation(raw: string | null, radiusKm: number | null) {
  * metro, remote-scoped or multi-place query, or any radius, returns null so the caller falls back to the indexed
  * live query and its R-Tree (issue #630, #631).
  *
- * A granular role is only answered from the rollup when the rollup actually holds a row for it. A catalog built
- * before WS-17a added granular tags has no such row, so the request falls through to the live indexed query instead
- * of falsely reading zero.
+ * A role filter is read as taxonomy ids (an old category or ESCO name resolves to its ids) and is only answered from
+ * the rollup when exactly one of its tag values has rows there. A value with no row, one that spans several rows, or
+ * free text falls through to the live indexed query, which counts each Posting once, instead of falsely reading zero.
  * @param db The catalog database.
  * @param filters The validated public filters.
  * @returns The totals, or null when the rollup cannot answer or has not been built.
@@ -168,13 +183,13 @@ export function supplyFacetTotals(db: CatalogDatabase, filters: SupplyFilters) {
     return null;
   }
 
-  if (filters.granularRole !== null && !hasRoleFacet(db, filters.granularRole)) {
+  const facetRole = facetRoleOf(db, filters.granularRole ?? filters.role);
+
+  if (facetRole === null) {
     return null;
   }
 
-  const conditions: SQL[] = [
-    eq(supplyFacets.role, filters.granularRole ?? filters.role ?? ANY_ROLE_FACET),
-  ];
+  const conditions: SQL[] = [eq(supplyFacets.role, facetRole)];
 
   if (location !== null) {
     conditions.push(eq(supplyFacets.countryCode, location.countryCode));

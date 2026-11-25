@@ -4,7 +4,7 @@ import { ESCO_ROLE_OPTIONS } from "../../shared/esco-roles.ts";
 import { ROLE_CATEGORIES, ROLES, ROLE_SUBCATEGORIES } from "../../shared/role-taxonomy.ts";
 import { ROLE_GROUPS, SUBROLES } from "../../shared/tag-taxonomy.ts";
 
-import { legacyTagToTaxonomy, legacyTargetToTaxonomy } from "./legacy-roles.ts";
+import { legacyTagToTaxonomy, legacyTargetToTaxonomy, titleNamedRole } from "./legacy-roles.ts";
 
 const roleIds = new Set(ROLES.map((role) => role.id));
 const categoryIds = new Set<string>(ROLE_CATEGORIES.map((category) => category.id));
@@ -124,5 +124,53 @@ describe("legacy saved targets map onto the taxonomy", () => {
 
   test("free text is kept as typed", () => {
     expect(legacyTargetToTaxonomy("Kotlin backend")).toEqual(["Kotlin backend"]);
+  });
+});
+
+describe("current taxonomy names resolve to their ids", () => {
+  test("a role, subcategory or category name becomes its id, case-insensitively", () => {
+    expect(legacyTargetToTaxonomy("Backend Engineer")).toEqual(["sw.backend"]);
+    expect(legacyTargetToTaxonomy("electrician")).toEqual(["trade.electrician"]);
+    expect(legacyTargetToTaxonomy("Skilled Trades")).toEqual(["skilled-trades"]);
+    expect(legacyTargetToTaxonomy("Software Engineer (general)")).toEqual(["sw.general"]);
+  });
+
+  test("one part of a combined role name reaches that role when it clearly names a job", () => {
+    expect(legacyTargetToTaxonomy("Platform Engineer")).toEqual(["infra.devops"]);
+    expect(legacyTargetToTaxonomy("nurse practitioner")).toEqual(["health.np"]);
+    expect(legacyTargetToTaxonomy("Paramedic")).toEqual(["health.ems"]);
+    expect(legacyTargetToTaxonomy("Help Desk")).toEqual(["it.support"]);
+  });
+
+  test("a level word does not hide the role it qualifies, and a role named with one keeps it", () => {
+    expect(legacyTargetToTaxonomy("Senior Backend Engineer")).toEqual(["sw.backend"]);
+    expect(legacyTargetToTaxonomy("Sr. Data Engineer II")).toEqual(["data.engineer"]);
+    expect(legacyTargetToTaxonomy("Shift Lead")).toEqual(["food.supervisor"]);
+    expect(legacyTargetToTaxonomy("Lead Project Manager")).toEqual(["ops.pm"]);
+    expect(legacyTargetToTaxonomy("Principal Engineer")).toEqual(["Principal Engineer"]);
+  });
+
+  test("a title names a role only by a role's own name, never a broad one", () => {
+    expect(titleNamedRole("Staff Software Engineer")).toBe("sw.general");
+    expect(titleNamedRole("Registered Nurse")).toBe("health.rn");
+    expect(titleNamedRole("Registered Nurse - ICU Nights")).toBeNull();
+    expect(titleNamedRole("Head of Sales")).toBeNull();
+  });
+
+  test("a vague or shared part stays free text, so it never claims one role", () => {
+    expect(legacyTargetToTaxonomy("Analyst")).toEqual(["Analyst"]);
+    expect(legacyTargetToTaxonomy("Assistant")).toEqual(["Assistant"]);
+    expect(legacyTargetToTaxonomy("Coordinator")).toEqual(["Coordinator"]);
+    expect(legacyTargetToTaxonomy("IT")).toEqual(["IT"]);
+  });
+
+  test("every current name resolves back to an id that names it", () => {
+    for (const role of ROLES) {
+      const [id] = legacyTargetToTaxonomy(role.name);
+
+      expect(ROLES.find((candidate) => candidate.id === id)?.name.toLowerCase()).toBe(
+        role.name.toLowerCase(),
+      );
+    }
   });
 });

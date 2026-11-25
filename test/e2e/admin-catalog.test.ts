@@ -166,17 +166,12 @@ test("a tag import posted from admin applies to matched postings and writes an a
     .parse(await tagsResponse.json())
     .postingTags.filter((row) => row.postingId === posting.id);
 
-  expect(tags.length).toBe(3);
-
-  for (const row of tags) {
-    expect(row.source).toBe("import");
-  }
-
-  const role = tags.find((row) => row.dimension === "role");
-  const seniority = tags.find((row) => row.dimension === "seniority");
-
-  expect(role?.value).toBe("Software Engineering");
-  expect(seniority?.value).toBe("senior");
+  expect(tags.map((row) => `${row.dimension}=${row.value}:${row.source}`).toSorted()).toEqual([
+    "granular_role=sw.backend:import",
+    "role=software-it:import",
+    "seniority=senior:import",
+    "subrole=software-it/software-engineering:import",
+  ]);
 
   const importsResponse = await fetch(`${adminIsolatedAppServer.url}/__test__/tag-imports`);
   const imports = tagImportsSchema.parse(await importsResponse.json());

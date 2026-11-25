@@ -5,6 +5,7 @@ import {
   createTargetChoicesCache,
   targetChoices,
 } from "../../src/server/profile/target-choices.ts";
+import { ROLES } from "../../src/shared/role-taxonomy.ts";
 
 const NOW = 1_795_000_000_000;
 
@@ -45,7 +46,7 @@ function setup() {
 
     catalog.sqlite
       .prepare(
-        "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, 'role', ?, 'rules')",
+        "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, 'granular_role', ?, 'rules')",
       )
       .run(id, input.role);
   }
@@ -56,32 +57,31 @@ function setup() {
 test("role choices: closed Postings with more tags never crowd an open role out of the list", () => {
   const { addPosting, catalogDb } = setup();
 
-  for (let index = 0; index < 90; index += 1) {
+  for (const [index, closedRole] of ROLES.filter((role) => role.id !== "health.rn")
+    .slice(0, 90)
+    .entries()) {
     for (let copy = 0; copy < 3; copy += 1) {
-      addPosting(`closed-${String(index)}-${String(copy)}`, {
-        closed: true,
-        role: `Closed role ${String(index).padStart(2, "0")}`,
-      });
+      addPosting(`closed-${String(index)}-${String(copy)}`, { closed: true, role: closedRole.id });
     }
   }
 
-  addPosting("open-1", { closed: false, role: "Open role" });
+  addPosting("open-1", { closed: false, role: "health.rn" });
 
-  expect(targetChoices(catalogDb).roles).toEqual(["Open role"]);
+  expect(targetChoices(catalogDb).roles).toEqual(["Registered Nurse"]);
 });
 
 test("role choices: ranks open roles by how many open Postings carry them", () => {
   const { addPosting, catalogDb } = setup();
 
-  addPosting("a1", { closed: false, role: "Rare" });
-  addPosting("b1", { closed: false, role: "Common" });
-  addPosting("b2", { closed: false, role: "Common" });
-  addPosting("c1", { closed: true, role: "Common" });
-  addPosting("c2", { closed: true, role: "Rare" });
-  addPosting("c3", { closed: true, role: "Rare" });
-  addPosting("c4", { closed: true, role: "Rare" });
+  addPosting("a1", { closed: false, role: "health.rn" });
+  addPosting("b1", { closed: false, role: "sw.backend" });
+  addPosting("b2", { closed: false, role: "sw.backend" });
+  addPosting("c1", { closed: true, role: "sw.backend" });
+  addPosting("c2", { closed: true, role: "health.rn" });
+  addPosting("c3", { closed: true, role: "health.rn" });
+  addPosting("c4", { closed: true, role: "health.rn" });
 
-  expect(targetChoices(catalogDb).roles).toEqual(["Common", "Rare"]);
+  expect(targetChoices(catalogDb).roles).toEqual(["Backend Engineer", "Registered Nurse"]);
 });
 
 test("a failed background refresh is reported, not swallowed", async () => {

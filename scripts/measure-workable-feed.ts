@@ -9,7 +9,8 @@ import { Parser } from "htmlparser2";
 import { DESCRIPTION_CAP, htmlToText } from "../src/server/catalog/html-to-text.ts";
 import { resolveLocation } from "../src/server/catalog/geo.ts";
 import { tagPosting } from "../src/server/catalog/tag-rules.ts";
-import { roleTargetMatches } from "../src/server/profile/targets.ts";
+import { committedRoleLabels } from "../src/server/catalog/taxonomy-tags.ts";
+import { workableRoleMatches } from "../src/server/catalog/workable-feed.ts";
 import { targetsInputSchema } from "../src/shared/targets.ts";
 
 import type { Seniority } from "../src/shared/tag-taxonomy.ts";
@@ -157,12 +158,12 @@ function locationMatches(place: string, tags: ReturnType<typeof tagPosting>, loc
 type Profile = (typeof profiles)[number];
 
 function targetConditions(
+  job: { title: string; department: string | null },
   tags: ReturnType<typeof tagPosting>,
   locationRaw: string,
   profile: Profile,
 ) {
   const { targets } = profile;
-  const roleValues = [tags.role, tags.subrole].filter((value) => value !== null);
 
   const salaryMeets =
     targets.salaryFloorMinor === null ||
@@ -177,9 +178,7 @@ function targetConditions(
     employment: targets.employmentTypes.includes(tags.employmentType),
     language: tags.language !== null && languages.has(tags.language),
     seniority: tags.seniority !== null && targets.seniorities.includes(tags.seniority),
-    role: targets.roles.some((role) =>
-      roleValues.some((value) => roleTargetMatches(role, [value])),
-    ),
+    role: workableRoleMatches({ ...job, tags }, targets.roles, committedRoleLabels()),
     location: targets.locations.some((place) => locationMatches(place, tags, locationRaw)),
     salary: salaryMeets,
   };
@@ -330,7 +329,7 @@ function handleJob(fields: Record<string, string>) {
       continue;
     }
 
-    const conditions = targetConditions(tags, locationRaw ?? "", profile);
+    const conditions = targetConditions(input, tags, locationRaw ?? "", profile);
 
     for (const [name, passed] of Object.entries(conditions)) {
       if (passed) {

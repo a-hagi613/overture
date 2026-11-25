@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { gunzipSync } from "node:zlib";
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { DuckDBInstance } from "@duckdb/node-api";
@@ -92,7 +93,7 @@ function fixtureRow(overrides: FixtureRow = {}) {
     salary_currency: "CAD",
     salary_period: "YEAR",
     salary_summary: "CAD 120,000 - 160,000",
-    description: "a description that must never be read",
+    description: "<p>Build <b>payment</b> APIs.</p><script>ignored()</script>",
     raw: '{"must":"never be read"}',
     ...overrides,
   };
@@ -185,19 +186,19 @@ function scratchDirectory() {
 }
 
 describe("buildStapplyIngestQuery", () => {
-  test("projects only the catalog columns and reads each board's own parquet", () => {
+  test("projects only the catalog columns, a capped description, and reads each board's own parquet", () => {
     const sql = buildStapplyIngestQuery({
       boards: stapplyBoardSources("https://storage.example/jobs"),
       freshnessCutoffMs: null,
     });
 
-    expect(STAPPLY_PROJECTED_COLUMNS).not.toContain("description");
+    expect(STAPPLY_PROJECTED_COLUMNS).toContain("description");
     expect(STAPPLY_PROJECTED_COLUMNS).not.toContain("raw");
     expect(STAPPLY_PROJECTED_COLUMNS).toContain("job_category");
     expect(STAPPLY_PROJECTED_COLUMNS).toContain("region");
     expect(STAPPLY_PROJECTED_COLUMNS).toContain("locations");
     expect(STAPPLY_PROJECTED_COLUMNS).toContain("skill_requirements");
-    expect(sql).not.toMatch(/\bdescription\b/u);
+    expect(sql).toContain("left(description, 4000) AS description");
     expect(sql).not.toMatch(/\braw\b/u);
     expect(sql).not.toMatch(/read_parquet\('[^']*all\.parquet/iu);
     expect(sql).toContain("https://storage.example/jobs/greenhouse/jobs.parquet");
@@ -219,7 +220,19 @@ describe("buildStapplyIngestQuery", () => {
     });
 
     expect(withoutCutoff).not.toContain("posted_at_ms >=");
-    expect(withCutoff).toContain(`posted_at_ms >= ${String(NOW - 30 * 86_400_000)}`);
+    expect(withCutoff).toContain(`posted_at_ms >= ${String(NOW - 7 * 86_400_000)}`);
+    expect(withCutoff).toContain("posted_at_ms IS NULL OR");
+  });
+
+  test("honours the freshness window and can leave undated Postings out", () => {
+    const datedOnly = buildStapplyIngestQuery({
+      boards: stapplyBoardSources("https://storage.example/jobs"),
+      freshnessCutoffMs: seedFreshnessCutoffMs(NOW, 30),
+      includeUndated: false,
+    });
+
+    expect(datedOnly).toContain(`posted_at_ms >= ${String(NOW - 30 * 86_400_000)}`);
+    expect(datedOnly).not.toContain("posted_at_ms IS NULL");
   });
 
   test("quotes a URL that contains a single quote", () => {
@@ -281,6 +294,13 @@ describe("streamStapplyIngest", () => {
     expect(kept?.experience).toBe("6");
     expect(kept?.isRemote).toBe(true);
     expect(kept?.contentHash).toMatch(/^[0-9a-f]{64}$/u);
+
+    const description =
+      kept?.descriptionGz === null || kept?.descriptionGz === undefined
+        ? null
+        : gunzipSync(kept.descriptionGz).toString("utf8");
+
+    expect(description).toBe("Build payment APIs.");
   });
 
   test("prefers the apply-supported board for the same company and requisition", async () => {

@@ -2,27 +2,30 @@ import { z } from "zod";
 
 import { ROLE_GROUPS } from "./tag-taxonomy.ts";
 import { isEscoRole } from "./esco-roles.ts";
-import type { RoleGroup } from "./tag-taxonomy.ts";
+import { isRoleTaxonomyValue } from "./role-taxonomy.ts";
+
+const roleFilterValue = (accepts: (value: string) => boolean, message: string) =>
+  z.string().trim().min(1).max(80).refine(accepts, { message }).optional();
+
+const isCategoryValue = (value: string) =>
+  ROLE_GROUPS.some((group) => group === value) || isRoleTaxonomyValue(value);
+
+const isRoleValue = (value: string) => isEscoRole(value) || isRoleTaxonomyValue(value);
 
 /**
  * The filters the public supply preview accepts (issue #567, WS-17b). They stay deliberately small and closed:
  * the landing asks about a Level-1 category, an optional Level-2 granular role and a place, and every value is one
  * the catalog's own tags use, so a stranger cannot make the server scan arbitrary columns.
  *
- * `role` is the original Level-1 query parameter and keeps working unchanged; `category` is its explicit alias and
- * `granularRole` adds the 134 ESCO Level-2 roles (issue #629). A granular role is more specific than its category,
- * so when both arrive the granular role is the filter and the category is only a UI hint.
+ * `role` is the original category parameter and `category` its explicit alias; `granularRole` names a role or
+ * subcategory (issue #629). Each takes a role-taxonomy id or name (issue #660) or a retired category or ESCO role name,
+ * which the server reads as taxonomy ids. A granular role is more specific than its category, so when both arrive the
+ * granular role is the filter and the category is only a UI hint.
  */
 export const supplyQuerySchema = z.object({
-  role: z.enum(ROLE_GROUPS).optional(),
-  category: z.enum(ROLE_GROUPS).optional(),
-  granularRole: z
-    .string()
-    .trim()
-    .min(1)
-    .max(80)
-    .refine((value) => isEscoRole(value), { message: "unknown granular role" })
-    .optional(),
+  role: roleFilterValue(isCategoryValue, "unknown role category"),
+  category: roleFilterValue(isCategoryValue, "unknown role category"),
+  granularRole: roleFilterValue(isRoleValue, "unknown granular role"),
   location: z.string().trim().min(2).max(120).optional(),
   remote: z.enum(["1", "0", "true", "false"]).optional(),
   /** The radius around a resolved city; absent keeps an exact city match. */
@@ -32,9 +35,9 @@ export const supplyQuerySchema = z.object({
 export type SupplyQuery = z.infer<typeof supplyQuerySchema>;
 
 export interface SupplyFilters {
-  /** The Level-1 category, or null for every category. */
-  role: RoleGroup | null;
-  /** The Level-2 ESCO role, or null for every role. It wins over `role` when both are set. */
+  /** The category (a role-taxonomy id or name, or a retired category name), or null for every category. */
+  role: string | null;
+  /** The role or subcategory (a role-taxonomy id or name, or a retired ESCO name), or null. It wins over `role`. */
   granularRole: string | null;
   location: string | null;
   radiusKm: number | null;

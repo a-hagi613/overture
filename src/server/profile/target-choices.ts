@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 
 import type { CatalogDatabase } from "../platform/db/client.ts";
 import type { EmploymentType, Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
@@ -8,6 +8,7 @@ import { postings, postingTags } from "../platform/db/catalog-schema.ts";
 import { logError } from "../platform/log.ts";
 import { countryNameFor } from "../catalog/geo.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES } from "../../shared/tag-taxonomy.ts";
+import { roleTaxonomyName } from "../../shared/role-taxonomy.ts";
 
 const MAX_ROLE_CHOICES = 12;
 const MAX_LOCATION_CHOICES = 8;
@@ -29,7 +30,8 @@ export interface TargetChoices {
 /**
  * Every value Onboarding offers as a target, taken from Postings that are still
  * open. A value with no open Posting is never offered, so a pick can never be
- * empty.
+ * empty. Roles are the most common role ids by name; a category or subcategory
+ * is chosen in the category picker instead.
  * @param db The application database.
  * @returns The choices for roles, locations, seniority, workplace and employment type.
  */
@@ -40,7 +42,7 @@ export function targetChoices(db: CatalogDatabase) {
     .select({ total: count(), value: postingTags.value })
     .from(postingTags)
     .innerJoin(postings, eq(postings.id, postingTags.postingId))
-    .where(and(open, inArray(postingTags.dimension, ["role", "subrole", "granular_role"])))
+    .where(and(open, eq(postingTags.dimension, "granular_role")))
     .groupBy(postingTags.value)
     .orderBy(desc(count()), postingTags.value)
     .limit(MAX_ROLE_CHOICES)
@@ -83,7 +85,7 @@ export function targetChoices(db: CatalogDatabase) {
   return {
     employmentTypes: shownEmploymentTypes.filter((value) => hasEmploymentType(value)),
     locations: locationChoices(db),
-    roles: roleCandidates.map((row) => row.value),
+    roles: roleCandidates.map((row) => roleTaxonomyName(row.value)),
     seniorities: SENIORITIES.filter(
       (value) => seniorityPresent.has(value) && hasOpenSeniority(value),
     ),

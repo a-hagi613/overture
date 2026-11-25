@@ -363,7 +363,8 @@ test("the recorded Workable trim ingests once, stays searchable, and closes what
     const tags = await postingTags(harness);
 
     expect(tags.length).toBeGreaterThan(0);
-    expect(tags.every((tag) => tag.source === "rules")).toBe(true);
+    expect(tags.every((tag) => tag.source === "rules" || tag.source === "llm")).toBe(true);
+    expect(tags.some((tag) => tag.dimension === "granular_role")).toBe(true);
 
     const found = await search(harness, sample?.title ?? "");
 

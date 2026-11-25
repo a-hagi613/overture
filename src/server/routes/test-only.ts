@@ -120,6 +120,7 @@ import { dedupeKeyFor } from "../catalog/dedupe-key.ts";
 import { resetFeedContentHashes } from "../catalog/feed-retag.ts";
 import { normalizeApplyUrl, normalizeTitle } from "../catalog/normalize.ts";
 import { DEFAULT_IMPORT_SOURCE, importTags } from "../catalog/tag-import.ts";
+import { committedRoleLabels, retagPosting } from "../catalog/taxonomy-tags.ts";
 import { readLlmUsage, recordLlmUsage } from "../platform/llm/usage.ts";
 import { monthKey, readMailSummary, readMailUsage } from "../platform/mail/budget.ts";
 import { ANSWER_KINDS, QUESTION_FIELD_TYPES, REVIEW_REASONS } from "../../shared/questions.ts";
@@ -216,6 +217,8 @@ const userNameBody = z.object({ email: z.email(), name: z.string().min(1) });
 
 const lowercased = (value: string) => value.trim().toLowerCase();
 const roleBody = z.object({ userId: z.string().min(1), role: z.enum(["user", "owner"]) });
+
+const ROLE_TAG_DIMENSIONS = new Set<string>(["role", "subrole", "granular_role"]);
 
 const postingTagBody = z.object({
   dimension: z.enum(["role", "subrole", "seniority", "granular_role", "esco"]),
@@ -697,6 +700,10 @@ function seedPosting(
       })
       .onConflictDoNothing()
       .run();
+  }
+
+  if (row.tags.some((tag) => ROLE_TAG_DIMENSIONS.has(tag.dimension))) {
+    retagPosting(catalogDb, id, committedRoleLabels());
   }
 
   for (const [position, question] of row.questions.entries()) {

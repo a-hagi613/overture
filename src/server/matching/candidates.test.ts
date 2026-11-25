@@ -39,6 +39,12 @@ interface SeedTag {
   value: string;
 }
 
+const NURSE_TAGS = [
+  { dimension: "role", value: "healthcare" },
+  { dimension: "subrole", value: "healthcare/nursing" },
+  { dimension: "granular_role", value: "health.rn" },
+] as const satisfies readonly SeedTag[];
+
 interface SeedOverrides {
   workplace?: "remote" | "hybrid" | "onsite" | "unknown";
   employmentType?: "full_time" | "unknown";
@@ -164,23 +170,24 @@ function fresh() {
     })
     .run();
 
-  seedPosting(catalog, "registered-nurse", "Registered Nurse", [
-    { dimension: "role", value: "Healthcare" },
-    { dimension: "granular_role", value: "Registered Nurse" },
-  ]);
+  seedPosting(catalog, "registered-nurse", "Registered Nurse", NURSE_TAGS);
   seedPosting(catalog, "nurse-practitioner", "Nurse Practitioner", [
-    { dimension: "role", value: "Healthcare" },
-    { dimension: "granular_role", value: "Nurse Practitioner" },
+    { dimension: "role", value: "healthcare" },
+    { dimension: "subrole", value: "healthcare/nursing" },
+    { dimension: "granular_role", value: "health.np" },
   ]);
   seedPosting(catalog, "software", "Software Engineer", [
-    { dimension: "role", value: "Software Engineering" },
-    { dimension: "granular_role", value: "Software Engineer" },
+    { dimension: "role", value: "software-it" },
+    { dimension: "subrole", value: "software-it/software-engineering" },
+    { dimension: "granular_role", value: "sw.general" },
   ]);
   seedPosting(catalog, "civil", "Civil Engineer", [
-    { dimension: "role", value: "Civil Engineering" },
+    { dimension: "role", value: "engineering" },
+    { dimension: "subrole", value: "engineering/civil" },
+    { dimension: "granular_role", value: "eng.civil" },
   ]);
   seedPosting(catalog, "platform", "Platform Engineer", [
-    { dimension: "role", value: "Platform Engineer" },
+    { dimension: "role", value: "software-it" },
   ]);
 
   const candidates = createCandidateService({
@@ -203,8 +210,8 @@ async function rankedIds(roles: readonly string[]) {
   return rows.map((row) => row.id);
 }
 
-describe("candidate matching with Level-2 ESCO roles", () => {
-  test("a granular_role-tagged Posting enters the pool and carries its granular tag", async () => {
+describe("candidate matching on role-taxonomy ids", () => {
+  test("a granular_role-tagged Posting enters the pool and carries its role id", async () => {
     const { candidates } = fresh();
 
     const rows = await candidates.ranked(
@@ -216,32 +223,48 @@ describe("candidate matching with Level-2 ESCO roles", () => {
     expect(rows.map((row) => row.id)).toEqual(["registered-nurse"]);
     expect(rows.at(0)?.tags).toContainEqual({
       dimension: "granular_role",
-      value: "Registered Nurse",
+      value: "health.rn",
     });
   });
 
-  test("a known Level-2 role does not cross-match a different role that shares a word", async () => {
+  test("a role target admits only that role, never a neighbour that needs another licence", async () => {
     expect(await rankedIds(["Registered Nurse"])).toEqual(["registered-nurse"]);
-    expect(await rankedIds(["Software Engineering"])).toEqual(["software"]);
+    expect(await rankedIds(["health.rn"])).toEqual(["registered-nurse"]);
   });
 
-  test("a free-text target keeps the existing word-overlap behaviour", async () => {
-    expect(await rankedIds(["Platform"])).toEqual(["platform"]);
+  test("a subcategory or category target reaches every role inside it", async () => {
+    expect((await rankedIds(["healthcare/nursing"])).toSorted()).toEqual([
+      "nurse-practitioner",
+      "registered-nurse",
+    ]);
+    expect((await rankedIds(["Software Engineering"])).toSorted()).toEqual([
+      "platform",
+      "software",
+    ]);
   });
 
-  test("picking a category and a granular role matches the union, never double-counting", async () => {
-    expect(await rankedIds(["Registered Nurse", "Software Engineering"])).toEqual([
+  test("a free-text target matches every word of the title", async () => {
+    expect(await rankedIds(["Engineer Platform"])).toEqual(["platform"]);
+    expect(await rankedIds(["Engineer Platfor"])).toEqual([]);
+  });
+
+  test("picking a category and a role matches the union, never double-counting", async () => {
+    expect(await rankedIds(["Registered Nurse", "sw.general"])).toEqual([
       "registered-nurse",
       "software",
     ]);
   });
+
+  test("an exact role ranks above its subcategory, which ranks above its category", async () => {
+    const ids = await rankedIds(["health.rn", "healthcare/nursing", "software-it"]);
+
+    expect(ids.slice(0, 2)).toEqual(["registered-nurse", "nurse-practitioner"]);
+    expect(ids.slice(2).toSorted()).toEqual(["platform", "software"]);
+  });
 });
 
 describe("a Posting missing an optional field is still matched", () => {
-  const nurse = [
-    { dimension: "role", value: "Healthcare" },
-    { dimension: "granular_role", value: "Registered Nurse" },
-  ] as const satisfies readonly SeedTag[];
+  const nurse = NURSE_TAGS;
 
   async function idsFor(overrides: SeedOverrides, targets: Partial<TargetsInput> = {}) {
     const { candidates, catalog } = fresh();
@@ -291,10 +314,7 @@ describe("a Posting missing an optional field is still matched", () => {
 });
 
 describe("seniority is a ranking signal, blocked only three or more levels away", () => {
-  const nurse = [
-    { dimension: "role", value: "Healthcare" },
-    { dimension: "granular_role", value: "Registered Nurse" },
-  ] as const satisfies readonly SeedTag[];
+  const nurse = NURSE_TAGS;
 
   async function rankedWith(seeds: readonly [string, Seniority][], seniorities: Seniority[]) {
     const { candidates, catalog } = fresh();

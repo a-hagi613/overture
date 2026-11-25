@@ -178,7 +178,7 @@ test("unclassified Postings are tagged from recorded Haiku batch responses", asy
 
     expect(rows.length).toBe(1);
     expect(roleRow?.dimension).toBe("role");
-    expect(roleRow?.value).toBe("Design");
+    expect(roleRow?.value).toBe("product-design");
     expect(roleRow?.source).toBe("llm");
 
     const postings = await harness.postings();
@@ -197,20 +197,20 @@ test("unclassified Postings are tagged from recorded Haiku batch responses", asy
       const [tagRow] = postingRows;
 
       expect(postingRows.length).toBe(1);
-      expect(tagRow?.value).toBe("Design");
+      expect(tagRow?.value).toBe("product-design");
       expect(tagRow?.source).toBe("llm");
     }
 
     const classified = await postingByTitle(harness, "Full Stack Developer");
 
-    expect(classified?.tagSource).toBe("rules");
+    expect(classified?.tagSource).toBe("llm");
 
     const classifiedRows = await tagRowsFor(harness, classified?.id ?? "");
 
     const classifiedRoleRow = classifiedRows.find((row) => row.dimension === "role");
 
-    expect(classifiedRoleRow?.value).toBe("Software Engineering");
-    expect(classifiedRoleRow?.source).toBe("rules");
+    expect(classifiedRoleRow?.value).toBe("software-it");
+    expect(classifiedRoleRow?.source).toBe("llm");
   } finally {
     await harness.close();
     anthropic.stop();
@@ -223,7 +223,7 @@ test("over the tagging cap nothing is sent until the next day", async () => {
 
   try {
     harness.fixture.mutateBoard("greenhouse", boardToken, {
-      addJobs: [addedJob("7101", "Community Engagement Coordinator")],
+      addJobs: [addedJob("7101", "Puppetry Workshop Steward")],
     });
 
     await harness.runBackfillCycle();
@@ -238,7 +238,7 @@ test("over the tagging cap nothing is sent until the next day", async () => {
     const spentMicros = afterFirstSend.totals.costMicros;
 
     harness.fixture.mutateBoard("greenhouse", boardToken, {
-      addJobs: [addedJob("7102", "Executive Assistant to the CEO")],
+      addJobs: [addedJob("7102", "Lighthouse Archive Steward")],
     });
 
     await harness.runBackfillCycle();
@@ -256,7 +256,7 @@ test("over the tagging cap nothing is sent until the next day", async () => {
 
     expect(blockedUsage.totals.calls).toBe(1);
 
-    const waiting = await postingByTitle(harness, "Executive Assistant to the CEO");
+    const waiting = await postingByTitle(harness, "Lighthouse Archive Steward");
 
     expect(waiting).not.toBe(null);
     expect(waiting?.tagSource).toBe("rules");
@@ -316,18 +316,18 @@ test("over the tagging cap nothing is sent until the next day", async () => {
 
     expect(anthropic.batchesCreated()).toBe(2);
     expect(anthropic.requests().map((request) => request.title)).toEqual([
-      "Community Engagement Coordinator",
-      "Executive Assistant to the CEO",
+      "Puppetry Workshop Steward",
+      "Lighthouse Archive Steward",
     ]);
 
-    const taggedNextDay = await postingByTitle(harness, "Executive Assistant to the CEO");
+    const taggedNextDay = await postingByTitle(harness, "Lighthouse Archive Steward");
 
     expect(taggedNextDay?.tagSource).toBe("llm");
 
     const nextDayRows = await tagRowsFor(harness, taggedNextDay?.id ?? "");
 
     expect(nextDayRows.length).toBe(1);
-    expect(nextDayRows[0]?.value).toBe("Administrative");
+    expect(nextDayRows[0]?.value).toBe("admin-office");
     expect(nextDayRows[0]?.source).toBe("llm");
   } finally {
     await harness.close();

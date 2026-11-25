@@ -10,8 +10,8 @@ import type { SupplyFilters } from "../../shared/supply.ts";
 
 import { openCatalogDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
-import { countSupportedSupply } from "./supply.ts";
-import { rebuildSupplyFacets } from "./supply-facets.ts";
+import { countSupplyLive, countSupportedSupply } from "./supply.ts";
+import { rebuildSupplyFacets, supplyFacetTotals } from "./supply-facets.ts";
 
 const NOW = 1_800_000_000_000;
 
@@ -438,6 +438,54 @@ describe("countSupportedSupply", () => {
     expect(
       countSupportedSupply(target.db, filter({ granularRole: "Registered Nurse" })).total,
     ).toBe(0);
+  });
+
+  test("reads a taxonomy id, a current name or a retired name on a catalog tagged with taxonomy ids", () => {
+    const target = fixture();
+
+    const nurse = (id: string, role: string, ats: PostingSeed["ats"]) => {
+      insertSeed(target.sqlite, {
+        ats,
+        applySupported: true,
+        city: "Houston",
+        closed: false,
+        countryCode: "US",
+        granularRole: role,
+        id,
+        locationRaw: "Houston, TX",
+        role: "healthcare",
+        subrole: "healthcare/nursing",
+        workplace: "onsite",
+      });
+    };
+
+    nurse("rn-1", "health.rn", "greenhouse");
+    nurse("rn-2", "health.rn", "lever");
+    nurse("np-1", "health.np", "greenhouse");
+
+    const live = (overrides: Partial<SupplyFilters>) =>
+      countSupplyLive(target.db, filter(overrides)).total;
+
+    const counted = (overrides: Partial<SupplyFilters>) =>
+      countSupportedSupply(target.db, filter(overrides)).total;
+
+    for (const read of [live, counted]) {
+      expect(read({ role: "healthcare" })).toBe(3);
+      expect(read({ role: "Healthcare" })).toBe(3);
+      expect(read({ granularRole: "healthcare/nursing" })).toBe(3);
+      expect(read({ granularRole: "health.rn" })).toBe(2);
+      expect(read({ granularRole: "Registered Nurse" })).toBe(2);
+      expect(read({ granularRole: "Nurse Practitioner / Anesthetist / Midwife" })).toBe(1);
+      expect(read({ granularRole: "health.rn", role: "software-it" })).toBe(2);
+    }
+
+    rebuildSupplyFacets(target.db);
+
+    expect(supplyFacetTotals(target.db, filter({ granularRole: "Registered Nurse" }))?.total).toBe(
+      2,
+    );
+    expect(counted({ role: "Healthcare" })).toBe(3);
+    expect(counted({ granularRole: "health.rn" })).toBe(2);
   });
 
   test("filters by location, remote, and both together", () => {

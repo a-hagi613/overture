@@ -1,4 +1,4 @@
-import { and, count, eq, exists, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -13,7 +13,7 @@ import { getSettingNumber, getAllKillSwitches } from "../platform/settings/index
 import { publishEvent } from "../platform/sse/stream.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createLanguagesService } from "../profile/languages.ts";
-import { createTargetsService, matchedRoleTags, roleTargetMatches } from "../profile/targets.ts";
+import { createTargetsService } from "../profile/targets.ts";
 import { resolveLocation, sameRegion } from "../catalog/geo.ts";
 import { ACTIVE_APPLICATION_STATUSES } from "./applications.ts";
 import { salaryMeetsFloor } from "./fx.ts";
@@ -28,8 +28,10 @@ import {
   seniorityAccepted,
   workplaceAccepted,
 } from "./optional-fields.ts";
+import { planRoleTargets, roleMatchScore, roleTargetCondition } from "./role-targets.ts";
 
 import type { SkipTarget } from "./skip-match.ts";
+import type { RoleTargetPlan } from "./role-targets.ts";
 
 const DAY_MS = 86_400_000;
 const POOL_TTL_MS = 30_000;
@@ -44,6 +46,7 @@ export interface CandidatePosting {
   companyDomain: string | null;
   ats: Ats;
   title: string;
+  titleNorm: string;
   locationRaw: string | null;
   countryCode: string | null;
   region: string | null;
@@ -194,6 +197,7 @@ interface FilterContext {
   userId: string;
   at: number;
   targets: TargetsInput;
+  rolePlan: RoleTargetPlan;
   languages: readonly string[];
   places: TargetPlace[];
   workAuthorised: boolean;
@@ -236,12 +240,17 @@ type FilterReason =
 
 interface Verdict {
   reason: FilterReason | null;
+  roleScore: number;
   locationScore: number;
   salaryKnown: boolean;
   seniority: number;
 }
 
-function targetBasicsMatch(posting: CandidatePosting, targets: TargetsInput) {
+function targetBasicsMatch(
+  posting: CandidatePosting,
+  targets: TargetsInput,
+  rolePlan: RoleTargetPlan,
+) {
   if (!workplaceAccepted(posting.workplace, targets.workplaces)) {
     return "workplace" satisfies FilterReason;
   }
@@ -250,23 +259,7 @@ function targetBasicsMatch(posting: CandidatePosting, targets: TargetsInput) {
     return "employment_type" satisfies FilterReason;
   }
 
-  let roleMatch = false;
-
-  for (const tag of posting.tags) {
-    if (
-      tag.dimension !== "role" &&
-      tag.dimension !== "subrole" &&
-      tag.dimension !== "granular_role"
-    ) {
-      continue;
-    }
-
-    if (targets.roles.some((role) => roleTargetMatches(role, [tag.value]))) {
-      roleMatch = true;
-    }
-  }
-
-  if (!roleMatch) {
+  if (roleMatchScore(rolePlan, posting) === 0) {
     return "role" satisfies FilterReason;
   }
 
@@ -336,6 +329,7 @@ export function createCandidateService(deps: CandidateDeps) {
     companyDomain: companies.domain,
     ats: postings.ats,
     title: postings.title,
+    titleNorm: postings.titleNorm,
     locationRaw: postings.locationRaw,
     countryCode: postings.countryCode,
     region: postings.region,
@@ -354,10 +348,11 @@ export function createCandidateService(deps: CandidateDeps) {
   };
 
   function loadPool(targets: TargetsInput, languages: readonly string[]) {
-    const roleTags = matchedRoleTags(catalogDb, targets.roles);
+    const rolePlan = planRoleTargets(targets.roles);
+    const roleCondition = roleTargetCondition(rolePlan);
 
     if (
-      roleTags.length === 0 ||
+      roleCondition === null ||
       targets.seniorities.length === 0 ||
       targets.workplaces.length === 0 ||
       targets.employmentTypes.length === 0 ||
@@ -376,18 +371,7 @@ export function createCandidateService(deps: CandidateDeps) {
           eq(postings.status, "open"),
           eq(postings.applySupported, true),
           ...optionalFieldConditions(catalogDb, { ...targets, languages }),
-          exists(
-            catalogDb
-              .select({ one: sql`1` })
-              .from(postingTags)
-              .where(
-                and(
-                  eq(postingTags.postingId, postings.id),
-                  inArray(postingTags.dimension, ["role", "subrole", "granular_role"]),
-                  inArray(postingTags.value, roleTags),
-                ),
-              ),
-          ),
+          roleCondition,
         ),
       )
       .all();
@@ -609,6 +593,7 @@ export function createCandidateService(deps: CandidateDeps) {
       places,
       recentCompanies,
       repostKeys,
+      rolePlan: planRoleTargets(targets.roles),
       skipRows,
       targets,
       userId,
@@ -624,6 +609,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (posting.closedAt !== null || posting.status === "closed") {
       return {
         reason: "closed",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -633,6 +619,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (!posting.applySupported) {
       return {
         reason: "apply_unsupported",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -642,6 +629,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (!languageAccepted(posting.language, context.languages)) {
       return {
         reason: "language",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -655,6 +643,7 @@ export function createCandidateService(deps: CandidateDeps) {
     ) {
       return {
         reason: "kill_switch",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -664,6 +653,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (context.hidden.has(posting.id)) {
       return {
         reason: "hidden",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -673,17 +663,19 @@ export function createCandidateService(deps: CandidateDeps) {
     if (context.flaggedPostings.has(posting.id)) {
       return {
         reason: "flagged",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
       } satisfies Verdict;
     }
 
-    const basics = targetBasicsMatch(posting, context.targets);
+    const basics = targetBasicsMatch(posting, context.targets, context.rolePlan);
 
     if (basics !== null) {
       return {
         reason: basics,
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -693,6 +685,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (checkApplied && context.appliedPostings.has(posting.id)) {
       return {
         reason: "already_applied",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -702,6 +695,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (context.activeCompanies.has(posting.companyId)) {
       return {
         reason: "open_application_company",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -711,6 +705,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (context.recentCompanies.has(posting.companyId)) {
       return {
         reason: "company_cooldown",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -720,6 +715,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (context.repostKeys.has(posting.dedupeKey)) {
       return {
         reason: "repost_guard",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -732,6 +728,7 @@ export function createCandidateService(deps: CandidateDeps) {
     ) {
       return {
         reason: "crowd_limit",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -743,6 +740,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (!location.matched) {
       return {
         reason: "location",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -764,6 +762,7 @@ export function createCandidateService(deps: CandidateDeps) {
     if (!salary.meets) {
       return {
         reason: "salary",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -788,6 +787,7 @@ export function createCandidateService(deps: CandidateDeps) {
 
       return {
         reason: skip.reason === "current_employer" ? "current_employer" : "skip_list",
+        roleScore: 0,
         locationScore: 0,
         salaryKnown: false,
         seniority: 0,
@@ -796,6 +796,7 @@ export function createCandidateService(deps: CandidateDeps) {
 
     return {
       reason: null,
+      roleScore: roleMatchScore(context.rolePlan, posting),
       locationScore: location.score,
       salaryKnown: salary.known,
       seniority: seniorityScore(posting, context.targets.seniorities),
@@ -821,7 +822,7 @@ export function createCandidateService(deps: CandidateDeps) {
       rankedRows.push({
         ...posting,
         codeRank:
-          40 +
+          verdict.roleScore +
           verdict.seniority +
           verdict.locationScore +
           (verdict.salaryKnown ? 10 : 0) +

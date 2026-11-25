@@ -2224,3 +2224,33 @@ export const ROLES: readonly RoleOption[] = [
     broad: false,
   },
 ];
+
+const TAXONOMY_VALUES = new Set<string>([
+  ...ROLE_CATEGORIES.flatMap((category) => [category.id, category.name]),
+  ...ROLE_SUBCATEGORIES.flatMap((sub) => [sub.id, sub.name]),
+  ...ROLES.flatMap((role) => [role.id, role.name]),
+]);
+
+/**
+ * @param value A query or stored target string.
+ * @returns True when it is a category, subcategory or role id or name in the role taxonomy.
+ */
+export function isRoleTaxonomyValue(value: string) {
+  return TAXONOMY_VALUES.has(value);
+}
+
+const NAME_BY_ID = new Map<string, string>([
+  ...ROLE_CATEGORIES.map((category) => [category.id, category.name] as const),
+  ...ROLE_SUBCATEGORIES.map((sub) => [sub.id, sub.name] as const),
+  ...ROLES.map((role) => [role.id, role.name] as const),
+]);
+
+/**
+ * The name a person reads for a role tag or saved target: a category, subcategory or role id becomes its name, and
+ * anything else (a retired label, free text) stays as given.
+ * @param value A tag value or saved target.
+ * @returns The readable name.
+ */
+export function roleTaxonomyName(value: string) {
+  return NAME_BY_ID.get(value) ?? value;
+}

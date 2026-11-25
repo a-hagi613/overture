@@ -250,7 +250,7 @@ test.describe("the landing live supply preview", () => {
     const layoutBefore = await layoutOf(page);
 
     await category.selectOption("Software Engineering");
-    await expect(count).toHaveText("3");
+    await expect(count).toHaveText("2");
 
     await role.click();
     await page.getByPlaceholder("Search roles…").fill("Software Engineer");
@@ -259,7 +259,7 @@ test.describe("the landing live supply preview", () => {
       .getByRole("option", { name: /Software Engineer/u })
       .first()
       .click();
-    await expect(count).toHaveText("3");
+    await expect(count).toHaveText("2");
 
     await category.selectOption("Data & Analytics");
     await expect(count).toHaveText("1");
@@ -283,7 +283,7 @@ test.describe("the landing live supply preview", () => {
     await expect(count).toHaveText("3");
 
     await category.selectOption("Software Engineering");
-    await expect(count).toHaveText("2");
+    await expect(count).toHaveText("1");
 
     await category.selectOption("");
     await location.click();

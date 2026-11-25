@@ -9,7 +9,7 @@ import type { CatalogDatabase } from "../platform/db/client.ts";
 
 import { openCatalogDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
-import { countMatchingPostings, roleTargetMatches } from "./targets.ts";
+import { countMatchingPostings } from "./targets.ts";
 
 const NOW = 1_800_000_000_000;
 
@@ -20,7 +20,21 @@ const CITIES = [
   { city: "Austin", country: "US", region: "Texas" },
 ] as const;
 
-const ROLE_TAGS = ["Backend Engineer", "Product Designer"] as const;
+const ROLE_TAGS = [
+  {
+    title: "Backend Engineer",
+    category: "software-it",
+    subcategory: "software-it/software-engineering",
+    role: "sw.backend",
+  },
+  {
+    title: "Product Designer",
+    category: "product-design",
+    subcategory: "product-design/design",
+    role: "design.ux",
+  },
+] as const;
+
 const SENIORITY_TAGS = ["entry", "mid", "senior"] as const;
 const WORKPLACES = ["remote", "hybrid", "onsite"] as const;
 const EMPLOYMENT_TYPES = ["full_time", "part_time", "contract"] as const;
@@ -75,7 +89,7 @@ function postingValues(index: number) {
       `https://example.test/${id}`,
       `https://example.test/${id}`,
       `Job ${String(index)}`,
-      role,
+      role.title.toLowerCase(),
       `${place.city}, ${place.country}`,
       place.country,
       place.region,
@@ -98,11 +112,13 @@ function insertPosting(sqlite: Database, index: number) {
   const posting = postingValues(index);
 
   sqlite.prepare(POSTING_INSERT).run(...posting.values);
-  sqlite.prepare(TAG_INSERT).run(posting.id, "role", posting.role);
+  sqlite.prepare(TAG_INSERT).run(posting.id, "role", posting.role.category);
+  sqlite.prepare(TAG_INSERT).run(posting.id, "subrole", posting.role.subcategory);
+  sqlite.prepare(TAG_INSERT).run(posting.id, "granular_role", posting.role.role);
   sqlite.prepare(TAG_INSERT).run(posting.id, "seniority", posting.seniority);
 
   if (index % 5 === 0) {
-    sqlite.prepare(TAG_INSERT).run(posting.id, "subrole", "Platform");
+    sqlite.prepare(TAG_INSERT).run(posting.id, "granular_role", "infra.devops");
   }
 }
 
@@ -205,7 +221,7 @@ function queryPlan(target: Fixture, logged: LoggedQuery) {
 }
 
 describe("countMatchingPostings", () => {
-  test("matches a Level-1 category and a Level-2 granular role exactly, and keeps every label of a multi-label Posting", () => {
+  test("matches a category and a role by taxonomy id, and keeps every label of a multi-label Posting", () => {
     const target = fixture(0);
 
     const insertPostingRow = (id: string, title: string) => {
@@ -238,12 +254,13 @@ describe("countMatchingPostings", () => {
     insertPostingRow("p-swe", "Backend Engineer");
     insertPostingRow("p-data", "Data Scientist");
 
-    target.sqlite.prepare(TAG_INSERT).run("p-swe", "role", "Software Engineering");
-    target.sqlite.prepare(TAG_INSERT).run("p-swe", "granular_role", "Backend Engineer");
+    target.sqlite.prepare(TAG_INSERT).run("p-swe", "role", "software-it");
+    target.sqlite.prepare(TAG_INSERT).run("p-swe", "subrole", "software-it/software-engineering");
+    target.sqlite.prepare(TAG_INSERT).run("p-swe", "granular_role", "sw.backend");
     target.sqlite.prepare(TAG_INSERT).run("p-swe", "seniority", "senior");
-    target.sqlite.prepare(TAG_INSERT).run("p-data", "role", "Data & Analytics");
-    target.sqlite.prepare(TAG_INSERT).run("p-data", "granular_role", "Data Scientist");
-    target.sqlite.prepare(TAG_INSERT).run("p-data", "role", "Software Engineering");
+    target.sqlite.prepare(TAG_INSERT).run("p-data", "role", "data-ai");
+    target.sqlite.prepare(TAG_INSERT).run("p-data", "granular_role", "data.scientist");
+    target.sqlite.prepare(TAG_INSERT).run("p-data", "role", "software-it");
     target.sqlite.prepare(TAG_INSERT).run("p-data", "seniority", "senior");
 
     const base = {
@@ -264,7 +281,12 @@ describe("countMatchingPostings", () => {
     expect(
       countMatchingPostings(target.db, { ...base, roles: ["Software Engineer"] }, ["en"]),
     ).toBe(0);
+    expect(countMatchingPostings(target.db, { ...base, roles: ["Civil Engineer"] }, ["en"])).toBe(
+      0,
+    );
     expect(countMatchingPostings(target.db, { ...base, roles: ["backend"] }, ["en"])).toBe(1);
+    expect(countMatchingPostings(target.db, { ...base, roles: ["sw.backend"] }, ["en"])).toBe(1);
+    expect(countMatchingPostings(target.db, { ...base, roles: ["data-ai"] }, ["en"])).toBe(1);
   });
 
   test("counts the open Postings the filters name", () => {
@@ -427,18 +449,14 @@ describe("countMatchingPostings", () => {
     target.queries.length = 0;
     countMatchingPostings(target.db, filter({ locations: ["Austin"] }), ["de"]);
 
-    const roleQuery = target.queries.find((entry) => entry.query.includes("select distinct"));
     const countQuery = target.queries.find((entry) => entry.query.includes("count(*)"));
 
-    if (roleQuery === undefined || countQuery === undefined) {
-      throw new Error("the count and its role-tag lookup both ran");
+    if (countQuery === undefined) {
+      throw new Error("the count ran");
     }
 
-    const rolePlan = queryPlan(target, roleQuery).join("\n");
     const countPlan = queryPlan(target, countQuery).join("\n");
 
-    expect(rolePlan).toContain("posting_tags_dimension_value_posting");
-    expect(rolePlan).not.toMatch(/SCAN posting_tags/u);
     expect(countPlan).not.toMatch(/SCAN posting_tags/u);
     expect(countPlan).not.toContain("TEMP B-TREE");
     expect(countPlan.match(/SEARCH posting_tags/gu)).toHaveLength(3);
@@ -505,22 +523,5 @@ describe("countMatchingPostings", () => {
     expect(durations).toHaveLength(25);
     expect(p95).toBeLessThan(500);
     expect(slowest).toBeLessThan(500);
-  });
-});
-
-describe("roleTargetMatches", () => {
-  test("a known Level-1 category or Level-2 role matches only its exact label, case-insensitively", () => {
-    expect(roleTargetMatches("Registered Nurse", ["Registered Nurse"])).toBe(true);
-    expect(roleTargetMatches("registered nurse", ["Registered Nurse"])).toBe(true);
-    expect(roleTargetMatches("Registered Nurse", ["Nurse Practitioner"])).toBe(false);
-    expect(roleTargetMatches("Software Engineering", ["Software Engineering"])).toBe(true);
-    expect(roleTargetMatches("Software Engineering", ["Software Engineer"])).toBe(false);
-    expect(roleTargetMatches("Software Engineering", ["Civil Engineering"])).toBe(false);
-  });
-
-  test("a free-text target still matches on a shared meaningful word", () => {
-    expect(roleTargetMatches("platform", ["Platform Engineer"])).toBe(true);
-    expect(roleTargetMatches("backend", ["Senior Backend Engineer"])).toBe(true);
-    expect(roleTargetMatches("backend", ["Frontend Engineer"])).toBe(false);
   });
 });

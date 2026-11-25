@@ -6,10 +6,12 @@ import type { CatalogDatabase } from "../db/client.ts";
 import type { EmploymentType, Seniority, Workplace } from "../../../shared/tag-taxonomy.ts";
 
 import { resolvedLocationCondition } from "../../catalog/location-filter.ts";
+import { roleFilterCondition, roleFilterTagValues } from "../../matching/role-targets.ts";
 
 export interface SearchFilters {
+  /** A category: a role-taxonomy id or name, or a retired category name (issue #660). */
   role: string | null;
-  /** A Level-2 ESCO role (WS-17b); when set it is the role filter and `role` is only its category hint. */
+  /** A role or subcategory id or name, or a retired ESCO name; when set it is the filter and `role` only a hint. */
   granularRole: string | null;
   seniority: Seniority | null;
   workplace: Workplace | null;
@@ -93,11 +95,10 @@ function tagMatches(dimensions: readonly string[], value: string) {
 
 function filterConditions(db: CatalogDatabase, filters: SearchFilters, nowMs: number) {
   const parts: SQL[] = [];
+  const roleValue = filters.granularRole ?? filters.role;
 
-  if (filters.granularRole !== null) {
-    parts.push(tagMatches(["granular_role", "role"], filters.granularRole));
-  } else if (filters.role !== null) {
-    parts.push(tagMatches(["role", "subrole", "granular_role"], filters.role));
+  if (roleValue !== null) {
+    parts.push(roleFilterCondition(roleValue));
   }
 
   if (filters.seniority !== null) {
@@ -188,7 +189,10 @@ function roleWeight(value: string | null) {
     column: sql`(select max(coalesce(pt.weight, 0)) from posting_tags pt
       where pt.posting_id = postings.id
         and pt.dimension in ('role', 'subrole', 'granular_role')
-        and pt.value = ${value}) as tagWeight`,
+        and pt.value in (${sql.join(
+          roleFilterTagValues(value).map((tag) => sql`${tag}`),
+          sql`, `,
+        )})) as tagWeight`,
     order: sql`tagWeight desc, rank, id`,
   };
 }

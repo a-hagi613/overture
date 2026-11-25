@@ -267,7 +267,7 @@ describe("runTagFallbackJob", () => {
       { dimension: "role", source: "rules", value: "Design" },
     ]);
     expect(tagRowsFor(catalog.sqlite, "posting-open")).toEqual([
-      { dimension: "role", source: "llm", value: "Design" },
+      { dimension: "role", source: "llm", value: "product-design" },
     ]);
 
     catalog.sqlite.close();

@@ -97,7 +97,7 @@ async function seedMatchingPostings(request: APIRequestContext) {
 
   const board = createdSchema.parse(await boardResponse.json());
 
-  const postings = Array.from({ length: 176 }, (_, index) => ({
+  const postings = Array.from({ length: 183 }, (_, index) => ({
     boardId: board.id,
     companyId: company.id,
     ats: "greenhouse",

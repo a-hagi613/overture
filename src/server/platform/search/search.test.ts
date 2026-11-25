@@ -244,6 +244,38 @@ describe("search filters", () => {
     ).toEqual(["hybrid-role"]);
   });
 
+  test("reads a taxonomy id or a retired name on a catalog tagged with taxonomy ids, higher weight first", () => {
+    const target = fixture([
+      { id: "labelled", title: "Backend Engineer" },
+      { id: "bridged", title: "Backend Engineer" },
+      { id: "nurse", title: "Backend Nurse Educator" },
+    ]);
+
+    const tag = target.sqlite.prepare(
+      "insert into posting_tags (posting_id, dimension, value, source, weight) values (?, ?, ?, 'llm', ?)",
+    );
+
+    tag.run("labelled", "role", "software-it", 1);
+    tag.run("labelled", "granular_role", "sw.backend", 1);
+    tag.run("bridged", "role", "software-it", 0.5);
+    tag.run("bridged", "granular_role", "sw.backend", 0.5);
+    tag.run("nurse", "role", "healthcare", 1);
+
+    const ids = (filters: Partial<SearchFilters>) =>
+      searchPostings(target.db, {
+        filters: noFilters(filters),
+        limit: 10,
+        nowMs: NOW,
+        openOnly: true,
+        text: "Backend",
+      }).map((hit) => hit.id);
+
+    expect(ids({ granularRole: "sw.backend" })).toEqual(["labelled", "bridged"]);
+    expect(ids({ granularRole: "Backend Engineer" })).toEqual(["labelled", "bridged"]);
+    expect(ids({ role: "Software Engineering" })).toEqual(["labelled", "bridged"]);
+    expect(ids({ role: "healthcare" })).toEqual(["nurse"]);
+  });
+
   test("the location filter routes a city through posting_locations", () => {
     const { db } = fixture(SEARCH_ROWS);
 

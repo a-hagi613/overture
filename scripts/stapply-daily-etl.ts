@@ -20,6 +20,7 @@ import { openCatalogDatabase } from "../src/server/platform/db/client.ts";
 import { migrateCatalogDatabase } from "../src/server/platform/db/migrate.ts";
 import {
   CATALOG_SIZE_BUDGET_BYTES,
+  DEFAULT_SEED_FRESHNESS_DAYS,
   assertCatalogSizeWithinBudget,
   buildCatalogManifest,
   buildStapplyIngestQuery,
@@ -62,6 +63,7 @@ import {
 } from "../src/server/catalog/geo-store.ts";
 import { salaryUsdUpdateSql } from "../src/server/catalog/salary-usd.ts";
 import { rebuildSupplyFacets } from "../src/server/catalog/supply-facets.ts";
+import { committedRoleLabels, writeTaxonomyTags } from "../src/server/catalog/taxonomy-tags.ts";
 import {
   compressCatalogSnapshot,
   decompressCatalogSnapshot,
@@ -92,6 +94,7 @@ const args = parseArgs({
     "source-base-url": { type: "string" },
     "as-of": { type: "string" },
     "freshness-days": { type: "string" },
+    "include-undated": { type: "boolean" },
     "allow-row-drop": { type: "boolean" },
     "dry-run": { type: "boolean" },
     "skip-llm": { type: "boolean" },
@@ -115,7 +118,8 @@ if (Number.isNaN(now)) {
 
 const builtAt = new Date(now).toISOString();
 const version = builtAt.slice(0, 10);
-const freshnessDays = Number(args.values["freshness-days"] ?? "30");
+const freshnessDays = Number(args.values["freshness-days"] ?? String(DEFAULT_SEED_FRESHNESS_DAYS));
+const includeUndated = args.values["include-undated"] === true;
 
 if (!Number.isFinite(freshnessDays) || freshnessDays < 0) {
   throw new TypeError("--freshness-days must be zero or a positive number");
@@ -185,14 +189,17 @@ const objects = outDir === undefined ? objectStoreFromEnv() : createDiskObjectSt
 
 function haikuClassifierFromEnv() {
   const apiKey = envValue("ANTHROPIC_API_KEY");
+  const maxItems = Number(envValue("CATALOG_LLM_MAX_ITEMS") ?? "0");
 
-  if (apiKey === undefined) {
+  if (apiKey === undefined || !Number.isInteger(maxItems) || maxItems <= 0) {
     return null;
   }
 
   const model = envValue("CATALOG_LLM_MODEL");
+  const classify = createHaikuBatchClassifier(model === undefined ? { apiKey } : { apiKey, model });
 
-  return createHaikuBatchClassifier(model === undefined ? { apiKey } : { apiKey, model });
+  return async (items: readonly AmbiguousClassificationItem[]) =>
+    classify(items.slice(0, maxItems));
 }
 
 function embedderFromEnv() {
@@ -345,7 +352,8 @@ async function main() {
     `geo_places: ${String(geo.places)} places (${String(geo.cities)} cities) from dataset ${geo.datasetVersion}`,
   );
 
-  const freshnessCutoffMs = seed && freshnessDays > 0 ? seedFreshnessCutoffMs(now) : null;
+  const freshnessCutoffMs =
+    seed && freshnessDays > 0 ? seedFreshnessCutoffMs(now, freshnessDays) : null;
 
   createStapplyStaging(catalog.db);
 
@@ -374,7 +382,7 @@ async function main() {
 
     const streamed = await streamStapplyIngest({
       connection,
-      sql: buildStapplyIngestQuery({ boards: [board], freshnessCutoffMs }),
+      sql: buildStapplyIngestQuery({ boards: [board], freshnessCutoffMs, includeUndated }),
       onRow: (row) => {
         buffer.push(row);
 
@@ -505,6 +513,12 @@ async function main() {
     `classification: ${String(taggingReport.tier1_esco_rules)} rules, ${String(taggingReport.tier2_embeddings)} embeddings, ${String(taggingReport.tier3_haiku_resolved)} haiku; ${String(taggingReport.still_untagged)} still untagged; cache ${cacheMode}`,
   );
 
+  const taxonomyTags = writeTaxonomyTags(catalog.db, committedRoleLabels());
+
+  progress(
+    `role taxonomy: ${String(taxonomyTags.labelled)} AI labelled, ${String(taxonomyTags.categoryOnly)} AI category only, ${String(taxonomyTags.titled)} named by title, ${String(taxonomyTags.bridged)} bridged, ${String(taxonomyTags.junk)} junk, ${String(taxonomyTags.untagged)} untagged`,
+  );
+
   rebuildSupplyFacets(catalog.db);
 
   progress("supply facets rebuilt");
@@ -578,6 +592,7 @@ async function main() {
     prunedSnapshots: publish.pruned,
     seed,
     freshnessDays: freshnessCutoffMs === null ? null : freshnessDays,
+    includeUndated,
     sqlite: {
       path: catalogPath,
       bytes: sqliteBytesWithinBudget,
@@ -604,6 +619,7 @@ async function main() {
       skillsTagged,
     },
     tagging: taggingReport,
+    taxonomyTags,
     classificationCache: cacheMode,
     perBoard: perBoardSummary,
     tagSources,
