@@ -7,21 +7,36 @@ const ENTRY = "scripts/demo-video/remotion/index.ts";
 const PUBLIC_DIR = "scripts/demo-video/assets";
 const OUTPUT_DIR = "public/videos";
 
-const REQUIRED_FRAMES = [
+const REQUIRED_CAPTURE_FILES = [
+  "metrics.json",
   "home-desktop.png",
-  "ready-desktop.png",
-  "review-desktop.png",
-  "tracker-desktop.png",
-  "resume-desktop.png",
-  "inbox-desktop.png",
-  "calendar-desktop.png",
   "home-mobile.png",
-  "ready-mobile.png",
-  "review-mobile.png",
-  "tracker-mobile.png",
-  "resume-mobile.png",
-  "inbox-mobile.png",
-  "calendar-mobile.png",
+  "tracker-before-desktop.png",
+  "tracker-drag-backdrop-desktop.png",
+  "tracker-over-desktop.png",
+  "tracker-after-desktop.png",
+  "tracker-overlay-desktop.png",
+  "tracker-before-mobile.png",
+  "tracker-drag-backdrop-mobile.png",
+  "tracker-over-mobile.png",
+  "tracker-after-mobile.png",
+  "tracker-overlay-mobile.png",
+  "resume-empty-desktop.png",
+  "resume-scan-0-desktop.png",
+  "resume-scan-1-desktop.png",
+  "resume-scan-2-desktop.png",
+  "resume-scan-3-desktop.png",
+  "resume-done-desktop.png",
+  "resume-empty-mobile.png",
+  "resume-scan-0-mobile.png",
+  "resume-scan-1-mobile.png",
+  "resume-scan-2-mobile.png",
+  "resume-scan-3-mobile.png",
+  "resume-done-mobile.png",
+  "inbox-before-desktop.png",
+  "inbox-after-desktop.png",
+  "inbox-before-mobile.png",
+  "inbox-after-mobile.png",
 ] as const;
 
 interface VideoSpec {
@@ -135,9 +150,9 @@ function renderPoster(spec: VideoSpec) {
 }
 
 function main() {
-  for (const frame of REQUIRED_FRAMES) {
-    if (!existsSync(join(PUBLIC_DIR, "captures", frame))) {
-      throw new Error(`missing ${frame}; run bun run scripts/demo-video/capture.ts first`);
+  for (const file of REQUIRED_CAPTURE_FILES) {
+    if (!existsSync(join(PUBLIC_DIR, "captures", file))) {
+      throw new Error(`missing ${file}; run bun run scripts/demo-video/capture.ts first`);
     }
   }
 

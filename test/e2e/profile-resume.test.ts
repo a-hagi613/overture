@@ -366,3 +366,34 @@ test("over the cap the scanned upload still succeeds but the text stays empty", 
     anthropic.stop();
   }
 });
+
+test("uploading a resume on /profile/resume finishes scanning and settles to PDF verified", async ({
+  browser,
+  isolatedAppServer: { url: appServerUrl },
+}) => {
+  const owner = await ownerContextFor(appServerUrl);
+  const context = await browser.newContext({ storageState: await owner.storageState() });
+  const page = await context.newPage();
+
+  try {
+    await page.goto(`${appServerUrl}/profile/resume`, { waitUntil: "load" });
+    await page.getByRole("button", { name: /Upload PDF/iu }).waitFor({ state: "visible" });
+
+    await page.locator('#profile-resume input[type="file"]').setInputFiles({
+      buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+      mimeType: "application/pdf",
+      name: "sam-rivera-resume.pdf",
+    });
+
+    const scan = page.getByTestId("resume-scan");
+
+    await expect(scan).toBeVisible();
+    await expect(page.getByText("PDF verified", { exact: true })).toBeHidden();
+    await expect(scan).toBeHidden({ timeout: 10_000 });
+    await expect(page.getByText("PDF verified", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Replace resume/iu })).toBeEnabled();
+  } finally {
+    await owner.dispose();
+    await context.close();
+  }
+});

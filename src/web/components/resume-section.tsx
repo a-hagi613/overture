@@ -63,12 +63,17 @@ export function ResumeSection() {
       if (localPreview !== null) {
         URL.revokeObjectURL(localPreview.url);
       }
+    },
+    [localPreview],
+  );
 
+  useEffect(
+    () => () => {
       if (scanTimerRef.current !== null) {
         globalThis.clearTimeout(scanTimerRef.current);
       }
     },
-    [localPreview],
+    [],
   );
 
   const pw = copy.profileWorkspace;
@@ -155,7 +160,9 @@ export function ResumeSection() {
 
   let statusBadge = null;
 
-  if (current?.unreadable === true) {
+  if (showScanner) {
+    statusBadge = null;
+  } else if (current?.unreadable === true) {
     statusBadge = <Badge variant="need">{copy.nav.profilePages.resumeNeedsReupload}</Badge>;
   } else if (filename !== null) {
     statusBadge = <Badge variant="ok">{copy.nav.profilePages.resumeVerified}</Badge>;

@@ -366,13 +366,12 @@ The four choreographed surfaces, so nobody re-invents them:
    orange ring.
 
 **The workspace walkthrough.** "Inside the workspace" is the one recorded surface: two silent, muted H.264
-recordings of the seeded workspace (1280×800 desktop, 720×1280 phone), each with a poster frame, rendered directly
+recordings of the seeded workspace (1280×800 desktop, 720×1280 phone), each with a frame-0 poster, rendered directly
 in a frameless `HoverPlayCard` with no surrounding toolbar, duration label, or sample-data chrome. The desktop
 recording plays on `lg` and up, the phone recording below it. Hovering or pressing Play starts playback with a centered Play/Pause overlay and subtle bottom-left
-Playing/Paused badge. Inside the desktop recording, the sidebar stays pinned at 1:1 while spring-eased zoom
-and camera moves focus on the right workspace pane across the 90-day momentum chart, Approval Queue, Review
-Queue, Application Tracker, Resume & Cover Letter, Inbox, and Calendar. The video never autoplays on load; it
-plays only on intentional hover or an explicit Play click.
+Playing/Paused badge. Every scene stays at 1:1 scale with zero camera zoom: starting on Home (90-day trajectory),
+dragging an application card from Applied to Interviews on Tracker, uploading and scanning a resume on Profile, and
+opening an employer reply in Inbox. The video never autoplays on load; it plays only on intentional hover or an explicit Play click.
 
 **Reduced motion.** Every animation has a static state. With `animate` off or under
 `prefers-reduced-motion`, transitions and keyframes are disabled and each loop shows one finished frame

@@ -1,7 +1,8 @@
-import { Sequence, staticFile, useCurrentFrame } from "remotion";
+import { Img, Sequence, staticFile, useCurrentFrame } from "remotion";
 
 import { ChapterPill } from "./chapter-pill.tsx";
-import { activeSegmentAtFrame, chapterFor, SEGMENTS } from "./chapters.ts";
+import { activeSegmentAtFrame, SEGMENTS } from "./chapters.ts";
+import { useCaptureMetrics } from "./metrics.ts";
 import { launchSpring } from "./motion.ts";
 import { PaperBackground } from "./paper-background.tsx";
 import { ScreenClip } from "./screen-clip.tsx";
@@ -12,6 +13,7 @@ const FRAME_BOX = { height: 760, left: 32, top: 20, width: 1216 } as const;
 export function DesktopDemo() {
   const frame = useCurrentFrame();
   const { chapter, segment } = activeSegmentAtFrame(frame);
+  const metrics = useCaptureMetrics();
 
   const pillSpring =
     segment.from === 0
@@ -43,19 +45,26 @@ export function DesktopDemo() {
           width: FRAME_BOX.width,
         }}
       >
+        <Img
+          src={staticFile("captures/home-desktop.png")}
+          style={{
+            display: "block",
+            height: "100%",
+            inset: 0,
+            objectFit: "cover",
+            objectPosition: "center top",
+            position: "absolute",
+            width: "100%",
+          }}
+        />
+
         {SEGMENTS.map((item) => (
           <Sequence
             durationInFrames={item.durationInFrames}
             from={item.from}
             key={`screen-${item.chapter}-${String(item.from)}`}
           >
-            <ScreenClip
-              chapter={chapterFor(item.chapter)}
-              freezeZoom={item.from === 721}
-              segment={item}
-              source={staticFile(`captures/${item.chapter}-desktop.png`)}
-              variant="desktop"
-            />
+            <ScreenClip metrics={metrics.desktop} segment={item} variant="desktop" />
           </Sequence>
         ))}
 
