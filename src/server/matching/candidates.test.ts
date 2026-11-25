@@ -38,12 +38,22 @@ interface SeedTag {
   value: string;
 }
 
+interface SeedOverrides {
+  workplace?: "remote" | "hybrid" | "onsite" | "unknown";
+  employmentType?: "full_time" | "unknown";
+  language?: string | null;
+  seniority?: string | null;
+}
+
 function seedPosting(
   catalog: ReturnType<typeof openCatalogDatabase>,
   id: string,
   title: string,
   roleTags: readonly SeedTag[],
+  overrides: SeedOverrides = {},
 ) {
+  const seniority = overrides.seniority === undefined ? "senior" : overrides.seniority;
+
   catalog.db
     .insert(postings)
     .values({
@@ -58,10 +68,10 @@ function seedPosting(
       companyId: "company-1",
       countryCode: "DE",
       dedupeKey: `greenhouse:${id}`,
-      employmentType: "full_time",
+      employmentType: overrides.employmentType ?? "full_time",
       firstSeenAt: NOW,
       id,
-      language: "English",
+      language: overrides.language === undefined ? "English" : overrides.language,
       lastSeenAt: NOW,
       locationRaw: "Berlin, Germany",
       postedAt: NOW - 1000,
@@ -70,7 +80,7 @@ function seedPosting(
       title,
       titleNorm: title.toLowerCase(),
       url: `https://boards.example/jobs/${id}`,
-      workplace: "onsite",
+      workplace: overrides.workplace ?? "onsite",
     })
     .run();
   catalog.db
@@ -82,7 +92,16 @@ function seedPosting(
         source: "rules" as const,
         value: tag.value,
       })),
-      { dimension: "seniority" as const, postingId: id, source: "rules" as const, value: "senior" },
+      ...(seniority === null
+        ? []
+        : [
+            {
+              dimension: "seniority" as const,
+              postingId: id,
+              source: "rules" as const,
+              value: seniority,
+            },
+          ]),
     ])
     .run();
 }
@@ -170,7 +189,7 @@ function fresh() {
     personal: createPersonalCrypto(app.db, masterKeyringFor(new Uint8Array(32).fill(9))),
   });
 
-  return { candidates, catalog };
+  return { candidates, catalog, clock };
 }
 
 async function rankedIds(roles: readonly string[]) {
@@ -214,5 +233,58 @@ describe("candidate matching with Level-2 ESCO roles", () => {
       "registered-nurse",
       "software",
     ]);
+  });
+});
+
+describe("a Posting missing an optional field is still matched", () => {
+  const nurse = [
+    { dimension: "role", value: "Healthcare" },
+    { dimension: "granular_role", value: "Registered Nurse" },
+  ] as const satisfies readonly SeedTag[];
+
+  async function idsFor(overrides: SeedOverrides, targets: Partial<TargetsInput> = {}) {
+    const { candidates, catalog } = fresh();
+
+    seedPosting(catalog, "gap", "Registered Nurse", nurse, overrides);
+
+    const rows = await candidates.ranked(
+      "user-1",
+      { ...BASE_TARGETS, roles: ["Registered Nurse"], ...targets },
+      ["English"],
+    );
+
+    return rows.map((row) => row.id);
+  }
+
+  test("a title with no seniority word", async () => {
+    expect(await idsFor({ seniority: null })).toContain("gap");
+  });
+
+  test("a different seniority is still filtered", async () => {
+    expect(await idsFor({ seniority: "intern" })).not.toContain("gap");
+  });
+
+  test("an unknown workplace for someone open to on-site work", async () => {
+    expect(await idsFor({ workplace: "unknown" })).toContain("gap");
+  });
+
+  test("an unknown workplace is never shown to someone who wants remote only", async () => {
+    expect(
+      await idsFor({ workplace: "unknown" }, { workplaces: ["remote"], locations: ["Germany"] }),
+    ).not.toContain("gap");
+  });
+
+  test("an unknown employment type", async () => {
+    expect(await idsFor({ employmentType: "unknown" })).toContain("gap");
+  });
+
+  test("no detected language", async () => {
+    expect(await idsFor({ language: null })).toContain("gap");
+  });
+
+  test("a complete Posting still ranks above one with gaps", async () => {
+    const ids = await idsFor({ seniority: null });
+
+    expect(ids.indexOf("registered-nurse")).toBeLessThan(ids.indexOf("gap"));
   });
 });

@@ -61,7 +61,7 @@ const baseTargets = {
   roles: ["Backend"],
   seniorities: ["senior"],
   workplaces: ["onsite"],
-  locations: ["Toronto, ON"],
+  locations: ["Ottawa, ON"],
   employmentTypes: ["full_time"],
   salaryFloorMinor: 14_000_000,
   salaryCurrency: "CAD",
@@ -119,7 +119,7 @@ async function seedPostings(appServerUrl: string) {
     language: "fr",
     countryCode: "CA",
     region: "Ontario",
-    city: "Toronto",
+    city: "Ottawa",
   };
 
   const postings = [

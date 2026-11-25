@@ -765,11 +765,12 @@ answers snapshot records the derivation key next to the value.
 
 A posting is a candidate for a user when all hold: open (`status='open'` and `closed_at IS NULL`) and
 `apply_supported=1` (a board without a deterministic apply adapter never matches; issue #563); tags intersect
-`targets.roles` (or subroles) and
-`seniorities`; workplace ∈ targets; location matches a target location (a remote posting matches when its country
+`targets.roles` (or subroles); its seniority tag, when it has one, ∈ `seniorities` (a title with no seniority
+word is not excluded); workplace ∈ targets (an unknown workplace passes for a user open to on-site or hybrid work,
+never for a remote-only user); location matches a target location (a remote posting matches when its country
 is a target country, or when it names no country and the user has an unscoped `work_auth=yes` (a country-scoped
 answer is never used for a posting that names no country); a
-remote posting restricted to a region, e.g. "Remote, EU", matches only target countries in that region); employment type ∈ targets; posting language ∈ `languages`;
+remote posting restricted to a region, e.g. "Remote, EU", matches only target countries in that region); employment type ∈ targets or unknown; posting language ∈ `languages` or undetected;
 salary ≥ floor when the posting lists salary (converted with `fx_rates`; postings without salary are never excluded);
 company not skipped (below); no other application by this user to this company in status preparing, needs_review,
 ready, approved, sending or confirming, and none sent to it in the last 30 days (failed, skipped and withdrawn do not count);
