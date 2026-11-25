@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
 import { z } from "zod";
 
 import type { OnboardingTargetsView } from "../../shared/onboarding.ts";
@@ -25,6 +26,7 @@ const skipCompanySchema = z.object({
 });
 
 const onboardingStateSchema = z.object({
+  applicationsLeft: z.number().default(0),
   currentEmployer: z.string().nullable(),
   needsOnboarding: z.boolean(),
   onboardedAt: z.string().nullable(),
@@ -38,6 +40,7 @@ const onboardingTargetsSchema: z.ZodType<OnboardingTargetsView> = z.object({
   choices: z.object({
     employmentTypes: z.array(z.enum(EMPLOYMENT_TYPES)),
     locations: z.array(z.string()),
+    roleCounts: z.record(z.string(), z.number()).default({}),
     roles: z.array(z.string()),
     seniorities: z.array(z.enum(SENIORITIES)),
     workplaces: z.array(z.enum(WORKPLACES)),
@@ -213,7 +216,11 @@ export function useUploadOnboardingResume() {
   return useMutation({
     mutationFn: uploadOnboardingResume,
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: stateKey });
+      client.removeQueries({ queryKey: matchesKey });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: stateKey }),
+        client.invalidateQueries({ queryKey: targetsKey }),
+      ]);
     },
   });
 }
@@ -224,11 +231,22 @@ export function useOnboardingTargets() {
 
 export function useSaveOnboardingTargets() {
   const client = useQueryClient();
+  const sequence = useRef(0);
 
   return useMutation({
     mutationFn: saveOnboardingTargets,
-    onSuccess: (view) => {
+    onMutate: () => {
+      sequence.current += 1;
+
+      return sequence.current;
+    },
+    onSuccess: (view, _variables, requestId) => {
+      if (requestId !== sequence.current) {
+        return;
+      }
+
       client.setQueryData(targetsKey, view);
+      client.removeQueries({ queryKey: matchesKey });
     },
   });
 }
@@ -288,10 +306,20 @@ export function useOnboardingMatches() {
 
 export function useSaveOnboardingMatches() {
   const client = useQueryClient();
+  const sequence = useRef(0);
 
   return useMutation({
     mutationFn: saveOnboardingMatches,
-    onSuccess: (view) => {
+    onMutate: () => {
+      sequence.current += 1;
+
+      return sequence.current;
+    },
+    onSuccess: (view, _variables, requestId) => {
+      if (requestId !== sequence.current) {
+        return;
+      }
+
       client.setQueryData(matchesKey, view);
     },
   });

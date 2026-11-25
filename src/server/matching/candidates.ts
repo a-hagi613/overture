@@ -14,7 +14,12 @@ import { publishEvent } from "../platform/sse/stream.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService } from "../profile/targets.ts";
-import { resolveLocation, sameRegion } from "../catalog/geo.ts";
+import {
+  countryCodesForContinent,
+  resolveLocation,
+  resolveLocationQuery,
+  sameRegion,
+} from "../catalog/geo.ts";
 import { ACTIVE_APPLICATION_STATUSES } from "./applications.ts";
 import { salaryMeetsFloor } from "./fx.ts";
 import { countryInRegion, remoteRegionOf } from "./regions.ts";
@@ -75,6 +80,13 @@ interface TargetPlace {
   region: string | null;
 }
 
+interface TargetLocationCriteria {
+  places: TargetPlace[];
+  remoteContinents: Set<string>;
+  remoteRegions: Set<string>;
+  remoteWorldwide: boolean;
+}
+
 interface CandidateDeps {
   db: AppDatabase;
   catalogDb: CatalogDatabase;
@@ -82,42 +94,131 @@ interface CandidateDeps {
   personal: PersonalCrypto;
 }
 
-function targetPlaces(targets: TargetsInput) {
+function addTargetPlace(
+  places: TargetPlace[],
+  countryCode: string,
+  city: string | null,
+  region: string | null,
+) {
+  if (
+    !places.some(
+      (existing) =>
+        existing.countryCode === countryCode &&
+        existing.city === city &&
+        existing.region === region,
+    )
+  ) {
+    places.push({ city, countryCode, region });
+  }
+}
+
+function targetLocationCriteria(targets: TargetsInput) {
   const places: TargetPlace[] = [];
+  const remoteContinents = new Set<string>();
+  const remoteRegions = new Set<string>();
+  let remoteWorldwide = false;
 
   for (const location of targets.locations) {
+    const queries = resolveLocationQuery(location);
+    const macro = remoteRegionOf(location);
+
+    if (macro !== null && macro !== "WORLDWIDE") {
+      remoteRegions.add(macro);
+    }
+
+    for (const group of queries) {
+      if (group.kind === null && group.remote) {
+        remoteWorldwide = true;
+
+        continue;
+      }
+
+      if (group.kind === "continent") {
+        for (const continentCode of group.continentCodes) {
+          if (group.remote) {
+            remoteContinents.add(continentCode);
+          } else {
+            for (const countryCode of countryCodesForContinent(continentCode)) {
+              addTargetPlace(places, countryCode, null, null);
+            }
+          }
+        }
+      }
+    }
+
     const resolved = resolveLocation(location);
 
     if (resolved.countryCode !== null) {
-      places.push({
-        countryCode: resolved.countryCode,
-        city: resolved.city,
-        region: resolved.region,
-      });
+      addTargetPlace(places, resolved.countryCode, resolved.city, resolved.region);
     }
   }
 
-  return places;
+  return {
+    places,
+    remoteContinents,
+    remoteRegions,
+    remoteWorldwide,
+  } satisfies TargetLocationCriteria;
+}
+
+function remoteCountryAllowed(countryCode: string, criteria: TargetLocationCriteria) {
+  if (criteria.places.some((place) => place.countryCode === countryCode)) {
+    return true;
+  }
+
+  for (const region of criteria.remoteRegions) {
+    if (countryInRegion(countryCode, region)) {
+      return true;
+    }
+  }
+
+  for (const continent of criteria.remoteContinents) {
+    if (countryCodesForContinent(continent).includes(countryCode)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function remoteMacroRegionAllowed(macroRegion: string, criteria: TargetLocationCriteria) {
+  if (criteria.remoteRegions.has(macroRegion)) {
+    return true;
+  }
+
+  if (criteria.places.some((place) => countryInRegion(place.countryCode, macroRegion))) {
+    return true;
+  }
+
+  return [...criteria.remoteContinents].some((continent) =>
+    countryCodesForContinent(continent).some((countryCode) =>
+      countryInRegion(countryCode, macroRegion),
+    ),
+  );
 }
 
 function locationMatch(
   posting: CandidatePosting,
-  places: readonly TargetPlace[],
+  criteria: TargetLocationCriteria,
   workAuthorised: boolean,
 ) {
   if (posting.workplace === "remote") {
+    if (criteria.remoteWorldwide) {
+      return { matched: true, score: 15 };
+    }
+
     const macroRegion = remoteRegionOf(posting.locationRaw);
 
     if (posting.countryCode !== null) {
       return {
-        matched: places.some((place) => place.countryCode === posting.countryCode),
+        matched: remoteCountryAllowed(posting.countryCode, criteria),
         score: 15,
       };
     }
 
     if (macroRegion !== null && macroRegion !== "WORLDWIDE") {
       return {
-        matched: places.some((place) => countryInRegion(place.countryCode, macroRegion)),
+        matched: remoteMacroRegionAllowed(macroRegion, criteria),
         score: 15,
       };
     }
@@ -127,7 +228,7 @@ function locationMatch(
 
   let best = 0;
 
-  for (const place of places) {
+  for (const place of criteria.places) {
     if (posting.countryCode !== place.countryCode) {
       continue;
     }
@@ -199,7 +300,7 @@ interface FilterContext {
   targets: TargetsInput;
   rolePlan: RoleTargetPlan;
   languages: readonly string[];
-  places: TargetPlace[];
+  locationCriteria: TargetLocationCriteria;
   workAuthorised: boolean;
   skipRows: SkipTarget[];
   activeCompanies: Set<string>;
@@ -454,7 +555,7 @@ export function createCandidateService(deps: CandidateDeps) {
     languages: readonly string[],
   ) {
     const at = clock.now();
-    const places = targetPlaces(targets);
+    const locationCriteria = targetLocationCriteria(targets);
     const workAuthorised = workAuthorisation(await facts.list(userId));
 
     const skipRows = db
@@ -590,7 +691,7 @@ export function createCandidateService(deps: CandidateDeps) {
       globalOff,
       hidden,
       languages,
-      places,
+      locationCriteria,
       recentCompanies,
       repostKeys,
       rolePlan: planRoleTargets(targets.roles),
@@ -735,7 +836,7 @@ export function createCandidateService(deps: CandidateDeps) {
       } satisfies Verdict;
     }
 
-    const location = locationMatch(posting, context.places, context.workAuthorised);
+    const location = locationMatch(posting, context.locationCriteria, context.workAuthorised);
 
     if (!location.matched) {
       return {

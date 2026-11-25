@@ -99,7 +99,14 @@ test("a brand-new user picks three matches and the trial prepares them", async (
 });
 
 const emptyChoices = {
-  choices: { employmentTypes: [], locations: [], roles: [], seniorities: [], workplaces: [] },
+  choices: {
+    employmentTypes: [],
+    locations: [],
+    roleCounts: {},
+    roles: [],
+    seniorities: [],
+    workplaces: [],
+  },
   currencies: [],
   matchedCount: 0,
   targets: {

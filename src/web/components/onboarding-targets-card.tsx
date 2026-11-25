@@ -109,7 +109,8 @@ export function OnboardingTargetsCard({
     initialCategoryFor(view.targets.roles),
   );
 
-  const [matchedCount, setMatchedCount] = useState(view.matchedCount);
+  const [savedMatchedCount, setSavedMatchedCount] = useState<number | null>(null);
+  const matchedCount = savedMatchedCount ?? view.matchedCount;
   const [failed, setFailed] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const sequence = useRef(0);
@@ -128,7 +129,7 @@ export function OnboardingTargetsCard({
       const saved = await save(next);
 
       if (id === sequence.current) {
-        setMatchedCount(saved.matchedCount);
+        setSavedMatchedCount(saved.matchedCount);
       }
 
       return true;
@@ -197,6 +198,7 @@ export function OnboardingTargetsCard({
           onToggleRole={(role) => {
             void commit({ ...draft, roles: toggle(draft.roles, role) });
           }}
+          roleCounts={choices.roleCounts}
           selectedRoles={draft.roles}
         />
 

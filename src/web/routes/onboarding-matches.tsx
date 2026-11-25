@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -67,10 +67,11 @@ function previewMatchesFromBoard(board: BoardResponse, base: OnboardingMatches) 
 export function OnboardingMatchesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const preview = params.get("preview") === "1";
   const trialParam = params.get("trial") === "1";
   const cardParam = params.get("card");
+  const cancelledParam = cardParam === "cancelled";
   const sessionId = params.get("session");
   const returned = cardParam === "verified" && sessionId !== null;
   const suffix = preview ? "?preview=1" : "";
@@ -83,18 +84,20 @@ export function OnboardingMatchesPage() {
   const acceptConsent = useAcceptConsent();
   const prepare = usePrepareOnboarding();
 
-  const [selected, setSelected] = useState<string[] | null>(null);
-  const [openingModal, setOpeningModal] = useState(false);
-
-  const [modalOpen, setModalOpen] = useState(
-    () => trialParam || returned || cardParam === "cancelled",
+  const [selectionState, setSelectionState] = useState<{ ids: string[]; signature: string } | null>(
+    null,
   );
 
+  const [openingModal, setOpeningModal] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [modalDismissed, setModalDismissed] = useState(false);
   const [trialState, setTrialState] = useState<TrialCardState>("verify");
   const [agreed, setAgreed] = useState(false);
+  const completingRef = useRef(false);
+  const cancelledNoticeRef = useRef(false);
 
   const needsPreviewBoard = preview && matches.data?.matches.length === 0;
+  const hasApplications = !preview && (state.data?.applicationsLeft ?? 0) > 0;
 
   const boardQuery = useQuery({
     enabled: needsPreviewBoard,
@@ -103,11 +106,18 @@ export function OnboardingMatchesPage() {
   });
 
   useEffect(() => {
+    if (!preview && cancelledParam && !cancelledNoticeRef.current) {
+      cancelledNoticeRef.current = true;
+      toast.info(trialText.cancelledNote);
+    }
+  }, [cancelledParam, preview]);
+
+  useEffect(() => {
     if (preview || state.data === undefined) {
       return;
     }
 
-    if (state.data.onboardedAt !== null) {
+    if (state.data.onboardedAt !== null && !completingRef.current) {
       void navigate("/home", { replace: true });
 
       return;
@@ -119,7 +129,7 @@ export function OnboardingMatchesPage() {
   }, [navigate, preview, state.data]);
 
   const verify = useMutation({
-    mutationFn: async (picks: readonly string[]) => {
+    mutationFn: async (currentPicks: readonly string[]) => {
       if (preview) {
         return "granted" as const;
       }
@@ -132,28 +142,43 @@ export function OnboardingMatchesPage() {
         await acceptConsent.mutateAsync(consent.data.current.version);
       }
 
-      if (!returned) {
+      if (!hasApplications && !returned) {
         globalThis.location.assign(await startCardSetup());
 
         return "redirect" as const;
       }
 
-      const outcome = await verifyTrialCard(sessionId);
+      if (!hasApplications && returned) {
+        const outcome = await verifyTrialCard(sessionId);
 
-      if (outcome !== "granted") {
-        return outcome;
+        if (outcome !== "granted") {
+          return outcome;
+        }
       }
 
       const current = await fetchOnboardingMatches();
-      const targetIds = current.selected.length > 0 ? current.selected : [...picks];
+
+      const targetIds =
+        currentPicks.length > 0 ? [...currentPicks] : current.selected.slice(0, current.pickLimit);
 
       if (targetIds.length === 0) {
         return "empty_selection" as const;
       }
 
+      completingRef.current = true;
+
       const result = await prepare.mutateAsync(targetIds);
 
-      return result.prepared > 0 ? ("granted" as const) : ("empty_selection" as const);
+      if (result.prepared <= 0) {
+        completingRef.current = false;
+
+        return "empty_selection" as const;
+      }
+
+      return "granted" as const;
+    },
+    onError: () => {
+      completingRef.current = false;
     },
     onSuccess: async (outcome) => {
       if (outcome === "granted") {
@@ -173,12 +198,13 @@ export function OnboardingMatchesPage() {
           queryClient.invalidateQueries({ queryKey: ["board"] }),
         ]);
 
-        await navigate("/ready");
+        await navigate("/ready", { replace: true });
 
         return;
       }
 
       if (outcome === "empty_selection") {
+        completingRef.current = false;
         setModalOpen(false);
         toast.error(copy.onboarding.matches.prepareFailed);
 
@@ -186,6 +212,7 @@ export function OnboardingMatchesPage() {
       }
 
       if (outcome !== "redirect") {
+        completingRef.current = false;
         setTrialState(outcome);
       }
     },
@@ -218,15 +245,24 @@ export function OnboardingMatchesPage() {
       ? previewMatchesFromBoard(boardQuery.data, matches.data)
       : matches.data;
 
-  const defaultSelected = effectiveMatches.matches
-    .slice(0, effectiveMatches.pickLimit)
-    .map((item) => item.id);
+  const topMatches = effectiveMatches.matches.slice(0, effectiveMatches.pickLimit);
+  const topMatchIds = new Set(topMatches.map((item) => item.id));
+  const matchesSignature = topMatches.map((item) => item.id).join(",");
+  const defaultSelected = topMatches.map((item) => item.id);
+  const validSaved = effectiveMatches.selected.filter((id) => topMatchIds.has(id));
+
+  let fallbackPicks = defaultSelected;
+
+  if (validSaved.length > 0) {
+    fallbackPicks = validSaved;
+  }
 
   const picks =
-    selected ??
-    (effectiveMatches.selected.length > 0 ? effectiveMatches.selected : defaultSelected);
+    selectionState?.signature === matchesSignature
+      ? selectionState.ids.filter((id) => topMatchIds.has(id))
+      : fallbackPicks;
 
-  const selectedMatches = effectiveMatches.matches.filter((match) => picks.includes(match.id));
+  const selectedMatches = topMatches.filter((match) => picks.includes(match.id));
   const busy = save.isPending || openingModal;
 
   const toggle = (id: string) => {
@@ -234,15 +270,14 @@ export function OnboardingMatchesPage() {
       ? picks.filter((pick) => pick !== id)
       : [...picks, id].slice(0, effectiveMatches.pickLimit);
 
-    setSelected(next);
+    setSelectionState({ ids: next, signature: matchesSignature });
 
     if (!preview) {
       save.mutate(next);
     }
   };
 
-  const autoModalOpen =
-    !preview && !modalDismissed && (trialParam || returned || (state.data?.step ?? 0) >= 4);
+  const autoModalOpen = !preview && !modalDismissed && (trialParam || returned || cancelledParam);
 
   const effectiveModalOpen = modalOpen || autoModalOpen;
 
@@ -335,11 +370,21 @@ export function OnboardingMatchesPage() {
         consentSlot={consentCheckbox}
         disabled={verifyDisabled}
         error={verify.isError || restart.isError || prepare.isError}
+        hasApplications={hasApplications}
         onOpenChange={(nextOpen) => {
           setModalOpen(nextOpen);
 
           if (!nextOpen) {
             setModalDismissed(true);
+
+            if (trialParam || returned || cardParam !== null || sessionId !== null) {
+              const next = new URLSearchParams(params);
+
+              next.delete("trial");
+              next.delete("card");
+              next.delete("session");
+              setParams(next, { replace: true });
+            }
           }
         }}
         onVerify={() => {

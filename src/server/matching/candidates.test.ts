@@ -50,6 +50,10 @@ interface SeedOverrides {
   employmentType?: "full_time" | "unknown";
   language?: string | null;
   seniority?: string | null;
+  city?: string | null;
+  countryCode?: string | null;
+  region?: string | null;
+  locationRaw?: string | null;
 }
 
 function seedPosting(
@@ -70,19 +74,19 @@ function seedPosting(
       ats: "greenhouse",
       atsJobId: id,
       boardId: "board-1",
-      city: "Berlin",
+      city: overrides.city === undefined ? "Berlin" : overrides.city,
       closedAt: null,
       companyId: "company-1",
-      countryCode: "DE",
+      countryCode: overrides.countryCode === undefined ? "DE" : overrides.countryCode,
       dedupeKey: `greenhouse:${id}`,
       employmentType: overrides.employmentType ?? "full_time",
       firstSeenAt: NOW,
       id,
       language: overrides.language === undefined ? "English" : overrides.language,
       lastSeenAt: NOW,
-      locationRaw: "Berlin, Germany",
+      locationRaw: overrides.locationRaw === undefined ? "Berlin, Germany" : overrides.locationRaw,
       postedAt: NOW - 1000,
-      region: "Berlin",
+      region: overrides.region === undefined ? "Berlin" : overrides.region,
       status: "open",
       title,
       titleNorm: title.toLowerCase(),
@@ -369,5 +373,76 @@ describe("seniority is a ranking signal, blocked only three or more levels away"
   test("a manager Posting sits level with staff, so an entry-level target never sees it", async () => {
     expect(await rankedWith([["manager", "manager"]], ["entry"])).toEqual([]);
     expect(await rankedWith([["manager", "manager"]], ["mid"])).toEqual(["manager"]);
+  });
+});
+
+describe("remote target locations match without prior work_auth", () => {
+  test("picking 'Remote' matches remote postings worldwide or in any country without work_auth", async () => {
+    const { candidates, catalog } = fresh();
+
+    seedPosting(catalog, "remote-us", "Registered Nurse", NURSE_TAGS, {
+      city: null,
+      countryCode: "US",
+      locationRaw: "Remote, United States",
+      region: null,
+      workplace: "remote",
+    });
+    seedPosting(catalog, "remote-world", "Registered Nurse", NURSE_TAGS, {
+      city: null,
+      countryCode: null,
+      locationRaw: "Remote",
+      region: null,
+      workplace: "remote",
+    });
+    seedPosting(catalog, "remote-eu", "Registered Nurse", NURSE_TAGS, {
+      city: null,
+      countryCode: null,
+      locationRaw: "Remote, Europe",
+      region: null,
+      workplace: "remote",
+    });
+
+    const anyRemote = await candidates.ranked(
+      "user-1",
+      {
+        ...BASE_TARGETS,
+        locations: ["Remote"],
+        roles: ["Registered Nurse"],
+        workplaces: ["remote"],
+      },
+      ["English"],
+    );
+
+    expect(anyRemote.map((row) => row.id).toSorted()).toEqual([
+      "remote-eu",
+      "remote-us",
+      "remote-world",
+    ]);
+
+    const euRemote = await candidates.ranked(
+      "user-1",
+      {
+        ...BASE_TARGETS,
+        locations: ["Remote (Europe)"],
+        roles: ["Registered Nurse"],
+        workplaces: ["remote"],
+      },
+      ["English"],
+    );
+
+    expect(euRemote.map((row) => row.id)).toEqual(["remote-eu"]);
+
+    const canadaOnly = await candidates.ranked(
+      "user-1",
+      {
+        ...BASE_TARGETS,
+        locations: ["Canada"],
+        roles: ["Registered Nurse"],
+        workplaces: ["remote"],
+      },
+      ["English"],
+    );
+
+    expect(canadaOnly).toEqual([]);
   });
 });

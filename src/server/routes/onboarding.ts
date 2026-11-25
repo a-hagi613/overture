@@ -152,6 +152,7 @@ export function createOnboardingRoutes(deps: {
     const skipList = await skipCompanies.list(account.id);
 
     return {
+      applicationsLeft: applicationsLeft(db, account.id, clock.now()),
       currentEmployer:
         skipList.find((company) => company.reason === "current_employer")?.name ?? null,
       needsOnboarding: account.role !== "owner" && state.onboardedAt === null,
@@ -175,13 +176,16 @@ export function createOnboardingRoutes(deps: {
   async function matchesView(userId: string) {
     const preview = await deps.matching.preview(userId, 9);
     const saved = savedPostingIds(userId);
-    const available = new Set(preview.items.map((item) => item.id));
+
+    const selectableIds = new Set(
+      preview.items.slice(0, ONBOARDING_MATCH_PICK_LIMIT).map((item) => item.id),
+    );
 
     return {
       matches: preview.items,
       pickLimit: ONBOARDING_MATCH_PICK_LIMIT,
       poolCount: preview.poolCount,
-      selected: saved.filter((id) => available.has(id)),
+      selected: saved.filter((id) => selectableIds.has(id)),
     };
   }
 

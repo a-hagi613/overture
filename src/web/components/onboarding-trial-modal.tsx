@@ -18,6 +18,7 @@ export function OnboardingTrialModal({
   consentSlot,
   disabled,
   error,
+  hasApplications = false,
   onOpenChange,
   onVerify,
   open,
@@ -29,6 +30,7 @@ export function OnboardingTrialModal({
   consentSlot: ReactNode;
   disabled: boolean;
   error: boolean;
+  hasApplications?: boolean | undefined;
   onOpenChange: (open: boolean) => void;
   onVerify: () => void;
   open: boolean;
@@ -55,9 +57,15 @@ export function OnboardingTrialModal({
 
   let ctaLabel: string = returned ? text.ctaReturnButton : text.ctaButton;
 
+  if (hasApplications && !returned) {
+    ctaLabel = text.ctaDirectButton;
+  }
+
   if (busy) {
     ctaLabel = text.ctaBusy;
   }
+
+  const showStripeCopy = !hasApplications || returned;
 
   let footerSlot = (
     <>
@@ -73,10 +81,12 @@ export function OnboardingTrialModal({
         <span>{ctaLabel}</span>
         <ArrowRight aria-hidden="true" size={16} />
       </Button>
-      <p className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-        <Lock aria-hidden="true" size={12} />
-        <span>{text.stripeNote}</span>
-      </p>
+      {showStripeCopy ? (
+        <p className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+          <Lock aria-hidden="true" size={12} />
+          <span>{text.stripeNote}</span>
+        </p>
+      ) : null}
       {disabled ? (
         <output className="mt-2 block text-center text-xs font-medium text-muted-foreground">
           {text.consentRequired}
@@ -113,7 +123,7 @@ export function OnboardingTrialModal({
     <Root onOpenChange={onOpenChange} open={open}>
       <Portal>
         <Overlay className="ov-overlay-in fixed inset-0 z-50 bg-scrim backdrop-blur-xs" />
-        <Content className="ov-pop-in fixed left-1/2 top-1/2 z-50 w-11/12 max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-6 shadow-lift focus:outline-none">
+        <Content className="ov-pop-in fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-11/12 max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lift focus:outline-none">
           <div className="flex items-start justify-between gap-3">
             <Badge variant={badgeVariant}>{badgeLabel}</Badge>
             <Button
@@ -133,9 +143,11 @@ export function OnboardingTrialModal({
 
           {state === "verify" ? (
             <>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                {returned ? text.returnReadyNote : text.modalReason}
-              </p>
+              {showStripeCopy ? (
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  {returned ? text.returnReadyNote : text.modalReason}
+                </p>
+              ) : null}
               {selectedMatches.length === 0 ? null : (
                 <ul className="mt-4 space-y-1.5 rounded-lg border border-border bg-muted/40 p-3">
                   {selectedMatches.map((match) => (

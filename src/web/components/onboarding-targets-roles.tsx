@@ -1,7 +1,13 @@
-import { X } from "lucide-react";
+import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { useState } from "react";
 
 import { copy } from "../../shared/copy.ts";
-import { onboardingRolesForCategory } from "../../shared/onboarding-options.ts";
+import {
+  ONBOARDING_ROLE_CHIP_LIMIT,
+  onboardingRolesForCategory,
+  orderOnboardingRoles,
+  visibleOnboardingRoles,
+} from "../../shared/onboarding-options.ts";
 import type { RoleCategoryId } from "../../shared/role-taxonomy.ts";
 import { ROLE_CATEGORIES, roleCategoryById } from "../../shared/role-taxonomy.ts";
 import { OnboardingTargetChip } from "./onboarding-target-chip.tsx";
@@ -15,16 +21,25 @@ export function OnboardingTargetsRoles({
   category,
   onCategoryChange,
   onToggleRole,
+  roleCounts,
   selectedRoles,
 }: {
   category: RoleCategoryId;
   onCategoryChange: (next: RoleCategoryId) => void;
   onToggleRole: (role: string) => void;
+  roleCounts?: Readonly<Record<string, number>> | undefined;
   selectedRoles: readonly string[];
 }) {
+  const [expandedCategory, setExpandedCategory] = useState<RoleCategoryId | null>(null);
   const categoryRoles = onboardingRolesForCategory(category);
   const categoryRoleSet = new Set(categoryRoles);
   const otherSelectedRoles = selectedRoles.filter((role) => !categoryRoleSet.has(role));
+  const orderedRoles = orderOnboardingRoles(categoryRoles, roleCounts);
+  const expanded = expandedCategory === category;
+  const { hiddenCount, visible } = visibleOnboardingRoles(orderedRoles, selectedRoles, expanded);
+
+  const showMoreToggle =
+    orderedRoles.length > ONBOARDING_ROLE_CHIP_LIMIT && (expanded || hiddenCount > 0);
 
   return (
     <div className="space-y-4">
@@ -61,7 +76,7 @@ export function OnboardingTargetsRoles({
           aria-labelledby="w-roles"
           className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0"
         >
-          {categoryRoles.map((role) => (
+          {visible.map((role) => (
             <OnboardingTargetChip
               key={role}
               on={selectedRoles.includes(role)}
@@ -73,6 +88,26 @@ export function OnboardingTargetsRoles({
             </OnboardingTargetChip>
           ))}
         </fieldset>
+        {showMoreToggle ? (
+          <Button
+            ariaExpanded={expanded}
+            className="mt-2.5"
+            onClick={() => {
+              setExpandedCategory(expanded ? null : category);
+            }}
+            size="sm"
+            variant="ghost"
+          >
+            <span>
+              {expanded ? copy.onboarding.fewerRoles : copy.onboarding.moreRoles(hiddenCount)}
+            </span>
+            {expanded ? (
+              <ChevronUp aria-hidden="true" size={14} />
+            ) : (
+              <ChevronDown aria-hidden="true" size={14} />
+            )}
+          </Button>
+        ) : null}
       </div>
 
       {otherSelectedRoles.length === 0 ? null : (

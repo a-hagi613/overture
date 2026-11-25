@@ -287,6 +287,7 @@ export async function seedOnboardingTargetsFlow(request: APIRequestContext, appS
       locationRaw: "London, England, United Kingdom",
       tags: [
         { dimension: "role", value: "Platform Engineer" },
+        { dimension: "granular_role", value: "infra.devops" },
         { dimension: "seniority", value: "senior" },
       ],
       title: "Platform Engineer",
@@ -305,6 +306,7 @@ export async function seedOnboardingTargetsFlow(request: APIRequestContext, appS
       locationRaw: "London, England, United Kingdom",
       tags: [
         { dimension: "role", value: "Platform Engineer" },
+        { dimension: "granular_role", value: "infra.devops" },
         { dimension: "seniority", value: "senior" },
       ],
       title: "Platform Engineer",
@@ -323,6 +325,7 @@ export async function seedOnboardingTargetsFlow(request: APIRequestContext, appS
       locationRaw: "London, England, United Kingdom",
       tags: [
         { dimension: "role", value: "Platform Engineer" },
+        { dimension: "granular_role", value: "infra.devops" },
         { dimension: "seniority", value: "senior" },
       ],
       title: "Platform Engineer",
