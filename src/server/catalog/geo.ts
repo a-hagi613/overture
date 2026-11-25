@@ -89,7 +89,6 @@ const countryAliases = new Map([
   ["scotland", "GB"],
   ["wales", "GB"],
   ["republic of ireland", "IE"],
-  // Country names in their own language, as non-English job boards print them.
   ["deutschland", "DE"],
   ["osterreich", "AT"],
   ["schweiz", "CH"],
@@ -297,12 +296,10 @@ const CITY_ALIASES = [
   { alias: "saigon", country: "VN", name: "Ho Chi Minh City" },
   { alias: "frankfurt", country: "DE", name: "Frankfurt am Main" },
   { alias: "metro manila", country: "PH", name: "Manila" },
-  // Business districts GeoNames files as sections of a bigger city, so they are not rows of their own.
   { alias: "sandton", country: "ZA", name: "Johannesburg" },
   { alias: "annapolis junction", admin1: "MD", country: "US", name: "Fort Meade" },
 ] as const satisfies readonly { alias: string; admin1?: string; country: string; name: string }[];
 
-/** A single place name that is both a region and a city this big means the city ("Sofia", "Buenos Aires"). */
 const CITY_OVER_REGION_POPULATION = 1_000_000;
 
 let cityTopIndex: Map<string, number> | null = null;
@@ -410,11 +407,6 @@ function segmentsOf(text: string) {
     .filter((segment) => !remoteKeywords.has(segment.normalized));
 }
 
-/**
- * Drops a postcode printed beside a place: "10115 Berlin" → "Berlin", "CA 94105" → "CA".
- * @param segment One trimmed location segment.
- * @returns The segment without a leading or trailing postcode; a bare number is left alone.
- */
 function withoutPostcode(segment: string) {
   return segment.replace(/^\d{4,6}\s+(?=\D)/u, "").replace(/(?<=\D)\s+\d{4,6}(?:-\d{4})?$/u, "");
 }
@@ -512,12 +504,6 @@ function findCity(normalized: string, countryCode: string | null, regionIsoCode:
   return null;
 }
 
-/**
- * A city of at least {@link CITY_OVER_REGION_POPULATION} with this name in the country, wherever its region.
- * @param normalized The folded place name.
- * @param countryCode The country the city must be in.
- * @returns The city's index, or null.
- */
 function bigCityNamed(normalized: string, countryCode: string) {
   const index = findCity(normalized, countryCode, null);
 
@@ -795,7 +781,6 @@ export function resolvePlaceQuery(group: string) {
     let match = findCity(segment.normalized, countryCode, regionIsoCode);
 
     if (match === null && index === regionIndex && countryCode !== null) {
-      // "Sofia, Bulgaria": the segment read as Sofia Province names the capital, which sits in its own region.
       match = bigCityNamed(segment.normalized, countryCode);
 
       if (match !== null) {

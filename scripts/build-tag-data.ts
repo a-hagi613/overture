@@ -251,13 +251,10 @@ interface GeoDataset {
   cities: CompactCity[];
 }
 
-/** Latin-script names, accented letters included, so endonyms such as "München" and "Göteborg" are kept. */
 const LATIN_NAME = /^[A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F '.-]{2,39}$/u;
 
-/** All-capital tokens such as "MUC" or "EDDM" are airport codes, not place names. */
 const CODE_LIKE = /^[A-Z]{2,5}$/u;
 
-/** Cities this big get every Latin alternate (the resolver only reads alternates at this size). */
 const FULL_ALTERNATES_POPULATION = 50_000;
 
 function compactCityLine(
@@ -291,7 +288,6 @@ function compactCityLine(
   const keptAlternates: string[] = [];
   const limit = residents >= FULL_ALTERNATES_POPULATION ? Number.POSITIVE_INFINITY : 3;
 
-  // The local spelling ("Köln" for "Koeln") goes first, then GeoNames' alternates.
   for (const alternate of [localName, ...alternates.split(",")]) {
     const trimmed = alternate.trim();
     const normalized = normalizeTitle(trimmed);
@@ -533,8 +529,7 @@ async function buildOnet() {
   );
 }
 
-// `bun scripts/build-tag-data.ts geo` (or `onet`) rebuilds one file; no argument rebuilds both.
-const only = process.argv[2];
+const only = process.argv.at(2);
 
 if (only === undefined || only === "geo") {
   await buildGeoPlaces();
