@@ -1,9 +1,6 @@
 import type { RoleCategoryId } from "./role-taxonomy.ts";
-import type { Seniority, Workplace } from "./tag-taxonomy.ts";
+import type { Seniority } from "./tag-taxonomy.ts";
 import { pickableRoles, roleCategoryOf } from "./role-taxonomy.ts";
-
-/** Workplace options offered during onboarding. */
-export const ONBOARDING_WORKPLACES: readonly Workplace[] = ["remote", "hybrid"];
 
 /** Seniority levels offered during onboarding in universal career progression order. */
 export const ONBOARDING_SENIORITIES: readonly Seniority[] = [

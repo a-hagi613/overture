@@ -8,7 +8,7 @@ import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
-import { seedOnboardingTargetsFlow } from "./onboarding-targets-harness.ts";
+import { seedOnboardingTargetsFlow, seedOnsitePosting } from "./onboarding-targets-harness.ts";
 
 const test = appTest.extend<{ onboardingServer: AppServer }>({
   onboardingServer: [
@@ -215,6 +215,81 @@ test("choices persist across reload, optional salary saves, and browser zone is 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
   expect(state.step).toBe(3);
+
+  await context.close();
+  await request.dispose();
+});
+
+test("a fresh user is offered on-site work and sees matches only once every group has a pick", async ({
+  browser,
+  onboardingServer,
+}) => {
+  const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
+  const storageState = await storageStateFor(request, onboardingServer.url);
+
+  await seedOnsitePosting(request);
+
+  const context = await browser.newContext({
+    storageState,
+    viewport: { height: 1400, width: 1280 },
+  });
+
+  const page = await context.newPage();
+  const seeMatches = page.getByRole("button", { name: "See my matches" });
+  const status = page.getByTestId("onboarding-targets-status");
+
+  await page.goto(`${onboardingServer.url}/onboarding`);
+  await page.locator('input[type="file"]').setInputFiles("test/e2e/fixtures/resume-text.pdf");
+  await expect(page.getByText("resume-text.pdf")).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/targets$/u);
+  await expect(page.getByRole("button", { exact: true, name: "On-site" })).toBeVisible();
+  await expect(seeMatches).toBeDisabled();
+  await expect(status).toHaveText(
+    "Pick at least one role, location, workplace and seniority to see your matches.",
+  );
+
+  await page.getByRole("button", { exact: true, name: "DevOps / SRE / Platform Engineer" }).click();
+  await page.getByLabel("Locations").click();
+  await page.getByRole("option", { exact: true, name: "London" }).click();
+  await page.keyboard.press("Escape");
+  const held = Promise.withResolvers<undefined>();
+
+  await page.route("**/api/onboarding/targets", async (route) => {
+    const body = route.request().postData() ?? "";
+
+    if (route.request().method() === "PUT" && !body.includes('"senior"')) {
+      await held.promise;
+    }
+
+    await route.fallback();
+  });
+
+  await page.getByRole("button", { exact: true, name: "Remote" }).click();
+  await expect(seeMatches).toBeDisabled();
+
+  await page.getByRole("button", { exact: true, name: "Senior" }).click();
+  await expect(seeMatches).toBeEnabled();
+  await expect(status).toHaveText("3 open roles match");
+
+  const late = page.waitForResponse(
+    (response) => response.request().method() === "PUT" && response.url().endsWith("/targets"),
+  );
+
+  held.resolve(undefined);
+  await late;
+  await page.unroute("**/api/onboarding/targets");
+  await expect(status).toHaveText("3 open roles match");
+
+  await page.getByRole("button", { exact: true, name: "On-site" }).click();
+  await expect(status).toHaveText("4 open roles match");
+
+  const saved = targetsSchema.parse(await (await request.get("/api/profile/targets")).json());
+
+  expect(saved.targets.workplaces).toEqual(["remote", "onsite"]);
+
+  await seeMatches.click();
+  await expect(page).toHaveURL(/\/onboarding\/matches$/u);
 
   await context.close();
   await request.dispose();
