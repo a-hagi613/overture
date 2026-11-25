@@ -12,7 +12,8 @@ const POLL_MS = 10_000;
 
 const clock = createClock();
 
-const [pages = "form", sessions = "3", providers = "browser_use"] = Bun.argv.slice(2);
+const [pages = "form:greenhouse,form:lever,form:ashby", sessions = "1", providers = "browser_use"] =
+  Bun.argv.slice(2);
 
 const payload = labRunPayloadSchema.parse({
   pages: pages.split(",").map((page) => page.trim()),

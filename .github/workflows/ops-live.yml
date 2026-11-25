@@ -458,7 +458,7 @@ jobs:
         run: |
           set -euo pipefail
           status=0
-          output="$(timeout 1080s flyctl ssh console -a overture-web -C "gosu app bun run /app/scripts/lab-run.ts form 3 browser_use" 2>&1)" || status=$?
+          output="$(timeout 1080s flyctl ssh console -a overture-web -C "gosu app bun run /app/scripts/lab-run.ts form:greenhouse,form:lever,form:ashby 1 browser_use" 2>&1)" || status=$?
           printf '%s\n' "$output"
           {
             echo "### Synthetic lab run (Overture's own forms, no employer)"
