@@ -2735,6 +2735,10 @@ export const copy = {
     back: "Back",
     continue: "Continue",
     seeMatches: "See my matches",
+    pickEveryGroup:
+      "Pick at least one role, location, workplace and seniority to see your matches.",
+    matchedCount: (count: number) =>
+      `${count.toLocaleString("en-US")} open ${plural(count, "role", "roles")} match`,
     currentEmployer: "Current employer",
     currentEmployerHint: "We will never apply here.",
     currentEmployerPlaceholder: "Add your current employer",

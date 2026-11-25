@@ -394,3 +394,37 @@ export async function seedOnboardingTargetsFlow(request: APIRequestContext, appS
 }
 
 export { boardTargets };
+
+export async function seedOnsitePosting(request: APIRequestContext) {
+  const companyId = await created(request, "/__test__/catalog/companies", {
+    domain: "onsite-clinic.example",
+    name: "Onsite Clinic",
+  });
+
+  const boardId = await created(request, "/__test__/catalog/boards", {
+    ats: "greenhouse",
+    boardToken: "onsite-clinic",
+    companyId,
+  });
+
+  await seedPostings(request, [
+    {
+      ats: "greenhouse",
+      atsJobId: "onsite-clinic-1",
+      boardId,
+      city: "London",
+      companyId,
+      countryCode: "GB",
+      employmentType: "full_time",
+      language: "en",
+      locationRaw: "London, England, United Kingdom",
+      tags: [
+        { dimension: "role", value: "Platform Engineer" },
+        { dimension: "seniority", value: "senior" },
+      ],
+      title: "Platform Engineer",
+      url: "https://onsite-clinic.example/1",
+      workplace: "onsite",
+    },
+  ]);
+}

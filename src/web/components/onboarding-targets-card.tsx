@@ -12,7 +12,6 @@ import { copy } from "../../shared/copy.ts";
 import {
   DEFAULT_ONBOARDING_CATEGORY,
   ONBOARDING_SENIORITIES,
-  ONBOARDING_WORKPLACES,
   onboardingCategoryForRole,
 } from "../../shared/onboarding-options.ts";
 import { OnboardingTargetChip } from "./onboarding-target-chip.tsx";
@@ -110,6 +109,7 @@ export function OnboardingTargetsCard({
     initialCategoryFor(view.targets.roles),
   );
 
+  const [matchedCount, setMatchedCount] = useState(view.matchedCount);
   const [failed, setFailed] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const sequence = useRef(0);
@@ -125,7 +125,11 @@ export function OnboardingTargetsCard({
     sequence.current = id;
 
     try {
-      await save(next);
+      const saved = await save(next);
+
+      if (id === sequence.current) {
+        setMatchedCount(saved.matchedCount);
+      }
 
       return true;
     } catch {
@@ -140,8 +144,14 @@ export function OnboardingTargetsCard({
   };
 
   const choices: OnboardingTargetChoices = view.choices;
-  const workplaces = choicesWithSelected(ONBOARDING_WORKPLACES, draft.workplaces);
+  const workplaces = choicesWithSelected(choices.workplaces, draft.workplaces);
   const seniorities = choicesWithSelected(ONBOARDING_SENIORITIES, draft.seniorities);
+
+  const complete =
+    draft.roles.length > 0 &&
+    draft.locations.length > 0 &&
+    draft.workplaces.length > 0 &&
+    draft.seniorities.length > 0;
 
   const commitSalary = (raw: string) => {
     const floor = floorFromInput(raw);
@@ -199,7 +209,11 @@ export function OnboardingTargetsCard({
         />
 
         <div className="border-t border-border pt-5">
-          <OnboardingTargetChipGroup headingId="w-work" label={copy.onboarding.workplace}>
+          <OnboardingTargetChipGroup
+            headingId="w-work"
+            label={copy.onboarding.workplace}
+            note={copy.onboarding.atLeastOne}
+          >
             {workplaces.map((workplace) => (
               <OnboardingTargetChip
                 key={workplace}
@@ -215,7 +229,11 @@ export function OnboardingTargetsCard({
         </div>
 
         <div className="border-t border-border pt-5">
-          <OnboardingTargetChipGroup headingId="w-sen" label={copy.onboarding.seniority}>
+          <OnboardingTargetChipGroup
+            headingId="w-sen"
+            label={copy.onboarding.seniority}
+            note={copy.onboarding.atLeastOne}
+          >
             {seniorities.map((seniority) => (
               <OnboardingTargetChip
                 key={seniority}
@@ -265,7 +283,15 @@ export function OnboardingTargetsCard({
         </p>
       ) : null}
 
-      <div className="mt-7 flex items-center justify-between gap-3 border-t border-border pt-5">
+      <p
+        aria-live="polite"
+        className="mt-6 text-sm text-muted-foreground"
+        data-testid="onboarding-targets-status"
+      >
+        {complete ? copy.onboarding.matchedCount(matchedCount) : copy.onboarding.pickEveryGroup}
+      </p>
+
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-5">
         <Button asChild size="default" variant="ghost">
           <Link to={backTo}>
             <ArrowLeft aria-hidden="true" size={15} />
@@ -274,7 +300,7 @@ export function OnboardingTargetsCard({
         </Button>
         <Button
           ariaBusy={continuing}
-          disabled={continuing}
+          disabled={continuing || !complete}
           onClick={() => {
             void continueOn();
           }}
