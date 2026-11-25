@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -5,6 +6,7 @@ import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
 import { OnboardingTargetsCard } from "../components/onboarding-targets-card.tsx";
 import {
+  matchesKey,
   useFinishOnboardingStep,
   useOnboardingState,
   useOnboardingTargets,
@@ -16,6 +18,7 @@ import {
 
 export function OnboardingTargetsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [params] = useSearchParams();
   const preview = params.get("preview") === "1";
   const suffix = preview ? "?preview=1" : "";
@@ -46,10 +49,8 @@ export function OnboardingTargetsPage() {
       return;
     }
 
-    if (state.data.step >= 4) {
-      void navigate("/onboarding/matches?trial=1", { replace: true });
-    } else if (state.data.step === 3) {
-      void navigate("/onboarding/matches", { replace: true });
+    if (state.data.onboardedAt !== null) {
+      void navigate("/home", { replace: true });
     }
   }, [navigate, preview, state.data]);
 
@@ -97,9 +98,16 @@ export function OnboardingTargetsPage() {
         currentEmployer={state.data.currentEmployer}
         onContinue={async () => {
           if (!preview) {
+            if (state.data.resume === null) {
+              await navigate("/onboarding/resume", { replace: true });
+
+              return;
+            }
+
             await finish.mutateAsync(2);
           }
 
+          queryClient.removeQueries({ queryKey: matchesKey });
           await navigate(`/onboarding/matches${suffix}`);
         }}
         preview={preview}

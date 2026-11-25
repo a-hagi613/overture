@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
 import { openCatalogDatabase } from "../platform/db/client.ts";
-import { locationChoiceCounts, locationChoices } from "./target-choices.ts";
+import { locationChoiceCounts, locationChoices, targetChoices } from "./target-choices.ts";
 
 const NOW = 1_795_000_000_000;
 
@@ -91,5 +91,57 @@ describe("the open-Posting location query", () => {
       "Lisbon",
       "Toronto",
     ]);
+  });
+});
+
+describe("targetChoices roleCounts", () => {
+  test("returns open-posting counts by taxonomy name even beyond top 12 and ignores closed postings", () => {
+    const fixture = migrated();
+
+    const roles: [string, number][] = [
+      ["sw.general", 20],
+      ["sw.backend", 18],
+      ["sw.frontend", 16],
+      ["sw.fullstack", 15],
+      ["sw.mobile", 14],
+      ["sw.embedded", 13],
+      ["sw.game", 12],
+      ["sw.qa", 11],
+      ["sw.web", 10],
+      ["sw.erp", 9],
+      ["sw.devops", 8],
+      ["sw.sysadmin", 7],
+      ["health.rn", 4],
+      ["health.lpn", 2],
+    ];
+
+    let index = 0;
+
+    for (const [roleId, total] of roles) {
+      for (let i = 0; i < total; i += 1) {
+        addPosting(fixture, { closed: false, index });
+        fixture.sqlite
+          .prepare(
+            "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, 'granular_role', ?, 'rules')",
+          )
+          .run(`p${String(index)}`, roleId);
+        index += 1;
+      }
+    }
+
+    addPosting(fixture, { closed: true, index });
+    fixture.sqlite
+      .prepare(
+        "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, 'granular_role', 'health.lpn', 'rules')",
+      )
+      .run(`p${String(index)}`);
+
+    const choices = targetChoices(fixture.catalogDb);
+
+    expect(choices.roles).toHaveLength(12);
+    expect(choices.roles[0]).toBe("Software Engineer (general)");
+    expect(choices.roleCounts["Software Engineer (general)"]).toBe(20);
+    expect(choices.roleCounts["Registered Nurse"]).toBe(4);
+    expect(choices.roleCounts["LPN / LVN"]).toBe(2);
   });
 });

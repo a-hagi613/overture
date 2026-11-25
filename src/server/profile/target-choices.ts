@@ -21,6 +21,7 @@ const shownEmploymentTypes = EMPLOYMENT_TYPES.filter(
 
 export interface TargetChoices {
   roles: string[];
+  roleCounts: Record<string, number>;
   locations: string[];
   seniorities: Seniority[];
   workplaces: Workplace[];
@@ -33,20 +34,33 @@ export interface TargetChoices {
  * empty. Roles are the most common role ids by name; a category or subcategory
  * is chosen in the category picker instead.
  * @param db The application database.
- * @returns The choices for roles, locations, seniority, workplace and employment type.
+ * @returns The choices for roles, role counts, locations, seniority, workplace and employment type.
  */
 export function targetChoices(db: CatalogDatabase) {
   const open = isNull(postings.closedAt);
 
-  const roleCandidates = db
+  const roleRows = db
     .select({ total: count(), value: postingTags.value })
     .from(postingTags)
     .innerJoin(postings, eq(postings.id, postingTags.postingId))
     .where(and(open, eq(postingTags.dimension, "granular_role")))
     .groupBy(postingTags.value)
     .orderBy(desc(count()), postingTags.value)
-    .limit(MAX_ROLE_CHOICES)
     .all();
+
+  const roleTotals = new Map<string, number>();
+
+  for (const row of roleRows) {
+    const name = roleTaxonomyName(row.value);
+
+    roleTotals.set(name, (roleTotals.get(name) ?? 0) + row.total);
+  }
+
+  const orderedRoles = [...roleTotals.entries()]
+    .toSorted((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([name]) => name);
+
+  const roleCounts = Object.fromEntries(roleTotals);
 
   const hasOpenSeniority = (value: string) =>
     db
@@ -85,7 +99,8 @@ export function targetChoices(db: CatalogDatabase) {
   return {
     employmentTypes: shownEmploymentTypes.filter((value) => hasEmploymentType(value)),
     locations: locationChoices(db),
-    roles: roleCandidates.map((row) => roleTaxonomyName(row.value)),
+    roleCounts,
+    roles: orderedRoles.slice(0, MAX_ROLE_CHOICES),
     seniorities: SENIORITIES.filter(
       (value) => seniorityPresent.has(value) && hasOpenSeniority(value),
     ),

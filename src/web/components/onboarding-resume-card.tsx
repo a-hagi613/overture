@@ -121,9 +121,9 @@ export function OnboardingResumeCard({
 
   let headerBadge = <Badge variant="outline">{copy.onboarding.resumeRequired}</Badge>;
 
-  if (resume?.unreadable === true) {
+  if (!showScanner && resume?.unreadable === true) {
     headerBadge = <Badge variant="need">{copy.nav.profilePages.resumeNeedsReupload}</Badge>;
-  } else if (resume !== null) {
+  } else if (!showScanner && resume !== null) {
     headerBadge = <Badge variant="ok">{copy.nav.profilePages.resumeVerified}</Badge>;
   }
 

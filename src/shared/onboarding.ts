@@ -47,6 +47,7 @@ export interface OnboardingMatchesView {
 
 export interface OnboardingTargetChoices {
   roles: string[];
+  roleCounts?: Record<string, number>;
   locations: string[];
   seniorities: Seniority[];
   workplaces: Workplace[];
