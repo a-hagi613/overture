@@ -112,10 +112,8 @@ test("an invited email joins by magic link, gets one grant of 300, and cannot be
 
   await signInByMagicLink(page, appUrl, page.request, guestEmail);
   await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
-  await page.goto(`${appUrl}/home`);
-  await expect(
-    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
-  ).toBeVisible();
+  await page.goto(`${appUrl}/profile/billing`);
+  await expect(page.getByRole("heading", { level: 1, name: /Billing/u })).toBeVisible();
   await expect(page.getByText("of 300 on your plan")).toBeVisible();
 
   const state = await verifyAuthState(appUrl, page.request);
@@ -141,10 +139,8 @@ test("an invited email joins by magic link, gets one grant of 300, and cannot be
 
   await signInByMagicLink(page, appUrl, page.request, guestEmail);
   await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
-  await page.goto(`${appUrl}/home`);
-  await expect(
-    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
-  ).toBeVisible();
+  await page.goto(`${appUrl}/profile/billing`);
+  await expect(page.getByRole("heading", { level: 1, name: /Billing/u })).toBeVisible();
   await expect(page.getByText("of 300 on your plan")).toBeVisible();
 
   expect(
@@ -184,10 +180,8 @@ test("an invite is accepted by Google and by LinkedIn, each granting 300 once", 
   await page.goto(`${appUrl}/signin`);
   await page.getByRole("button", { name: "Continue with Google" }).click();
   await expect(page.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
-  await page.goto(`${appUrl}/home`);
-  await expect(
-    page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
-  ).toBeVisible();
+  await page.goto(`${appUrl}/profile/billing`);
+  await expect(page.getByRole("heading", { level: 1, name: /Billing/u })).toBeVisible();
   await expect(page.getByText("of 300 on your plan")).toBeVisible();
 
   const linkedInContext = await browser.newContext();
@@ -198,10 +192,8 @@ test("an invite is accepted by Google and by LinkedIn, each granting 300 once", 
   await linkedInPage.goto(`${appUrl}/signin`);
   await linkedInPage.getByRole("button", { name: "Continue with LinkedIn" }).click();
   await expect(linkedInPage.getByRole("heading", { name: /Upload your resume/u })).toBeVisible();
-  await linkedInPage.goto(`${appUrl}/home`);
-  await expect(
-    linkedInPage.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
-  ).toBeVisible();
+  await linkedInPage.goto(`${appUrl}/profile/billing`);
+  await expect(linkedInPage.getByRole("heading", { level: 1, name: /Billing/u })).toBeVisible();
   await expect(linkedInPage.getByText("of 300 on your plan")).toBeVisible();
 
   await linkedInContext.close();

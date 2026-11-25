@@ -22,6 +22,17 @@ import { closeTopLayerHost, useTopLayerHost } from "./lib/top-layer-host.ts";
 
 const collapsedStorageKey = "overture.rail";
 
+const UNONBOARDED_ALLOWED_PATHS = new Set([
+  "/profile/account",
+  "/profile/billing",
+  "/settings",
+  "/settings/billing",
+  "/settings/billing/plans",
+  "/settings/delete",
+  "/settings/export",
+  "/settings/support-access",
+]);
+
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -54,7 +65,7 @@ export function AppShell() {
 
   useLiveUpdates();
 
-  const allowUnonboarded = location.pathname === "/profile/billing";
+  const allowUnonboarded = UNONBOARDED_ALLOWED_PATHS.has(location.pathname);
   const onboardingBlocked = onboarding.data?.needsOnboarding === true && !allowUnonboarded;
   const waitingForOnboarding = session !== null && onboarding.isPending && !allowUnonboarded;
 

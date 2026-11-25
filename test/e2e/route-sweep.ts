@@ -53,13 +53,15 @@ export const targets: Target[] = routerPaths.map((path) => ({
   url: urlFor(path),
 }));
 
-const redirects = new Map(
-  [
+const redirects = new Map([
+  ["/onboarding", "/onboarding/resume"],
+  ["/onboarding/trial", "/onboarding/matches"],
+  ...[
     ...routeSource.matchAll(
       /path:\s*"(?<from>[^"]+)"[^}]*?<(?:Navigate replace|PreserveSearchRedirect)\s+to="(?<to>[^"#]+)/gu,
     ),
-  ].map((match) => [match.groups?.from ?? "", match.groups?.to ?? ""]),
-);
+  ].map((match) => [match.groups?.from ?? "", match.groups?.to ?? ""] as const),
+]);
 
 /**
  * The path a route settles on: its own path, or the target of a `<Navigate>` redirect.
@@ -76,7 +78,13 @@ export function landingPath(path: string) {
   return new URL(target, "https://overture.local").pathname;
 }
 
-export async function navigate(page: Page, path: string, landing = path) {
+export async function navigate(
+  page: Page,
+  path: string,
+  landing: string | readonly string[] = path,
+) {
+  const allowed = [landing].flat();
+
   await page.evaluate(async (next) => {
     globalThis.history.pushState({}, "", next);
     globalThis.dispatchEvent(new PopStateEvent("popstate"));
@@ -86,7 +94,7 @@ export async function navigate(page: Page, path: string, landing = path) {
       });
     });
   }, path);
-  await page.waitForFunction((next) => globalThis.location.pathname === next, landing);
+  await page.waitForFunction((paths) => paths.includes(globalThis.location.pathname), allowed);
 }
 
 export async function openContext(
