@@ -2281,10 +2281,7 @@ const CATEGORY_BY_VALUE = new Map<string, RoleCategoryId>([
     [category.id, category.id] as const,
     [category.name, category.id] as const,
   ]),
-  ...ROLE_SUBCATEGORIES.flatMap((sub) => [
-    [sub.id, sub.categoryId] as const,
-    [sub.name, sub.categoryId] as const,
-  ]),
+  ...ROLE_SUBCATEGORIES.map((sub) => [sub.id, sub.categoryId] as const),
   ...ROLES.flatMap((role) => [
     [role.id, role.categoryId] as const,
     [role.name, role.categoryId] as const,
@@ -2292,8 +2289,9 @@ const CATEGORY_BY_VALUE = new Map<string, RoleCategoryId>([
 ]);
 
 /**
- * The category a saved target belongs to, so a picker opens on it.
- * @param value A category, subcategory or role id or name.
+ * The category a saved target belongs to, so a picker opens on it. Subcategory names are not read: several repeat
+ * across categories (`Supervision`, `Other`) and some equal a category's name (`Healthcare` under Management).
+ * @param value A category or role id or name, or a subcategory id.
  * @returns Its category id, or null for a retired label or free text.
  */
 export function roleCategoryOf(value: string) {

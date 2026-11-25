@@ -255,10 +255,18 @@ function roleNameAliases() {
   return [...uniqueOwners(direct), ...uniqueOwners(shared)];
 }
 
-const wholeNames = [
+const categoryAndRoleNames = [
   ...ROLE_CATEGORIES.map((category) => [nameKey(category.name), category.id] as const),
-  ...ROLE_SUBCATEGORIES.map((sub) => [nameKey(sub.name), sub.id] as const),
   ...ROLES.map((role) => [nameKey(role.name), role.id] as const),
+];
+
+const categoryAndRoleKeys = new Set(categoryAndRoleNames.map(([key]) => key));
+
+const wholeNames = [
+  ...[
+    ...uniqueOwners(ROLE_SUBCATEGORIES.map((sub) => [nameKey(sub.name), sub.id] as const)),
+  ].filter(([key]) => !categoryAndRoleKeys.has(key)),
+  ...categoryAndRoleNames,
 ];
 
 const wholeNameKeys = new Set(wholeNames.map(([key]) => key));

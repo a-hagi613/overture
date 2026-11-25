@@ -135,6 +135,13 @@ describe("current taxonomy names resolve to their ids", () => {
     expect(legacyTargetToTaxonomy("Software Engineer (general)")).toEqual(["sw.general"]);
   });
 
+  test("a category name wins over a subcategory that shares it, and a repeated subcategory name names none", () => {
+    expect(legacyTargetToTaxonomy("Engineering")).toEqual(["engineering"]);
+    expect(legacyTargetToTaxonomy("Healthcare")).toEqual(["healthcare"]);
+    expect(legacyTargetToTaxonomy("Supervision")).toEqual(["Supervision"]);
+    expect(legacyTargetToTaxonomy("Business systems")).toEqual(["software-it/business-systems"]);
+  });
+
   test("one part of a combined role name reaches that role when it clearly names a job", () => {
     expect(legacyTargetToTaxonomy("Platform Engineer")).toEqual(["infra.devops"]);
     expect(legacyTargetToTaxonomy("nurse practitioner")).toEqual(["health.np"]);

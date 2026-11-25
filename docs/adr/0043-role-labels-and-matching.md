@@ -51,7 +51,9 @@ different stack), not label errors. Labelling the week cost $6.59 with the Batch
   build, the tag store behind the board poll and imports, the test routes), so a title the rules could not place still
   gets its label before the paid fallback sees it, and a second pass changes nothing.
 - **Matching.** A saved target is read as taxonomy ids: an id, a current name, a retired category or ESCO name, or one
-  clear part of a combined name (`Nurse Practitioner` of `Nurse Practitioner / Anesthetist / Midwife`). A role target
+  clear part of a combined name (`Nurse Practitioner` of `Nurse Practitioner / Anesthetist / Midwife`). A category
+  name wins over a subcategory that shares it (`Engineering`, `Healthcare` also name subcategories under Management),
+  and a subcategory name used in several categories (`Supervision`, `Other`) names none and stays free text. A role target
   matches only that role; a neighbour in the same subcategory is not admitted, because it often needs another licence
   or level, and that widening was never measured. A subcategory or category target reaches every role inside it. Other
   text is free text and matches a title holding every one of its words. Role depth ranks: exact role 40, subcategory

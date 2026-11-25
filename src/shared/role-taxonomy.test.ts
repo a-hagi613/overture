@@ -31,4 +31,10 @@ describe("the role pickers", () => {
     expect(roleCategoryOf("Data & AI")).toBe("data-ai");
     expect(roleCategoryOf("Puppetry Workshop Steward")).toBeNull();
   });
+
+  test("read a category name as that category even where a subcategory elsewhere shares it", () => {
+    expect(roleCategoryOf("Healthcare")).toBe("healthcare");
+    expect(roleCategoryOf("Engineering")).toBe("engineering");
+    expect(roleCategoryOf("Supervision")).toBeNull();
+  });
 });
