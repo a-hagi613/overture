@@ -20,6 +20,13 @@ import { salaryMeetsFloor } from "./fx.ts";
 import { countryInRegion, remoteRegionOf } from "./regions.ts";
 import { skipMatches } from "./skip-match.ts";
 import { flaggedPostingIds } from "./posting-flags.ts";
+import {
+  employmentAccepted,
+  languageAccepted,
+  optionalFieldConditions,
+  seniorityAccepted,
+  workplaceAccepted,
+} from "./optional-fields.ts";
 
 import type { SkipTarget } from "./skip-match.ts";
 
@@ -266,11 +273,11 @@ interface Verdict {
 }
 
 function targetBasicsMatch(posting: CandidatePosting, targets: TargetsInput) {
-  if (!targets.workplaces.some((workplace) => workplace === posting.workplace)) {
+  if (!workplaceAccepted(posting.workplace, targets.workplaces)) {
     return "workplace" satisfies FilterReason;
   }
 
-  if (!targets.employmentTypes.some((type) => type === posting.employmentType)) {
+  if (!employmentAccepted(posting.employmentType, targets.employmentTypes)) {
     return "employment_type" satisfies FilterReason;
   }
 
@@ -294,12 +301,11 @@ function targetBasicsMatch(posting: CandidatePosting, targets: TargetsInput) {
     return "role" satisfies FilterReason;
   }
 
-  const seniorityMatch = posting.tags.some(
-    (tag) =>
-      tag.dimension === "seniority" && targets.seniorities.some((value) => value === tag.value),
-  );
+  const postingSeniorities = posting.tags
+    .filter((tag) => tag.dimension === "seniority")
+    .map((tag) => tag.value);
 
-  if (!seniorityMatch) {
+  if (!seniorityAccepted(postingSeniorities, targets.seniorities)) {
     return "seniority" satisfies FilterReason;
   }
 
@@ -400,12 +406,7 @@ export function createCandidateService(deps: CandidateDeps) {
           isNull(postings.closedAt),
           eq(postings.status, "open"),
           eq(postings.applySupported, true),
-          inArray(postings.workplace, targets.workplaces),
-          inArray(postings.employmentType, targets.employmentTypes),
-          inArray(
-            sql`lower(${postings.language})`,
-            languages.map((language) => language.toLowerCase()),
-          ),
+          ...optionalFieldConditions(catalogDb, { ...targets, languages }),
           exists(
             catalogDb
               .select({ one: sql`1` })
@@ -415,18 +416,6 @@ export function createCandidateService(deps: CandidateDeps) {
                   eq(postingTags.postingId, postings.id),
                   inArray(postingTags.dimension, ["role", "subrole", "granular_role"]),
                   inArray(postingTags.value, roleTags),
-                ),
-              ),
-          ),
-          exists(
-            catalogDb
-              .select({ one: sql`1` })
-              .from(postingTags)
-              .where(
-                and(
-                  eq(postingTags.postingId, postings.id),
-                  eq(postingTags.dimension, "seniority"),
-                  inArray(postingTags.value, targets.seniorities),
                 ),
               ),
           ),
@@ -681,9 +670,7 @@ export function createCandidateService(deps: CandidateDeps) {
       } satisfies Verdict;
     }
 
-    const language = posting.language?.toLowerCase() ?? "";
-
-    if (!context.languages.some((candidate) => candidate.toLowerCase() === language)) {
+    if (!languageAccepted(posting.language, context.languages)) {
       return {
         reason: "language",
         locationScore: 0,

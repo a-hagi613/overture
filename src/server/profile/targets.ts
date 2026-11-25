@@ -11,6 +11,7 @@ import { normalizeTitle } from "../catalog/normalize.ts";
 import { resolveLocation } from "../catalog/geo.ts";
 import { resolvedLocationCondition } from "../catalog/location-filter.ts";
 import { catalogRevision } from "../catalog/revision.ts";
+import { optionalFieldConditions } from "../matching/optional-fields.ts";
 import { ESCO_ROLE_NAMES } from "../../shared/esco-roles.ts";
 import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
 import { emptyTargets, targetsInputSchema } from "../../shared/targets.ts";
@@ -225,9 +226,7 @@ function countMatches(db: CatalogDatabase, filters: MatchFilters) {
     isNull(postings.closedAt),
     eq(postings.status, "open"),
     eq(postings.applySupported, true),
-    inArray(postings.workplace, filters.workplaces),
-    inArray(postings.employmentType, filters.employmentTypes),
-    inArray(sql`lower(${postings.language})`, filters.languages),
+    ...optionalFieldConditions(db, filters),
     exists(
       db
         .select({ one: sql`1` })
@@ -237,18 +236,6 @@ function countMatches(db: CatalogDatabase, filters: MatchFilters) {
             eq(postingTags.postingId, postings.id),
             inArray(postingTags.dimension, ["role", "subrole", "granular_role"]),
             inArray(postingTags.value, roleTags),
-          ),
-        ),
-    ),
-    exists(
-      db
-        .select({ one: sql`1` })
-        .from(postingTags)
-        .where(
-          and(
-            eq(postingTags.postingId, postings.id),
-            eq(postingTags.dimension, "seniority"),
-            inArray(postingTags.value, filters.seniorities),
           ),
         ),
     ),
