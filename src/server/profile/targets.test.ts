@@ -441,7 +441,6 @@ describe("countMatchingPostings", () => {
     expect(rolePlan).not.toMatch(/SCAN posting_tags/u);
     expect(countPlan).not.toMatch(/SCAN posting_tags/u);
     expect(countPlan).not.toContain("TEMP B-TREE");
-    // Role tag, wanted seniority, and "no seniority tag at all" — each a covering-index search.
     expect(countPlan.match(/SEARCH posting_tags/gu)).toHaveLength(3);
     expect(countPlan.match(/SCAN postings/gu)?.length ?? 0).toBeLessThanOrEqual(1);
   });
