@@ -7,6 +7,32 @@ import { CalendarDayContext, toCalendarDate } from "../lib/calendar-day-context.
 import { countText } from "../lib/calendar-format.ts";
 import { chipKindOf, dayKeyOf } from "../lib/calendar-grid.ts";
 
+function firstPillTone(customKind: string | undefined, apiItem: CalendarItem | undefined) {
+  if (customKind === "interview") {
+    return "bg-ok-soft text-ok";
+  }
+
+  if (customKind !== undefined) {
+    return "bg-signal-soft text-signal-text";
+  }
+
+  if (apiItem === undefined) {
+    return "bg-muted text-foreground";
+  }
+
+  const kind = chipKindOf(apiItem);
+
+  if (kind === "interview") {
+    return "bg-ok-soft text-ok";
+  }
+
+  if (kind === "offer" || kind === "checkin") {
+    return "bg-signal-soft text-signal-text";
+  }
+
+  return "bg-muted text-foreground";
+}
+
 function dotColorFor(item: CalendarItem) {
   const kind = chipKindOf(item);
 
@@ -60,7 +86,7 @@ export function CalendarDayButton(props: DayButtonProps) {
     : "border-border bg-background text-foreground hover:border-input hover:bg-muted";
 
   if (isSelected) {
-    cellStyle = "border-signal bg-card text-foreground ring-1 ring-signal shadow-sh";
+    cellStyle = "border-signal bg-card text-foreground ring-1 ring-signal";
   } else if (isToday) {
     cellStyle = "border-signal/60 bg-card text-foreground";
   }
@@ -82,16 +108,14 @@ export function CalendarDayButton(props: DayButtonProps) {
 
   const summaryParts = [
     ...countText(apiEvents),
-    ...(customEvents.length > 0
-      ? [`${String(customEvents.length)} custom ${customEvents.length === 1 ? "event" : "events"}`]
-      : []),
+    ...(customEvents.length > 0 ? [copy.calendar.customEventCount(customEvents.length)] : []),
   ];
 
   const dayAriaLabel = [
     formattedDay,
     summaryParts.length === 0 ? copy.calendar.nothing : summaryParts.join(", "),
     ...(firstLabel === null ? [] : [firstLabel]),
-    ...(totalEvents > 1 ? [`+${String(totalEvents - 1)} more`] : []),
+    ...(totalEvents > 1 ? [copy.calendar.more(totalEvents - 1)] : []),
   ].join(", ");
 
   return (
@@ -99,7 +123,7 @@ export function CalendarDayButton(props: DayButtonProps) {
       aria-current={isToday ? "date" : undefined}
       aria-disabled={ariaDisabled}
       aria-pressed={isSelected}
-      className={`flex h-16 w-full cursor-pointer flex-col items-start justify-between rounded-lg border p-1.5 text-left transition md:h-24 md:p-2 ${cellStyle}`}
+      className={`flex h-14 w-full cursor-pointer flex-col items-start justify-between rounded-lg border p-1.5 text-left transition md:h-20 md:p-2 2xl:h-24 ${cellStyle}`}
       data-day={key}
       disabled={disabled}
       onBlur={onBlur}
@@ -118,17 +142,20 @@ export function CalendarDayButton(props: DayButtonProps) {
       <span className="sr-only">{dayAriaLabel}</span>
       <div aria-hidden="true" className="flex w-full items-center justify-between gap-1">
         <span
-          className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold tabular-nums ${numeralStyle}`}
+          className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-xs font-semibold tabular-nums sm:h-6 sm:w-6 ${numeralStyle}`}
         >
           {cellDate.day}
         </span>
         {totalEvents > 0 ? (
-          <span className="flex items-center gap-0.5">
+          <span className="flex min-w-0 items-center justify-end gap-0.5 overflow-hidden">
             {customEvents.slice(0, 2).map((event) => (
-              <span className="h-1.5 w-1.5 rounded-full bg-signal" key={event.id} />
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-signal" key={event.id} />
             ))}
             {apiEvents.slice(0, 3).map((item) => (
-              <span className={`h-1.5 w-1.5 rounded-full ${dotColorFor(item)}`} key={item.id} />
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColorFor(item)}`}
+                key={item.id}
+              />
             ))}
           </span>
         ) : null}
@@ -136,12 +163,17 @@ export function CalendarDayButton(props: DayButtonProps) {
 
       {firstLabel === null ? null : (
         <div aria-hidden="true" className="hidden w-full md:block">
-          <p className="truncate rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground">
+          <p
+            className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${firstPillTone(
+              customEvents[0]?.kind,
+              customEvents[0] === undefined ? apiEvents[0] : undefined,
+            )}`}
+          >
             {firstLabel}
           </p>
           {totalEvents > 1 ? (
             <p className="mt-0.5 px-0.5 text-xs font-medium text-muted-foreground tabular-nums">
-              {`+${String(totalEvents - 1)} more`}
+              {copy.calendar.more(totalEvents - 1)}
             </p>
           ) : null}
         </div>

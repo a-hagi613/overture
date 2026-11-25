@@ -9,7 +9,7 @@ import { Card } from "./ui/card.tsx";
 import { dsCardTitle, dsEyebrow, dsMetric } from "./ui/ds.ts";
 
 export interface BillingUpgradeOption {
-  detail: string;
+  bullets: readonly string[];
   featured: boolean;
   id: BillingPlan;
   name: string;
@@ -34,12 +34,19 @@ export function BillingUpgradeCard({
   const bp = copy.nav.profilePages;
   const headingId = `billing-upgrade-${option.id}-heading`;
 
+  const bulletList = (
+    <ul className="mt-4 flex list-none flex-col gap-2.5 p-0 text-sm text-foreground">
+      {option.bullets.map((bullet) => (
+        <li className="flex items-start gap-2.5" key={bullet}>
+          <Check aria-hidden="true" className="mt-0.5 shrink-0 text-signal-text" size={15} />
+          <span>{bullet}</span>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
-    <Card
-      ariaLabelledBy={headingId}
-      className={option.featured ? "border-signal/60 p-6" : "p-6"}
-      variant="elevated"
-    >
+    <Card ariaLabelledBy={headingId} className={option.featured ? "border-signal/60 p-6" : "p-6"}>
       <div className="flex h-full flex-col justify-between gap-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
@@ -53,10 +60,7 @@ export function BillingUpgradeCard({
             <span className={dsMetric}>{option.price}</span>
             <span className="text-sm text-muted-foreground">{option.per}</span>
           </div>
-          <p className="mt-3 flex items-start gap-2 text-sm text-foreground">
-            <Check aria-hidden="true" className="mt-0.5 shrink-0 text-signal-text" size={16} />
-            <span>{option.detail}</span>
-          </p>
+          {bulletList}
         </div>
         <div>
           <Button

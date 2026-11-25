@@ -192,8 +192,8 @@ export async function prepareOnboarding(postingIds: string[]) {
   );
 }
 
-export function useOnboardingState() {
-  return useQuery({ queryFn: fetchOnboardingState, queryKey: stateKey, retry: 1 });
+export function useOnboardingState(enabled = true) {
+  return useQuery({ enabled, queryFn: fetchOnboardingState, queryKey: stateKey, retry: 1 });
 }
 
 export function useFinishOnboardingStep() {

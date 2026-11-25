@@ -49,21 +49,25 @@ async function expectReadyMatches(
 
   await page.goto(`${appServerUrl}/ready`);
 
-  await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "Ready summary" }).getByText("2", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: "applications ready to send" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Approval Queue" })).toBeVisible();
+
+  const summary = page.getByRole("region", { name: "Ready summary" });
+
+  await expect(summary.getByText("Pending approval")).toBeVisible();
+  await expect(summary.getByText("2", { exact: true })).toBeVisible();
   await expect(page.getByText("1 scheduled")).toBeVisible();
-  await expect(page.getByText("Approved · sending around Nov 21, 2:20 PM")).toBeVisible();
-  await expect(page.getByText("Drafted from your resume").first()).toBeVisible();
-  await expect(page.getByText("Saved answers only").first()).toBeVisible();
+  await expect(page.getByText("Scheduled · Nov 21, 2:20 PM")).toBeVisible();
   await expect(page.getByText("7 of 10 sent today", { exact: true }).first()).toBeVisible();
 
-  await page.getByRole("button", { name: /Show \d+ saved answers, Halden Systems/u }).click();
-  await expect(page.getByText("maya-okafor-2026.pdf").first()).toBeVisible();
+  await page.getByRole("button", { name: "Inspect Halden Systems" }).click();
+
+  const drawer = page.getByRole("dialog", { name: "Inspect prepared application" });
+
+  await expect(drawer.getByText("Saved answers only").first()).toBeVisible();
+  await expect(drawer.getByText("Saved answer").first()).toBeVisible();
+  await drawer.getByRole("button", { name: /Show more/u }).click();
+  await expect(drawer.getByText("maya-okafor-2026.pdf").first()).toBeVisible();
+  await drawer.getByRole("button", { name: "Close" }).click();
 
   await page.evaluate(async () => {
     await Promise.all([

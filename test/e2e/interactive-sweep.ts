@@ -269,8 +269,13 @@ async function measureLandmarks(page: Page) {
 async function checkTarget(page: Page, target: Target, url: string, width: number) {
   const expectedPath = new URL(url).pathname;
 
-  const landing =
-    expectedPath === "/profile" && width >= 768 ? "/profile/resume" : landingPath(expectedPath);
+  let landing: string | readonly string[] = landingPath(expectedPath);
+
+  if (expectedPath === "/profile" && width >= 768) {
+    landing = "/profile/resume";
+  } else if (expectedPath === "/onboarding/trial") {
+    landing = ["/onboarding/matches", "/onboarding/resume"];
+  }
 
   await navigate(page, expectedPath, landing);
   await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
@@ -293,16 +298,27 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
     .first()
     .waitFor({ state: "detached", timeout: 10_000 })
     .catch(() => undefined);
+  await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
 
-  const landmarks = await measureLandmarks(page);
+  const hasExpectedDialog =
+    target.path === "/onboarding/trial" &&
+    (await page
+      .locator('[role="dialog"]')
+      .first()
+      .isVisible()
+      .catch(() => false));
 
-  expect
-    .soft(landmarks.h1.length, `${target.path} visible h1s: ${landmarks.h1.join(" | ")}`)
-    .toBe(1);
-  expect.soft(landmarks.main, `${target.path} visible main count`).toBe(1);
-  expect
-    .soft(landmarks.firstIsSkipToMain, `${target.path} first focusable is the skip link`)
-    .toBe(true);
+  if (!hasExpectedDialog) {
+    const landmarks = await measureLandmarks(page);
+
+    expect
+      .soft(landmarks.h1.length, `${target.path} visible h1s: ${landmarks.h1.join(" | ")}`)
+      .toBe(1);
+    expect.soft(landmarks.main, `${target.path} visible main count`).toBe(1);
+    expect
+      .soft(landmarks.firstIsSkipToMain, `${target.path} first focusable is the skip link`)
+      .toBe(true);
+  }
 
   const axe = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

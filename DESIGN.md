@@ -195,22 +195,23 @@ Inline numbers in tables and metadata are mono and tabular. `Yes` in serif besid
 |---|---|---|---|---|---|---|
 | Hero display (serif) | `text-hero` | clamp(44px, 6vw, 88px) | 44 | 1.06 | -.02em | Final emphasis word only |
 | Section heading (serif) | `text-section` | clamp(32px, 4.2vw, 56px) | 32 | 1.08 | -.015em | Final emphasis word only |
-| Page title (serif) | `text-page-title` | clamp(32px, 3vw, 42px) | 32 | 1.08 | -.01em | Final emphasis word only, `text-signal` |
-| Card / item title (serif) | `text-card-title` | clamp(22px, 1.8vw, 26px) | 22 | 1.20 | — | Never |
-| Metric numeral (serif) | `text-metric` | clamp(40px, 3.5vw, 52px) | 40 | 1.00 | — | Never (tabular upright) |
+| Marketing page title (serif) | `text-page-title` | clamp(32px, 3vw, 42px) | 32 | 1.08 | -.01em | Final emphasis word only, `text-signal` |
+| Workspace page title (sans) | `text-workspace-title` | 22 | 22 | 1.25 | -.02em | Never |
+| Marketing card title (serif) | `text-card-title` | clamp(22px, 1.8vw, 26px) | 22 | 1.20 | — | Never |
+| Workspace panel title (sans) | `text-panel-title` | 15 | 15 | 1.35 | -.01em | Never |
+| Display numeral (serif) | `text-metric` | clamp(40px, 3.5vw, 52px) | 40 | 1.00 | — | Never (tabular upright) |
+| Workspace KPI numeral (sans) | `text-kpi` | 24 | 24 | 1.10 | -.02em | Never (tabular upright) |
 | Lead / Intro (sans) | `text-base` | 16 | 16 | 1.50 | — | Never |
 | Body (sans) | `text-sm` | 14 | 14 | 1.43 | — | Never |
 | Small / Mono metadata | `text-xs` | 12 | 12 | 1.33 | — | Never |
 | Eyebrow / Micro-label (caps) | `text-eyebrow` | 11 | 11 | 1.20 | .14em | Never |
 
-`text-page-title` is the app page-title token: `dsPageTitle` in `src/web/components/ui/ds.ts` uses it, and
-every app route heading uses `dsPageTitle` or `PageHeader`. `text-section` is only for landing and marketing
-surfaces. `text-hero` is only for the landing hero.
+`text-workspace-title` (`dsPageTitle`) is the workspace page-title token across all logged-in app routes (`PageHeader`), set cleanly in Plus Jakarta Sans without italic orange accents. `text-page-title` (`dsDisplayPageTitle`) is used on public marketing, sign-in, legal, and consent pages. `text-section` is only for landing and marketing surfaces. `text-hero` is only for the landing hero.
 
 **Strict typography, component library & mobile rules (enforced by `overture/no-raw-design-styles`):**
-- Every text element uses one of the 9 tokens above — never arbitrary `text-[...px]` or `text-[...rem]`, and never un-tokenized Tailwind scale jumps (`text-lg` through `text-9xl`). The rule covers all of `src/web`, routes and admin included.
+- Every text element uses one of the tokens above — never arbitrary `text-[...px]` or `text-[...rem]`, and never un-tokenized Tailwind scale jumps (`text-lg` through `text-9xl`). The rule covers all of `src/web`, routes and admin included.
 - Line height comes from the token; add a Tailwind `leading-*` utility only where a denser or looser block genuinely needs it (a card title over two lines, display type on the landing). Never set a raw `leading-[…]` in new code.
-- Italic serif is reserved **strictly** for the final emphasis word of Hero, Section and page headings (`h1`/`h2`) — never numerals, step badges, or card titles. In the app the page title's emphasis word is `italic text-signal` ("Good morning, *Sam.*", "Ready to *send*"); it is the only orange type in app chrome (ADR 0037).
+- Italic serif is reserved **strictly** for the landing, sign-in, and legal display headings (`h1`/`h2`) — never inside in-app workspace headers, numerals, step badges, or workspace panels. Workspace cards use flat `1px` hairline `rounded-xl` containers with left accent hairlines where status needs emphasis, avoiding nested cards or heavy drop shadows.
 - **Single-source shadcn/ui & 21st.dev component system (`src/web/components/ui/*`):** Never hand-roll buttons, cards, badges, inputs, tabs, switches, dialogs, command palettes, SVG charts, or calendars from scratch. Compose every screen from the shared primitives (`Button`, `Card`, `Badge`, `Input`, `Switch`, `Separator`, `Tabs`, `ScrollArea`, `ChartArea` via `recharts`, `Calendar` via `react-day-picker`, `CommandDialog` via `cmdk` + Radix Dialog, `AnimatedBeam`, and `lucide-react` icons), styled exclusively with Ember `@theme` tokens.
 - Mobile (`390px`) is a first-class layout target alongside tablet (`768px`), laptop (`1280px`), and widescreen (`1440px+`): metadata lines stack cleanly instead of wrapping mid-phrase, previews swap to native `390px` mobile screens under `lg` (`1024px`), and touch targets stay `≥ 40–44px`.
 
@@ -343,7 +344,7 @@ is the only live mark.
 | Travel | ≤12px for reveals (stamp 6, summary 10) |
 | Rotation | ≤6° (stack offsets 1.6–2.6, glide 4, stamp 3) |
 | Tick | 800ms state timer drives every loop |
-| Forbidden | springs, bounce, overshoot, parallax, auto-playing video |
+| Forbidden | springs, bounce, overshoot, parallax, auto-playing video (the workspace walkthrough below is the one recorded exception) |
 
 The four choreographed surfaces, so nobody re-invents them:
 
@@ -363,6 +364,14 @@ The four choreographed surfaces, so nobody re-invents them:
 4. **Path** (How it works) — a dotted path threads the six tiles through the gutters with a numbered
    node at each. One orange dot walks it at ~520px/s and rests .55s on each node, which lights with an
    orange ring.
+
+**The workspace walkthrough.** "Inside the workspace" is the one recorded surface: two silent, muted H.264
+recordings of the seeded workspace (1280×800 desktop, 720×1280 phone), each with a frame-0 poster, rendered directly
+in a frameless `HoverPlayCard` with no surrounding toolbar, duration label, or sample-data chrome. The desktop
+recording plays on `lg` and up, the phone recording below it. Hovering or pressing Play starts playback with a centered Play/Pause overlay and subtle bottom-left
+Playing/Paused badge. Every scene stays at 1:1 scale with zero camera zoom: starting on Home (90-day trajectory),
+dragging an application card from Applied to Interviews on Tracker, uploading and scanning a resume on Profile, and
+opening an employer reply in Inbox. The video never autoplays on load; it plays only on intentional hover or an explicit Play click.
 
 **Reduced motion.** Every animation has a static state. With `animate` off or under
 `prefers-reduced-motion`, transitions and keyframes are disabled and each loop shows one finished frame
@@ -437,12 +446,9 @@ and a 44px menu button; the sheet rises 8px over .4s and holds the links, Theme 
 button carries `aria-expanded` and a label that changes between Open menu and Close menu.
 
 Sidebar items: active = card surface, hairline, a 2px `signal` marker on the left edge (top edge in
-the tab bar) — the active nav marker is one of the four sanctioned orange uses (§2). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the five
-primary destinations (Home, Ready, Review, Applications, Inbox), then Notifications, Support and the
-Profile menu (Resume & Cover Letter, Saved answers, Job Preferences, Billing, Account), then the theme
-toggle and the usage card. Under 1280, or when collapsed on desktop (remembered per browser), the sidebar
+the tab bar) — the active nav marker is one of the four sanctioned orange uses (§2). The sidebar holds, top to bottom: the lockup and a collapse button, Search (⌘K), the primary destinations (Home, Ready, Review, Applications, Inbox, Calendar), a collapsible Career group (Resume & Cover Letter, Job Preferences, Application Answers), Notifications and Support, then the usage card and the Account menu (Billing, Account settings, theme toggle, Sign out). Under 1280, or when collapsed on desktop (remembered per browser), the sidebar
 becomes a 76px icon rail; under 768 a slim top header carries the page title plus Search, Notifications and
-Profile, and a 64px tab bar carries the same five primary destinations. Profile opens the `/profile` hub
+Profile, and a 64px tab bar carries the five primary destinations (Home, Ready, Review, Applications, Inbox). Profile opens the `/profile` hub
 on the phone. There is no Settings destination: account and billing are Profile pages (ADR 0037).
 
 The URL owns the open panel and the current filter, so refresh, Back and a shared link restore the view:

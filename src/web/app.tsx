@@ -1,41 +1,49 @@
-import { PanelLeftClose } from "lucide-react";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, Outlet, useNavigate } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 
-import { copy } from "../shared/copy.ts";
 import { Backdrop } from "./components/backdrop.tsx";
 import { BoardRail } from "./components/board-rail.tsx";
-import { BrandMark } from "./components/brand-mark.tsx";
 import { MobileTopHeader } from "./components/mobile-top-header.tsx";
 import { RouteErrorBoundary } from "./components/route-error-boundary.tsx";
 import { RouteFallback } from "./components/route-fallback.tsx";
-import { SideNav } from "./components/side-nav.tsx";
-import { SidebarSearchButton } from "./components/sidebar-search-button.tsx";
-import { SidebarThemeToggle } from "./components/sidebar-theme-toggle.tsx";
+import { SidebarContent } from "./components/sidebar-content.tsx";
+import { SidebarDrawer } from "./components/sidebar-drawer.tsx";
 import { TabBar } from "./components/tab-bar.tsx";
-import { Button } from "./components/ui/button.tsx";
-import { Separator } from "./components/ui/separator.tsx";
 import { Toaster } from "./components/ui/sonner.tsx";
-import { UsageCard } from "./components/usage.tsx";
 import { WorkspaceSearchDialog } from "./components/workspace-search-dialog.tsx";
 import { authClient } from "./lib/auth-client.ts";
 import { useLiveUpdates } from "./lib/live-events.ts";
 import { useMediaQuery } from "./lib/media-query.ts";
 import { useNavCounts } from "./lib/nav-api.ts";
 import { useUnreadNotificationCount } from "./lib/notifications-api.ts";
+import { useOnboardingState } from "./lib/onboarding-api.ts";
 import { closeTopLayerHost, useTopLayerHost } from "./lib/top-layer-host.ts";
 
 const collapsedStorageKey = "overture.rail";
 
+const UNONBOARDED_ALLOWED_PATHS = new Set([
+  "/profile/account",
+  "/profile/billing",
+  "/settings",
+  "/settings/billing",
+  "/settings/billing/plans",
+  "/settings/delete",
+  "/settings/export",
+  "/settings/support-access",
+]);
+
 export function AppShell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: session, isPending } = authClient.useSession();
+  const onboarding = useOnboardingState(session !== null);
   const navCounts = useNavCounts();
   const unreadNotifications = useUnreadNotificationCount();
   const desktop = useMediaQuery("(min-width: 1280px)");
   const overlayHost = useTopLayerHost();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [tabletDrawerOpen, setTabletDrawerOpen] = useState(false);
 
   const changeSearchOpen = useCallback((open: boolean) => {
     if (open) {
@@ -57,24 +65,51 @@ export function AppShell() {
 
   useLiveUpdates();
 
+  const allowUnonboarded = UNONBOARDED_ALLOWED_PATHS.has(location.pathname);
+  const onboardingBlocked = onboarding.data?.needsOnboarding === true && !allowUnonboarded;
+  const waitingForOnboarding = session !== null && onboarding.isPending && !allowUnonboarded;
+
   useEffect(() => {
     if (!isPending && session === null) {
       void navigate("/signin");
+    } else if (onboardingBlocked) {
+      void navigate("/onboarding", { replace: true });
     }
-  }, [isPending, navigate, session]);
+  }, [isPending, navigate, onboardingBlocked, session]);
 
-  if (isPending || session === null) {
+  if (isPending || session === null || waitingForOnboarding || onboardingBlocked) {
     return <RouteFallback fullScreen />;
   }
 
   const wide = desktop && !railCollapsed;
+  const drawerOpen = !desktop && tabletDrawerOpen;
 
-  const toggleRail = () => {
+  const toggleDesktopRail = () => {
     setRailCollapsed((current) => {
       globalThis.localStorage.setItem(collapsedStorageKey, current ? "0" : "1");
 
       return !current;
     });
+  };
+
+  const handleExpand = () => {
+    if (desktop) {
+      toggleDesktopRail();
+
+      return;
+    }
+
+    setTabletDrawerOpen(true);
+  };
+
+  const handleCollapse = () => {
+    if (desktop) {
+      toggleDesktopRail();
+
+      return;
+    }
+
+    setTabletDrawerOpen(false);
   };
 
   return (
@@ -84,45 +119,20 @@ export function AppShell() {
         <MobileTopHeader onOpenSearch={openSearch} unreadNotifications={unreadNotifications} />
         {wide ? (
           <aside
-            className="fixed left-0 top-0 z-20 flex h-dvh w-[268px] flex-col gap-2 overflow-visible border-r border-border bg-sidebar px-4 pb-2.5 pt-3.5 min-[1700px]:w-[296px]"
+            className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-border bg-sidebar xl:flex 2xl:w-72"
             data-shell-sidebar
           >
-            <div className="flex items-center justify-between px-1.5">
-              <Link
-                aria-label={copy.brand.homeAria}
-                className="flex items-center gap-2.5 transition hover:opacity-80"
-                to="/home"
-              >
-                <BrandMark size={30} />
-                <span className="font-serif text-card-title leading-none text-foreground">
-                  {copy.app.name}
-                </span>
-              </Link>
-              <Button
-                ariaLabel={copy.shell.collapseSidebar}
-                className="h-9 w-9"
-                onClick={toggleRail}
-                size="icon"
-                variant="ghost"
-              >
-                <PanelLeftClose aria-hidden="true" className="h-4 w-4" />
-              </Button>
-            </div>
-            <Separator />
-            <SidebarSearchButton onOpen={openSearch} />
-            <Separator />
-            <div className="flex flex-1 flex-col">
-              <SideNav counts={navCounts} showLabels unreadNotifications={unreadNotifications} />
-            </div>
-            <div className="mt-auto flex flex-col gap-1.5">
-              <SidebarThemeToggle />
-              <UsageCard />
-            </div>
+            <SidebarContent
+              counts={navCounts}
+              onCollapse={handleCollapse}
+              onOpenSearch={openSearch}
+              unreadNotifications={unreadNotifications}
+            />
           </aside>
         ) : (
           <BoardRail
             counts={navCounts}
-            onExpand={toggleRail}
+            onExpand={handleExpand}
             onOpenSearch={openSearch}
             unreadNotifications={unreadNotifications}
           />
@@ -130,17 +140,15 @@ export function AppShell() {
         <div
           aria-hidden="true"
           className={
-            wide
-              ? "hidden w-[268px] flex-none min-[1700px]:w-[296px] xl:block"
-              : "hidden w-[76px] flex-none md:block"
+            wide ? "hidden w-64 flex-none xl:block 2xl:w-72" : "hidden w-18 flex-none md:block"
           }
         />
         <main
-          className="min-w-0 flex-1 px-4 pb-7 pt-5 outline-none md:px-7 md:pb-10 md:pt-7 min-[1700px]:px-14 min-[1700px]:pt-8"
+          className="flex min-w-0 flex-1 flex-col px-4 pb-6 pt-5 outline-none md:px-7 md:pb-6 md:pt-6 2xl:px-14 2xl:pt-7"
           id="main-content"
           tabIndex={-1}
         >
-          <div className="mx-auto w-full max-w-[1440px]">
+          <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col">
             <RouteErrorBoundary insideShell>
               <Suspense fallback={<RouteFallback />}>
                 <Outlet />
@@ -150,6 +158,13 @@ export function AppShell() {
         </main>
         <TabBar counts={navCounts} />
       </div>
+      <SidebarDrawer
+        counts={navCounts}
+        onOpenChange={setTabletDrawerOpen}
+        onOpenSearch={openSearch}
+        open={drawerOpen}
+        unreadNotifications={unreadNotifications}
+      />
       <WorkspaceSearchDialog onOpenChange={changeSearchOpen} open={searchOpen} />
       {overlayHost === null ? <Toaster /> : createPortal(<Toaster />, overlayHost)}
     </div>

@@ -90,7 +90,7 @@ test("authenticated /api/search lists matching postings and /search redirects to
   ).toBe(true);
 
   await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent(QUERIES.title)}`);
-  await expect(ownerPage).toHaveURL(/\/applications\?q=Senior/u);
+  await expect(ownerPage).toHaveURL(/\/tracker\?q=Senior/u);
   await expect(ownerPage.getByRole("heading", { level: 1 })).toBeVisible();
 
   await ownerPage.keyboard.press("Control+k");

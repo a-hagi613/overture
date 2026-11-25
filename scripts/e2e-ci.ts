@@ -38,6 +38,9 @@ const playwrightProjectPattern =
 const webRouteEntryPattern =
   /\{\s*path:\s*"(?<path>[^"]+)"\s*,\s*element:\s*<(?<component>[A-Za-z0-9_]+)\s*\/>/gu;
 
+const redirectRouteEntryPattern =
+  /\{\s*path:\s*"(?<path>[^"]+)"\s*,\s*element:\s*<PreserveSearchRedirect\s+to="(?<to>[^"]+)"\s*\/>/gu;
+
 const billingUserRoutePattern = /\/admin\/billing\/users\/\$\{[^}]*\}(?<refund>\/refund)?/gu;
 
 const gotoPathPattern = /\.(?:goto|toHaveURL)\([\s\S]{0,160}?(?<path>\/[A-Za-z0-9_\-.:/]*)/gu;
@@ -667,13 +670,19 @@ function shellForRoute(urlPath: string) {
     urlPath === "/home" ||
     urlPath === "/ready" ||
     urlPath === "/board" ||
+    urlPath === "/tracker" ||
+    urlPath === "/applications" ||
+    urlPath === "/search" ||
     urlPath === "/review" ||
     urlPath === "/calendar" ||
     urlPath === "/inbox" ||
     urlPath === "/inbox/:id" ||
+    urlPath === "/inbox/address" ||
     urlPath === "/notifications" ||
     urlPath === "/profile" ||
     urlPath.startsWith("/profile/") ||
+    urlPath === "/settings" ||
+    urlPath.startsWith("/settings/") ||
     urlPath === "/support"
   ) {
     return "app" as const;
@@ -755,6 +764,37 @@ export function webRouteEntries(
       urlPath,
       routeFile,
       shell,
+      modules: [...modules].toSorted((left, right) => left.localeCompare(right)),
+    });
+  }
+
+  for (const match of text.matchAll(redirectRouteEntryPattern)) {
+    const urlPath = match.groups?.path;
+    const to = match.groups?.to;
+
+    if (urlPath === undefined || to === undefined) {
+      continue;
+    }
+
+    const [rawTarget = ""] = to.split(/[?#]/u);
+    const targetPath = rawTarget === "" ? "/" : rawTarget;
+    const target = entries.find((candidate) => candidate.urlPath === targetPath);
+
+    if (target === undefined) {
+      continue;
+    }
+
+    const modules = new Set<string>(target.modules);
+    const redirectFile = "src/web/components/preserve-search-redirect.tsx";
+
+    if (files.has(redirectFile)) {
+      modules.add(redirectFile);
+    }
+
+    entries.push({
+      urlPath,
+      routeFile: target.routeFile,
+      shell: shellForRoute(urlPath),
       modules: [...modules].toSorted((left, right) => left.localeCompare(right)),
     });
   }
@@ -927,10 +967,9 @@ function visitedUiRoutes(
     }
   }
 
-  if (combined.includes('"/terms", "/privacy", "/consent"')) {
+  if (combined.includes('"/terms", "/privacy"')) {
     routes.add("/terms");
     routes.add("/privacy");
-    routes.add("/consent");
   }
 
   if (combined.includes("openBoard(")) {

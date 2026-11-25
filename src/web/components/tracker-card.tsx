@@ -1,7 +1,6 @@
 import { useDraggable } from "@dnd-kit/core";
-import { ArrowRight, GripVertical, MapPin, Send } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import type { KeyboardEvent, PointerEvent } from "react";
-import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import type { BoardCard } from "../lib/board-api.ts";
@@ -9,18 +8,16 @@ import type { TrackerLaneKey } from "../lib/tracker-lanes.ts";
 import { cardBadgeFor, formatCardSalary } from "../lib/tracker-lanes.ts";
 import { CompanyAvatar } from "./company-avatar.tsx";
 import { Badge } from "./ui/badge.tsx";
-import { Button } from "./ui/button.tsx";
 import { dsMono } from "./ui/ds.ts";
 
-export function TrackerCard({
-  card,
-  draggable,
-  isKeyboardDragging = false,
-  lane,
-  onCardKeyDown,
-  onOpen,
-  selected,
-}: {
+const EMPTY_SCORE = "—";
+
+/**
+ * Compact Linear/Attio-style application card rendered inside Tracker Board lanes.
+ * @param props Card payload, drag/selection state, and keyboard/click callbacks.
+ * @returns Draggable application card element.
+ */
+export function TrackerCard(props: {
   card: BoardCard;
   draggable: boolean;
   isKeyboardDragging?: boolean | undefined;
@@ -31,6 +28,16 @@ export function TrackerCard({
   onOpen: (id: string) => void;
   selected: boolean;
 }) {
+  const {
+    card,
+    draggable,
+    isKeyboardDragging = false,
+    lane,
+    onCardKeyDown,
+    onOpen,
+    selected,
+  } = props;
+
   const { attributes, isDragging, listeners, setNodeRef } = useDraggable({
     data: { card, lane },
     disabled: !draggable,
@@ -55,10 +62,10 @@ export function TrackerCard({
 
   return (
     <article
-      className={`group rounded-xl border bg-card text-left transition ${
+      className={`group rounded-md border bg-card text-left transition ${
         selected
-          ? "border-signal shadow-lift ring-1 ring-signal/30"
-          : "border-border shadow-sh hover:border-foreground/30 hover:shadow-lift"
+          ? "border-signal ring-1 ring-signal/30"
+          : "border-border hover:border-foreground/25"
       } ${isDragging ? "opacity-35" : ""} ${isKeyboardDragging ? "border-signal ring-2 ring-signal/45" : ""}`}
       ref={setNodeRef}
     >
@@ -67,7 +74,7 @@ export function TrackerCard({
         aria-disabled={draggable ? attributes["aria-disabled"] : undefined}
         aria-pressed={isKeyboardDragging ? true : undefined}
         aria-roledescription={draggable ? attributes["aria-roledescription"] : undefined}
-        className={`block w-full rounded-xl p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
+        className={`block w-full rounded-md p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
           draggable ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-pointer"
         }`}
         data-card={card.id}
@@ -78,70 +85,54 @@ export function TrackerCard({
         onPointerDown={handlePointerDown}
         type="button"
       >
-        <div className="flex items-center gap-2.5">
-          <CompanyAvatar company={card.company} logoUrl={card.logoUrl} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-foreground">{card.company}</p>
-            <p className={`${dsMono} mt-0.5`}>{`${String(card.ageDays)}d`}</p>
-          </div>
+        <div className="flex items-center gap-2">
+          <CompanyAvatar
+            className="h-6 w-6 rounded text-xs"
+            company={card.company}
+            logoUrl={card.logoUrl}
+          />
+          <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
+            {card.company}
+          </span>
+          <span className={`${dsMono} shrink-0`}>{`${String(card.ageDays)}d`}</span>
           {draggable ? (
             <GripVertical
               aria-hidden="true"
-              className="shrink-0 text-muted-foreground/60 transition group-hover:text-foreground"
-              size={16}
+              className="shrink-0 text-muted-foreground/50 opacity-0 transition group-hover:opacity-100"
+              size={13}
             />
           ) : null}
         </div>
 
-        <h3 className="mt-3 line-clamp-2 min-h-[2.75rem] font-serif text-card-title leading-snug text-foreground transition group-hover:text-foreground">
+        <h3 className="mt-1.5 line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground">
           {card.title}
         </h3>
 
-        <div className="mt-2.5 space-y-1 text-xs">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <MapPin aria-hidden="true" className="shrink-0" size={13} />
-            <span className="truncate">{card.location ?? copy.board.locationFallback}</span>
-          </div>
-          {salary === null ? null : (
-            <p className="font-mono text-xs text-muted-foreground tabular-nums">{salary}</p>
-          )}
-        </div>
+        <p className="mt-1 truncate text-xs text-muted-foreground">
+          {card.location ?? copy.board.locationFallback}
+        </p>
 
-        <div className="mt-3.5 flex items-center justify-between gap-2 border-t border-border pt-3">
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold tabular-nums">
+        {salary === null ? null : (
+          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground tabular-nums">
+            {salary}
+          </p>
+        )}
+
+        <div className="mt-2.5 flex items-center justify-between gap-1.5 border-t border-border/60 pt-2">
+          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold tabular-nums">
             <span
               aria-hidden="true"
-              className={`h-2 w-2 rounded-full ${strongMatch ? "bg-signal" : "bg-muted-foreground/50"}`}
+              className={`h-1.5 w-1.5 rounded-full ${strongMatch ? "bg-signal" : "bg-muted-foreground/45"}`}
             />
             <span className={strongMatch ? "text-signal-text" : "text-muted-foreground"}>
-              {card.score === null ? "—" : copy.board.matchPercent(card.score)}
+              {card.score === null ? EMPTY_SCORE : copy.board.matchShort(card.score)}
             </span>
           </span>
-          <Badge variant={badge.variant}>{badge.label}</Badge>
+          <Badge className="max-w-full shrink truncate" variant={badge.variant}>
+            {badge.label}
+          </Badge>
         </div>
       </button>
-
-      {lane === "ready" ? (
-        <div className="border-t border-border px-4 pb-3.5 pt-2.5">
-          <Button asChild className="w-full" size="sm" variant="primary">
-            <Link to="/ready">
-              <Send aria-hidden="true" size={14} />
-              <span>{copy.board.reviewAndSend}</span>
-            </Link>
-          </Button>
-        </div>
-      ) : null}
-
-      {lane === "review" && card.needsYou ? (
-        <div className="border-t border-border px-4 pb-3.5 pt-2.5">
-          <Button asChild className="w-full" size="sm" variant="secondary">
-            <Link to="/review">
-              <span>{copy.board.answerNow}</span>
-              <ArrowRight aria-hidden="true" size={14} />
-            </Link>
-          </Button>
-        </div>
-      ) : null}
     </article>
   );
 }

@@ -55,9 +55,11 @@ test("a brand-new user picks three matches and the trial prepares them", async (
   expect(state.step).toBe(4);
   expect(state.onboardedAt).toBeNull();
 
-  await expect(page.getByRole("checkbox")).not.toBeChecked();
-  await page.getByRole("checkbox").check();
-  await expect(page.getByRole("button", { name: "Verify card" })).toBeEnabled();
+  const dialog = page.getByRole("dialog");
+
+  await expect(dialog.getByRole("checkbox")).not.toBeChecked();
+  await dialog.getByRole("checkbox").check();
+  await expect(dialog.getByRole("button", { name: "Continue for free" })).toBeEnabled();
 
   const matches = matchesSchema.parse(await (await request.get("/api/onboarding/matches")).json());
   const { selected } = matches;

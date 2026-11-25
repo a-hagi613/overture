@@ -12,23 +12,23 @@ import { dsBody, dsCardTitle } from "./ui/ds.ts";
 
 function classificationBadge(value: string | null) {
   if (value === "offer") {
-    return { label: "Offer", variant: "signal" as const };
+    return { label: copy.inbox.classifications.offer, variant: "signal" as const };
   }
 
   if (value === "interview") {
-    return { label: "Interview", variant: "ok" as const };
+    return { label: copy.inbox.classifications.interview, variant: "ok" as const };
   }
 
   if (value === "screening") {
-    return { label: "Screening", variant: "secondary" as const };
+    return { label: copy.inbox.classifications.screening, variant: "secondary" as const };
   }
 
   if (value === "ack") {
-    return { label: "Confirmation", variant: "outline" as const };
+    return { label: copy.inbox.classifications.ack, variant: "outline" as const };
   }
 
   if (value === "rejection") {
-    return { label: "Closed", variant: "outline" as const };
+    return { label: copy.inbox.classifications.rejection, variant: "outline" as const };
   }
 
   return null;
@@ -68,7 +68,7 @@ export function InboxThreadPane({
 
   if (threadId === null) {
     return (
-      <div className="flex min-h-[420px] flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
         <MailOpen aria-hidden="true" className="text-muted-foreground" size={28} />
         <h2 className={`${dsCardTitle} mt-3`}>{copy.inbox.selectThreadTitle}</h2>
         <p className={`${dsBody} mt-1 max-w-xs text-xs`}>{copy.inbox.selectThreadBody}</p>
@@ -110,7 +110,7 @@ export function InboxThreadPane({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="border-b border-border px-5 py-4 md:px-6">
+      <div className="shrink-0 border-b border-border px-5 py-4 md:px-6">
         <Button className="-ml-2 mb-2 lg:hidden" onClick={onBack} size="sm" variant="ghost">
           <ArrowLeft aria-hidden="true" size={15} />
           <span>{copy.nav.inbox}</span>
@@ -121,19 +121,22 @@ export function InboxThreadPane({
             <CompanyAvatar company={thread.company} size="lg" tone="signal" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className={dsCardTitle}>{thread.company}</h2>
+                <h2 className={`${dsCardTitle} break-words`}>{thread.company}</h2>
                 {tag === null ? null : <Badge variant={tag.variant}>{tag.label}</Badge>}
+                <Badge variant="outline">{copy.inbox.messageCount(messages.length)}</Badge>
               </div>
-              <p className="mt-1 text-sm font-medium text-foreground">{thread.subject}</p>
+              <p className="mt-1 break-words text-sm font-medium text-foreground">
+                {thread.subject}
+              </p>
               {thread.title === null ? null : (
-                <p className="mt-0.5 text-xs text-muted-foreground">{thread.title}</p>
+                <p className="mt-0.5 break-words text-xs text-muted-foreground">{thread.title}</p>
               )}
             </div>
           </div>
 
           {thread.applicationId === null ? null : (
             <Button asChild size="sm" variant="outline">
-              <Link to={`/applications?card=${thread.applicationId}`}>
+              <Link to={`/tracker?card=${thread.applicationId}`}>
                 <span>{copy.inbox.viewOnTracker}</span>
                 <ArrowUpRight aria-hidden="true" size={14} />
               </Link>
@@ -142,19 +145,24 @@ export function InboxThreadPane({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6" data-scroll-region>
-        {messages.map((message, index) => (
-          <InboxMessageBlock
-            first={index === 0}
-            key={message.id}
-            message={message}
-            now={now}
-            zone={zone}
-          />
-        ))}
+      <div className="relative min-h-0 flex-1">
+        <div
+          className="px-5 py-5 md:px-6 lg:absolute lg:inset-0 lg:overflow-y-auto"
+          data-scroll-region
+        >
+          {messages.map((message, index) => (
+            <InboxMessageBlock
+              first={index === 0}
+              key={message.id}
+              message={message}
+              now={now}
+              zone={zone}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="border-t border-border bg-sidebar px-5 py-3 text-center md:px-6">
+      <div className="shrink-0 border-t border-border bg-muted/30 px-5 py-2.5 text-center md:px-6">
         <p className="text-xs text-muted-foreground">{copy.inbox.readOnly}</p>
       </div>
     </div>

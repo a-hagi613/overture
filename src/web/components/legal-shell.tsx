@@ -34,7 +34,10 @@ export function LegalShell({ children }: { children: ReactNode }) {
             <p>
               {`${copy.legal.footerName}${copy.legal.footerSeparator}${copy.legal.footerContact}`}
             </p>
-            <nav aria-label={copy.legal.footerLinksLabel} className="flex items-center gap-3 pt-1">
+            <nav
+              aria-label={copy.legal.footerLinksLabel}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1"
+            >
               <Link
                 className="font-medium text-foreground underline decoration-input underline-offset-4 hover:decoration-foreground max-md:inline-flex max-md:min-h-11 max-md:items-center"
                 to="/terms"
@@ -47,6 +50,13 @@ export function LegalShell({ children }: { children: ReactNode }) {
                 to="/privacy"
               >
                 {copy.legal.privacyLink}
+              </Link>
+              <span aria-hidden="true">{copy.legal.footerSeparator.trim()}</span>
+              <Link
+                className="font-medium text-foreground underline decoration-input underline-offset-4 hover:decoration-foreground max-md:inline-flex max-md:min-h-11 max-md:items-center"
+                to="/consent"
+              >
+                {copy.legal.consentLink}
               </Link>
             </nav>
           </div>

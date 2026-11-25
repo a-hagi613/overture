@@ -154,10 +154,7 @@ export function createOnboardingRoutes(deps: {
     return {
       currentEmployer:
         skipList.find((company) => company.reason === "current_employer")?.name ?? null,
-      needsOnboarding:
-        account.role !== "owner" &&
-        state.step < ONBOARDING_STEP_COUNT &&
-        state.onboardedAt === null,
+      needsOnboarding: account.role !== "owner" && state.onboardedAt === null,
       onboardedAt: state.onboardedAt,
       pauseReason: state.pauseReason,
       resume,

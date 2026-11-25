@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
@@ -7,6 +6,7 @@ import { fetchProfileSettings, saveProfileSettings } from "../lib/profile-api.ts
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsCardTitle } from "./ui/ds.ts";
+import { Select } from "./ui/select.tsx";
 
 const knownZones = [
   { label: copy.settings.timeZoneToronto, value: "America/Toronto" },
@@ -63,7 +63,7 @@ export function TimeLanguageSection() {
       void queryClient.invalidateQueries({ queryKey: ["calendar"] });
       void queryClient.invalidateQueries({ queryKey: ["profile-targets"] });
       void queryClient.invalidateQueries({ queryKey: ["profile-targets-count"] });
-      toast.success("Time and language updated.");
+      toast.success(copy.settings.timeLanguageSavedToast);
     },
   });
 
@@ -111,28 +111,21 @@ export function TimeLanguageSection() {
             <p className="mt-0.5 text-xs text-muted-foreground">{copy.settings.timeZoneHint}</p>
           </div>
 
-          <div className="relative w-full shrink-0 sm:w-56">
-            <select
-              className="h-10 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={controlsDisabled}
-              id="settings-timezone"
-              onChange={(event) => {
-                persist(languages, event.currentTarget.value);
-              }}
-              value={zone}
-            >
-              {zoneOptions([browserZone(), savedZone, pendingZone]).map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              aria-hidden="true"
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              size={15}
-            />
-          </div>
+          <Select
+            className="w-full shrink-0 sm:w-56"
+            disabled={controlsDisabled}
+            id="settings-timezone"
+            onChange={(event) => {
+              persist(languages, event.currentTarget.value);
+            }}
+            value={zone}
+          >
+            {zoneOptions([browserZone(), savedZone, pendingZone]).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
         </div>
 
         <div

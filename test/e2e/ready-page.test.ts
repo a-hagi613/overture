@@ -54,50 +54,49 @@ test("Ready sends only on approval, and the two layers, Edit, Skip, Undo and sav
   const page = await context.newPage();
 
   await page.goto(`${readyServer.url}/ready`);
-  await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "Ready summary" }).getByText("2", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: "applications ready to send" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Approval Queue" })).toBeVisible();
+
+  const summary = page.getByRole("region", { name: "Ready summary" });
+
+  await expect(summary.getByText("Pending approval")).toBeVisible();
+  await expect(summary.getByText("2", { exact: true })).toBeVisible();
+  await expect(summary.getByText("Scheduled", { exact: true })).toBeVisible();
+  await expect(summary.getByText("1", { exact: true })).toBeVisible();
   await expect(page.getByText("1 scheduled")).toBeVisible();
-  await expect(
-    page
-      .getByText(
-        "Using your unchanged resume PDF · Spaced 20 min apart to protect your profile · No charge if sending fails",
-      )
-      .first(),
-  ).toBeVisible();
 
-  const northwind = page
-    .locator('section[aria-label="Applications ready to send"] > section')
-    .filter({
-      has: page.getByRole("heading", { level: 2, name: "Platform Engineer" }),
-    });
+  const queue = page.locator('section[aria-label="Applications ready to send"]');
 
-  const halden = page.locator('section[aria-label="Applications ready to send"] > section').filter({
+  const northwind = queue.locator("article").filter({
+    has: page.getByRole("heading", { level: 2, name: "Platform Engineer" }),
+  });
+
+  const halden = queue.locator("article").filter({
     has: page.getByRole("heading", { level: 2, name: "Site Reliability Engineer" }),
   });
 
-  const northwindScheduled = page
-    .locator('section[aria-label="Scheduled applications"] section')
-    .filter({ hasText: "Northwind Labs" });
+  const scheduled = page.locator('section[aria-label="Scheduled applications"]');
 
   const before = await readyOf(request);
 
   expect(before.ready).toBe(2);
   expect(before.approved).toBe(1);
 
-  await expect(northwind.getByText("Drafted from your resume").first()).toBeVisible();
-  await expect(halden.getByText("Your answer").first()).toBeVisible();
-  await expect(halden.getByText("Saved answers only")).toBeVisible();
+  await northwind.getByRole("button", { name: "Inspect Northwind Labs" }).click();
 
-  await halden.getByRole("button", { name: /Show \d+ saved answers, Halden Systems/u }).click();
-  await expect(halden.getByRole("button", { name: /Hide \d+ saved answers/u })).toBeVisible();
-  await expect(halden.getByText("maya-okafor-2026.pdf")).toBeVisible();
+  const drawer = page.getByRole("dialog", { name: "Inspect prepared application" });
 
-  await halden
+  await expect(drawer.getByText("Drafted from your resume").first()).toBeVisible();
+
+  await drawer.getByRole("button", { name: "Next application" }).click();
+  await expect(drawer.getByText("Your answer").first()).toBeVisible();
+  await expect(drawer.getByText("Saved answers only")).toBeVisible();
+  await expect(drawer.getByText("Saved answer").first()).toBeVisible();
+
+  await drawer.getByRole("button", { name: /Show more/u }).click();
+  await expect(drawer.getByRole("button", { name: "Show less" })).toBeVisible();
+  await expect(drawer.getByText("maya-okafor-2026.pdf")).toBeVisible();
+
+  await drawer
     .getByRole("button", {
       name: "Edit answer: Are you comfortable with a weekly on-call rotation?",
     })
@@ -105,7 +104,7 @@ test("Ready sends only on approval, and the two layers, Edit, Skip, Undo and sav
 
   const edited = "Yes. I have kept a weekly rotation for three years and would keep this one.";
 
-  await halden
+  await drawer
     .getByRole("textbox", {
       name: "Your answer to Are you comfortable with a weekly on-call rotation?",
     })
@@ -115,14 +114,14 @@ test("Ready sends only on approval, and the two layers, Edit, Skip, Undo and sav
     (candidate) => candidate.request().method() === "PUT" && candidate.url().includes("/answers/"),
   );
 
-  await halden.getByRole("button", { name: "Save", exact: true }).click();
+  await drawer.getByRole("button", { name: "Save", exact: true }).click();
   await saved;
   await expect(
-    halden.getByRole("textbox", {
+    drawer.getByRole("textbox", {
       name: "Your answer to Are you comfortable with a weekly on-call rotation?",
     }),
   ).toHaveCount(0);
-  await expect(halden.getByText(edited, { exact: true })).toBeVisible();
+  await expect(drawer.getByText(edited, { exact: true })).toBeVisible();
   await expect(page.getByText("Answer saved.")).toBeVisible();
 
   const afterEdit = await readyOf(request);
@@ -130,7 +129,7 @@ test("Ready sends only on approval, and the two layers, Edit, Skip, Undo and sav
   expect(afterEdit.ready).toBe(2);
   expect(afterEdit.approved).toBe(1);
 
-  await halden.getByRole("button", { name: "Skip" }).click();
+  await drawer.getByRole("button", { name: "Skip" }).click();
   await expect(halden).toHaveCount(0);
 
   const skipToast = page
@@ -140,14 +139,16 @@ test("Ready sends only on approval, and the two layers, Edit, Skip, Undo and sav
   await skipToast.getByRole("button", { name: "Undo" }).click();
   await expect(halden).toBeVisible();
 
+  await drawer.getByRole("button", { name: "Close" }).click();
+
   const approved = page.waitForResponse(
     (candidate) =>
       candidate.request().method() === "POST" &&
       /\/api\/applications\/[^/]+\/approve$/u.test(candidate.url()),
   );
 
-  await northwind.getByRole("button", { name: "Approve & Next" }).click();
-  await page.getByRole("button", { name: "Yes, send application" }).click();
+  await northwind.getByRole("button", { name: "Approve", exact: true }).click();
+  await page.getByRole("button", { name: "Approve & schedule" }).click();
   await approved;
   await expect(page.getByText("Scheduled to send to Northwind Labs.")).toBeVisible();
 
@@ -155,24 +156,10 @@ test("Ready sends only on approval, and the two layers, Edit, Skip, Undo and sav
     .locator("[data-sonner-toast]")
     .filter({ hasText: "Scheduled to send to Northwind Labs." });
 
-  await approvalToast.getByRole("button", { name: "Undo" }).click();
-  await expect(northwind.getByRole("button", { name: "Approve & Next" })).toBeVisible();
-
-  const afterUndoApproval = await readyOf(request);
-
-  expect(afterUndoApproval.ready).toBe(2);
-  expect(afterUndoApproval.approved).toBe(1);
-
-  const approvedAgain = page.waitForResponse(
-    (candidate) =>
-      candidate.request().method() === "POST" &&
-      /\/api\/applications\/[^/]+\/approve$/u.test(candidate.url()),
-  );
-
-  await northwind.getByRole("button", { name: "Approve & Next" }).click();
-  await page.getByRole("button", { name: "Yes, send application" }).click();
-  await approvedAgain;
-  await expect(northwindScheduled.getByText(/^Approved/u)).toBeVisible();
+  await expect(approvalToast.getByRole("button", { name: "Undo" })).toHaveCount(0);
+  await expect(scheduled.getByRole("button", { name: "Undo" })).toHaveCount(0);
+  await expect(scheduled.getByText("Northwind Labs", { exact: true }).first()).toBeVisible();
+  await expect(scheduled.getByText(/^(?:Scheduled ·|Queued$)/u).first()).toBeVisible();
 
   const afterSend = await readyOf(request);
 
@@ -181,11 +168,12 @@ test("Ready sends only on approval, and the two layers, Edit, Skip, Undo and sav
 
   const all = page.waitForResponse(
     (candidate) =>
-      candidate.request().method() === "POST" && candidate.url().endsWith("/api/ready/approve"),
+      candidate.request().method() === "POST" &&
+      /\/api\/applications\/[^/]+\/approve$/u.test(candidate.url()),
   );
 
-  await page.getByRole("button", { name: "Approve 1 saved-only application" }).click();
-  await page.getByRole("button", { name: "Yes, send all (1)" }).click();
+  await halden.getByRole("button", { name: "Approve", exact: true }).click();
+  await page.getByRole("button", { name: "Approve & schedule" }).click();
   await all;
 
   const afterAll = await readyOf(request);

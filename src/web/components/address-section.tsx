@@ -12,11 +12,16 @@ import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
 
 export function AddressSection() {
   const { address } = copy.profile;
-  const { data } = useMailbox();
+  const pw = copy.profileWorkspace;
+  const { data, isPending } = useMailbox();
   const [copied, setCopied] = useState(false);
-  const liveAlias = data?.address ?? address.alias;
+  const liveAlias = data?.address ?? null;
 
   const handleCopy = async () => {
+    if (liveAlias === null) {
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText(liveAlias);
       setCopied(true);
@@ -30,19 +35,26 @@ export function AddressSection() {
   };
 
   return (
-    <Card ariaLabelledBy="profile-address-heading" className="mt-6 p-5 md:p-6" id="profile-address">
+    <Card ariaLabelledBy="profile-address-heading" className="p-5 md:p-6" id="profile-address">
       <h2 className={dsCardTitle} id="profile-address-heading">
         {`${address.titlePlain} ${address.titleItalic}`}
       </h2>
       <p className={`${dsBody} mt-1 max-w-2xl`}>{address.intro}</p>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3.5">
-        <p className="min-w-0 flex-1 break-all font-mono text-sm font-medium text-foreground">
-          {liveAlias}
+      <div className="mt-5 flex flex-col items-start gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3.5">
+        <p
+          className={
+            liveAlias === null
+              ? "w-full break-words text-sm text-muted-foreground"
+              : "w-full break-all font-mono text-sm font-medium text-foreground"
+          }
+        >
+          {liveAlias ?? (isPending ? copy.settings.applyEmailLoading : pw.addressNotAssigned)}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <SourceChip variant="dashed">{address.chip}</SourceChip>
           <Button
+            disabled={liveAlias === null}
             onClick={() => {
               void handleCopy();
             }}

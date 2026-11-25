@@ -8,14 +8,13 @@ import { dsBody, dsPageTitle } from "../components/ui/ds.ts";
 
 export function NotFoundPage() {
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-xl items-center justify-center py-12">
-      <Card className="w-full p-8 text-center" variant="elevated">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted text-signal-text">
+    <div className="mx-auto flex flex-1 max-w-xl items-center justify-center py-12">
+      <Card className="w-full p-8 text-center" variant="default">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
           <Compass aria-hidden="true" size={24} />
         </div>
         <h1 className={`${dsPageTitle} mt-4`}>
-          {copy.nav.profilePages.notFoundTitlePlain}
-          <em className="italic text-signal">{copy.nav.profilePages.notFoundTitleItalic}</em>
+          {`${copy.nav.profilePages.notFoundTitlePlain}${copy.nav.profilePages.notFoundTitleItalic}`}
         </h1>
         <p className={`${dsBody} mx-auto mt-2 max-w-sm`}>{copy.notFound.body}</p>
         <div className="mt-6">

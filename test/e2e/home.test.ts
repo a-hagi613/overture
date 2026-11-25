@@ -158,12 +158,14 @@ test("the Start/Pause switch flips running and the page updates over SSE", async
   await page.clock.setFixedTime(new Date(2026, 10, 17, 11, 0, 0));
   await page.goto(`${homeServer.url}/home`);
 
-  await expect(page.getByText("Sending active")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Application sending" })).toBeVisible();
+  await expect(page.getByText("Active", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Pause sending" }).click();
 
-  await expect(page.getByText("Sending paused")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Sending is paused" })).toBeVisible();
+  await expect(page.getByText("Paused", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Application sending" })).toBeVisible();
+  await expect(page.getByText("Nothing new will send until you resume.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
   const paused = await request.get("/api/home");
@@ -172,11 +174,11 @@ test("the Start/Pause switch flips running and the page updates over SSE", async
 
   await page.getByRole("button", { name: "Resume" }).click();
 
-  await expect(page.getByText("Sending active")).toBeVisible();
+  await expect(page.getByText("Active", { exact: true })).toBeVisible();
 
   await request.post("/api/running", { data: { running: false } });
 
-  await expect(page.getByText("Sending paused")).toBeVisible();
+  await expect(page.getByText("Paused", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
   await context.close();
@@ -353,51 +355,43 @@ test("Home puts actions above the chart and the outcomes strip follows 7D, 30D a
       await page.clock.setFixedTime(new Date(2026, 10, 17, 11, 0, 0));
       await page.goto(`${homeServer.url}/home`);
 
-      await expect(page.getByText("Sending active")).toBeVisible();
+      await expect(page.getByText("Active", { exact: true })).toBeVisible();
 
-      const outcomes = page.getByTestId("home-outcomes");
+      const chartCard = page.getByTestId("home-chart");
 
-      await expect(outcomes.getByText("Applications sent")).toBeVisible();
-      await expect(outcomes.getByText("37", { exact: true })).toBeVisible();
-      await expect(outcomes.getByText("+6 vs the previous 7 days")).toBeVisible();
-      await expect(outcomes.getByText("Replies", { exact: true })).toBeVisible();
-      await expect(outcomes.getByText("9", { exact: true })).toBeVisible();
-      await expect(outcomes.getByText("Interviews", { exact: true })).toBeVisible();
-      await expect(outcomes.getByText("3", { exact: true })).toBeVisible();
+      await expect(chartCard).toBeVisible();
+      await expect(chartCard.getByRole("heading", { name: "Applications sent" })).toBeVisible();
+      await expect(chartCard.getByText("37", { exact: true })).toBeVisible();
+      await expect(chartCard.getByText("applications", { exact: true })).toBeVisible();
+      await expect(chartCard.getByText("+6", { exact: true })).toBeVisible();
 
-      const chart = await page.getByTestId("home-chart").boundingBox();
+      const chart = await chartCard.boundingBox();
+      const failuresBox = await page.getByTestId("home-failures").boundingBox();
 
       expect(chart).not.toBeNull();
+      expect(failuresBox).not.toBeNull();
 
-      const actions = await Promise.all([
-        page.locator("#home-needs-you").boundingBox(),
-        page.locator("#home-ready-title").boundingBox(),
-        page.getByTestId("home-failures").boundingBox(),
-      ]);
-
-      for (const box of actions) {
-        expect(box).not.toBeNull();
-
-        if (box !== null && chart !== null) {
-          expect(box.y, `${String(width)}px action above the chart`).toBeLessThan(chart.y);
-        }
+      if (failuresBox !== null && chart !== null) {
+        expect(failuresBox.y, `${String(width)}px failures above chart`).toBeLessThan(chart.y);
       }
 
-      await expect(page.getByTestId("home-failures")).toContainText("Couldn't apply");
+      await expect(page.locator("#home-ready-title")).toBeVisible();
+      await expect(page.locator("#home-needs-you")).toBeVisible();
+      await expect(page.getByTestId("home-failures")).toContainText("Not sent");
       await expect(page.getByTestId("home-failures")).toContainText("Ferro Cloud, DevOps Engineer");
-      await expect(page.getByTestId("home-activity")).toContainText("Sent · confirmed");
 
-      await outcomes.getByRole("button", { name: "30D" }).click();
-      await expect(outcomes.getByText("69", { exact: true })).toBeVisible();
-      await expect(outcomes.getByText("+69 vs the previous 30 days")).toBeVisible();
+      await chartCard.getByRole("button", { name: "30D" }).click();
+      await expect(chartCard.getByText("69", { exact: true })).toBeVisible();
+      await expect(chartCard.getByText("+69", { exact: true })).toBeVisible();
+      await expect(chartCard.getByText("applications", { exact: true })).toBeVisible();
 
-      await outcomes.getByRole("button", { name: "90D" }).click();
-      await expect(outcomes.getByText("69", { exact: true })).toBeVisible();
-      await expect(page.getByText("Weekly applications sent · Last 90 days")).toBeVisible();
+      await chartCard.getByRole("button", { name: "90D" }).click();
+      await expect(chartCard.getByText("69", { exact: true })).toBeVisible();
+      await expect(chartCard.getByText("Weekly", { exact: true })).toBeVisible();
 
-      await outcomes.getByRole("button", { name: "7D" }).click();
-      await expect(outcomes.getByText("37", { exact: true })).toBeVisible();
-      await expect(page.getByText("Daily applications sent · Last 7 days")).toBeVisible();
+      await chartCard.getByRole("button", { name: "7D" }).click();
+      await expect(chartCard.getByText("37", { exact: true })).toBeVisible();
+      await expect(chartCard.getByText("Daily", { exact: true })).toBeVisible();
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth,

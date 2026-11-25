@@ -70,3 +70,20 @@ export const supplyCountsSchema = z.object({
 });
 
 export type SupplyCounts = z.infer<typeof supplyCountsSchema>;
+
+export const locationSuggestQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+});
+
+export const locationSuggestionSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+  meta: z.string(),
+  kind: z.enum(["continent", "country", "region", "metro", "city"]),
+});
+
+export type LocationSuggestion = z.infer<typeof locationSuggestionSchema>;
+
+export const locationSuggestionsResponseSchema = z.object({
+  suggestions: z.array(locationSuggestionSchema),
+});

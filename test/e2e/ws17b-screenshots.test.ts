@@ -159,8 +159,13 @@ test.describe("WS-17b review screenshots", () => {
 
       await page.goto(`${isolatedAppServer.url}/#live-jobs`);
       await page.getByLabel("Category", { exact: true }).selectOption("Software Engineering");
-      await page.getByLabel("Role", { exact: true }).fill("Software Engineer");
-      await page.getByLabel("Role", { exact: true }).press("Enter");
+      await page.getByRole("button", { name: /^Role:/u }).click();
+      await page.getByPlaceholder("Search roles…").fill("Software Engineer");
+      await page
+        .getByRole("listbox")
+        .getByRole("option", { name: /Software Engineer/u })
+        .first()
+        .click();
       await expect(page.getByTestId("supply-count")).toHaveText("2");
 
       await shoot(page, `landing-supply-${String(width)}-${theme}`, page.locator("#live-jobs"));

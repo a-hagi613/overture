@@ -1,9 +1,11 @@
+import { Check } from "lucide-react";
+
 import type { QuestionFieldType } from "../../shared/questions";
 
 import { copy } from "../../shared/copy.ts";
 import { OPTION_FIELD_TYPES } from "../../shared/questions.ts";
-import { Button } from "./ui/button.tsx";
 import { Input } from "./ui/input.tsx";
+import { Textarea } from "./ui/textarea.tsx";
 
 export interface AnswerField {
   fieldType: QuestionFieldType;
@@ -56,15 +58,19 @@ export function ReviewAnswer({
     return (
       <fieldset
         aria-labelledby={labelledBy}
-        className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0"
+        className="m-0 grid min-w-0 grid-cols-1 gap-2 border-0 p-0 sm:grid-cols-2"
       >
-        {field.options.map((option) => {
+        {field.options.map((option, index) => {
           const selected = chosen.includes(option);
 
           return (
-            <Button
-              ariaPressed={selected}
-              className="rounded-full"
+            <button
+              aria-pressed={selected}
+              className={`flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-md border px-4 py-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
+                selected
+                  ? "border-foreground bg-muted font-semibold text-foreground"
+                  : "border-border bg-card font-medium text-foreground hover:bg-muted/60"
+              }`}
               key={option}
               onClick={() => {
                 if (!multiple) {
@@ -79,11 +85,23 @@ export function ReviewAnswer({
 
                 onChange(next.join(", "));
               }}
-              size="sm"
-              variant={selected ? "primary" : "outline"}
+              type="button"
             >
-              {option}
-            </Button>
+              <span className="min-w-0 truncate">{option}</span>
+              <span className="flex shrink-0 items-center gap-2">
+                {selected ? (
+                  <Check aria-hidden="true" className="text-signal-text" size={14} />
+                ) : null}
+                {index < 9 ? (
+                  <kbd
+                    aria-hidden="true"
+                    className="hidden rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block"
+                  >
+                    {String(index + 1)}
+                  </kbd>
+                ) : null}
+              </span>
+            </button>
           );
         })}
       </fieldset>
@@ -108,9 +126,9 @@ export function ReviewAnswer({
 
   if (field.fieldType === "textarea") {
     return (
-      <textarea
-        aria-labelledby={labelledBy}
-        className="min-h-24 w-full rounded-md border border-input bg-card p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+      <Textarea
+        ariaLabelledBy={labelledBy}
+        className="min-h-32 p-3.5"
         onChange={(event) => {
           onChange(event.target.value);
         }}
@@ -123,6 +141,7 @@ export function ReviewAnswer({
   return (
     <Input
       ariaLabel={copy.review.yourAnswer}
+      className="h-12 text-sm"
       onChange={(event) => {
         onChange(event.target.value);
       }}

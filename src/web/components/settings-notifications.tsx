@@ -27,7 +27,7 @@ export function SettingsNotifications() {
       { enabled, kind },
       {
         onSuccess: () => {
-          toast.success("Notification preference saved.");
+          toast.success(copy.settings.notificationsSavedToast);
         },
       },
     );

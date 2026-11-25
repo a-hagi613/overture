@@ -1,20 +1,11 @@
 import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
-import { useConsent } from "../lib/consent-api.ts";
-import { longDate } from "../lib/consent-format.ts";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
 
 export function AccountLegalCard() {
-  const { data: consent } = useConsent();
-
-  const consentDetail =
-    consent?.accepted === null || consent?.accepted === undefined
-      ? copy.settings.legalConsentNotAgreed
-      : `${copy.settings.legalConsentVersion(consent.accepted.version)}${copy.settings.legalSeparator}${copy.settings.legalConsentAccepted(longDate(consent.accepted.at))}`;
-
   const rows = [
     {
       detail: copy.settings.legalTermsDetail,
@@ -29,9 +20,9 @@ export function AccountLegalCard() {
       to: "/privacy",
     },
     {
-      detail: consentDetail,
+      detail: copy.settings.legalConsentDetail,
       label: copy.settings.legalConsent,
-      linkText: copy.settings.legalConsentRead,
+      linkText: copy.settings.legalOpen,
       to: "/consent",
     },
   ] as const;

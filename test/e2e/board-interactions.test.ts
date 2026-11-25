@@ -501,7 +501,7 @@ for (const [width, scheme] of [
     await expect(page.getByText("Typed here").first()).toBeVisible();
     await expect(page.getByText("L1 · ", { exact: false }).first()).toBeVisible();
     await expect(page.getByText("The PDF was not restyled or regenerated")).toBeVisible();
-    await expect(page.getByText("No saved answer was invented")).toBeVisible();
+    await expect(page.getByText("Nothing fabricated")).toBeVisible();
 
     const overflows = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -545,7 +545,7 @@ test("a sentence with no recorded source says so and withholds the no-invention 
   await page.getByRole("tab", COVER_TAB).click();
 
   await expect(page.getByText("No source recorded")).toBeVisible();
-  await expect(page.getByText("No saved answer was invented")).toHaveCount(0);
+  await expect(page.getByText("Nothing fabricated")).toHaveCount(0);
   await expect(page.getByText("The PDF was not restyled or regenerated")).toBeVisible();
 
   await context.close();

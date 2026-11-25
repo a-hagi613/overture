@@ -85,7 +85,7 @@ export function LandingHowItWorks() {
   return (
     <section
       aria-labelledby="how-it-works-title"
-      className={`${dsContainer} py-16 sm:py-24`}
+      className={`${dsContainer} pb-14 pt-12 sm:pb-20 sm:pt-16`}
       id="how-it-works"
     >
       <div className="mx-auto max-w-2xl text-center">
@@ -100,7 +100,7 @@ export function LandingHowItWorks() {
 
       <div className="relative mt-10 xl:px-7">
         <div className="relative xl:pt-16">
-          <div className="grid grid-cols-1 gap-7 xl:grid-cols-12 xl:grid-rows-[340px_360px] xl:gap-x-7 xl:gap-y-16">
+          <div className="grid grid-cols-1 gap-7 xl:grid-cols-12 xl:grid-rows-[minmax(340px,auto)_minmax(350px,auto)] xl:gap-x-7 xl:gap-y-16">
             <div
               className="relative flex min-w-0 flex-col xl:col-span-6 xl:col-start-1 xl:row-span-2 xl:row-start-1"
               onMouseEnter={() => {

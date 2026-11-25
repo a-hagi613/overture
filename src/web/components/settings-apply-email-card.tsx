@@ -79,9 +79,15 @@ export function SettingsApplyEmailCard() {
       </div>
       <p className={`${dsBody} mt-1 max-w-2xl`}>{copy.settings.applyEmailLead}</p>
 
-      <div className="mt-5 rounded-xl border border-border bg-background px-4 py-3.5">
+      <div className="mt-5 rounded-lg border border-border bg-muted/40 px-4 py-3.5">
         <p className={dsEyebrow}>{copy.settings.applyEmailAliasLabel}</p>
-        <p className="mt-1 break-all font-mono text-sm font-medium text-foreground">
+        <p
+          className={
+            state.applyAddress === null
+              ? "mt-1 break-words text-sm text-muted-foreground"
+              : "mt-1 break-all font-mono text-sm font-medium text-foreground"
+          }
+        >
           {state.applyAddress ?? copy.settings.applyEmailNotAssigned}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">{copy.settings.applyEmailAliasNote}</p>

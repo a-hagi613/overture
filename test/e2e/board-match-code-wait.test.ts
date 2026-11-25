@@ -251,7 +251,7 @@ for (const width of [390, 1280] as const) {
         throw new Error("The sheet has no box.");
       }
 
-      expect(Math.round(box.width)).toBe(width === 1280 ? 468 : 358);
+      expect(Math.round(box.width)).toBe(width === 1280 ? 576 : 358);
 
       const monogram = await sheet.locator("[aria-hidden=true]").first().boundingBox();
 
@@ -260,7 +260,7 @@ for (const width of [390, 1280] as const) {
 
       const inputBox = await sheet.getByLabel("Verification code").boundingBox();
 
-      expect(Math.round(inputBox?.height ?? 0)).toBe(50);
+      expect(Math.round(inputBox?.height ?? 0)).toBe(48);
 
       await expectNoOverflow(page);
       await expect(sheet.getByText(/\bno\./u)).toHaveCount(0);
@@ -337,7 +337,7 @@ for (const width of [768, 1920, 2560] as const) {
     const sheet = page.getByTestId("code-paste-sheet");
     const box = await sheet.boundingBox();
 
-    expect(Math.round(box?.width ?? 0)).toBe(width >= 1700 ? 520 : 468);
+    expect(Math.round(box?.width ?? 0)).toBe(width >= 1280 ? 576 : 512);
 
     await expectNoOverflow(page);
 

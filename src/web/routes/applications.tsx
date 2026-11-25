@@ -1,60 +1,42 @@
-import { lazy } from "react";
-import { useSearchParams } from "react-router";
+import { Navigate, useSearchParams } from "react-router";
 
-import { copy } from "../../shared/copy.ts";
-import { PageHeader } from "../components/page-header.tsx";
-import { SegmentedControl } from "../components/ui/segmented-control.tsx";
-import { SegmentedControlItem } from "../components/ui/segmented-control-item.tsx";
 import { useMediaQuery } from "../lib/media-query.ts";
+import { BoardPage } from "./board.tsx";
 
-const BoardPage = lazy(async () => {
-  const loaded = await import("./board.tsx");
-
-  return { default: loaded.BoardPage };
-});
-
-const CalendarPage = lazy(async () => {
-  const loaded = await import("./calendar.tsx");
-
-  return { default: loaded.CalendarPage };
-});
-
-type ApplicationsView = "board" | "list" | "calendar";
+type ApplicationsView = "board" | "list";
 
 function viewFrom(value: string | null) {
-  if (value === "board" || value === "list" || value === "calendar") {
+  if (value === "board" || value === "list") {
     return value;
   }
 
   return null;
 }
 
-function leadFor(view: ApplicationsView) {
-  if (view === "calendar") {
-    return copy.calendar.lead;
-  }
-
-  if (view === "list") {
-    return copy.board.listLead;
-  }
-
-  return copy.board.trackerLead;
-}
-
 /**
- * The canonical Applications destination.
+ * The canonical Application Tracker destination (`/tracker`).
  *
- * One view at a time, chosen by `?view=board|list|calendar`. With no view in the
- * URL the desktop opens the Board and the phone opens the scannable List; the
- * Board stays one tap away on the phone. The page header and the switcher are
- * rendered here once so the Calendar does not repeat the page chrome.
+ * One view at a time (`board` or `list`), synced with `?view=board|list`. Desktop opens Board
+ * and phone opens List when neither is requested; legacy `?view=calendar` links redirect to the
+ * standalone `/calendar` route.
  *
- * @returns The header, the view switcher and the selected view.
+ * @returns Tracker workspace page or calendar redirect.
  */
 export function ApplicationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const desktop = useMediaQuery("(min-width: 1024px)");
-  const requested = viewFrom(searchParams.get("view"));
+  const rawView = searchParams.get("view");
+
+  if (rawView === "calendar") {
+    const next = new URLSearchParams(searchParams);
+
+    next.delete("view");
+    const query = next.toString();
+
+    return <Navigate replace to={query === "" ? "/calendar" : `/calendar?${query}`} />;
+  }
+
+  const requested = viewFrom(rawView);
   const view: ApplicationsView = requested ?? (desktop ? "board" : "list");
 
   const changeView = (next: string) => {
@@ -67,56 +49,13 @@ export function ApplicationsPage() {
     const params = new URLSearchParams(searchParams);
 
     params.set("view", target);
-
-    if (target === "calendar") {
-      params.delete("filter");
-    } else {
-      params.delete("month");
-    }
-
+    params.delete("month");
     setSearchParams(params, { replace: true });
   };
 
-  const calendar = view === "calendar";
-  const lead = leadFor(view);
-
   return (
-    <div>
-      <PageHeader
-        lead={lead}
-        titleNode={
-          calendar ? (
-            <>
-              {copy.calendar.titlePlain}{" "}
-              <em className="italic text-signal">{copy.calendar.titleItalic}</em>
-            </>
-          ) : (
-            <>
-              {copy.board.trackerTitlePlain}{" "}
-              <em className="italic text-signal">{copy.board.trackerTitleItalic}</em>
-            </>
-          )
-        }
-      />
-
-      <SegmentedControl
-        ariaLabel={copy.board.views.label}
-        className="mt-5 w-full gap-1 md:w-auto"
-        onValueChange={changeView}
-        value={view}
-      >
-        <SegmentedControlItem className="flex-1 md:flex-none" value="board">
-          {copy.board.views.board}
-        </SegmentedControlItem>
-        <SegmentedControlItem className="flex-1 md:flex-none" value="list">
-          {copy.board.views.list}
-        </SegmentedControlItem>
-        <SegmentedControlItem className="flex-1 md:flex-none" value="calendar">
-          {copy.board.views.calendar}
-        </SegmentedControlItem>
-      </SegmentedControl>
-
-      {calendar ? <CalendarPage /> : <BoardPage view={view} />}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <BoardPage onChangeView={changeView} view={view} />
     </div>
   );
 }

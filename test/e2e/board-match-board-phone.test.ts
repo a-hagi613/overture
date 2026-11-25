@@ -48,12 +48,9 @@ async function expectPhoneBoardMatches(browser: Browser, appServerUrl: string, t
 
   await openBoard(page, appServerUrl, PHONE_WIDTH, selectedId);
 
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Application Tracker" })).toBeVisible();
   await expect(
     page.getByRole("heading", { level: 2, name: "Senior Backend Engineer" }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Every application from match to decision.").filter({ visible: true }),
   ).toBeVisible();
   await expect(page.getByRole("group", { name: "Stages" })).toBeVisible();
   await page.evaluate(async () => {

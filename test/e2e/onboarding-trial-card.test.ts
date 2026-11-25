@@ -39,6 +39,7 @@ async function ownerStorageState(appUrl: string) {
 
   expect(requested.ok()).toBe(true);
   await api.get(await latestMailLink(appUrl, api, authTestIdentity.ownerEmail));
+  await api.post("/api/onboarding/1");
 
   const storageState = await api.storageState();
 
@@ -70,7 +71,7 @@ async function openTrialPage(
 
 for (const width of [390, 1280, 2560]) {
   for (const theme of ["light", "dark"] as const) {
-    test(`the trial page at ${String(width)}px ${theme} has no overflow and passes axe`, async ({
+    test(`the trial modal at ${String(width)}px ${theme} has no overflow and passes axe`, async ({
       browser,
       trialServer,
     }) => {
@@ -78,16 +79,17 @@ for (const width of [390, 1280, 2560]) {
       const { context, page } = await openTrialPage(browser, storageState, width, theme);
 
       await page.goto(`${trialServer.url}/onboarding/trial`);
+      await expect(page).toHaveURL(/\/onboarding\/matches\?trial=1$/u);
 
+      const dialog = page.getByRole("dialog");
+
+      await expect(dialog).toBeVisible();
       await expect(
-        page.getByRole("heading", {
-          level: 1,
-          name: /Verify a card for your three free Applications/u,
-        }),
+        dialog.getByRole("heading", { name: /Your first 3 applications are free/u }),
       ).toBeVisible();
-      await expect(page.getByRole("button", { name: "Verify card" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Verify card" })).toBeDisabled();
-      await expect(page.getByRole("checkbox")).not.toBeChecked();
+      await expect(dialog.getByRole("button", { name: "Continue for free" })).toBeVisible();
+      await expect(dialog.getByRole("button", { name: "Continue for free" })).toBeDisabled();
+      await expect(dialog.getByRole("checkbox")).not.toBeChecked();
 
       await page.evaluate(async () => document.fonts.ready);
 
@@ -109,7 +111,7 @@ for (const width of [390, 1280, 2560]) {
 for (const width of [390, 1280]) {
   for (const theme of ["light", "dark"] as const) {
     for (const state of ["verify", "declined", "used"] as const) {
-      test(`the ${state} card at ${String(width)}px ${theme} is captured and accessible`, async ({
+      test(`the ${state} modal state at ${String(width)}px ${theme} is captured and accessible`, async ({
         browser,
         trialServer,
       }) => {
@@ -131,17 +133,21 @@ for (const width of [390, 1280]) {
 
         await page.goto(`${trialServer.url}/onboarding/trial?card=verified&session=cs_setup_ui`);
 
+        const dialog = page.getByRole("dialog");
+
+        await expect(dialog).toBeVisible();
+
         if (state !== "verify") {
-          await page.getByRole("button", { name: "Verify card" }).click();
+          await dialog.getByRole("button", { name: "Start my 3 free applications" }).click();
         }
 
         const heading = {
-          verify: /Verify a card$/u,
-          declined: /Card declined/u,
-          used: /Card already used/u,
+          verify: /Your first 3 applications are free/u,
+          declined: /Card could not be confirmed/u,
+          used: /Free trial already used/u,
         }[state];
 
-        await expect(page.getByRole("heading", { level: 2, name: heading })).toBeVisible();
+        await expect(dialog.getByRole("heading", { name: heading })).toBeVisible();
 
         await page.evaluate(async () => document.fonts.ready);
 

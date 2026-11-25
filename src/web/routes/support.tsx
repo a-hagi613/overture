@@ -11,6 +11,7 @@ import { Card } from "../components/ui/card.tsx";
 import { dsBody, dsCardTitle, dsMono } from "../components/ui/ds.ts";
 import { Input } from "../components/ui/input.tsx";
 import { Separator } from "../components/ui/separator.tsx";
+import { Textarea } from "../components/ui/textarea.tsx";
 import { authClient } from "../lib/auth-client.ts";
 
 const CATEGORIES: readonly { id: SupportCategory; label: string }[] = [
@@ -85,18 +86,10 @@ export function SupportPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader
-        lead={sp.lead}
-        titleNode={
-          <>
-            {sp.titlePlain}
-            <em className="italic text-signal">{sp.titleItalic}</em>
-          </>
-        }
-      />
+    <div className="flex min-w-0 flex-1 flex-col">
+      <PageHeader titleNode={sp.titlePlain} />
 
-      <Card className="mt-6 p-5 md:p-6" variant="elevated">
+      <Card className="mt-6 max-w-4xl p-5 md:p-6" variant="default">
         {referenceId === null ? (
           <form
             className="flex flex-col gap-5"
@@ -105,7 +98,7 @@ export function SupportPage() {
               void handleSubmit();
             }}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-4 py-3">
               <span className="text-xs font-semibold text-muted-foreground">{sp.fromLabel}</span>
               <span className={`${dsMono} min-w-0 break-all`}>
                 {userName === "" ? userEmail : `${userName} · ${userEmail}`}
@@ -118,12 +111,13 @@ export function SupportPage() {
                 {CATEGORIES.map((item) => (
                   <Button
                     ariaPressed={category === item.id}
+                    className="rounded-full"
                     key={item.id}
                     onClick={() => {
                       setCategory(item.id);
                     }}
                     size="sm"
-                    variant={category === item.id ? "primary" : "secondary"}
+                    variant={category === item.id ? "primary" : "outline"}
                   >
                     {item.label}
                   </Button>
@@ -158,8 +152,8 @@ export function SupportPage() {
               >
                 {sp.messageLabel}
               </label>
-              <textarea
-                className="min-h-36 w-full rounded-md border border-input bg-card px-3.5 py-2.5 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+              <Textarea
+                className="min-h-36"
                 id="support-message"
                 onChange={(event) => {
                   setMessage(event.currentTarget.value);

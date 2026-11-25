@@ -121,8 +121,9 @@ async function captureShot(
   });
 
   await page.goto(`${appServerUrl}/ready`);
-  await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Approval Queue" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Platform Engineer" })).toBeVisible();
+  await page.getByRole("button", { name: "Inspect Northwind Labs" }).click();
   await expect(page.getByText("Written for this role").first()).toBeVisible();
 
   await page.evaluate(async () => {
@@ -130,8 +131,8 @@ async function captureShot(
   });
 
   if (width === 390) {
-    await page.getByRole("button", { name: "Approve & Next" }).first().scrollIntoViewIfNeeded();
-    await expect(page.getByRole("button", { name: "Approve & Next" }).first()).toBeInViewport();
+    await page.getByRole("button", { name: "Approve" }).first().scrollIntoViewIfNeeded();
+    await expect(page.getByRole("button", { name: "Approve" }).first()).toBeInViewport();
 
     await page.screenshot({
       fullPage: false,
@@ -167,7 +168,7 @@ async function captureReady(
 }
 
 function cardFor(page: Page, roleTitle: string) {
-  return page.locator('section[aria-label="Applications ready to send"] > section').filter({
+  return page.locator('section[aria-label="Applications ready to send"] article').filter({
     has: page.getByRole("heading", { level: 2, name: roleTitle }),
   });
 }
@@ -204,47 +205,41 @@ test("drafted prose expands, saved answers collapse, and A, E and S triage one c
 
   await page.goto(`${readyServer.url}/ready`);
 
+  const queue = page.locator('section[aria-label="Applications ready to send"]');
   const northwind = cardFor(page, "Platform Engineer");
-  const cobalt = cardFor(page, "Data Engineer");
+  const drawer = page.getByRole("dialog", { name: "Inspect prepared application" });
 
-  await expect(
-    northwind.getByRole("button", { name: "Show 5 saved answers, Northwind Labs" }),
-  ).toBeVisible();
-  await expect(
-    northwind
-      .getByText(
-        "Using your unchanged resume PDF · Spaced 20 min apart to protect your profile · No charge if sending fails",
-      )
-      .first(),
-  ).toBeVisible();
-  await expect(northwind.getByText("maya-okafor-2026.pdf")).toHaveCount(0);
+  await queue.getByRole("button", { name: "Inspect Northwind Labs" }).click();
+  await expect(drawer.getByText("Saved answer").first()).toBeVisible();
+  await expect(drawer.getByText("maya-okafor-2026.pdf")).toHaveCount(0);
 
-  await northwind.getByRole("button", { name: "Show 5 saved answers, Northwind Labs" }).click();
-  await expect(northwind.getByText("maya-okafor-2026.pdf")).toBeVisible();
-  await expect(northwind.getByText("Saved answer").first()).toBeVisible();
+  await drawer.getByRole("button", { name: /Show more/u }).click();
+  await expect(drawer.getByText("maya-okafor-2026.pdf")).toBeVisible();
 
-  await expect(
-    cobalt.getByText(
-      "All answers come directly from your saved answers. Nothing here was newly written.",
-    ),
-  ).toBeVisible();
-  await expect(cobalt.getByRole("button", { name: /Show \d+ saved answers/u })).toBeVisible();
+  await drawer.getByRole("button", { name: "Close" }).click();
+  await queue.getByRole("button", { name: "Inspect Cobalt Freight" }).click();
+  await expect(drawer.getByText("Saved answers only")).toBeVisible();
+  await expect(drawer.getByText("maya-okafor-2026.pdf")).toBeVisible();
+  await expect(drawer.getByRole("button", { name: /Show more/u })).toHaveCount(0);
+
+  await drawer.getByRole("button", { name: "Close" }).click();
 
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
   await page.getByRole("heading", { level: 1 }).click();
   await page.keyboard.press("e");
 
-  const textbox = northwind.getByRole("textbox", {
+  const textbox = drawer.getByRole("textbox", {
     name: "Your answer to Are you comfortable with a weekly on-call rotation?",
   });
 
   await expect(textbox).toBeVisible();
   await textbox.fill("typed here");
   await textbox.press("a");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Approve & schedule" })).toHaveCount(0);
   await expect(textbox).toHaveValue("typed herea");
-  await northwind.getByRole("button", { name: "Cancel" }).click();
+  await drawer.getByRole("button", { name: "Cancel" }).click();
+  await drawer.getByRole("button", { name: "Close" }).click();
 
   await page.getByRole("heading", { level: 1 }).click();
   await page.keyboard.press("s");
@@ -271,7 +266,7 @@ test("drafted prose expands, saved answers collapse, and A, E and S triage one c
   });
 
   await page.keyboard.press("a");
-  await page.getByRole("button", { name: "Yes, send application" }).click();
+  await page.getByRole("button", { name: "Approve & schedule" }).click();
   const sent = await approvalRequest;
   const sentBody = dwellBodySchema.parse(sent.postDataJSON());
 
@@ -280,12 +275,17 @@ test("drafted prose expands, saved answers collapse, and A, E and S triage one c
   expect(sentBody.dwellMs).toBeLessThanOrEqual(86_400_000);
   await expect(page.getByText("Scheduled to send to Northwind Labs.")).toBeVisible();
 
-  await page
+  const approvalToast = page
     .locator("[data-sonner-toast]")
-    .filter({ hasText: "Scheduled to send to Northwind Labs." })
-    .getByRole("button", { name: "Undo" })
-    .click();
-  await expect(northwind).toBeVisible();
+    .filter({ hasText: "Scheduled to send to Northwind Labs." });
+
+  await expect(approvalToast.getByRole("button", { name: "Undo" })).toHaveCount(0);
+  await expect(
+    page
+      .locator('section[aria-label="Scheduled applications"]')
+      .getByText("Northwind Labs", { exact: true })
+      .first(),
+  ).toBeVisible();
 
   await context.close();
   await request.dispose();
@@ -350,16 +350,11 @@ test("only drafted cards leaves no batch button, and individual approval still w
   await page.goto(`${readyServer.url}/ready`);
 
   await expect(page.getByRole("button", { name: /saved-only/u })).toHaveCount(0);
-  await expect(
-    page.getByText(
-      "Newly written answers are approved one card at a time below, so you can read each one.",
-    ),
-  ).toBeVisible();
 
   const northwind = cardFor(page, "Platform Engineer");
 
   await northwind.getByRole("button", { name: "Approve" }).click();
-  await page.getByRole("button", { name: "Yes, send application" }).click();
+  await page.getByRole("button", { name: "Approve & schedule" }).click();
   await expect(page.getByText("Scheduled to send to Northwind Labs.")).toBeVisible();
 
   await context.close();

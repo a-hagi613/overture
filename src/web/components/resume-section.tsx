@@ -1,23 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Download, FileText, Upload } from "lucide-react";
+import { Download, FileText, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
-import {
-  fetchCurrentResume,
-  fetchProfileFacts,
-  resumeFileUrl,
-  uploadResumeFile,
-} from "../lib/profile-api.ts";
+import { fetchCurrentResume, resumeFileUrl, uploadResumeFile } from "../lib/profile-api.ts";
 import { safePdfUrl } from "../lib/pdf-url.ts";
+import { OnboardingResumeScan } from "./onboarding-resume-scan.tsx";
 import { PdfPreview } from "./pdf-preview.tsx";
 import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
-import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
+import { dsBody, dsCardTitle } from "./ui/ds.ts";
 import { SectionSkeleton } from "./section-skeleton.tsx";
+
+const SCAN_MIN_MS = 2200;
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) {
@@ -45,6 +43,7 @@ export function ResumeSection() {
   const { resume: copyResume } = copy.profile;
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scanTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
 
   const [localPreview, setLocalPreview] = useState<{
     bytes: number;
@@ -52,14 +51,11 @@ export function ResumeSection() {
     url: string;
   } | null>(null);
 
+  const [scanningFile, setScanningFile] = useState<string | null>(null);
+
   const resumeQuery = useQuery({
     queryFn: fetchCurrentResume,
     queryKey: ["profile-resume"],
-  });
-
-  const factsQuery = useQuery({
-    queryFn: fetchProfileFacts,
-    queryKey: ["profile-facts"],
   });
 
   useEffect(
@@ -71,6 +67,17 @@ export function ResumeSection() {
     [localPreview],
   );
 
+  useEffect(
+    () => () => {
+      if (scanTimerRef.current !== null) {
+        globalThis.clearTimeout(scanTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const pw = copy.profileWorkspace;
+
   const upload = useMutation({
     mutationFn: uploadResumeFile,
     onSuccess: (saved) => {
@@ -81,7 +88,7 @@ export function ResumeSection() {
       void queryClient.invalidateQueries({ queryKey: ["ready"] });
       void queryClient.invalidateQueries({ queryKey: ["nav"] });
       void queryClient.invalidateQueries({ queryKey: ["profile-strengthen"] });
-      toast.success("Resume uploaded and saved.");
+      toast.success(pw.resumeUploadedToast);
     },
   });
 
@@ -90,7 +97,6 @@ export function ResumeSection() {
   const bytes = localPreview?.bytes ?? current?.bytes ?? null;
   const pages = current?.pages ?? null;
   const uploadedText = current === null ? "" : formatUploadedDate(current.uploadedAt);
-  const factsCount = factsQuery.data?.facts.length ?? 0;
 
   const pdfUrl = safePdfUrl(
     localPreview?.url ?? (current === null ? null : resumeFileUrl(current.id)),
@@ -112,9 +118,13 @@ export function ResumeSection() {
     }
 
     if (file.type !== "application/pdf") {
-      toast.error("Please select a PDF file.");
+      toast.error(pw.resumePdfOnlyError);
 
       return;
+    }
+
+    if (scanTimerRef.current !== null) {
+      globalThis.clearTimeout(scanTimerRef.current);
     }
 
     const previewUrl = URL.createObjectURL(file);
@@ -124,18 +134,35 @@ export function ResumeSection() {
       filename: file.name,
       url: previewUrl,
     });
+    setScanningFile(file.name);
+
+    scanTimerRef.current = globalThis.setTimeout(() => {
+      setScanningFile(null);
+      scanTimerRef.current = null;
+    }, SCAN_MIN_MS);
 
     upload.mutate(file, {
       onError: () => {
+        if (scanTimerRef.current !== null) {
+          globalThis.clearTimeout(scanTimerRef.current);
+          scanTimerRef.current = null;
+        }
+
+        setScanningFile(null);
         setLocalPreview(null);
         toast.error(copy.onboarding.resumeUploadFailed);
       },
     });
   };
 
+  const showScanner = upload.isPending || scanningFile !== null;
+  const activeScanName = scanningFile ?? filename ?? copy.onboarding.resumeLabel;
+
   let statusBadge = null;
 
-  if (current?.unreadable === true) {
+  if (showScanner) {
+    statusBadge = null;
+  } else if (current?.unreadable === true) {
     statusBadge = <Badge variant="need">{copy.nav.profilePages.resumeNeedsReupload}</Badge>;
   } else if (filename !== null) {
     statusBadge = <Badge variant="ok">{copy.nav.profilePages.resumeVerified}</Badge>;
@@ -143,7 +170,7 @@ export function ResumeSection() {
 
   let uploadButtonLabel: string = copyResume.replace;
 
-  if (upload.isPending) {
+  if (showScanner) {
     uploadButtonLabel = copy.nav.profilePages.resumeUploading;
   } else if (filename === null) {
     uploadButtonLabel = copy.nav.profilePages.resumeUploadPdf;
@@ -154,9 +181,13 @@ export function ResumeSection() {
   }
 
   return (
-    <Card ariaLabelledBy="profile-resume-heading" className="mt-6 p-5 md:p-6" id="profile-resume">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <Card
+      ariaLabelledBy="profile-resume-heading"
+      className="flex h-full min-h-0 flex-col p-5"
+      id="profile-resume"
+    >
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <h2 className={dsCardTitle} id="profile-resume-heading">
             {copy.profile.tabs.resume}
           </h2>
@@ -165,86 +196,61 @@ export function ResumeSection() {
         {statusBadge}
       </div>
 
-      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <PdfPreview filename={filename} pages={pages} pdfUrl={pdfUrl} />
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-3.5">
-            <span
-              aria-hidden="true"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-foreground"
-            >
-              <FileText size={22} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-sm font-semibold text-foreground">
-                {filename ?? "No resume on file"}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                {metaParts.length === 0 ? "Upload a PDF up to 10 MB" : metaParts.join(" · ")}
-              </p>
-            </div>
+      <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex shrink-0 items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-foreground"
+          >
+            <FileText size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-mono text-sm font-semibold text-foreground">
+              {filename ?? pw.resumeNoFileLabel}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+              {metaParts.length === 0 ? pw.resumeUploadHint : metaParts.join(" · ")}
+            </p>
           </div>
+        </div>
 
-          <Card className="mt-5 flex items-start gap-3 p-4 shadow-none" variant="muted">
-            <CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0 text-ok" size={18} />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground">{copyResume.strongNote}</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                {copyResume.note}
-              </p>
-            </div>
-          </Card>
+        <div className="flex min-h-0 flex-1 flex-col">
+          {showScanner ? (
+            <OnboardingResumeScan filename={activeScanName} />
+          ) : (
+            <PdfPreview compact filename={filename} pages={pages} pdfUrl={pdfUrl} />
+          )}
+        </div>
 
-          <dl className="mt-5 grid grid-cols-2 gap-4 border-y border-border py-4">
-            <div>
-              <dt className={dsEyebrow}>{copyResume.factsRead}</dt>
-              <dd className="mt-1 font-serif text-card-title tabular-nums text-foreground">
-                {`${String(factsCount)} saved`}
-              </dd>
-            </div>
-            <div>
-              <dt className={dsEyebrow}>{copy.nav.profilePages.resumeFormatLabel}</dt>
-              <dd className="mt-1 font-serif text-card-title text-foreground">
-                {copy.nav.profilePages.resumeFormatValue}
-              </dd>
-            </div>
-          </dl>
+        <input
+          accept="application/pdf"
+          className="hidden"
+          onChange={handleFileChange}
+          ref={fileInputRef}
+          type="file"
+        />
 
-          <input
-            accept="application/pdf"
-            className="hidden"
-            onChange={handleFileChange}
-            ref={fileInputRef}
-            type="file"
-          />
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <Button
+            disabled={showScanner}
+            onClick={() => {
+              fileInputRef.current?.click();
+            }}
+            size="default"
+            variant="primary"
+          >
+            <Upload aria-hidden="true" size={15} />
+            <span>{uploadButtonLabel}</span>
+          </Button>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <Button
-              disabled={upload.isPending}
-              onClick={() => {
-                fileInputRef.current?.click();
-              }}
-              size="default"
-              variant="primary"
-            >
-              <Upload aria-hidden="true" size={15} />
-              <span>{uploadButtonLabel}</span>
+          {pdfUrl === null ? null : (
+            <Button asChild size="default" variant="outline">
+              <a download={filename ?? "resume.pdf"} href={pdfUrl}>
+                <Download aria-hidden="true" size={15} />
+                <span>{copyResume.download}</span>
+              </a>
             </Button>
-
-            {pdfUrl === null ? null : (
-              <Button asChild size="default" variant="outline">
-                <a download={filename ?? "resume.pdf"} href={pdfUrl}>
-                  <Download aria-hidden="true" size={15} />
-                  <span>{copyResume.download}</span>
-                </a>
-              </Button>
-            )}
-          </div>
-
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            {copyResume.newFileNote}
-          </p>
+          )}
         </div>
       </div>
     </Card>

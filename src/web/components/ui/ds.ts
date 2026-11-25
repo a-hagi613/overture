@@ -2,19 +2,26 @@ import { buttonVariants } from "./button-variants.ts";
 
 export const dsContainer = "mx-auto max-w-[1200px] px-5 sm:px-8 lg:px-12 2xl:max-w-[1440px]";
 
-export const dsCard = "rounded-xl border border-border bg-card shadow-sh";
+export const dsCard = "rounded-lg border border-border bg-card";
 
 export const dsEyebrow = "text-eyebrow font-semibold uppercase text-muted-foreground";
 
 export const dsSectionHeading = "font-serif text-section font-normal text-balance text-foreground";
 
-export const dsPageTitle = "font-serif text-page-title font-normal leading-tight text-foreground";
+export const dsPageTitle = "font-sans text-workspace-title font-semibold text-foreground";
 
 export const dsBandHeading = "font-serif text-section font-normal text-balance";
 
-export const dsCardTitle = "font-serif text-card-title font-normal text-foreground";
+export const dsCardTitle = "font-sans text-panel-title font-semibold text-foreground";
 
-export const dsMetric = "font-serif text-metric font-normal tabular-nums text-foreground";
+export const dsMetric = "font-sans text-kpi font-semibold tabular-nums text-foreground";
+
+export const dsDisplayPageTitle =
+  "font-serif text-page-title font-normal leading-tight text-foreground";
+
+export const dsDisplayCardTitle = "font-serif text-card-title font-normal text-foreground";
+
+export const dsDisplayMetric = "font-serif text-metric font-normal tabular-nums text-foreground";
 
 export const dsBody = "text-sm leading-relaxed text-muted-foreground text-pretty";
 

@@ -1,10 +1,8 @@
-import { Pause, Play } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import type { CueCardData } from "./landing-hero-card.tsx";
 
-import { Button } from "../ui/button.tsx";
 import { LANDING_COPY } from "./landing-copy.ts";
 import { LandingHeroCard } from "./landing-hero-card.tsx";
 
@@ -191,26 +189,49 @@ const railStops = [
   { label: "8 pm", left: "100%" },
 ] as const;
 
-const READ_MS = 3800;
-const STAMP_HOLD_MS = 1900;
+const READ_MS = 2500;
+const STAMP_HOLD_MS = 1350;
 
-export function LandingHeroStack({ compact = false }: { compact?: boolean }) {
+function nearestCardIndex(pct: number) {
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const [cardIndex, card] of cueCards.entries()) {
+    const distance = Math.abs(card.progressPct - pct);
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = cardIndex;
+    }
+  }
+
+  return bestIndex;
+}
+
+export function LandingHeroStack({
+  compact = false,
+  surface = "background",
+}: {
+  compact?: boolean;
+  surface?: "background" | "sidebar";
+}) {
   const [index, setIndex] = useState(0);
   const [stamped, setStamped] = useState(false);
-  const [paused, setPaused] = useState(false);
   const [appliedCount, setAppliedCount] = useState(0);
+  const [scrubPct, setScrubPct] = useState<number | null>(null);
 
   const currentCard = cueCards[index] ?? cueCards[0];
+  const isScrubbing = scrubPct !== null;
 
   useEffect(() => {
     let timer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
-    if (!paused && !stamped) {
+    if (!isScrubbing && !stamped) {
       timer = globalThis.setTimeout(() => {
         setStamped(true);
         setAppliedCount((count) => count + 1);
       }, READ_MS);
-    } else if (!paused) {
+    } else if (!isScrubbing) {
       timer = globalThis.setTimeout(() => {
         setStamped(false);
         setIndex((current) => {
@@ -230,29 +251,41 @@ export function LandingHeroStack({ compact = false }: { compact?: boolean }) {
         globalThis.clearTimeout(timer);
       }
     };
-  }, [paused, stamped]);
+  }, [isScrubbing, stamped]);
 
-  const togglePaused = () => {
-    setPaused((value) => !value);
+  const handleScrub = (nextPct: number) => {
+    const nextIndex = nearestCardIndex(nextPct);
+
+    setScrubPct(nextPct);
+    setStamped(false);
+    setIndex(nextIndex);
+    setAppliedCount(nextIndex);
+  };
+
+  const finishScrub = () => {
+    setScrubPct(null);
   };
 
   if (currentCard === undefined) {
     return null;
   }
 
+  const displayPct = scrubPct ?? currentCard.progressPct;
+  const motionClass = scrubPct === null ? "transition-[width,left] duration-300" : "";
+
   return (
     <section
       aria-label={LANDING_COPY.heroStack.ariaLabel}
-      className={compact ? "w-full max-w-[520px]" : "mx-auto w-full max-w-[540px]"}
+      className={compact ? "w-full max-w-[520px]" : "mx-auto w-full max-w-[650px]"}
     >
-      <div className="relative z-10 h-[324px] sm:h-[340px]">
+      <div className="relative z-10 h-[364px] sm:h-[404px]">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[292px] -translate-x-1 translate-y-4 -rotate-1 scale-95 rounded-xl border border-input bg-card opacity-65 shadow-sh sm:inset-x-2.5 sm:h-[304px] sm:-translate-x-2 sm:translate-y-5 sm:-rotate-2"
+          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[328px] -translate-x-1 translate-y-4 -rotate-1 scale-95 rounded-xl border border-input bg-card opacity-65 shadow-sh sm:inset-x-2.5 sm:h-[368px] sm:-translate-x-2 sm:translate-y-5 sm:-rotate-2"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 z-1 h-[292px] translate-x-1 translate-y-2.5 rotate-1 scale-[0.97] rounded-xl border border-input bg-card opacity-85 shadow-sh sm:inset-x-2.5 sm:h-[304px] sm:translate-x-2.5 sm:translate-y-3 sm:rotate-2"
+          className="pointer-events-none absolute inset-x-0 top-0 z-1 h-[328px] translate-x-1 translate-y-2.5 rotate-1 scale-[0.97] rounded-xl border border-input bg-card opacity-85 shadow-sh sm:inset-x-2.5 sm:h-[368px] sm:translate-x-2.5 sm:translate-y-3 sm:rotate-2"
         />
 
         <AnimatePresence initial={false} mode="popLayout">
@@ -277,33 +310,36 @@ export function LandingHeroStack({ compact = false }: { compact?: boolean }) {
                 {appliedCount}
               </motion.b>
             </span>
-            <Button
-              ariaLabel={paused ? "Play application cycle" : "Pause application cycle"}
-              className="h-11 w-11 rounded-full md:h-9 md:w-9"
-              onClick={togglePaused}
-              size="icon"
-              title={paused ? "Play" : "Pause"}
-              variant="secondary"
-            >
-              {paused ? (
-                <Play aria-hidden="true" className="h-3.5 w-3.5 fill-current" />
-              ) : (
-                <Pause aria-hidden="true" className="h-3.5 w-3.5 fill-current" />
-              )}
-            </Button>
           </output>
 
           <figure
             aria-label={LANDING_COPY.heroStack.windowAria}
-            className="relative mx-2.5 mb-0 mt-7 h-14 sm:mx-5"
+            className="relative mx-2.5 mb-0 mt-9 h-18 sm:mx-5"
           >
-            <div className="absolute inset-x-0 top-7 border-t border-foreground" />
+            <input
+              aria-label={LANDING_COPY.heroStack.windowAria}
+              aria-valuetext={`${currentCard.railTime} · ${currentCard.role}`}
+              className="peer absolute inset-x-0 top-1 z-20 h-11 w-full cursor-grab opacity-0 active:cursor-grabbing"
+              max={100}
+              min={0}
+              onBlur={finishScrub}
+              onChange={(event) => {
+                handleScrub(Number(event.currentTarget.value));
+              }}
+              onKeyUp={finishScrub}
+              onPointerUp={finishScrub}
+              onTouchEnd={finishScrub}
+              step={1}
+              type="range"
+              value={displayPct}
+            />
+            <div className="pointer-events-none absolute inset-x-0 top-6.5 h-1 rounded-full bg-border" />
             <div
-              className="absolute left-0 top-7 h-0.5 bg-signal transition-all duration-500"
-              style={{ width: `${String(currentCard.progressPct)}%` }}
+              className={`pointer-events-none absolute left-0 top-6.5 h-1 rounded-full bg-signal ${motionClass}`}
+              style={{ width: `${String(displayPct)}%` }}
             />
             {railStops.map((stop) => (
-              <span key={stop.left}>
+              <span className="pointer-events-none" key={stop.left}>
                 <span
                   className="absolute top-6 h-3 border-l border-foreground"
                   style={{ left: stop.left }}
@@ -316,11 +352,28 @@ export function LandingHeroStack({ compact = false }: { compact?: boolean }) {
                 </span>
               </span>
             ))}
+            {cueCards.map((card) => (
+              <span
+                className={`pointer-events-none absolute top-7 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${
+                  card.progressPct <= displayPct ? "bg-signal" : "bg-foreground/30"
+                }`}
+                key={card.railTime}
+                style={{ left: `${String(card.progressPct)}%` }}
+              />
+            ))}
             <span
-              className="absolute top-7 h-0 w-0 transition-all duration-500 before:absolute before:-left-1.5 before:-top-1.5 before:h-3 before:w-3 before:rounded-full before:bg-signal before:ring-4 before:ring-background"
-              style={{ left: `${String(currentCard.progressPct)}%` }}
+              className={`pointer-events-none absolute top-7 h-0 w-0 ${motionClass}`}
+              style={{ left: `${String(displayPct)}%` }}
             >
-              <span className="absolute bottom-3.5 left-0 -translate-x-1/2 whitespace-nowrap rounded border border-input bg-card px-2 py-0.5 font-mono text-xs text-foreground shadow-sh">
+              <span
+                className={`absolute -left-4 -top-2.5 flex h-5 w-8 items-center justify-center gap-1 rounded-full bg-signal shadow-sh ring-4 transition-transform peer-hover:scale-105 peer-focus-visible:ring-2 peer-focus-visible:ring-foreground ${
+                  surface === "sidebar" ? "ring-sidebar" : "ring-background"
+                }`}
+              >
+                <span className="h-2 w-0.5 rounded-full bg-primary-ink/90" />
+                <span className="h-2 w-0.5 rounded-full bg-primary-ink/90" />
+              </span>
+              <span className="absolute bottom-5 left-0 -translate-x-1/2 whitespace-nowrap rounded border border-input bg-card px-2.5 py-1 font-mono text-xs text-foreground shadow-sh sm:text-sm">
                 {currentCard.railTime}
               </span>
             </span>

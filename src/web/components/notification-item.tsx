@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, CircleHelp, Clock, Hash, Mail, Pause, Send } from "lucide-react";
+import { ArrowRight, Bell, CircleHelp, Clock, Hash, ListChecks, Mail, Pause } from "lucide-react";
 import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
@@ -12,7 +12,7 @@ const ACTIONS = new Map(Object.entries(copy.notifications.page.actions));
 function renderKindIcon(kind: string) {
   switch (kind) {
     case "ready": {
-      return <Send size={16} />;
+      return <ListChecks size={16} />;
     }
 
     case "review": {
@@ -65,77 +65,80 @@ function stampFor(row: NotificationRow, now: number, zone: string) {
   return formatter.format(new Date(row.at)).replace(",", "");
 }
 
-function undoApplicationId(url: string) {
-  try {
-    return new URL(url, "https://overture.local").searchParams.get("undo");
-  } catch {
-    return null;
+function kindBadgeClass(kind: string) {
+  switch (kind) {
+    case "interview":
+    case "offer": {
+      return "border-ok/30 bg-ok-soft text-ok";
+    }
+
+    case "ready":
+    case "review":
+    case "code_wait": {
+      return "border-signal/30 bg-signal-soft text-signal-text";
+    }
+
+    case "paused":
+    case "failed":
+    case "alert": {
+      return "border-need/30 bg-need-soft text-need";
+    }
+
+    default: {
+      return "border-border bg-muted text-foreground";
+    }
   }
 }
 
 export function NotificationItem({
   now,
-  onAction,
   onRead,
   row,
   zone,
 }: {
   now: number;
-  onAction: (row: NotificationRow) => void;
   onRead: (id: string) => void;
   row: NotificationRow;
   zone: string;
 }) {
   const label = ACTIONS.get(row.kind) ?? null;
-  const undoId = undoApplicationId(row.url);
   const unread = row.readAt === null;
+  const destination = row.kind === "stage_move" ? "/tracker" : row.url;
 
   return (
     <li className="flex items-start gap-3.5 border-t border-border py-4 first:border-t-0">
       <span
         aria-hidden="true"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-foreground"
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${kindBadgeClass(row.kind)}`}
       >
         {renderKindIcon(row.kind)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
             {unread ? (
               <>
                 <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-signal" />
                 <span className="sr-only">{copy.notifications.page.unread}</span>
               </>
             ) : null}
-            <span>{row.title}</span>
+            <span className="break-words">{row.title}</span>
           </p>
           <span className={dsMono}>{stampFor(row, now, zone)}</span>
         </div>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{row.body}</p>
+        <p className="mt-1 break-words text-sm leading-relaxed text-muted-foreground">{row.body}</p>
         {label === null ? null : (
           <div className="mt-3">
-            {undoId === null ? (
-              <Button asChild size="sm" variant="outline">
-                <Link
-                  onClick={() => {
-                    onRead(row.id);
-                  }}
-                  to={row.url}
-                >
-                  {label}
-                </Link>
-              </Button>
-            ) : (
-              <Button
+            <Button asChild size="sm" variant="outline">
+              <Link
                 onClick={() => {
-                  onAction(row);
+                  onRead(row.id);
                 }}
-                size="sm"
-                variant="outline"
+                to={destination}
               >
                 {label}
-              </Button>
-            )}
+              </Link>
+            </Button>
           </div>
         )}
       </div>

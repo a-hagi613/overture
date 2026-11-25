@@ -178,7 +178,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
     }
   });
 
-  test("Job Calendar adds and removes a custom event", async ({
+  test("Calendar adds and removes a custom event", async ({
     browser,
     appServerUrl,
     ownerStorageState,
@@ -192,7 +192,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
 
     try {
       await page.goto(`${appServerUrl}/calendar`);
-      await expect(page.getByRole("heading", { level: 1, name: "Job Calendar" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Calendar" })).toBeVisible();
 
       await page.getByRole("button", { name: "Add event" }).click();
       await page.getByLabel("Event title").fill("Staff panel interview");
@@ -237,19 +237,18 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await expect(page.getByRole("heading", { level: 1, name: "Notifications" })).toBeVisible();
 
       await page.goto(`${appServerUrl}/support`);
-      await expect(page.getByRole("heading", { level: 1, name: "Contact Support" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Support" })).toBeVisible();
 
       const previewSteps = [
-        { heading: /Resume/u, path: "/onboarding/resume?preview=1" },
+        { heading: /Upload your resume/u, path: "/onboarding/resume?preview=1" },
         { heading: /Job preferences/u, path: "/onboarding/targets?preview=1" },
         { heading: /Your matches/u, path: "/onboarding/matches?preview=1" },
-        { heading: /Verify a card/u, path: "/onboarding/trial?preview=1" },
+        { heading: /Your first 3 applications are free/u, path: "/onboarding/trial?preview=1" },
       ] as const;
 
       await inSequence(previewSteps, async (step) => {
         await page.goto(`${appServerUrl}${step.path}`);
-        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-        await expect(page.locator("body")).toContainText(step.heading);
+        await expect(page.getByRole("heading", { name: step.heading }).first()).toBeVisible();
         await expect(page.locator("body")).not.toContainText("Skip anything.");
       });
 
@@ -277,7 +276,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
 
       await page.goto(`${demoServer.url}/applications`);
       await expect(
-        page.getByRole("heading", { level: 1, name: "Your Applications" }),
+        page.getByRole("heading", { level: 1, name: "Application Tracker" }),
       ).toBeVisible();
       await page
         .getByRole("button", { name: /Tidepool Analytics/u })
@@ -288,7 +287,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await page.keyboard.press("Escape");
 
       await page.goto(`${demoServer.url}/ready`);
-      await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Approval Queue" })).toBeVisible();
       await page
         .getByRole("button", { name: /^Approve(?: & Next)?$/u })
         .first()
@@ -301,13 +300,13 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await expect(confirmDialog).toBeHidden();
 
       await page.goto(`${demoServer.url}/review`);
-      await expect(page.getByRole("heading", { level: 1, name: "Your Review" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Review Queue" })).toBeVisible();
       await expect(
         page.getByText("What are your salary expectations for this role?").first(),
       ).toBeVisible();
 
       await page.goto(`${demoServer.url}/inbox`);
-      await expect(page.getByRole("heading", { level: 1, name: "Employer Inbox" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
 
       const unreadTab = page.getByRole("button", { name: /^Unread \(\d+\)$/u });
       const allTab = page.getByRole("button", { name: /^All \(\d+\)$/u });
@@ -321,7 +320,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
     }
   });
 
-  test("Public legal pages Terms and Privacy render cleanly with zero axe violations", async ({
+  test("Public legal pages Terms, Privacy, and Application Consent render cleanly with zero axe violations", async ({
     browser,
     appServerUrl,
   }) => {
@@ -329,7 +328,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
     const page = await context.newPage();
 
     try {
-      await inSequence(["/terms", "/privacy"], async (legalPath) => {
+      await inSequence(["/terms", "/privacy", "/consent"], async (legalPath) => {
         await page.goto(`${appServerUrl}${legalPath}`);
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 

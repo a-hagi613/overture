@@ -225,14 +225,14 @@ async function expectReviewMatchesBoard(
 
   await page.goto(`${appServerUrl}/review`);
 
-  if (width === 1280) {
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Blocked applications" }),
-    ).toBeVisible();
-  }
+  await expect(page.getByRole("heading", { level: 1, name: "Review Queue" })).toBeVisible();
 
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByText("Four questions, ten applications waiting")).toBeVisible();
+  const summary = page.getByRole("region", { name: "Review summary" });
+
+  await expect(summary.getByText("Open questions")).toBeVisible();
+  await expect(summary.getByText("4", { exact: true })).toBeVisible();
+  await expect(summary.getByText("Blocked applications")).toBeVisible();
+  await expect(summary.getByText("10", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", {
       level: 2,
@@ -265,7 +265,7 @@ for (const width of [1280, 390]) {
   }
 }
 
-test("mobile Review Back returns to the list without hiding the active question", async ({
+test("mobile Review drawer opens from the list and Close returns without hiding the active question", async ({
   browser,
   reviewServer,
 }) => {
@@ -291,17 +291,25 @@ test("mobile Review Back returns to the list without hiding the active question"
   });
 
   await expect(page.getByRole("heading", { level: 2, name: firstPrompt })).toBeVisible();
-  await expect(page.getByText("Four questions, ten applications waiting")).toBeVisible();
-
-  await page.getByRole("button", { name: "All questions" }).click();
-
-  await expect(page.getByRole("heading", { level: 2, name: "Blocked applications" })).toBeVisible();
-  await expect(page.getByText("Four questions, ten applications waiting")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Review summary" })).toBeVisible();
   await expect(firstPromptButton).toBeVisible();
 
   await firstPromptButton.click();
 
-  await expect(page.getByRole("heading", { level: 2, name: firstPrompt })).toBeVisible();
+  const dialog = page.getByRole("dialog");
+
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: firstPrompt })).toBeVisible();
+  await expect(page).toHaveURL(/[?&]question=/u);
+
+  await dialog.getByRole("button", { name: "Close" }).click();
+
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(firstPromptButton).toBeVisible();
+
+  await firstPromptButton.click();
+
+  await expect(dialog.getByRole("heading", { name: firstPrompt })).toBeVisible();
 
   await context.close();
 });

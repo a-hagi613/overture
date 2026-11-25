@@ -2,7 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import type { CompanyBrandKey } from "./company-brands-data.ts";
 
-import { dsCardTitle, dsEyebrow, dsMono } from "../ui/ds.ts";
+import { dsDisplayCardTitle, dsEyebrow, dsMono } from "../ui/ds.ts";
 import { companyBrands } from "./company-brands-data.ts";
 import { CompanyBrandTile } from "./company-brands.tsx";
 import { LANDING_COPY } from "./landing-copy.ts";
@@ -40,7 +40,7 @@ export function LandingHeroCard({
         scale: stamped ? 0.99 : 1,
         y: stamped ? 2 : 0,
       }}
-      className={`absolute inset-x-0 top-0 z-10 flex h-[292px] flex-col overflow-hidden rounded-xl border bg-card px-4 py-3.5 shadow-lift transition-colors duration-300 sm:inset-x-2.5 sm:h-[304px] sm:px-5 sm:py-4 ${
+      className={`absolute inset-x-0 top-0 z-10 flex h-[328px] flex-col overflow-hidden rounded-xl border bg-card px-4 py-4 shadow-lift transition-colors duration-300 sm:inset-x-2.5 sm:h-[368px] sm:px-6 sm:py-5 ${
         stamped ? "border-signal" : "border-input"
       }`}
       exit={
@@ -48,17 +48,17 @@ export function LandingHeroCard({
       }
       initial={reducedMotion ? false : { opacity: 0, rotate: 2, scale: 0.94, y: 24 }}
       key={`${companyName}-${String(index)}`}
-      transition={{ damping: 23, stiffness: 280, type: "spring" }}
+      transition={{ damping: 24, stiffness: 360, type: "spring" }}
     >
       <div className="flex items-center gap-3">
         <CompanyBrandTile brandKey={card.brandKey} />
         <div className="min-w-0 flex-1">
-          <p className={`${dsCardTitle} truncate`}>{card.role}</p>
+          <p className={`${dsDisplayCardTitle} truncate`}>{card.role}</p>
           <p className="truncate text-xs text-muted-foreground sm:text-sm">{companyName}</p>
         </div>
         <figure
           aria-label={`Match ${String(card.score)}`}
-          className="relative m-0 h-12 w-12 flex-none sm:h-13 sm:w-13"
+          className="relative m-0 h-13 w-13 flex-none sm:h-14 sm:w-14"
         >
           <svg aria-hidden="true" className="absolute inset-0 h-full w-full" viewBox="0 0 56 56">
             <circle className="stroke-input" cx="28" cy="28" fill="none" r="24" strokeWidth="2.5" />
@@ -80,15 +80,15 @@ export function LandingHeroCard({
         </figure>
       </div>
 
-      <p className={`${dsMono} mt-2 truncate`}>{card.meta}</p>
+      <p className={`${dsMono} mt-2.5 truncate`}>{card.meta}</p>
 
-      <div className="mt-2.5 grid grid-cols-[minmax(0,1fr)_1.25rem_minmax(0,1fr)] gap-x-2 sm:grid-cols-[minmax(0,1fr)_1.75rem_minmax(0,1fr)]">
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_1.25rem_minmax(0,1fr)] gap-x-2 sm:grid-cols-[minmax(0,1fr)_1.75rem_minmax(0,1fr)]">
         <span className={dsEyebrow}>{LANDING_COPY.heroStack.postingAsks}</span>
         <span />
         <span className={dsEyebrow}>{LANDING_COPY.heroStack.yourResume}</span>
       </div>
 
-      <div className="mt-1.5 flex flex-col gap-1.5">
+      <div className="mt-2 flex flex-col gap-2">
         {card.rows.map((row, rowIdx) => (
           <motion.div
             animate={{ opacity: 1, x: 0 }}
@@ -96,7 +96,7 @@ export function LandingHeroCard({
             initial={reducedMotion ? false : { opacity: 0, x: -6 }}
             key={row.ask}
             transition={
-              reducedMotion ? { duration: 0 } : { delay: 0.12 + rowIdx * 0.11, duration: 0.34 }
+              reducedMotion ? { duration: 0 } : { delay: 0.08 + rowIdx * 0.07, duration: 0.24 }
             }
           >
             <span className="truncate text-xs text-muted-foreground sm:text-sm">{row.ask}</span>
@@ -111,7 +111,7 @@ export function LandingHeroCard({
         ))}
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-2.5">
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3">
         <span className="truncate text-xs text-muted-foreground sm:text-sm">{card.footNote}</span>
         <span className={`${dsMono} flex-none`}>{card.viaLine}</span>
       </div>
@@ -125,8 +125,8 @@ export function LandingHeroCard({
             initial={{ opacity: 0, scale: 2.1 }}
             transition={{ damping: 21, mass: 0.68, stiffness: 460, type: "spring" }}
           >
-            <span className="-rotate-10 inline-flex items-center justify-center rounded-lg border-[3px] border-signal bg-card/95 p-1 shadow-sh">
-              <span className="inline-flex items-center justify-center rounded border border-dashed border-signal px-5 py-1.5 font-sans text-card-title font-extrabold uppercase leading-none tracking-[0.18em] text-signal">
+            <span className="-rotate-10 inline-flex items-center justify-center rounded-lg border-[3px] border-signal bg-card/95 p-1.5 shadow-lift">
+              <span className="inline-flex items-center justify-center rounded border border-dashed border-signal px-7 py-2.5 font-sans text-page-title font-extrabold uppercase leading-none tracking-[0.2em] text-signal">
                 {LANDING_COPY.heroStack.appliedStamp}
               </span>
             </span>

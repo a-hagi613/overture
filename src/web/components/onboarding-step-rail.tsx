@@ -6,35 +6,36 @@ export function OnboardingStepRail({
   labels = copy.onboarding.steps,
   step,
 }: {
-  labels?: readonly string[];
+  labels?: readonly string[] | undefined;
   step: number;
 }) {
   const current = Math.min(Math.max(step, 1), labels.length);
 
   return (
-    <div className="my-6">
+    <div className="my-5">
       <ol
         aria-label={copy.onboarding.stepsLabel}
-        className="hidden items-center justify-between gap-2 rounded-xl border border-border bg-card p-2 shadow-sh md:flex"
+        className="hidden items-center gap-3 md:grid md:grid-cols-3"
       >
         {labels.map((name, index) => {
           const position = index + 1;
           const done = position < current;
           const active = position === current;
 
+          let cardClass = "border-border bg-card/60 text-muted-foreground";
           let dotClass = "border-border bg-muted text-muted-foreground";
 
           if (done) {
+            cardClass = "border-ok/35 bg-ok-soft/45 text-foreground";
             dotClass = "border-ok bg-ok text-primary-ink";
           } else if (active) {
+            cardClass = "border-signal/60 bg-card text-foreground";
             dotClass = "border-signal bg-signal text-primary-ink";
           }
 
           return (
             <li
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                active ? "bg-muted text-foreground" : "text-muted-foreground"
-              }`}
+              className={`flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-xs font-semibold transition ${cardClass}`}
               key={name}
             >
               <span

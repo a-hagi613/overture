@@ -1,86 +1,138 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ChevronRight,
+  ClipboardList,
   CreditCard,
   FileText,
+  LogOut,
   MessageCircle,
-  ShieldCheck,
+  Settings,
   SlidersHorizontal,
-  User,
 } from "lucide-react";
-import { Link } from "react-router";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
-import { PROFILE_SUBMENU } from "../lib/nav-api.ts";
-import { AdminPortalMenuItem } from "./admin-portal-menu-item.tsx";
+import { authClient } from "../lib/auth-client.ts";
+import { ACCOUNT_SUBMENU, JOB_PROFILE_SUBMENU } from "../lib/nav-api.ts";
 import { PageHeader } from "./page-header.tsx";
 import { SidebarThemeToggle } from "./sidebar-theme-toggle.tsx";
 import { Card } from "./ui/card.tsx";
+import { dsEyebrow } from "./ui/ds.ts";
 import { Separator } from "./ui/separator.tsx";
+import { UsageCard } from "./usage.tsx";
 
 const ROW_CLASS =
-  "flex min-h-14 items-center gap-3 rounded-md px-3 text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2";
+  "flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-md px-3 text-left text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2";
 
-const PROFILE_ICONS = {
-  account: ShieldCheck,
+const SUBMENU_ICONS = {
+  account: Settings,
   billing: CreditCard,
-  details: User,
+  details: ClipboardList,
   preferences: SlidersHorizontal,
   resume: FileText,
 } as const;
 
 export function ProfileHub() {
-  return (
-    <div className="mx-auto max-w-2xl">
-      <PageHeader
-        lead={copy.nav.profileHub.lead}
-        titleNode={
-          <>
-            {copy.nav.profileHub.titlePlain}
-            <em className="italic text-signal">{copy.nav.profileHub.titleItalic}</em>
-          </>
-        }
-      />
-      <nav aria-label={copy.nav.profileMenu.label} className="mt-6">
-        <Card className="p-1.5">
-          <ul className="flex flex-col">
-            {PROFILE_SUBMENU.map((item) => {
-              const Icon = PROFILE_ICONS[item.key];
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [signingOut, setSigningOut] = useState(false);
 
-              return (
-                <li key={item.key}>
-                  <Link className={ROW_CLASS} to={item.to}>
-                    <Icon aria-hidden="true" className="shrink-0 text-muted-foreground" size={20} />
-                    <span className="min-w-0 flex-1">{item.label}</span>
-                    <ChevronRight
-                      aria-hidden="true"
-                      className="shrink-0 text-muted-foreground"
-                      size={18}
-                    />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+  const handleSignOut = async () => {
+    if (signingOut) {
+      return;
+    }
+
+    setSigningOut(true);
+
+    try {
+      const result = await authClient.signOut();
+
+      if (result.error === null) {
+        queryClient.clear();
+        await navigate("/signin");
+
+        return;
+      }
+
+      toast.error(copy.settings.signOutThisError);
+    } catch {
+      toast.error(copy.settings.signOutThisError);
+    }
+
+    setSigningOut(false);
+  };
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-6">
+      <PageHeader titleNode={copy.nav.profileHub.titlePlain} />
+      <nav
+        aria-label={copy.nav.profileMenu.label}
+        className="grid grid-cols-1 items-start gap-5 md:grid-cols-2"
+      >
+        <Card className="flex flex-col p-1.5">
+          <p className={`${dsEyebrow} px-3 pb-1 pt-2`}>{copy.nav.jobProfile}</p>
+          {JOB_PROFILE_SUBMENU.map((item) => {
+            const Icon = SUBMENU_ICONS[item.key];
+
+            return (
+              <Link className={ROW_CLASS} key={item.key} to={item.to}>
+                <Icon aria-hidden="true" className="shrink-0 text-muted-foreground" size={20} />
+                <span className="min-w-0 flex-1">{item.label}</span>
+                <ChevronRight
+                  aria-hidden="true"
+                  className="shrink-0 text-muted-foreground"
+                  size={18}
+                />
+              </Link>
+            );
+          })}
+        </Card>
+        <Card className="flex flex-col p-1.5">
+          <p className={`${dsEyebrow} px-3 pb-1 pt-2`}>{copy.nav.accountSectionLabel}</p>
+          {ACCOUNT_SUBMENU.map((item) => {
+            const Icon = SUBMENU_ICONS[item.key];
+
+            return (
+              <Link className={ROW_CLASS} key={item.key} to={item.to}>
+                <Icon aria-hidden="true" className="shrink-0 text-muted-foreground" size={20} />
+                <span className="min-w-0 flex-1">{item.label}</span>
+                <ChevronRight
+                  aria-hidden="true"
+                  className="shrink-0 text-muted-foreground"
+                  size={18}
+                />
+              </Link>
+            );
+          })}
+          <Link className={ROW_CLASS} to="/support">
+            <MessageCircle
+              aria-hidden="true"
+              className="shrink-0 text-muted-foreground"
+              size={20}
+            />
+            <span className="min-w-0 flex-1">{copy.nav.support}</span>
+            <ChevronRight aria-hidden="true" className="shrink-0 text-muted-foreground" size={18} />
+          </Link>
+          <SidebarThemeToggle />
           <Separator className="my-1.5" />
-          <div className="flex flex-col">
-            <Link className={ROW_CLASS} to="/support">
-              <MessageCircle
-                aria-hidden="true"
-                className="shrink-0 text-muted-foreground"
-                size={20}
-              />
-              <span className="min-w-0 flex-1">{copy.nav.support}</span>
-              <ChevronRight
-                aria-hidden="true"
-                className="shrink-0 text-muted-foreground"
-                size={18}
-              />
-            </Link>
-            <AdminPortalMenuItem className={ROW_CLASS} />
-            <SidebarThemeToggle />
-          </div>
+          <button
+            className="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-md px-3 text-left text-sm font-medium text-need transition hover:bg-need-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            disabled={signingOut}
+            onClick={() => {
+              void handleSignOut();
+            }}
+            type="button"
+          >
+            <LogOut aria-hidden="true" className="shrink-0" size={20} />
+            <span>{signingOut ? copy.nav.signingOut : copy.nav.signOut}</span>
+          </button>
         </Card>
       </nav>
+      <div>
+        <UsageCard />
+      </div>
     </div>
   );
 }

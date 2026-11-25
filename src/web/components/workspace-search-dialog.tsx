@@ -4,17 +4,17 @@ import {
   Briefcase,
   Calendar,
   CircleHelp,
+  ClipboardList,
+  Columns3,
   CreditCard,
   FileText,
   Home,
   Inbox,
+  ListChecks,
   Mail,
   MessageCircle,
-  Send,
   Settings,
   SlidersHorizontal,
-  SquareKanban,
-  User,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
@@ -26,16 +26,16 @@ import { CommandDialog } from "./ui/command-dialog.tsx";
 
 const QUICK_LINKS = [
   { icon: Home, label: copy.nav.home, to: "/home" },
-  { icon: SquareKanban, label: copy.nav.applications, to: "/applications" },
-  { icon: Send, label: copy.nav.ready, to: "/ready" },
+  { icon: ListChecks, label: copy.nav.ready, to: "/ready" },
   { icon: CircleHelp, label: copy.nav.review, to: "/review" },
+  { icon: Columns3, label: copy.nav.tracker, to: "/tracker" },
   { icon: Inbox, label: copy.nav.inbox, to: "/inbox" },
-  { icon: Calendar, label: copy.nav.calendar, to: "/applications?view=calendar" },
+  { icon: Calendar, label: copy.nav.calendar, to: "/calendar" },
   { icon: FileText, label: copy.nav.profileMenu.resume, to: "/profile/resume" },
-  { icon: User, label: copy.nav.profileMenu.details, to: "/profile/details" },
   { icon: SlidersHorizontal, label: copy.nav.profileMenu.preferences, to: "/profile/preferences" },
+  { icon: ClipboardList, label: copy.nav.profileMenu.details, to: "/profile/details" },
   { icon: CreditCard, label: copy.nav.profileMenu.billing, to: "/profile/billing" },
-  { icon: Settings, label: copy.nav.profileMenu.account, to: "/profile/account" },
+  { icon: Settings, label: copy.nav.accountSettings, to: "/profile/account" },
   { icon: MessageCircle, label: copy.nav.support, to: "/support" },
   { icon: Bell, label: copy.shell.notificationsEmpty, to: "/notifications" },
 ] as const;
@@ -178,7 +178,7 @@ export function WorkspaceSearchDialog({
               className={ITEM_CLASS}
               key={app.id}
               onSelect={() => {
-                go(`/applications?card=${encodeURIComponent(app.id)}`);
+                go(`/tracker?card=${encodeURIComponent(app.id)}`);
               }}
               value={`app-${app.id}`}
             >
@@ -242,7 +242,7 @@ export function WorkspaceSearchDialog({
               className={ITEM_CLASS}
               key={interview.id}
               onSelect={() => {
-                go("/applications?view=calendar");
+                go("/calendar");
               }}
               value={`interview-${interview.id}`}
             >

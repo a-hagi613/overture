@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import type { OnboardingMatches } from "../lib/onboarding-api.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { OnboardingMatchBlurred } from "./onboarding-match-blurred.tsx";
 import { OnboardingMatchItem } from "./onboarding-match-item.tsx";
 import { OnboardingMatchesEmpty } from "./onboarding-matches-empty.tsx";
 import { Button } from "./ui/button.tsx";
@@ -13,6 +14,7 @@ import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
 const text = copy.onboarding.matches;
 
 export function OnboardingMatchesCard({
+  allowEmptyContinue = false,
   backTo,
   busy,
   failed,
@@ -21,6 +23,7 @@ export function OnboardingMatchesCard({
   onToggle,
   selected,
 }: {
+  allowEmptyContinue?: boolean | undefined;
   backTo: string;
   busy: boolean;
   failed: boolean;
@@ -30,13 +33,22 @@ export function OnboardingMatchesCard({
   selected: readonly string[];
 }) {
   const full = selected.length >= matches.pickLimit;
+  const topMatches = matches.matches.slice(0, matches.pickLimit);
+  const teaserMatches = matches.matches.slice(matches.pickLimit, matches.pickLimit + 3);
+  const remainingCount = Math.max(matches.poolCount - topMatches.length, teaserMatches.length);
+
+  let blurredPreview = teaserMatches;
+
+  if (blurredPreview.length === 0) {
+    blurredPreview = remainingCount > 0 ? topMatches.slice(0, 2) : [];
+  }
 
   return (
-    <Card ariaLabelledBy="ob-h" className="p-6 md:p-8" variant="elevated">
+    <Card ariaLabelledBy="ob-h" className="p-6 md:p-7">
       <h2 className={dsCardTitle} id="ob-h">
-        {`${text.titlePlain} ${text.titleItalic}`}
+        {text.titlePlain}
       </h2>
-      <p className={`${dsBody} mt-2 max-w-xl`}>{text.intro}</p>
+      <p className={`${dsBody} mt-1.5 max-w-xl`}>{text.intro}</p>
 
       {matches.matches.length === 0 ? (
         <OnboardingMatchesEmpty backTo={backTo} />
@@ -50,7 +62,7 @@ export function OnboardingMatchesCard({
           </div>
 
           <ul className="mt-3 flex flex-col gap-3">
-            {matches.matches.map((match) => {
+            {topMatches.map((match) => {
               const on = selected.includes(match.id);
 
               return (
@@ -64,6 +76,8 @@ export function OnboardingMatchesCard({
               );
             })}
           </ul>
+
+          <OnboardingMatchBlurred matches={blurredPreview} remainingCount={remainingCount} />
         </>
       )}
 
@@ -82,18 +96,19 @@ export function OnboardingMatchesCard({
         </Button>
         <Button
           ariaBusy={busy}
-          disabled={busy || selected.length === 0}
+          disabled={busy || (!allowEmptyContinue && selected.length === 0)}
           onClick={() => {
             void onContinue();
           }}
           size="lg"
           variant="primary"
         >
-          <span>{text.continue(matches.pickLimit)}</span>
+          <span>
+            {selected.length > 0 ? text.applyFree(selected.length) : text.continueFallback}
+          </span>
           <ArrowRight aria-hidden="true" size={16} />
         </Button>
       </div>
-      <p className="mt-3 text-center text-xs text-muted-foreground">{text.limitNote}</p>
     </Card>
   );
 }

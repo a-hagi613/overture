@@ -231,7 +231,7 @@ test("the Board card and phone lane live in the URL through refresh and Back", a
 
   await page.goBack();
   await expect(page.locator(SHEET)).toHaveCount(0);
-  await expect(page).toHaveURL(/\/applications(?:\?.*)?$/u);
+  await expect(page).toHaveURL(/\/tracker(?:\?.*)?$/u);
 
   await context.close();
   await request.dispose();
@@ -270,22 +270,25 @@ test("the Review question and filter live in the URL and Back returns to the pho
   );
 
   await page.goto(`${uiServer.url}/review`);
-  await page.getByRole("button", { name: copy.review.back, exact: true }).click();
   await expect(page.getByRole("button", { name: new RegExp(second.company, "u") })).toBeVisible();
 
   await page.getByRole("button", { name: new RegExp(second.company, "u") }).click();
-  await expect(page.getByRole("heading", { name: second.prompt })).toBeVisible();
+
+  const dialog = page.getByRole("dialog");
+
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: second.prompt })).toBeVisible();
   await expect(page).toHaveURL(/[?&]question=/u);
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: second.prompt })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: second.prompt })).toBeVisible();
 
   await page.goBack();
-  await expect(page.getByRole("heading", { name: second.prompt })).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: new RegExp(second.company, "u") })).toBeVisible();
 
   await page.goForward();
-  await expect(page.getByRole("heading", { name: second.prompt })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: second.prompt })).toBeVisible();
   await expect(page).toHaveURL(/[?&]question=/u);
 
   await context.close();
@@ -646,13 +649,23 @@ test("the theme flip cross-fades and stays instant under reduced motion", async 
     `'sha256-${createHash("sha256").update(bootCode, "utf8").digest("base64")}'`,
   );
 
-  const switched = await page.evaluate(() => {
-    document.querySelector<HTMLElement>('[role="switch"]')?.click();
+  await page.evaluate(() => {
+    const observer = new MutationObserver(() => {
+      if (document.documentElement.classList.contains("theme-switching")) {
+        document.documentElement.dataset.themeSwitchingObserved = "1";
+      }
+    });
 
-    return document.documentElement.className;
+    observer.observe(document.documentElement, { attributeFilter: ["class"], attributes: true });
   });
 
-  expect(switched).toContain("theme-switching");
+  await page
+    .locator("[data-shell-sidebar]")
+    .getByRole("button", { name: /Account menu/u })
+    .click();
+  await page.getByRole("menuitem", { name: "Dark mode" }).click();
+
+  await expect(page.locator("html")).toHaveAttribute("data-theme-switching-observed", "1");
   await expect(page.locator("html")).toHaveClass(/dark/u);
   await expect(page.locator("html")).not.toHaveClass(/theme-switching/u, { timeout: 2000 });
 
@@ -670,20 +683,32 @@ test("the theme flip cross-fades and stays instant under reduced motion", async 
   await reducedPage.goto(`${uiServer.url}/home`);
   await expect(reducedPage.getByRole("heading", { level: 1 })).toBeVisible();
 
-  const flip = await reducedPage.evaluate(() => {
-    const switchControl = document.querySelector<HTMLElement>('[role="switch"]');
+  await reducedPage.evaluate(() => {
+    const observer = new MutationObserver(() => {
+      if (document.documentElement.classList.contains("theme-switching")) {
+        document.documentElement.dataset.themeSwitchingObserved = "1";
+        document.documentElement.dataset.reducedTransitionDuration = getComputedStyle(
+          document.querySelector("main") ?? document.body,
+        ).transitionDuration;
+      }
+    });
 
-    switchControl?.click();
-
-    return {
-      duration: getComputedStyle(document.querySelector("main") ?? document.body)
-        .transitionDuration,
-      switching: document.documentElement.classList.contains("theme-switching"),
-    };
+    observer.observe(document.documentElement, { attributeFilter: ["class"], attributes: true });
   });
 
-  expect(flip.switching).toBe(true);
-  expect(Number(flip.duration.slice(0, -1))).toBeLessThan(0.01);
+  await reducedPage
+    .locator("[data-shell-sidebar]")
+    .getByRole("button", { name: /Account menu/u })
+    .click();
+  await reducedPage.getByRole("menuitem", { name: "Dark mode" }).click();
+
+  await expect(reducedPage.locator("html")).toHaveAttribute("data-theme-switching-observed", "1");
+
+  const duration = await reducedPage.evaluate(
+    () => document.documentElement.dataset.reducedTransitionDuration ?? "999s",
+  );
+
+  expect(Number(duration.slice(0, -1))).toBeLessThan(0.01);
 
   await reduced.close();
   await context.close();

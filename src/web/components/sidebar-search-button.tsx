@@ -5,7 +5,7 @@ import { copy } from "../../shared/copy.ts";
 export function SidebarSearchButton({ onOpen }: { onOpen: () => void }) {
   return (
     <button
-      className="flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-md border border-input bg-card px-3 text-left text-sm font-medium text-muted-foreground shadow-sh transition hover:border-foreground hover:text-foreground"
+      className="flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-md border border-input bg-card px-3 text-left text-sm font-medium text-muted-foreground transition hover:border-foreground hover:text-foreground"
       onClick={onOpen}
       type="button"
     >

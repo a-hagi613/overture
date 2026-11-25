@@ -5,11 +5,16 @@ import type { ClientIpConfig } from "../auth/client-ip.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { clientIp } from "../auth/client-ip.ts";
+import { suggestLocations } from "../catalog/geo-suggest.ts";
 import { countSupportedSupply } from "../catalog/supply.ts";
 import { consumeRateLimit } from "../platform/rate-limit.ts";
 import { defaultMetrics } from "../platform/telemetry/metrics.ts";
 import { measureSqliteQuery } from "../platform/telemetry/sqlite-metrics.ts";
-import { supplyFiltersOf, supplyQuerySchema } from "../../shared/supply.ts";
+import {
+  locationSuggestQuerySchema,
+  supplyFiltersOf,
+  supplyQuerySchema,
+} from "../../shared/supply.ts";
 import { validQuery } from "./validators.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
@@ -55,6 +60,24 @@ export function createSupplyRoutes(deps: {
     context.header("CDN-Cache-Control", "public, max-age=300");
 
     return context.json({ ...totals, generatedAt: clock.now() });
+  });
+
+  routes.get("/supply/locations", validQuery(locationSuggestQuerySchema), (context) => {
+    const clientKey = clientIp(context.req.raw, clientIpConfig) ?? SHARED_CLIENT_KEY;
+
+    if (!consumeRateLimit(db, `api.supply:${clientKey}`, clock.now(), SUPPLY_RATE_LIMIT)) {
+      context.header("Retry-After", "60");
+
+      return context.json({ error: API_ERRORS.rateLimited }, 429);
+    }
+
+    const { q } = context.req.valid("query");
+    const suggestions = suggestLocations(q ?? "");
+
+    context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+    context.header("CDN-Cache-Control", "public, max-age=600");
+
+    return context.json({ suggestions });
   });
 
   return routes;

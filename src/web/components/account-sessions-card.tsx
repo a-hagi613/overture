@@ -122,12 +122,13 @@ export function AccountSessionsCard({ email }: { email: string }) {
       </h2>
       <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{email}</p>
       <div className="mt-4 divide-y divide-border">
-        <div className="flex items-center justify-between gap-4 py-3.5 first:pt-0">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-3 py-3.5 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-foreground">{copy.settings.exportRow}</p>
             <p className="text-xs text-muted-foreground">{copy.settings.exportRowDetail}</p>
           </div>
           <Button
+            className="shrink-0 self-start sm:self-auto"
             disabled={
               downloading || exportState?.status === "preparing" || exportMutation.isPending
             }
@@ -142,13 +143,14 @@ export function AccountSessionsCard({ email }: { email: string }) {
           </Button>
         </div>
 
-        <div className="flex items-center justify-between gap-4 py-3.5">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-foreground">{copy.settings.signOutThis}</p>
             <p className="text-xs text-muted-foreground">{copy.settings.signOutThisDetail}</p>
           </div>
           <Button
             ariaBusy={signingOut}
+            className="shrink-0 self-start sm:self-auto"
             disabled={signingOut}
             onClick={() => {
               void signOutHere();
@@ -160,8 +162,8 @@ export function AccountSessionsCard({ email }: { email: string }) {
           </Button>
         </div>
 
-        <div className="flex items-center justify-between gap-4 py-3.5 last:pb-0">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-3 py-3.5 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-foreground">{copy.settings.signOutAll}</p>
             <p className="text-xs text-muted-foreground">
               {signedOutOthers ? copy.settings.signedOutMessage : copy.settings.signOutAllDetail}
@@ -174,6 +176,7 @@ export function AccountSessionsCard({ email }: { email: string }) {
           </div>
           <Button
             ariaBusy={revokingOthers}
+            className="shrink-0 self-start sm:self-auto"
             disabled={revokingOthers}
             onClick={() => {
               void revokeOthers();

@@ -38,7 +38,7 @@
   --font-serif: "Instrument Serif", Newsreader, Georgia, serif;
   --font-display: "Instrument Serif", Newsreader, Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --text-hero: clamp(2.875rem, 6.4vw, 5.75rem);
+  --text-hero: clamp(3.125rem, 6.8vw, 6.25rem);
   --text-hero--line-height: 1.06;
   --text-hero--letter-spacing: -0.02em;
   --text-section: clamp(2rem, 4.2vw, 3.5rem);
@@ -47,10 +47,19 @@
   --text-page-title: clamp(2rem, 3vw, 2.625rem);
   --text-page-title--line-height: 1.08;
   --text-page-title--letter-spacing: -0.01em;
+  --text-workspace-title: 1.375rem;
+  --text-workspace-title--line-height: 1.25;
+  --text-workspace-title--letter-spacing: -0.02em;
   --text-card-title: clamp(1.375rem, 1.8vw, 1.625rem);
   --text-card-title--line-height: 1.2;
+  --text-panel-title: 0.9375rem;
+  --text-panel-title--line-height: 1.35;
+  --text-panel-title--letter-spacing: -0.01em;
   --text-metric: clamp(2.5rem, 3.5vw, 3.25rem);
   --text-metric--line-height: 1;
+  --text-kpi: 1.5rem;
+  --text-kpi--line-height: 1.1;
+  --text-kpi--letter-spacing: -0.02em;
   --text-eyebrow: 0.6875rem;
   --text-eyebrow--line-height: 1.2;
   --text-eyebrow--letter-spacing: 0.14em;
@@ -73,8 +82,11 @@
   --animate-seg-l: ov-seg-l 1.2s var(--ease-ember) infinite, ov-seg-op 1.2s linear infinite;
   --animate-seg-d: ov-seg-d 1.2s var(--ease-ember) infinite, ov-seg-op 1.2s linear infinite;
   --animate-hub-pulse: ov-hub-pulse 4.2s ease-in-out infinite;
-  --animate-hint-pulse: ov-hint-pulse 2s ease-in-out infinite;
-  --animate-live-ping: ov-live-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --animate-hint-pulse: ov-hint-pulse 2.6s ease-in-out infinite;
+  --animate-live-ping: ov-live-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --animate-live-ping-once: ov-live-ping 1.05s cubic-bezier(0, 0, 0.2, 1) 1 forwards;
+  --animate-live-core-once: ov-live-core-tick 0.65s ease-out 1;
+  --animate-resume-scan: ov-resume-scan 1.45s cubic-bezier(0.23, 1, 0.32, 1) infinite alternate;
 }
 
 @keyframes ov-seg-r {
@@ -130,25 +142,111 @@
 @keyframes ov-hint-pulse {
   0%,
   100% {
-    opacity: 0.35;
-    transform: scale(0.8);
+    opacity: 0.8;
+    transform: scale(0.97);
   }
   50% {
     opacity: 1;
-    transform: scale(1.35);
+    transform: scale(1.04);
   }
 }
 
 @keyframes ov-live-ping {
   0% {
     transform: scale(1);
-    opacity: 0.95;
+    opacity: 0.6;
   }
-  75%,
+  55% {
+    opacity: 0.22;
+  }
   100% {
-    transform: scale(3.4);
+    transform: scale(2.4);
     opacity: 0;
   }
+}
+
+@keyframes ov-live-core-tick {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.38);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ov-resume-scan {
+  0% {
+    transform: translateY(-2%);
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(96%);
+    opacity: 0.72;
+  }
+}
+
+@keyframes ov-resume-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes ov-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ov-drawer-in {
+  from {
+    opacity: 0;
+    transform: translate3d(16px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes ov-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ov-overlay-in {
+  animation: ov-overlay-in 160ms var(--ease-out) both;
+}
+
+.ov-drawer-in {
+  animation: ov-drawer-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.ov-pop-in {
+  animation: ov-pop-in 160ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.ov-tooltip-in {
+  animation: ov-pop-in 150ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: var(--radix-tooltip-content-transform-origin);
 }
 
 .dark {
@@ -215,6 +313,41 @@ html {
   overscroll-behavior-x: none;
 }
 
+* {
+  scrollbar-color: color-mix(in srgb, var(--color-foreground) 18%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-foreground) 18%, transparent);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-foreground) 34%, transparent);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 img,
 svg,
 video,
@@ -251,6 +384,27 @@ canvas {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .live-dot-wave {
+    animation: ov-live-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite !important;
+  }
+
+  .live-dot-core {
+    animation: ov-hint-pulse 2.6s ease-in-out infinite !important;
+  }
+
+  .live-dot-wave-tick {
+    animation: ov-live-ping 1.05s cubic-bezier(0, 0, 0.2, 1) 1 forwards !important;
+  }
+
+  .live-dot-core-tick {
+    animation: ov-live-core-tick 0.65s ease-out 1 !important;
+  }
+
+  .ov-resume-scan-bar {
+    animation: ov-resume-pulse 1.8s ease-in-out infinite !important;
+    transform: translateY(48%) !important;
   }
 }
 
@@ -1360,4 +1514,26 @@ dialog[data-sheet-backdrop="lift"]::backdrop {
     min-height: 48px;
     width: 100%;
   }
+}
+
+.ov-progress {
+  appearance: none;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: var(--color-muted);
+}
+
+.ov-progress::-webkit-progress-bar {
+  border-radius: 9999px;
+  background-color: var(--color-muted);
+}
+
+.ov-progress::-webkit-progress-value {
+  border-radius: 9999px;
+  background-color: var(--color-signal);
+}
+
+.ov-progress::-moz-progress-bar {
+  border-radius: 9999px;
+  background-color: var(--color-signal);
 }

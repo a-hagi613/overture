@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown, Plus, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -12,9 +12,10 @@ import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
 import { fetchTargets, previewTargetsCount, saveTargets } from "../lib/profile-api.ts";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
-import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
+import { dsBody, dsCardTitle, dsEyebrow, dsMetric } from "./ui/ds.ts";
 import { Input } from "./ui/input.tsx";
 import { RolePicker } from "./ui/role-picker.tsx";
+import { Select } from "./ui/select.tsx";
 import { SectionSkeleton } from "./section-skeleton.tsx";
 
 const moneyFormat = new Intl.NumberFormat("en-US");
@@ -88,7 +89,7 @@ export function TargetsSection() {
       setSavedDraft(saved.targets);
       queryClient.setQueryData(["profile-targets"], saved);
       void queryClient.invalidateQueries({ queryKey: ["profile-targets-count"] });
-      toast.success("Job preferences saved.");
+      toast.success(copy.profileWorkspace.targetsSavedToast);
     },
   });
 
@@ -121,15 +122,15 @@ export function TargetsSection() {
   }
 
   return (
-    <Card ariaLabelledBy="profile-targets-heading" className="mt-6 p-5 md:p-6" id="profile-targets">
+    <Card ariaLabelledBy="profile-targets-heading" className="p-5 md:p-6" id="profile-targets">
       <h2 className={dsCardTitle} id="profile-targets-heading">
         {`${targets.titlePlain} ${targets.titleItalic}`}
       </h2>
       <p className={`${dsBody} mt-1 max-w-2xl`}>{targets.intro}</p>
 
-      <Card className="mt-5 flex flex-wrap items-center gap-4 p-4 shadow-none" variant="muted">
+      <div className="mt-5 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-muted/40 p-4">
         <span
-          className="font-serif text-metric leading-none text-signal-text tabular-nums"
+          className={`${dsMetric} leading-none text-signal-text`}
           data-testid="targets-matched-count"
         >
           {matchedCount}
@@ -138,7 +139,7 @@ export function TargetsSection() {
           <p className="text-sm font-semibold text-foreground">{targets.matchedLabel}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{targets.matchedNote}</p>
         </div>
-      </Card>
+      </div>
 
       <div className="mt-5 border-t border-border py-5">
         <h3 className={dsEyebrow}>{targets.roles}</h3>
@@ -164,30 +165,24 @@ export function TargetsSection() {
             <label className={`${dsEyebrow} block`} htmlFor="target-category">
               {targets.categoryLabel}
             </label>
-            <div className="relative mt-2">
-              <select
-                className="h-12 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3.5 pr-10 text-sm font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-                id="target-category"
-                onChange={(event) => {
-                  const next = event.currentTarget.value;
+            <Select
+              className="mt-2"
+              id="target-category"
+              onChange={(event) => {
+                const next = event.currentTarget.value;
 
-                  setRoleCategory(ROLE_GROUPS.find((group) => group === next) ?? null);
-                }}
-                value={roleCategory ?? ""}
-              >
-                <option value="">{targets.categoryAny}</option>
-                {ROLE_GROUPS.map((group) => (
-                  <option key={group} value={group}>
-                    {group}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                aria-hidden="true"
-                className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-                size={16}
-              />
-            </div>
+                setRoleCategory(ROLE_GROUPS.find((group) => group === next) ?? null);
+              }}
+              selectClassName="h-12 pl-3.5 pr-10"
+              value={roleCategory ?? ""}
+            >
+              <option value="">{targets.categoryAny}</option>
+              {ROLE_GROUPS.map((group) => (
+                <option key={group} value={group}>
+                  {group}
+                </option>
+              ))}
+            </Select>
           </div>
           <RolePicker
             allowFreeText
@@ -253,7 +248,7 @@ export function TargetsSection() {
               >
                 <Input
                   ariaLabel={targets.addLocation}
-                  className="h-9 w-52 text-xs"
+                  className="h-9 min-w-36 flex-1 text-xs sm:w-52 sm:flex-none"
                   onChange={(event) => {
                     setNewLocation(event.currentTarget.value);
                   }}
@@ -349,10 +344,10 @@ export function TargetsSection() {
           <label className={`${dsEyebrow} block`} htmlFor="ovt-salary">
             {targets.salaryFloor}
           </label>
-          <div className="mt-3 flex max-w-md items-center gap-2.5">
-            <select
-              aria-label={targets.currencyLabel}
-              className="h-10 w-24 shrink-0 rounded-md border border-input bg-card px-3 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+          <div className="mt-3 flex max-w-md flex-wrap items-center gap-2.5">
+            <Select
+              ariaLabel={targets.currencyLabel}
+              className="w-24 shrink-0"
               onChange={(event) => {
                 update({ salaryCurrency: event.currentTarget.value });
               }}
@@ -363,9 +358,9 @@ export function TargetsSection() {
                   {currency === "CAD" ? targets.currencyCad : targets.currencyUsd}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input
-              className="h-10 flex-1 tabular-nums"
+              className="h-10 min-w-32 flex-1 tabular-nums"
               id="ovt-salary"
               onChange={(event) => {
                 update({ salaryFloorMinor: floorFromInput(event.currentTarget.value) });

@@ -31,14 +31,14 @@ const okSchema = z.object({ ok: z.boolean() });
 const pauseReasons = [
   {
     action: "Resume sending",
-    copy: "Sending is paused. Nothing new will send until you resume.",
+    copy: "Nothing new will send until you resume.",
     href: null,
     reason: "user",
-    title: "Sending paused",
+    title: "Paused",
   },
   {
     action: "Finish setup",
-    copy: "Sending starts once your saved answers, forwarding and consent are in.",
+    copy: "Finish setting up your profile and email forwarding to start sending applications.",
     href: "/onboarding",
     reason: "onboarding",
     title: "Setup isn't finished.",
@@ -154,24 +154,20 @@ async function expectPausedHomeMatchesBoard(
   await expect(
     page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
   ).toBeVisible();
-  await expect(page.getByText("Sending paused")).toBeVisible();
-  await expect(
-    page.getByText("Sending is paused. Nothing new will send until you resume."),
-  ).toBeVisible();
+  await expect(page.getByText("Paused", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nothing new will send until you resume.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume sending" })).toBeVisible();
   await expect(page.getByText("3rd in line")).toBeVisible();
   await expect(page.getByText("Next send around 14:20 once sending resumes.")).toBeVisible();
-  await expect(page.getByText("Weekly check-in")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "How is the search going?" })).toBeVisible();
-  await expect(page.getByText("Sent · confirmed").first()).toBeVisible();
-  await expect(page.getByText("Couldn't apply", { exact: true })).toBeVisible();
+  await expect(page.getByText("Not sent", { exact: true })).toBeVisible();
   await expect(
     page.getByText("The form changed after we had filled it in, so we stopped before sending."),
   ).toBeVisible();
   await expect(page.getByText("Nothing was sent · 0 applications charged")).toBeVisible();
-  await expect(page.getByText("Tier 2 · Strengthen your profile")).toBeVisible();
-  await expect(page.getByText("Add two saved answers from your last role")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Recent in your Inbox" })).toBeVisible();
+  await expect(page.getByText("Complete your profile")).toBeVisible();
+  await expect(
+    page.getByText("2 saved answers remaining to auto-fill more applications"),
+  ).toBeVisible();
 
   await page.evaluate(async () => {
     await document.fonts.ready;

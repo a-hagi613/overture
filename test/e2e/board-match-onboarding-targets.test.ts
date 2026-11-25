@@ -65,7 +65,7 @@ async function expectOnboardingMatchesBoard(
     "aria-pressed",
     "true",
   );
-  await expect(page.getByRole("button", { name: "DevOps Engineer" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "Software Engineer" })).toHaveAttribute(
     "aria-pressed",
     "false",
   );
@@ -77,16 +77,8 @@ async function expectOnboardingMatchesBoard(
     "aria-pressed",
     "true",
   );
-  await expect(page.getByRole("button", { name: "Berlin" })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
-  await expect(page.getByRole("button", { name: "Amsterdam" })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
+  await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
   await expect(page.getByLabel("Minimum salary")).toHaveValue("140,000");
-  await expect(page.getByTestId("targets-match-count")).toHaveText("213");
 
   await page.evaluate(async () => {
     await document.fonts.ready;

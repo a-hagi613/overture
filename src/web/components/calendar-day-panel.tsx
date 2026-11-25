@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { CalendarDays, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { copy } from "../../shared/copy.ts";
@@ -62,22 +62,22 @@ export function CalendarDayPanel({
   const totalCount = items.length + customEvents.length;
 
   return (
-    <Card className="p-5" variant="elevated">
-      <div className="flex items-center justify-between gap-2">
+    <Card className="flex min-h-0 flex-1 flex-col p-5" variant="default">
+      <div className="flex shrink-0 items-center justify-between gap-2">
         <h2 className={`${dsCardTitle} whitespace-nowrap`} id={headingId}>
           {`${weekday}, ${day}`}
         </h2>
         {today ? <Badge variant="signal">{copy.calendar.today}</Badge> : null}
       </div>
 
-      <p className={`${dsBody} mt-1 text-xs`}>
-        {totalCount === 0
-          ? copy.calendar.emptyDay
-          : `${String(totalCount)} ${totalCount === 1 ? "item" : "items"} · ${summaryText(items, today)}`}
-      </p>
+      {totalCount > 0 ? (
+        <p className={`${dsBody} mt-1 shrink-0 text-xs`}>
+          {`${copy.calendar.itemCount(totalCount)} · ${summaryText(items, today)}`}
+        </p>
+      ) : null}
 
       <Button
-        className="mt-4 w-full"
+        className="mt-4 shrink-0 w-full"
         onClick={() => {
           setAdding((current) => !current);
         }}
@@ -88,29 +88,44 @@ export function CalendarDayPanel({
         <span>{copy.calendar.addEvent}</span>
       </Button>
 
-      {adding ? (
-        <CalendarEventForm
-          onCancel={() => {
-            setAdding(false);
-          }}
-          onSubmit={(input) => {
-            onAddEvent(input);
-            setAdding(false);
-          }}
-        />
-      ) : null}
+      {adding || totalCount > 0 ? (
+        <div className="relative mt-4 min-h-0 flex-1 border-t border-border">
+          <div
+            className="space-y-2.5 pt-4 lg:absolute lg:inset-0 lg:overflow-y-auto"
+            data-scroll-region
+          >
+            {adding ? (
+              <CalendarEventForm
+                onCancel={() => {
+                  setAdding(false);
+                }}
+                onSubmit={(input) => {
+                  onAddEvent(input);
+                  setAdding(false);
+                }}
+              />
+            ) : null}
 
-      {totalCount > 0 ? (
-        <div className="mt-4 space-y-2.5 border-t border-border pt-4">
-          {customEvents.map((event) => (
-            <CalendarDayEntry event={event} key={event.id} kind="custom" onDelete={onDeleteEvent} />
-          ))}
+            {customEvents.map((event) => (
+              <CalendarDayEntry
+                event={event}
+                key={event.id}
+                kind="custom"
+                onDelete={onDeleteEvent}
+              />
+            ))}
 
-          {items.map((item) => (
-            <CalendarDayEntry item={item} key={item.id} kind="api" zone={zone} />
-          ))}
+            {items.map((item) => (
+              <CalendarDayEntry item={item} key={item.id} kind="api" zone={zone} />
+            ))}
+          </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-8 text-center">
+          <CalendarDays aria-hidden="true" className="text-muted-foreground" size={20} />
+          <p className="max-w-xs text-xs text-muted-foreground">{copy.calendar.emptyDay}</p>
+        </div>
+      )}
     </Card>
   );
 }

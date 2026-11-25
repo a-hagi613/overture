@@ -7,11 +7,11 @@ import { cn } from "./cn.ts";
 const cardVariants = cva("rounded-xl border bg-card text-foreground", {
   variants: {
     variant: {
-      default: "border-border shadow-sh",
-      elevated: "border-input shadow-lift",
+      default: "border-border",
+      elevated: "border-border shadow-sh",
       interactive:
-        "border-border shadow-sh transition duration-quick ease-out hover:border-input hover:shadow-lift",
-      muted: "border-border bg-muted shadow-none",
+        "border-border transition duration-quick ease-out hover:border-input hover:bg-muted/30",
+      muted: "border-border bg-muted",
     },
   },
   defaultVariants: {
@@ -20,13 +20,13 @@ const cardVariants = cva("rounded-xl border bg-card text-foreground", {
 });
 
 export interface CardProps extends VariantProps<typeof cardVariants> {
-  ariaBusy?: boolean;
-  ariaLabel?: string;
-  ariaLabelledBy?: string;
+  ariaBusy?: boolean | undefined;
+  ariaLabel?: string | undefined;
+  ariaLabelledBy?: string | undefined;
   children: ReactNode;
-  className?: string;
-  dataTestId?: string;
-  id?: string;
+  className?: string | undefined;
+  dataTestId?: string | undefined;
+  id?: string | undefined;
 }
 
 export function Card({

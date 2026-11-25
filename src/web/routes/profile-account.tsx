@@ -15,7 +15,7 @@ import { SettingsNotifications } from "../components/settings-notifications.tsx"
 import { TimeLanguageSection } from "../components/time-language-section.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
-import { dsBody, dsCardTitle } from "../components/ui/ds.ts";
+import { dsBody, dsCardTitle, dsEyebrow } from "../components/ui/ds.ts";
 import { authClient } from "../lib/auth-client.ts";
 
 export function ProfileAccountPage() {
@@ -24,64 +24,70 @@ export function ProfileAccountPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="flex min-w-0 flex-1 flex-col gap-6">
       <PageHeader
-        lead={copy.nav.profilePages.accountLead}
-        titleNode={
-          <>
-            {copy.nav.profilePages.accountTitlePlain}
-            <em className="italic text-signal">{copy.nav.profilePages.accountTitleItalic}</em>
-          </>
-        }
+        titleNode={`${copy.nav.profilePages.accountTitlePlain}${copy.nav.profilePages.accountTitleItalic}`}
       />
 
-      <div className="mt-6 flex flex-col gap-5">
-        <AccountAdminCard />
+      <AccountAdminCard />
 
-        <div id="forwarding">
+      <section aria-labelledby="account-group-mail" className="flex flex-col gap-4">
+        <h2 className={dsEyebrow} id="account-group-mail">
+          {copy.settings.sectionGroups.mailboxHeading}
+        </h2>
+        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2" id="forwarding">
           <SettingsForwardingCard />
+          <SettingsApplyEmailCard />
         </div>
+        <AccountPacingCard />
+      </section>
 
-        <SettingsApplyEmailCard />
-
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
-          <SettingsNotifications />
-
-          <div className="flex flex-col gap-5">
+      <section aria-labelledby="account-group-prefs" className="flex flex-col gap-4">
+        <h2 className={dsEyebrow} id="account-group-prefs">
+          {copy.settings.sectionGroups.preferencesHeading}
+        </h2>
+        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
+          <div className="min-w-0 xl:col-span-6">
+            <SettingsNotifications />
+          </div>
+          <div className="flex min-w-0 flex-col gap-5 xl:col-span-6">
             <SettingsCalendarFeed />
             <TimeLanguageSection />
-            <AccountSessionsCard email={email} />
           </div>
         </div>
+      </section>
 
-        <AccountPacingCard />
-
+      <section aria-labelledby="account-group-security" className="flex flex-col gap-4">
+        <h2 className={dsEyebrow} id="account-group-security">
+          {copy.settings.sectionGroups.securityHeading}
+        </h2>
+        <AccountSessionsCard email={email} />
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
           <AccountSupportAccessCard />
           <AccountLegalCard />
         </div>
+      </section>
 
-        <Card ariaLabelledBy="account-danger" className="border-need/40 p-5 md:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0 flex-1">
-              <h2 className={dsCardTitle} id="account-danger">
-                {copy.settings.dangerHeading}
-              </h2>
-              <p className={`${dsBody} mt-1`}>{copy.settings.deleteDetail}</p>
-            </div>
-            <Button
-              className="self-start sm:self-auto"
-              onClick={() => {
-                setDeleteOpen(true);
-              }}
-              size="default"
-              variant="destructive"
-            >
-              {copy.settings.deleteButton}
-            </Button>
+      <Card ariaLabelledBy="account-danger" className="border-need/40 p-5 md:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <h2 className={dsCardTitle} id="account-danger">
+              {copy.settings.dangerHeading}
+            </h2>
+            <p className={`${dsBody} mt-1`}>{copy.settings.deleteDetail}</p>
           </div>
-        </Card>
-      </div>
+          <Button
+            className="self-start sm:self-auto"
+            onClick={() => {
+              setDeleteOpen(true);
+            }}
+            size="default"
+            variant="destructive"
+          >
+            {copy.settings.deleteButton}
+          </Button>
+        </div>
+      </Card>
 
       <AccountDeleteDialog onOpenChange={setDeleteOpen} open={deleteOpen} />
     </div>

@@ -39,7 +39,9 @@ export function HomeCheckIn({ checkIns }: { checkIns: HomeCheckin[] }) {
               key={checkIn.id}
             >
               <div className="min-w-0">
-                <p className="font-serif text-base leading-snug text-foreground">{checkIn.title}</p>
+                <p className="text-sm font-semibold leading-snug text-foreground">
+                  {checkIn.title}
+                </p>
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   {`${checkIn.company} · ${copy.home.checkIn.row(checkIn.days)}`}
                 </p>

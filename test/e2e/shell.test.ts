@@ -12,14 +12,17 @@ const desktopDestinations = [
   "Home",
   "Ready",
   "Review",
-  "Applications",
+  "Tracker",
+  "Resume & Cover Letter",
+  "Job Preferences",
+  "Application Answers",
   "Inbox",
+  "Calendar",
   "Notifications",
   "Support",
-  "Profile",
 ];
 
-const phoneDestinations = ["Home", "Ready", "Review", "Applications", "Inbox"];
+const phoneDestinations = ["Home", "Ready", "Review", "Tracker", "Inbox"];
 
 async function expectDestinations(
   locator: ReturnType<Page["getByRole"]>,
@@ -90,15 +93,18 @@ test("the shell lists workspace destinations on desktop and navigates to Account
     }),
   ).toBeHidden();
 
-  await sideNav.getByRole("link", { name: "Profile" }).hover();
-  await sideNav.getByRole("menuitem", { name: "Account" }).click();
+  await shellPage
+    .locator("[data-shell-sidebar]")
+    .getByRole("button", { name: /Account menu/u })
+    .click();
+  await shellPage.getByRole("menuitem", { name: "Account settings" }).click();
   await expect(shellPage).toHaveURL(/\/profile\/account$/u);
   await expect(shellPage.getByRole("heading", { name: "Account and sign-in" })).toBeVisible();
   await expect(shellPage.getByText(authTestIdentity.ownerEmail).first()).toBeVisible();
   await expect(shellPage.getByRole("button", { name: "Sign out everywhere" })).toBeVisible();
 
   await shellPage.goto(`${appServerUrl}/inbox`);
-  await expect(shellPage.getByRole("heading", { level: 1, name: "Employer Inbox" })).toBeVisible();
+  await expect(shellPage.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
 
   await shellPage.goto(`${appServerUrl}/missing-route`);
   await expect(shellPage.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
@@ -162,7 +168,7 @@ test("the phone header and tab bar reach search, notifications, the profile hub 
 
   await header.getByRole("link", { name: "Profile" }).click();
   await expect(shellPage).toHaveURL(/\/profile$/u);
-  await expect(shellPage.getByRole("heading", { level: 1, name: "Your Profile" })).toBeVisible();
+  await expect(shellPage.getByRole("heading", { level: 1, name: "Profile" })).toBeVisible();
   await expect(header.getByText("Profile", { exact: true })).toBeVisible();
 
   const hub = shellPage.getByRole("navigation", { name: "Profile sections" });
@@ -170,10 +176,10 @@ test("the phone header and tab bar reach search, notifications, the profile hub 
   await Promise.all(
     [
       "Resume & Cover Letter",
-      "Saved answers",
       "Job Preferences",
+      "Application Answers",
       "Billing",
-      "Account",
+      "Account settings",
       "Support",
     ].map(async (label) => {
       await expect(hub.getByRole("link", { name: label })).toBeVisible();
@@ -181,26 +187,31 @@ test("the phone header and tab bar reach search, notifications, the profile hub 
   );
 
   await expect(hub.getByRole("switch", { name: "Switch to dark mode" })).toBeVisible();
+  await expect(hub.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(shellPage.getByText("Applications left", { exact: true })).toBeVisible();
   await shellPage.getByRole("link", { name: "Job Preferences" }).click();
   await expect(shellPage).toHaveURL(/\/profile\/preferences$/u);
 
-  await tabBar.getByRole("link", { name: "Applications" }).click();
-  await expect(shellPage).toHaveURL(/\/applications$/u);
+  await tabBar.getByRole("link", { name: "Tracker" }).click();
+  await expect(shellPage).toHaveURL(/\/tracker$/u);
   await expect(
-    shellPage.getByRole("heading", { level: 1, name: "Your Applications" }),
+    shellPage.getByRole("heading", { level: 1, name: "Application Tracker" }),
   ).toBeVisible();
-  await expect(header.getByText("Applications", { exact: true })).toBeVisible();
+  await expect(header.getByText("Tracker", { exact: true })).toBeVisible();
+
+  await shellPage.goto(`${appServerUrl}/applications?from=legacy`);
+  await expect(shellPage).toHaveURL(/\/tracker\?from=legacy$/u);
 
   await shellPage.goto(`${appServerUrl}/board?card=abc`);
-  await expect(shellPage).toHaveURL(/\/applications\?card=abc$/u);
+  await expect(shellPage).toHaveURL(/\/tracker\?card=abc$/u);
 
   await shellPage.goto(`${appServerUrl}/calendar?month=2026-11`);
-  await expect(shellPage).toHaveURL(/\/applications\?view=calendar&month=2026-11$/u);
-  await expect(shellPage.getByRole("heading", { level: 1, name: "Job Calendar" })).toBeVisible();
+  await expect(shellPage).toHaveURL(/\/calendar\?month=2026-11$/u);
+  await expect(shellPage.getByRole("heading", { level: 1, name: "Calendar" })).toBeVisible();
   await expect(header.getByText("Calendar", { exact: true })).toBeVisible();
 
   await shellPage.goto(`${appServerUrl}/search?q=platform`);
-  await expect(shellPage).toHaveURL(/\/applications\?q=platform$/u);
+  await expect(shellPage).toHaveURL(/\/tracker\?q=platform$/u);
 
   await shellPage.setViewportSize({ width: 1280, height: 900 });
   await shellPage.goto(`${appServerUrl}/profile`);
@@ -245,9 +256,9 @@ test("the navigation, phone header, profile hub and Applications page render at 
         path: join(process.cwd(), `test/e2e/.tmp/nav-home-${String(width)}-${theme}.png`),
       });
 
-      await page.goto(`${appServerUrl}/applications`);
+      await page.goto(`${appServerUrl}/tracker`);
       await expect(
-        page.getByRole("heading", { level: 1, name: "Your Applications" }),
+        page.getByRole("heading", { level: 1, name: "Application Tracker" }),
       ).toBeVisible();
       await page.evaluate(async () => {
         await document.fonts.ready;
@@ -258,7 +269,7 @@ test("the navigation, phone header, profile hub and Applications page render at 
 
       if (width === 390) {
         await page.goto(`${appServerUrl}/profile`);
-        await expect(page.getByRole("heading", { level: 1, name: "Your Profile" })).toBeVisible();
+        await expect(page.getByRole("heading", { level: 1, name: "Profile" })).toBeVisible();
         await page.evaluate(async () => {
           await document.fonts.ready;
         });

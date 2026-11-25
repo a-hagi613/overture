@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -7,6 +7,7 @@ import type { CalendarDate } from "../lib/calendar-grid.ts";
 import { copy } from "../../shared/copy.ts";
 import { CalendarBoard } from "../components/calendar-board.tsx";
 import { CalendarDayPanel } from "../components/calendar-day-panel.tsx";
+import { PageHeader } from "../components/page-header.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { dsBody, dsCardTitle } from "../components/ui/ds.ts";
@@ -50,14 +51,13 @@ export function CalendarPage() {
   const customEventsQuery = useCalendarCustomEvents();
   const createCustomEvent = useCreateCalendarCustomEvent();
   const deleteCustomEvent = useDeleteCalendarCustomEvent();
-  const customEvents = customEventsQuery.data ?? [];
 
   const { month, year } = focus;
   const range = monthRange(year, month, localZone);
   const { data, isError, isFetching, refetch } = useCalendar(range, localZone);
   const zone = data?.timeZone ?? localZone;
   const today = dateIn(currentTime(), zone);
-  const buckets = bucketByDay(data?.items ?? [], zone);
+  const buckets = useMemo(() => bucketByDay(data?.items ?? [], zone), [data?.items, zone]);
   const monthKey = monthKeyOf(focus);
 
   if (data !== undefined && data.timeZone !== zoneSynced) {
@@ -92,14 +92,18 @@ export function CalendarPage() {
     }
   }, [monthKey, params, setParams]);
 
-  const customByDay = new Map<string, CustomCalendarEvent[]>();
+  const customByDay = useMemo(() => {
+    const grouped = new Map<string, CustomCalendarEvent[]>();
 
-  for (const event of customEvents) {
-    const existing = customByDay.get(event.dayKey) ?? [];
+    for (const event of customEventsQuery.data ?? []) {
+      const existing = grouped.get(event.dayKey) ?? [];
 
-    existing.push(event);
-    customByDay.set(event.dayKey, existing);
-  }
+      existing.push(event);
+      grouped.set(event.dayKey, existing);
+    }
+
+    return grouped;
+  }, [customEventsQuery.data]);
 
   const selectedKey = dayKeyOf(selected);
   const selectedApiItems = buckets.get(selectedKey) ?? [];
@@ -171,9 +175,10 @@ export function CalendarPage() {
   const initialLoading = data === undefined && !isError;
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader titleNode={copy.calendar.titlePlain} />
       {isError && data === undefined ? (
-        <Card className="mt-6 px-7 py-11 text-center">
+        <Card className="mt-4 px-7 py-11 text-center">
           <div role="alert">
             <h2 className={dsCardTitle}>{copy.calendar.errorTitle}</h2>
             <p className={`${dsBody} mt-2`}>{copy.calendar.errorBody}</p>
@@ -191,33 +196,38 @@ export function CalendarPage() {
         </Card>
       ) : null}
       {initialLoading ? (
-        <div className="mt-6">
+        <div className="mt-4">
           <RouteFallback />
         </div>
       ) : null}
       {loaded ? (
-        <div className="mt-6 grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <CalendarBoard
-            buckets={buckets}
-            customByDay={customByDay}
-            focus={focus}
-            isFetching={isFetching}
-            onFocusMonth={(next) => {
-              setNavigated(true);
-              setFocus(next);
-            }}
-            onSelectDate={selectDate}
-            onShiftMonth={(delta) => {
-              selectDate(shiftMonth(focus, delta));
-            }}
-            onToday={() => {
-              selectDate(today);
-            }}
-            selected={selected}
-            today={today}
-          />
+        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <CalendarBoard
+              buckets={buckets}
+              customByDay={customByDay}
+              focus={focus}
+              isFetching={isFetching}
+              onFocusMonth={(next) => {
+                setNavigated(true);
+                setFocus(next);
+              }}
+              onSelectDate={selectDate}
+              onShiftMonth={(delta) => {
+                selectDate(shiftMonth(focus, delta));
+              }}
+              onToday={() => {
+                selectDate(today);
+              }}
+              selected={selected}
+              today={today}
+            />
+          </div>
 
-          <aside aria-label={copy.calendar.dayPanel} className="min-w-0 lg:sticky lg:top-6">
+          <aside
+            aria-label={copy.calendar.dayPanel}
+            className="flex min-h-0 min-w-0 flex-col lg:w-96 lg:shrink-0"
+          >
             <CalendarDayPanel
               customEvents={selectedCustomEvents}
               date={selected}

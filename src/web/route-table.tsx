@@ -6,8 +6,8 @@ import { PreserveSearchRedirect } from "./components/preserve-search-redirect.ts
 import { RootLayout } from "./components/root-layout.tsx";
 import { RouteErrorElement } from "./components/route-error-element.tsx";
 import { RouteErrorPage } from "./components/route-error-page.tsx";
-import { ConsentPage } from "./routes/consent.tsx";
 import { LandingPage } from "./routes/landing.tsx";
+import { ConsentPage } from "./routes/consent.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
 import { PrivacyPage } from "./routes/privacy.tsx";
 import { SignInPage } from "./routes/signin.tsx";
@@ -37,6 +37,7 @@ const ApplicationsPage = lazyRoute(
 
 const ReadyPage = lazyRoute(async () => import("./routes/ready.tsx"), "ReadyPage");
 const ReviewPage = lazyRoute(async () => import("./routes/review.tsx"), "ReviewPage");
+const CalendarPage = lazyRoute(async () => import("./routes/calendar.tsx"), "CalendarPage");
 
 const InboxPage = lazyRoute(async () => import("./routes/inbox.tsx"), "InboxPage");
 
@@ -165,13 +166,14 @@ const withRouteError = (routes: RouteObject[]) =>
 const appShellChildren: RouteObject[] = withRouteError([
   { path: "/home", element: <HomePage /> },
   { path: "/ready", element: <ReadyPage /> },
-  { path: "/board", element: <PreserveSearchRedirect to="/applications" /> },
+  { path: "/board", element: <PreserveSearchRedirect to="/tracker" /> },
   { path: "/review", element: <ReviewPage /> },
-  { path: "/calendar", element: <PreserveSearchRedirect to="/applications?view=calendar" /> },
+  { path: "/calendar", element: <CalendarPage /> },
   { path: "/inbox", element: <InboxPage /> },
   { path: "/inbox/:id", element: <InboxThreadPage /> },
   { path: "/notifications", element: <NotificationsPage /> },
-  { path: "/applications", element: <ApplicationsPage /> },
+  { path: "/tracker", element: <ApplicationsPage /> },
+  { path: "/applications", element: <PreserveSearchRedirect to="/tracker" /> },
   { path: "/profile", element: <ProfileLandingPage /> },
   { path: "/profile/resume", element: <ProfileResumePage /> },
   { path: "/profile/details", element: <ProfileDetailsPage /> },
@@ -194,7 +196,7 @@ const appShellChildren: RouteObject[] = withRouteError([
     path: "/settings/support-access",
     element: <PreserveSearchRedirect to="/profile/account#support-access" />,
   },
-  { path: "/search", element: <PreserveSearchRedirect to="/applications" /> },
+  { path: "/search", element: <PreserveSearchRedirect to="/tracker" /> },
   { path: "/inbox/address", element: <PreserveSearchRedirect to="/profile/account#forwarding" /> },
   { path: "*", element: <NotFoundPage /> },
 ]);

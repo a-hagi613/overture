@@ -340,12 +340,21 @@ test("a rejection and an interview move the card, Undo restores it, and a hand m
   await expect(appliedCard).toBeVisible();
 
   const moved = page.locator(`section[aria-label="Applied"] button[data-card="${applicationId}"]`);
+  const interviews = page.locator('section[aria-label="Interviews"]');
 
   const drag = page.waitForResponse(
     (candidate) => candidate.request().method() === "PATCH" && candidate.url().includes("/stage"),
   );
 
-  await moved.dragTo(page.locator('section[aria-label="Interviews"]'));
+  await moved.hover();
+  await page.mouse.down();
+  await interviews.hover();
+
+  const interviewsBox = await interviews.boundingBox();
+
+  await page.mouse.move((interviewsBox?.x ?? 0) + 60, (interviewsBox?.y ?? 0) + 120, { steps: 8 });
+  await page.mouse.up();
+
   await drag;
 
   await expect(

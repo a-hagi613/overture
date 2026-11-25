@@ -135,7 +135,7 @@ test("switching to the personal email is saved and shown on Profile → Account"
     await expect(toggle).toBeChecked();
     await expect(card).toContainText(authTestIdentity.ownerEmail);
     await expect(card).toContainText(
-      `New applications put ${initial.personalEmail} on the form, and you paste each verification code.`,
+      `New applications use ${initial.personalEmail}. Paste verification codes when prompted.`,
     );
 
     expect(await readApplyEmail(request)).toMatchObject({ usePersonalEmail: true });

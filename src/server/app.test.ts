@@ -68,9 +68,29 @@ test("a hashed asset is cached forever and the shell never is", async () => {
   expect(index?.headers.get("Cache-Control")).toBe("no-cache");
 });
 
-test("the cache policy only marks hashed files immutable", () => {
+test("the cache policy only marks hashed files immutable and configures edge caching for videos and icons", () => {
   expect(staticCacheHeaders("/assets/app-123.js")).toEqual({
     "Cache-Control": "public, max-age=31536000, immutable",
+  });
+  expect(staticCacheHeaders("/videos/workspace-demo-desktop.mp4")).toEqual({
+    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+    "CDN-Cache-Control": "public, max-age=2592000, stale-while-revalidate=86400",
+  });
+  expect(staticCacheHeaders("/videos/workspace-demo-desktop-poster.png")).toEqual({
+    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+    "CDN-Cache-Control": "public, max-age=2592000, stale-while-revalidate=86400",
+  });
+  expect(staticCacheHeaders("/icons/icon-192.png")).toEqual({
+    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+    "CDN-Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
+  });
+  expect(staticCacheHeaders("/favicon.svg")).toEqual({
+    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+    "CDN-Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
+  });
+  expect(staticCacheHeaders("/manifest.webmanifest")).toEqual({
+    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+    "CDN-Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
   });
   expect(staticCacheHeaders("/sw.js")).toEqual({
     "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -78,6 +98,48 @@ test("the cache policy only marks hashed files immutable", () => {
   });
   expect(staticCacheHeaders("/app-shell.html")).toEqual({ "Cache-Control": "no-cache" });
   expect(staticCacheHeaders("/favicon.ico")).toBeUndefined();
+});
+
+test("static assets advertise byte ranges and slice video bytes with 206 and 416", async () => {
+  const root = staticRoot();
+
+  mkdirSync(join(root, "videos"));
+  writeFileSync(join(root, "videos", "demo.mp4"), "0123456789");
+
+  const full = await staticResponseFrom(root, "http://localhost/videos/demo.mp4");
+
+  expect(full?.status).toBe(200);
+  expect(full?.headers.get("Accept-Ranges")).toBe("bytes");
+  expect(full?.headers.get("CDN-Cache-Control")).toBe(
+    "public, max-age=2592000, stale-while-revalidate=86400",
+  );
+
+  const partial = await staticResponseFrom(root, "http://localhost/videos/demo.mp4", "bytes=0-3");
+
+  expect(partial?.status).toBe(206);
+  expect(partial?.headers.get("Accept-Ranges")).toBe("bytes");
+  expect(partial?.headers.get("Content-Range")).toBe("bytes 0-3/10");
+  expect(partial?.headers.get("Content-Length")).toBe("4");
+  expect(partial?.headers.get("CDN-Cache-Control")).toBe(
+    "public, max-age=2592000, stale-while-revalidate=86400",
+  );
+  expect(await partial?.text()).toBe("0123");
+
+  const suffix = await staticResponseFrom(root, "http://localhost/videos/demo.mp4", "bytes=-3");
+
+  expect(suffix?.status).toBe(206);
+  expect(suffix?.headers.get("Content-Range")).toBe("bytes 7-9/10");
+  expect(await suffix?.text()).toBe("789");
+
+  const unsatisfiable = await staticResponseFrom(
+    root,
+    "http://localhost/videos/demo.mp4",
+    "bytes=999-1000",
+  );
+
+  expect(unsatisfiable?.status).toBe(416);
+  expect(unsatisfiable?.headers.get("Content-Range")).toBe("bytes */10");
+  expect(unsatisfiable?.headers.get("Accept-Ranges")).toBe("bytes");
 });
 
 test("the extensionless service worker is served uncached from the build root", async () => {

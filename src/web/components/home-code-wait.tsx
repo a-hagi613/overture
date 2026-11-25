@@ -23,9 +23,8 @@ export function HomeCodeWait({
   return (
     <Card
       ariaLabelledBy="home-code-wait"
-      className="mt-5 border-need bg-card p-5 md:p-6"
+      className="mt-3 border-need/40 p-4"
       dataTestId="home-code-wait"
-      variant="elevated"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <Badge variant="need">{copy.home.codeWait.eyebrow}</Badge>
@@ -33,19 +32,18 @@ export function HomeCodeWait({
           {copy.home.codeWait.expires(clockText(remainingMs(wait, now)))}
         </span>
       </div>
-      <h2 className={`${dsCardTitle} mt-3.5`} id="home-code-wait">
-        {copy.home.codeWait.titlePlain(wait.company)}{" "}
-        <span className="italic">{copy.home.codeWait.titleItalic}</span>
+      <h2 className={`${dsCardTitle} mt-2.5`} id="home-code-wait">
+        {`${copy.home.codeWait.titlePlain(wait.company)} ${copy.home.codeWait.titleItalic}`}
       </h2>
-      <p className={`${dsBody} mt-2 max-w-2xl text-foreground`}>{copy.home.codeWait.body}</p>
-      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+      <p className={`${dsBody} mt-1.5 max-w-2xl text-foreground`}>{copy.home.codeWait.body}</p>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
         {copy.home.codeWait.asked}
       </p>
-      <div className="mt-4 flex flex-wrap gap-2.5">
-        <Button onClick={onPaste} size="default" variant="primary">
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button onClick={onPaste} size="sm" variant="primary">
           {copy.home.codeWait.paste}
         </Button>
-        <Button onClick={onNoCode} size="default" variant="secondary">
+        <Button onClick={onNoCode} size="sm" variant="secondary">
           {copy.home.codeWait.noCode}
         </Button>
       </div>

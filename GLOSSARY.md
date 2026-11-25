@@ -80,7 +80,7 @@ _Avoid_: reject, dismiss
 The Status after the employer may have received the Application and before its confirmation was seen. Shown as "Checking with the employer".
 
 **Couldn't apply**:
-An Application that was not sent, or whose sending could not be confirmed. It never uses one of the user's applications.
+An Application that was not sent, or whose sending could not be confirmed (surfaced concisely as **Not sent** on Home). It never uses one of the user's applications.
 _Avoid_: failed (in copy), error
 
 **Applications left**:

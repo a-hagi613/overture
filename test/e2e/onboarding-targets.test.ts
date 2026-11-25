@@ -4,7 +4,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
@@ -42,22 +42,17 @@ const targetsSchema = z.object({
   }),
 });
 
-async function countText(page: Page) {
-  return page.getByTestId("targets-match-count").textContent();
-}
-
 async function storageStateFor(request: APIRequestContext, appServerUrl: string) {
   await seedOnboardingTargetsFlow(request, appServerUrl);
 
   return request.storageState();
 }
 
-test("the searchable category and Level-2 role picker adds a granular target and counts live", async ({
+test("the category-first role chips, multi-select locations, and optional settings save cleanly", async ({
   browser,
   onboardingServer,
 }) => {
   const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
-
   const storageState = await storageStateFor(request, onboardingServer.url);
 
   const context = await browser.newContext({
@@ -70,15 +65,21 @@ test("the searchable category and Level-2 role picker adds a granular target and
   await page.goto(`${onboardingServer.url}/onboarding/targets`);
 
   const platform = page.getByRole("button", { name: "Platform Engineer" });
-  const london = page.getByRole("button", { name: "London" });
   const remote = page.getByRole("button", { exact: true, name: "Remote" });
   const hybrid = page.getByRole("button", { exact: true, name: "Hybrid" });
   const senior = page.getByRole("button", { name: "Senior" });
 
   await platform.click();
   await expect(platform).toHaveAttribute("aria-pressed", "true");
-  await london.click();
-  await expect(london).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByLabel("Locations").click();
+  await page.getByRole("option", { exact: true, name: "London" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "London" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
   await remote.click();
   await expect(remote).toHaveAttribute("aria-pressed", "true");
   await hybrid.click();
@@ -86,20 +87,15 @@ test("the searchable category and Level-2 role picker adds a granular target and
   await senior.click();
   await expect(senior).toHaveAttribute("aria-pressed", "true");
 
-  await expect(page.getByTestId("targets-match-count")).toHaveText("3");
+  await page.getByLabel("Category").click();
+  await page.getByRole("option", { exact: true, name: "Healthcare" }).click();
 
-  await page.getByLabel("Category", { exact: true }).selectOption("Healthcare");
-
-  const role = page.getByLabel("Add a specific role", { exact: true });
-
-  await role.fill("Registered Nurse");
-  await role.press("Enter");
-
+  await page.getByRole("button", { name: "Registered Nurse" }).click();
   await expect(page.getByRole("button", { name: "Registered Nurse" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect(page.getByTestId("targets-match-count")).toHaveText("4");
+  await expect(page.getByText("Also selected (1)")).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 1000 });
 
@@ -116,18 +112,16 @@ test("the searchable category and Level-2 role picker adds a granular target and
 
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.getByRole("button", { name: "Registered Nurse" }).click();
-
   await expect(page.getByRole("button", { name: "Registered Nurse" })).toHaveAttribute(
     "aria-pressed",
     "false",
   );
-  await expect(page.getByTestId("targets-match-count")).toHaveText("3");
 
   await context.close();
   await request.dispose();
 });
 
-test("choices come from open Postings, the count follows them, and the browser zone is saved", async ({
+test("choices persist across reload, optional salary saves, and browser zone is captured", async ({
   browser,
   onboardingServer,
 }) => {
@@ -145,36 +139,27 @@ test("choices come from open Postings, the count follows them, and the browser z
   await page.goto(`${onboardingServer.url}/onboarding/targets`);
 
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
-
   await expect(page.getByRole("button", { name: "Platform Engineer" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Product Manager" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ghost Role" })).toHaveCount(0);
 
-  expect(await countText(page)).toBe("0");
-
   await page.getByRole("button", { name: "Platform Engineer" }).click();
-  await page.getByRole("button", { name: "London" }).click();
+
+  await page.getByLabel("Category").click();
+  await page.getByRole("option", { exact: true, name: "Product Management" }).click();
+  await page.getByRole("button", { exact: true, name: "Product Manager" }).click();
+
+  await page.getByLabel("Locations").click();
+  await page.getByRole("option", { exact: true, name: "London" }).click();
+  await page.getByRole("option", { exact: true, name: "Berlin" }).click();
+  await page.keyboard.press("Escape");
+
   await page.getByRole("button", { exact: true, name: "Remote" }).click();
+  await page.getByRole("button", { name: "Hybrid" }).click();
   await page.getByRole("button", { name: "Senior" }).click();
 
-  await expect(page.getByTestId("targets-match-count")).toHaveText("3");
+  await page.getByRole("button", { name: "Platform Engineer" }).click();
 
-  await page.getByRole("button", { name: "Product Manager" }).click();
-
-  await expect(page.getByTestId("targets-match-count")).toHaveText("3");
-
-  await page.getByRole("button", { name: "Berlin" }).click();
-  await page.getByRole("button", { name: "Hybrid" }).click();
-
-  await expect(page.getByTestId("targets-match-count")).toHaveText("5");
-
-  const platformChip = page.getByRole("button", { name: "Platform Engineer" });
-
-  await platformChip.click();
-  await expect(platformChip).toHaveAttribute("aria-pressed", "false");
-
-  await expect(page.getByTestId("targets-match-count")).toHaveText("2");
-
+  await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
   await page.getByLabel("Minimum salary").fill("120,000");
   await page.getByLabel("Minimum salary").blur();
 
@@ -208,14 +193,22 @@ test("choices come from open Postings, the count follows them, and the browser z
 
   await page.reload();
 
-  await expect(page.getByTestId("targets-match-count")).toHaveText("2");
-  await expect(page.getByRole("button", { name: "Product Manager" })).toHaveAttribute(
+  await expect(page.getByRole("button", { exact: true, name: "Product Manager" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
+  await expect(page.getByRole("button", { name: "London" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "Berlin" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
   await expect(page.getByLabel("Minimum salary")).toHaveValue("120,000");
 
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "See my matches" }).click();
 
   await expect(page).toHaveURL(/\/onboarding\/matches$/u);
 

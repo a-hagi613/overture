@@ -76,10 +76,10 @@ export function CalendarBoard({
     <Card
       ariaBusy={isFetching}
       ariaLabelledBy="calendar-month"
-      className="min-w-0 p-2 sm:p-4 md:p-6"
-      variant="elevated"
+      className="flex min-h-0 min-w-0 flex-1 flex-col p-3 sm:p-4 lg:p-5"
+      variant="default"
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <CalendarDatePickerPopover
           month={monthDate}
           onSelectDate={(picked) => {
@@ -88,8 +88,8 @@ export function CalendarBoard({
           selected={selectedJs}
         />
 
-        <div className="flex items-center gap-1.5">
-          <Button onClick={onToday} size="sm" variant="outline">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+          <Button className="px-2.5 sm:px-3" onClick={onToday} size="sm" variant="outline">
             {copy.calendar.today}
           </Button>
           <Button
@@ -117,35 +117,39 @@ export function CalendarBoard({
         </div>
       </div>
 
-      <CalendarDayContext.Provider value={dayContext}>
-        <DayPicker
-          classNames={DAY_PICKER_CLASSES}
-          components={DAY_PICKER_COMPONENTS}
-          mode="single"
-          month={monthDate}
-          onMonthChange={(nextMonth) => {
-            onFocusMonth({
-              day: 1,
-              month: nextMonth.getMonth() + 1,
-              year: nextMonth.getFullYear(),
-            });
-          }}
-          onSelect={(picked) => {
-            if (picked !== undefined) {
-              onSelectDate(toCalendarDate(picked));
-            }
-          }}
-          selected={selectedJs}
-          showOutsideDays
-          weekStartsOn={1}
-        />
-      </CalendarDayContext.Provider>
+      <div className="flex-1">
+        <CalendarDayContext.Provider value={dayContext}>
+          <DayPicker
+            classNames={DAY_PICKER_CLASSES}
+            components={DAY_PICKER_COMPONENTS}
+            mode="single"
+            month={monthDate}
+            onMonthChange={(nextMonth) => {
+              onFocusMonth({
+                day: 1,
+                month: nextMonth.getMonth() + 1,
+                year: nextMonth.getFullYear(),
+              });
+            }}
+            onSelect={(picked) => {
+              if (picked !== undefined) {
+                onSelectDate(toCalendarDate(picked));
+              }
+            }}
+            selected={selectedJs}
+            showOutsideDays
+            weekStartsOn={1}
+          />
+        </CalendarDayContext.Provider>
 
-      {!isFetching && !hasMonthEvents ? (
-        <p className="mt-3 text-center text-xs text-muted-foreground">{copy.calendar.emptyMonth}</p>
-      ) : null}
+        {!isFetching && !hasMonthEvents ? (
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            {copy.calendar.emptyMonth}
+          </p>
+        ) : null}
+      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3.5 text-xs text-muted-foreground">
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-ok" />
           <span>{copy.calendar.kinds.interview}</span>

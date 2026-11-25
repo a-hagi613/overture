@@ -11,8 +11,8 @@ export function BoardSheetHeader({ detail }: { detail: ApplicationDetail }) {
         tone="signal"
       />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-signal-text">{detail.company}</p>
-        <h2 className="mt-0.5 font-serif text-page-title leading-tight text-foreground">
+        <p className="break-words text-sm font-semibold text-signal-text">{detail.company}</p>
+        <h2 className="mt-0.5 break-words font-serif text-page-title leading-tight text-foreground">
           {detail.posting.title}
         </h2>
       </div>

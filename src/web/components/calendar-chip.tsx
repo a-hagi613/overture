@@ -15,7 +15,7 @@ export function CalendarChip({
 }) {
   return (
     <span
-      className={`${block ? "flex" : "inline-flex max-w-full"} min-h-[21px] min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-sm px-1.5 text-eyebrow font-semibold ${CHIP_STYLE[kind].chip}`}
+      className={`${block ? "flex" : "inline-flex max-w-full"} min-h-5 min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-sm px-1.5 text-eyebrow font-semibold ${CHIP_STYLE[kind].chip}`}
       data-chip={kind}
     >
       <KindDot kind={kind} />

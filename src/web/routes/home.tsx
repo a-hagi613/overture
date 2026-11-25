@@ -12,7 +12,6 @@ import { firstNameOf } from "../lib/identity.ts";
 import { useHomeData } from "../lib/home-api.ts";
 import { CodePasteSheet } from "../components/code-paste-sheet.tsx";
 import type { CodePasteMode } from "../components/code-paste-sheet.tsx";
-import { HomeActivity } from "../components/home-activity.tsx";
 import { HomeBillingNotice } from "../components/home-billing-notice.tsx";
 import { HomeCaughtUp } from "../components/home-caught-up.tsx";
 import { HomeChart } from "../components/home-chart.tsx";
@@ -20,16 +19,12 @@ import { HomeCheckIn } from "../components/home-checkin.tsx";
 import { HomeCodeWait } from "../components/home-code-wait.tsx";
 import { HomeControlBand } from "../components/home-control-band.tsx";
 import { HomeFailures } from "../components/home-failures.tsx";
-import { HomeInbox } from "../components/home-inbox.tsx";
 import { HomeNeedsYou } from "../components/home-needs-you.tsx";
-import { HomeOutcomes } from "../components/home-outcomes.tsx";
 import { HomePauseBanner } from "../components/home-pause-banner.tsx";
 import { HomeQueue } from "../components/home-queue.tsx";
 import { HomeReadyCard } from "../components/home-ready-card.tsx";
-import { HomeSchedule } from "../components/home-schedule.tsx";
 import { HomeStrengthen } from "../components/home-strengthen.tsx";
 import { PageHeader } from "../components/page-header.tsx";
-import { PostApprovalCard } from "../components/post-approval-card.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 
@@ -121,8 +116,8 @@ export function HomePage() {
   const codeWaitAsking = wait !== null && asked;
   const showReady = home !== undefined && home.ready.ready > 0;
   const showNeedsYou = home !== undefined && home.reviews.total > 0;
-  const showCheckIn = home !== undefined && home.checkIns.length > 0;
   const showFailures = home !== undefined && home.activity.failed.length > 0;
+  const showCheckIn = home !== undefined && home.checkIns.length > 0;
   const caughtUp = home !== undefined && isAllCaughtUp(homeActionStateOf(home), codeWaitAsking);
 
   const closeSheet = useCallback(() => {
@@ -208,15 +203,10 @@ export function HomePage() {
   }
 
   return (
-    <div>
+    <div className="flex flex-1 flex-col">
       <PageHeader
         lead={dateLine(home?.timeZone)}
-        titleNode={
-          <>
-            {greetingWord(home?.timeZone)}{" "}
-            <em className="italic text-signal">{`${firstName === "" ? copy.app.name : firstName}.`}</em>
-          </>
-        }
+        titleNode={`${greetingWord(home?.timeZone)} ${firstName === "" ? copy.app.name : firstName}`}
       />
 
       {home?.pauseReason === null ||
@@ -226,30 +216,22 @@ export function HomePage() {
       )}
 
       {homePending ? (
-        <div aria-busy="true" className="mt-6 space-y-5">
+        <div aria-busy="true" className="mt-3 space-y-3">
           <span className="sr-only">{copy.shell.loadingPage}</span>
-          <Card className="p-6">
+          <Card className="p-4">
             <div className="animate-pulse space-y-3">
               <div className="h-5 w-1/3 rounded bg-muted" />
-              <div className="h-20 w-full rounded bg-muted" />
+              <div className="h-14 w-full rounded bg-muted" />
             </div>
           </Card>
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <Card className="p-6">
-              <div className="h-24 animate-pulse rounded bg-muted" />
-            </Card>
-            <Card className="p-6">
-              <div className="h-24 animate-pulse rounded bg-muted" />
-            </Card>
-            <Card className="p-6">
-              <div className="h-24 animate-pulse rounded bg-muted" />
-            </Card>
-          </div>
+          <Card className="p-4">
+            <div className="h-44 animate-pulse rounded bg-muted" />
+          </Card>
         </div>
       ) : null}
 
       {homeError ? (
-        <Card className="mt-6 flex flex-wrap items-center justify-between gap-4 p-6">
+        <Card className="mt-3 flex flex-wrap items-center justify-between gap-4 p-4">
           <p className="text-sm font-semibold text-foreground" role="alert">
             {copy.home.loadFailed}
           </p>
@@ -269,89 +251,72 @@ export function HomePage() {
         <>
           <HomeBillingNotice
             applicationsLeft={home.applicationsLeft}
-            endingGrant={home.endingGrant}
             planApplications={home.planApplications}
           />
-          <HomeControlBand home={home} />
-          {range === null ? null : (
-            <HomeOutcomes onRangeChange={setRangeKey} range={range} rangeKey={rangeKey} />
-          )}
-          {home.ready.approved > 0 ? <PostApprovalCard /> : null}
-        </>
-      )}
 
-      <div data-testid="home-actions">
-        {wait === null || !asked ? null : (
-          <HomeCodeWait
-            onNoCode={() => {
-              openSheet(wait, "no_code");
-            }}
-            onPaste={() => {
-              openSheet(wait, "waiting");
-            }}
-            serverNow={codeWaits?.now}
-            wait={wait}
-          />
-        )}
-        {home === undefined ? null : (
-          <>
-            {showReady || showNeedsYou ? (
-              <div
-                className={
-                  showReady && showNeedsYou ? "mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2" : "mt-5"
-                }
-              >
-                {showReady ? <HomeReadyCard readyCount={home.ready.ready} /> : null}
-                {showNeedsYou ? (
-                  <HomeNeedsYou
-                    applications={home.reviews.applications}
-                    reviews={home.reviews.list}
-                    total={home.reviews.total}
-                  />
-                ) : null}
-              </div>
-            ) : null}
-
-            {showFailures ? (
+          {showFailures ? (
+            <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-stretch">
               <HomeFailures failed={home.activity.failed} now={home.now} zone={home.timeZone} />
-            ) : null}
-
-            {showCheckIn ? (
-              <div className="mt-5">
-                <HomeCheckIn checkIns={home.checkIns} />
-              </div>
-            ) : null}
-
-            {caughtUp ? <HomeCaughtUp nextPrepAt={home.nextPrepAt} zone={home.timeZone} /> : null}
-          </>
-        )}
-      </div>
-
-      {home === undefined || range === null ? null : (
-        <div data-testid="home-progress">
-          <HomeChart range={range} rangeKey={rangeKey} />
-
-          {home.activity.sent.length === 0 ? null : (
-            <HomeActivity now={home.now} sent={home.activity.sent} zone={home.timeZone} />
+              <HomeControlBand home={home} />
+            </div>
+          ) : (
+            <div className="mt-3">
+              <HomeControlBand home={home} />
+            </div>
           )}
 
-          {paused ? (
-            <div className="mt-5">
-              <HomeQueue
-                position={home.queue.position}
-                sendAt={home.queue.sendAt}
-                zone={home.timeZone}
-              />
+          {wait === null || !asked ? null : (
+            <HomeCodeWait
+              onNoCode={() => {
+                openSheet(wait, "no_code");
+              }}
+              onPaste={() => {
+                openSheet(wait, "waiting");
+              }}
+              serverNow={codeWaits?.now}
+              wait={wait}
+            />
+          )}
+
+          {caughtUp ? <HomeCaughtUp nextPrepAt={home.nextPrepAt} zone={home.timeZone} /> : null}
+
+          {range === null ? null : (
+            <HomeChart onRangeChange={setRangeKey} range={range} rangeKey={rangeKey} />
+          )}
+
+          {showReady || showNeedsYou ? (
+            <div
+              className={
+                showReady && showNeedsYou ? "mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2" : "mt-3"
+              }
+            >
+              {showReady ? <HomeReadyCard readyCount={home.ready.ready} /> : null}
+              {showNeedsYou ? (
+                <HomeNeedsYou
+                  applications={home.reviews.applications}
+                  reviews={home.reviews.list}
+                  total={home.reviews.total}
+                />
+              ) : null}
             </div>
           ) : null}
 
-          {home.strengthen === null ? null : <HomeStrengthen missing={home.strengthen.missing} />}
+          {showCheckIn ? (
+            <div className="mt-3">
+              <HomeCheckIn checkIns={home.checkIns} />
+            </div>
+          ) : null}
 
-          <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <HomeInbox now={home.now} rows={home.recentInbox} zone={home.timeZone} />
-            <HomeSchedule now={home.now} zone={home.timeZone} />
-          </div>
-        </div>
+          {paused ? (
+            <HomeQueue
+              position={home.queue.position}
+              sendAt={home.queue.sendAt}
+              zone={home.timeZone}
+            />
+          ) : null}
+
+          {home.strengthen === null ? null : <HomeStrengthen missing={home.strengthen.missing} />}
+        </>
       )}
 
       {activeSheet === null ? null : (

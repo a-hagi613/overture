@@ -5,9 +5,12 @@ import { LandingGrain } from "./landing-grain.tsx";
 
 export function LandingClosingSection() {
   return (
-    <section aria-labelledby="closing-title" className="relative border-t border-border">
+    <section
+      aria-labelledby="closing-title"
+      className="relative overflow-hidden border-t border-border"
+    >
       <LandingGrain variant="closing" />
-      <div className={`${dsContainer} relative z-10 py-16 text-center sm:py-24`}>
+      <div className={`${dsContainer} relative z-10 py-14 text-center sm:py-20`}>
         <h2 className={`${dsBandHeading} mx-auto max-w-3xl text-foreground`} id="closing-title">
           {LANDING_COPY.closing.headingPlain}
           <span className="italic">{LANDING_COPY.closing.headingItalic}</span>

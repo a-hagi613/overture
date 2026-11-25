@@ -19,7 +19,7 @@ const PUBLIC_ATS = ["Greenhouse", "Lever", "Ashby", "Personio", "Workable"];
 const widths = [390, 768, 1280, 1440, 1920, 2560] as const;
 const themes = ["light", "dark"] as const;
 
-const landingHeadline = "The job hunt, handled.";
+const landingHeadline = "The job search, handled.";
 const annotationPattern = /\bfig(?:ure)?\.?\s*\d|\bfolio\b|§|\bartboard\b|\bboard note\b/iu;
 
 async function noScriptPage(browser: Browser, url: string) {
@@ -46,14 +46,14 @@ test.describe("public landing and embedded pricing, readable without JavaScript"
   }) => {
     const { html, text } = await noScriptPage(browser, `${appServerUrl}/`);
 
-    expect(text).toContain("The job hunt,");
+    expect(text).toContain("The job search,");
     expect(text).toContain("handled.");
     expect(text).toContain("Pay only for applications sent.");
     expect(text).toContain(PLAN.weekPrice);
-    expect(text).toContain(`${String(PLAN.weekApps)} confirmed job applications`);
+    expect(text).toContain(`${String(PLAN.weekApps)} confirmed applications`);
     expect(text).toContain(PLAN.monthPrice);
-    expect(text).toContain(`${String(PLAN.monthApps)} confirmed job applications`);
-    expect(text).toContain(`${String(TRIAL_APPS)} confirmed job applications`);
+    expect(text).toContain(`${String(PLAN.monthApps)} confirmed applications`);
+    expect(text).toContain(`${String(TRIAL_APPS)} confirmed applications`);
     expect(text).toContain(`over ${String(PLAN.weekDays)} days`);
     expect(html).toContain('href="/signin"');
     expect(html).toContain('href="/signup"');
@@ -61,7 +61,7 @@ test.describe("public landing and embedded pricing, readable without JavaScript"
     expect(html).toContain('href="/privacy"');
     expect(html).toContain('href="#pricing"');
     expect(text).toContain(
-      `daytime hours (${String(SEND.startHour).padStart(2, "0")}:00 to ${String(SEND.endHour).padStart(2, "0")}:00 local time)`,
+      `between ${String(SEND.startHour).padStart(2, "0")}:00 to ${String(SEND.endHour).padStart(2, "0")}:00 local time`,
     );
   });
 
@@ -80,19 +80,8 @@ test.describe("public landing and embedded pricing, readable without JavaScript"
   });
 });
 
-async function inSequence<T>(items: readonly T[], run: (item: T) => Promise<void>) {
-  const [first, ...rest] = items;
-
-  if (first === undefined) {
-    return;
-  }
-
-  await run(first);
-  await inSequence(rest, run);
-}
-
 test.describe("public landing served and checked in the browser", () => {
-  test("the landing screen is reachable, axe clean, shows pricing and interactive workspace tabs", async ({
+  test("the landing screen is reachable, axe clean, shows pricing and the workspace walkthrough", async ({
     page,
     appServerUrl,
   }) => {
@@ -103,13 +92,11 @@ test.describe("public landing served and checked in the browser", () => {
       page.getByRole("heading", { level: 2, name: "Pay only for applications sent." }),
     ).toBeVisible();
 
-    await inSequence(["Home", "Applications", "Inbox", "Calendar", "Profile"], async (tabLabel) => {
-      const tab = page.getByRole("button", { name: tabLabel });
+    const workspace = page.locator("#dashboard-preview");
 
-      await expect(tab).toBeVisible();
-      await tab.click();
-      await expect(tab).toHaveAttribute("aria-pressed", "true");
-    });
+    await workspace.scrollIntoViewIfNeeded();
+    await expect(workspace.locator("video")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Play walkthrough" })).toBeVisible();
 
     const landing = await new AxeBuilder({ page }).analyze();
 

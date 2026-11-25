@@ -29,7 +29,7 @@ export function CalendarEventForm({
   const canSave = title.trim() !== "";
 
   return (
-    <Card className="mt-4 border-border bg-background p-4 shadow-none">
+    <Card className="border-border bg-sidebar/35 p-4 shadow-none">
       <form
         className="space-y-3"
         onSubmit={(event) => {

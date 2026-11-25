@@ -173,21 +173,36 @@ export const copy = {
     home: "Home",
     ready: "Ready",
     applications: "Applications",
+    applicationsGroup: "Applications",
+    applicationsMenuLabel: "Applications sections",
+    tracker: "Tracker",
     review: "Review",
+    followUpsGroup: "Follow-ups",
+    followUpsMenuLabel: "Follow-ups sections",
     inbox: "Inbox",
     calendar: "Calendar",
     profile: "Profile",
+    jobProfile: "Profile",
+    jobProfileMenuLabel: "Profile sections",
+    accountMenuLabel: "Account menu",
+    accountSettings: "Account settings",
+    accountSectionLabel: "Account",
+    signOut: "Sign out",
+    signingOut: "Signing out…",
+    userFallback: "Account",
+    sidebarDrawerTitle: "Workspace navigation",
+    sidebarDrawerDescription: "Navigate workspace pages and account settings.",
     support: "Support",
     search: "Search",
     profileHub: {
-      titlePlain: "Your ",
-      titleItalic: "Profile",
+      titlePlain: "Profile",
+      titleItalic: "",
       lead: "Everything about you and your search, in one place.",
     },
     profileMenu: {
       label: "Profile sections",
       resume: "Resume & Cover Letter",
-      details: "Saved answers",
+      details: "Application Answers",
       preferences: "Job Preferences",
       billing: "Billing",
       account: "Account",
@@ -304,8 +319,8 @@ export const copy = {
     },
     supportPage: {
       title: "Support",
-      titlePlain: "Contact ",
-      titleItalic: "Support",
+      titlePlain: "Support",
+      titleItalic: "",
       lead: "Questions about your applications, billing, or account? Send us a note and we will reply by email.",
       fromLabel: "Sending as",
       categoryLabel: "Topic",
@@ -380,7 +395,7 @@ export const copy = {
     notificationsEmpty: "Notifications",
   },
   signIn: {
-    brandTagline: "The job hunt, handled.",
+    brandTagline: "The job search, handled.",
     back: "Back to Overture",
     adminPortalKicker: "The owner's portal",
     adminPortalSignIn: (email: string) => `Sign in with ${email}.`,
@@ -448,12 +463,12 @@ export const copy = {
     captchaUnavailable: "The bot check could not load. Check your connection and try again.",
     sampleLabel: "Sample data",
     story: {
-      pill: "Automated job search",
+      pill: "Your workspace",
       backdropRole: "Air Canada · Network Operations Planner",
       backdropQueue: "Ready · sends about 14:10",
-      heading: "The job hunt,",
-      headingItalic: "handled.",
-      deck: "Finds fresh roles on company career pages and submits tailored applications on your behalf.",
+      heading: "Your search,",
+      headingItalic: "still moving.",
+      deck: "Check the roles lined up for you, answer any open questions, and read replies from employers.",
       receiptAria: "Sample of an applied application, sample data",
       receiptTitle: "Financial Planning Analyst",
       receiptMeta: "Stripe · San Francisco, CA · Hybrid · Greenhouse",
@@ -466,14 +481,29 @@ export const copy = {
       receiptStamp: "10:42 · 11 answers from saved answers · Resume unchanged",
       stamp: "Applied",
       pillar01: "01",
-      pillar01Title: "Direct to employers",
-      pillar01Detail: "Submits straight to company career pages instead of stale job boards.",
+      pillar01Title: "Ready to send",
+      pillar01Detail: "Approve queued roles or let Overture apply on your schedule.",
       pillar02: "02",
-      pillar02Title: "Tailored to each role",
-      pillar02Detail: "Matches your resume and writes a fresh cover letter for every opening.",
+      pillar02Title: "Needs your answer",
+      pillar02Detail: "Reply once to new employer questions and we save it for next time.",
       pillar03: "03",
-      pillar03Title: "Every reply tracked",
-      pillar03Detail: "Follow every sent application and employer reply in one workspace.",
+      pillar03Title: "Employer inbox",
+      pillar03Detail: "Every confirmation, recruiter note, and interview invite in one place.",
+    },
+    signUpStory: {
+      pill: "Get started",
+      heading: "Upload once.",
+      headingItalic: "Apply daily.",
+      deck: "Add your resume, set the roles and places you want, and Overture applies straight on company career pages.",
+      pillar01: "01",
+      pillar01Title: "Two-minute setup",
+      pillar01Detail: "Upload your resume and tell us the roles, locations, and pay you want.",
+      pillar02: "02",
+      pillar02Title: "You stay in control",
+      pillar02Detail: "Review drafts first or turn on daily sending whenever you are ready.",
+      pillar03: "03",
+      pillar03Title: "3 free applications",
+      pillar03Detail: "See real submissions go out to employers before you pick a plan.",
     },
   },
   waitlist: {
@@ -721,7 +751,7 @@ export const copy = {
       action: "Send applications",
       countBadge: (count: number) => `${String(count)} ready`,
       eyebrow: "Ready to send",
-      subtitle: "Prepared applications waiting for your go-ahead",
+      subtitle: "Prepared applications waiting for approval",
       title: (ready: number, _approved = 0) =>
         `${String(ready)} ${ready === 1 ? "application" : "applications"} ready to send`,
     },
@@ -730,17 +760,15 @@ export const copy = {
       expires: (time: string) => `Expires in ${time}`,
       titlePlain: (company: string) => company,
       titleItalic: "needs a code.",
-      body:
-        "The form asked for a code sent to your email. Paste it in Overture within ten minutes, or the " +
-        "Application ends and can be tried again later.",
+      body: "The form asked for a verification code sent to your email. Paste it within 10 minutes or the application will pause so you can retry later.",
       asked: "No forwarded mail yet. The form stays open until the timer ends.",
       paste: "Paste the code",
       noCode: "No code yet",
     },
     rangeLabel: "Date range",
     ranges: { d7: "7D", d30: "30D", d90: "90D" },
-    running: "Sending active",
-    paused: "Sending paused",
+    running: "Active",
+    paused: "Paused",
     pause: "Pause",
     start: "Resume",
     switchAria: (running: boolean) => (running ? "Pause sending" : "Resume sending"),
@@ -753,15 +781,15 @@ export const copy = {
     control: {
       dailyProgress: (sent: number, cap: number) => `${String(sent)} of ${String(cap)} sent today`,
       pauseAction: "Pause sending",
-      pausedDetail: "Sending is paused. Nothing new will send until you resume.",
-      pausedTitle: "Sending is paused",
+      pausedDetail: "Nothing new will send until you resume.",
+      pausedTitle: "Application sending",
       pausedToast: "Sending paused.",
       readyEmptyDetail: "Overture is watching career pages and preparing your next matches.",
       readyEmptyTitle: "All caught up",
       resumeAction: "Resume sending",
       resumedToast: "Sending resumed.",
       resumeErrorToast: "Could not update sending status. Try again.",
-      runningTitle: "Sending is active",
+      runningTitle: "Application sending",
       viewBoard: "View Applications",
       windowNote: "Sends 8 am – 8 pm local time",
     },
@@ -781,7 +809,7 @@ export const copy = {
     heldWhilePaused: "Held while sending is paused",
     outOfApplications: {
       title: "Out of Applications.",
-      copy: "Approved Applications wait for your next period or a new plan. Nothing is sent without an Application left. Ready Applications stay ready.",
+      copy: "Approved applications wait for your next billing period or a plan upgrade. Nothing sends without remaining quota.",
       choosePlan: "Choose a plan",
       seeBoard: "See Applications",
     },
@@ -798,7 +826,7 @@ export const copy = {
         title: "Paused by you.",
       },
       onboarding: {
-        copy: "Sending starts once your saved answers, forwarding and consent are in.",
+        copy: "Finish setting up your profile and email forwarding to start sending applications.",
         fix: "Finish setup",
         title: "Setup isn't finished.",
       },
@@ -850,8 +878,8 @@ export const copy = {
       title: "How is the search going?",
     },
     activity: {
-      couldNotApply: "Couldn't apply",
-      couldNotApplyAria: (company: string, title: string) => `Couldn't apply: ${company}, ${title}`,
+      couldNotApply: "Not sent",
+      couldNotApplyAria: (company: string, title: string) => `Not sent: ${company}, ${title}`,
       confirming: "Confirming",
       failedDefault: "Overture stopped before sending.",
       latest: "Latest first",
@@ -859,11 +887,11 @@ export const copy = {
       title: "Activity",
     },
     strengthen: {
-      action: "Add saved answers",
-      eyebrow: "Tier 2 · Strengthen your profile",
-      note: "Saved answers cover common questions, so each one means fewer Reviews for you.",
+      action: "Complete profile",
+      eyebrow: "Complete your profile",
+      note: "Adding saved answers lets Overture fill common questions automatically with fewer items in Review.",
       title: (missing: number) =>
-        `Add ${countWord(missing)} ${plural(missing, "saved answer", "saved answers")} from your last role`,
+        `${String(missing)} ${plural(missing, "saved answer", "saved answers")} remaining to auto-fill more applications`,
     },
     interviewsBooked: (count: number) =>
       `${String(count)} ${plural(count, "interview", "interviews")} booked`,
@@ -874,6 +902,16 @@ export const copy = {
       styleLabel: "Chart type",
       areaLabel: "Line",
       barLabel: "Bar",
+      cadenceDaily: "Daily",
+      cadenceWeekly: "Weekly",
+      applicationsLabel: (count: number) => plural(count, "application", "applications"),
+      avgDaily: (value: string) => `Avg ${value} / day`,
+      avgWeekly: (value: string) => `Avg ${value} / wk`,
+      peakLabel: (value: number, label: string) => `Peak ${String(value)} (${label})`,
+      repliesCount: (count: number) => `${String(count)} ${plural(count, "reply", "replies")}`,
+      interviewsCount: (count: number) =>
+        `${String(count)} ${plural(count, "interview", "interviews")}`,
+      vsPrior: (days: number) => `vs prior ${String(days)} days`,
       today: (count: number) => `Today ${String(count)}`,
       thisWeek: (count: number) => `This week ${String(count)}`,
       totalBadge: (count: number) => `${String(count)} sent`,
@@ -886,7 +924,7 @@ export const copy = {
     },
     needsYou: {
       title: "Needs review",
-      note: "Questions that need your answer before sending",
+      note: "Questions waiting for your answer",
       openCount: (count: number) => `${String(count)} open`,
       askedBy: (companies: string) => `Asked by ${companies}`,
       blocksApps: (count: number) =>
@@ -923,161 +961,254 @@ export const copy = {
     eyebrow: "Legal",
     lastUpdated: "Last updated 21 November 2026",
     metaSeparator: " · ",
-    effective: "Effective when the plans open to the public",
-    footerName: "Overture",
+    effective: "Effective: November 24, 2026",
+    footerName: "Overture Inc.",
     footerContact: "admin@tryoverture.com",
     footerSeparator: " · ",
     footerLinksLabel: "Legal pages",
     draftNotice:
-      "Draft for owner review, not legal advice. Billing terms take effect when the plans open to the public.",
+      "Published by Overture Inc. These terms govern use of the Overture platform and related services. Direct legal or compliance inquiries to admin@tryoverture.com.",
     termsLink: "Terms of Service",
     privacyLink: "Privacy Policy",
+    consentLink: "Application Consent",
     contactHref: "mailto:admin@tryoverture.com",
     dateLocale: "en-GB",
     terms: {
       title: "Terms of Service",
       sections: [
         {
-          heading: "Who we are",
+          heading: "1. Agreement and Contracting Entity",
           blocks: [
             {
               kind: "paragraphWithLink",
-              before: "Overture is a job-search service run by Overture. You can reach us at ",
+              before:
+                'These Terms of Service constitute a binding agreement between you and Overture Inc. ("Overture," "we," "us," or "our") governing your access to and use of the Overture web platform, application automation workflows, and related services (collectively, the "Service"). Questions regarding these Terms may be directed to ',
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
             },
-          ],
-        },
-        {
-          heading: "What Overture does",
-          blocks: [
             {
               kind: "paragraph",
-              text: "Overture finds jobs that fit what you want, prepares each application from the resume and facts you save, and sends an application only after you approve it. You can skip or edit an application before you send it.",
+              text: "By creating an account, connecting an authentication provider, uploading career materials, or submitting an application through the Service, you confirm that you are at least 18 years of age, possess the legal capacity to enter into this agreement, and accept these Terms and our Privacy Policy.",
             },
           ],
         },
         {
-          heading: "Your account",
+          heading: "2. Scope of the Service",
           blocks: [
             {
               kind: "paragraph",
-              text: "You sign in with Google, LinkedIn or an emailed link. Keep your sign-in details to yourself, and tell us if you think someone else has used your account.",
+              text: "Overture provides automated job discovery, structured resume and response extraction, tailored application preparation, and controlled application submission workflows. Overture prepares candidate submissions using the documents, preferences, and factual answers you supply and transmits an application to a third-party employer only after you authorize submission.",
+            },
+            {
+              kind: "paragraph",
+              text: "You may review, modify, or skip any prepared application before transmission. Once an application is transmitted to an employer or external applicant tracking system, Overture cannot recall or alter the submission.",
             },
           ],
         },
         {
-          heading: "Your resume and facts",
+          heading: "3. Account Registration and Security",
           blocks: [
             {
               kind: "paragraph",
-              text: "You own what you give Overture. We use it to prepare the applications you approve and for nothing else. The Privacy Policy explains how we keep it safe.",
-            },
-          ],
-        },
-        {
-          heading: "Plans and payment",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "Overture is a paid service after the free trial. The Week plan costs $9.99 and includes 50 applications over 7 days. The Month plan costs $29.99 and includes 250 applications over 30 days. Checkout shows the price in your local currency, and taxes are added where they apply. Stripe processes the payment for Overture.",
-            },
-            {
-              kind: "paragraph",
-              text: "Accounts invited during the beta keep the applications their invite included. They choose a plan when those run out.",
-            },
-          ],
-        },
-        {
-          heading: "Free trial",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "A new account can try Overture with 3 applications at no charge. The trial starts after a card is checked with Stripe: Stripe verifies the card with a temporary authorisation and does not charge it. One card gets one trial. To enforce that, we keep a keyed fingerprint of the card, not the card number, apart from your account. It is not linked to you and it survives deleting your account.",
-            },
-          ],
-        },
-        {
-          heading: "Renewal",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "The Week and Month plans are subscriptions. Each one renews automatically at the end of its period at the price you agreed, until you cancel. Every paid period issues its allowance in full: 50 applications for Week over 7 days, 250 for Month over 30 days. Unused applications do not roll over. They expire when the period ends and are never refunded.",
-            },
-            {
-              kind: "paragraph",
-              text: "If a renewal payment fails, Overture pauses preparing and sending new applications until the payment succeeds or you choose another plan. Applications already sent are not affected.",
-            },
-          ],
-        },
-        {
-          heading: "Cancelling",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "You can cancel at any time from Profile \u2192 Settings, which opens the Stripe customer portal. Cancelling stops the next renewal. Your current period keeps running to its end, and its remaining applications stay usable until then. If you move between Week and Month, the new plan starts at your next renewal, not straight away.",
-            },
-          ],
-        },
-        {
-          heading: "Refunds and failed applications",
-          blocks: [
-            {
-              kind: "paragraph",
-              text: "We do not give refunds by default, including for a period you cancel part-way through or for applications you did not use. A failed application is different: if Overture could not send an application, you are never charged for it and it never uses one of your applications. You can try it again within your allowance.",
+              text: "Access to the Service requires authentication through a supported identity provider, such as Google or LinkedIn, or through a single-use verification link sent to your registered email address. You are responsible for maintaining the confidentiality of your authentication credentials and email inbox.",
             },
             {
               kind: "paragraphWithLink",
-              before: "If you think you were charged in error, write to ",
-              after: " and we will look at it.",
+              before:
+                "You agree to provide accurate account information and to notify Overture promptly at ",
+              after: " if you suspect unauthorized access to or compromise of your account.",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
             },
           ],
         },
         {
-          heading: "What you agree to on each application",
+          heading: "4. User Content and License Grant",
           blocks: [
             {
               kind: "paragraph",
-              text: "Each application you approve records the version of the consent text you agreed to. You can read every version in Profile \u2192 Settings.",
+              text: 'You retain full ownership of all resumes, cover letters, employment histories, saved form responses, job targets, forwarded job correspondence, and other materials you submit to the Service ("User Content").',
+            },
+            {
+              kind: "paragraph",
+              text: "You grant Overture Inc. a non-exclusive, worldwide, royalty-free license solely as necessary to host, parse, structure, format, transmit, and maintain records of User Content to operate, secure, and deliver the Service at your direction.",
+            },
+            {
+              kind: "paragraph",
+              text: "You represent and warrant that all User Content is truthful, accurate, and non-misleading, and that your provision and authorized submission of User Content does not infringe any third-party intellectual property, confidentiality, or contractual obligations.",
             },
           ],
         },
         {
-          heading: "What we cannot promise",
+          heading: "5. Acceptable Use and Platform Integrity",
           blocks: [
             {
               kind: "paragraph",
-              text: "Overture cannot make an employer reply, and it does not decide who is hired. Each employer's form and rules still apply to your application.",
+              text: "You agree to use the Service strictly for lawful personal career search activities. Without limiting the foregoing, you shall not:",
+            },
+            {
+              kind: "bullets",
+              items: [
+                "Submit fabricated credentials, impersonate another individual, or provide deceptive responses to employers.",
+                "Circumvent, manipulate, or probe trial eligibility limits, payment verification mechanisms, rate limits, or security controls.",
+                "Share, resell, sublicense, or operate an account on behalf of multiple distinct applicants or commercial staffing operations without written authorization.",
+                "Decompile, reverse engineer, scrape, or interfere with the availability or integrity of Overture infrastructure.",
+              ],
             },
           ],
         },
         {
-          heading: "Suspension and ending",
+          heading: "6. Subscription Plans, Allowances, and Beta Invitations",
           blocks: [
             {
               kind: "paragraph",
-              text: "We may suspend an account that breaks these terms or puts other people at risk. You can stop using Overture at any time and delete your account from Profile \u2192 Settings.",
+              text: "Following any applicable trial or invitation allowance, continued application submissions require an active paid subscription. Overture offers recurring subscription tiers denominated in United States Dollars at checkout, with localized currency conversion and applicable transaction taxes presented prior to purchase:",
+            },
+            {
+              kind: "bullets",
+              items: [
+                "Week Plan: $9.99 per 7-day billing period, including an allowance of up to 50 submitted applications.",
+                "Month Plan: $29.99 per 30-day billing period, including an allowance of up to 250 submitted applications.",
+              ],
+            },
+            {
+              kind: "paragraph",
+              text: "Accounts provisioned through an authorized beta invitation retain the specific application allowance associated with that invitation. Upon exhaustion of that balance, transitioning to further submissions requires selecting a paid subscription plan.",
             },
           ],
         },
         {
-          heading: "Changes",
+          heading: "7. Free Trial Eligibility and Card Verification",
           blocks: [
             {
               kind: "paragraph",
-              text: "If we change these terms, we will tell you by email before the change takes effect. A change to a price applies from your next renewal.",
+              text: "Eligible new accounts may receive a complimentary trial allowance of up to 3 submitted applications. Activation of the free trial requires payment card verification processed through Stripe using a temporary authorization hold that does not result in an immediate charge.",
+            },
+            {
+              kind: "paragraph",
+              text: "Free trial eligibility is strictly limited to one trial per payment instrument. To enforce this restriction without retaining raw payment card numbers, Overture derives and stores a keyed cryptographic fingerprint of the verified card in an isolated record detached from your user account. That fingerprint persists following account deletion solely to prevent duplicate trial redemptions.",
             },
           ],
         },
         {
-          heading: "Contact",
+          heading: "8. Automatic Renewal, Expiration, and Payment Failures",
           blocks: [
+            {
+              kind: "paragraph",
+              text: "Both the Week Plan and Month Plan are auto-renewing subscriptions. Unless canceled prior to the end of the active billing period, your subscription automatically renews at the conclusion of each 7-day or 30-day cycle at the disclosed rate, and your designated payment method is charged through Stripe.",
+            },
+            {
+              kind: "paragraph",
+              text: "Each billing cycle grants a fresh allowance of 50 applications (Week Plan) or 250 applications (Month Plan). Unused application allowances expire at the close of each billing cycle, do not roll over to subsequent cycles, and carry no monetary or credit value.",
+            },
+            {
+              kind: "paragraph",
+              text: "If a scheduled renewal charge fails, Overture suspends new application preparation and transmission until payment is successfully settled or an alternative valid payment method or plan is selected. Historical records of previously submitted applications remain accessible.",
+            },
+          ],
+        },
+        {
+          heading: "9. Cancellation and Plan Modifications",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "You may cancel your subscription at any time through the billing settings inside your Profile, which launches the Stripe Customer Portal. Cancellation prevents future recurring charges at the next billing boundary; your current subscription remains active through the end of the paid period, and any remaining application allowance stays available until expiration.",
+            },
+            {
+              kind: "paragraph",
+              text: "Upgrades or switches between the Week Plan and Month Plan take effect at the start of the next billing cycle rather than mid-cycle.",
+            },
+          ],
+        },
+        {
+          heading: "10. Refunds and Failed Submission Protections",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "All subscription fees are non-refundable once charged, including for partial billing cycles, early cancellation, or unused application allowances, except where required by applicable law.",
+            },
+            {
+              kind: "paragraph",
+              text: "If Overture is unable to complete and transmit an approved application due to a system failure or unhandled employer form error, that attempt does not consume your application allowance and incurs no per-application charge, allowing you to retry or resolve the item within your active allowance.",
+            },
             {
               kind: "paragraphWithLink",
-              before: "Questions about these terms: ",
+              before: "If you believe a billing error or duplicate charge occurred, contact ",
+              after: " promptly for review.",
+              href: "mailto:admin@tryoverture.com",
+              link: "admin@tryoverture.com",
+            },
+          ],
+        },
+        {
+          heading: "11. Authorization Records",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Whenever you authorize Overture to submit an application, the Service records the timestamp and version of the terms in effect at the time of your approval.",
+            },
+          ],
+        },
+        {
+          heading: "12. Third-Party Employers and Disclaimer of Outcomes",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture acts strictly as a technical preparation and submission tool at your direction. Overture is not a staffing agency or employer, does not guarantee employer responses, interview selections, or employment offers, and has no control over external hiring criteria, assessment platforms, or third-party applicant tracking system availability.",
+            },
+            {
+              kind: "paragraph",
+              text: 'THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT, TO THE MAXIMUM EXTENT PERMITTED BY LAW.',
+            },
+          ],
+        },
+        {
+          heading: "13. Limitation of Liability",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, OVERTURE INC. AND ITS OFFICERS, DIRECTORS, EMPLOYEES, AND AFFILIATES SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF EMPLOYMENT OPPORTUNITY, DATA, OR PROFITS, ARISING OUT OF OR RELATED TO YOUR USE OF THE SERVICE.",
+            },
+            {
+              kind: "paragraph",
+              text: "IN ALL EVENTS, OVERTURE INC.'S AGGREGATE LIABILITY FOR CLAIMS ARISING UNDER THESE TERMS SHALL NOT EXCEED THE GREATER OF THE TOTAL SUBSCRIPTION FEES PAID BY YOU TO OVERTURE INC. IN THE THREE (3) MONTHS PRECEDING THE CLAIM OR ONE HUNDRED UNITED STATES DOLLARS ($100.00).",
+            },
+          ],
+        },
+        {
+          heading: "14. Suspension and Termination",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture may suspend or terminate your access immediately upon reasonable determination that you have violated these Terms, engaged in fraudulent activity, or created material operational or security risk for the Service or third parties.",
+            },
+            {
+              kind: "paragraph",
+              text: "You may terminate your account at any time by deleting your account from Account Settings, subject to survival of provisions relating to accrued payment obligations, intellectual property, disclaimers, limitations of liability, and dispute terms.",
+            },
+          ],
+        },
+        {
+          heading: "15. Amendments to Terms",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture Inc. may update these Terms from time to time to reflect legal, operational, or pricing changes. We will provide advance notice by email to your registered address before material revisions take effect. Any modification to subscription pricing applies beginning on your next renewal cycle following notice.",
+            },
+          ],
+        },
+        {
+          heading: "16. Governing Law and Notices",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "These Terms are governed by the laws of the State of Delaware, United States, without regard to conflict-of-law principles, except where mandatory consumer protection laws in your jurisdiction apply.",
+            },
+            {
+              kind: "paragraphWithLink",
+              before:
+                "Legal notices and formal inquiries under these Terms must be sent to Overture Inc. at ",
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
@@ -1090,11 +1221,12 @@ export const copy = {
       title: "Privacy Policy",
       sections: [
         {
-          heading: "Who we are",
+          heading: "1. Scope and Data Controller",
           blocks: [
             {
               kind: "paragraphWithLink",
-              before: "Overture is run by Overture. Contact us at ",
+              before:
+                'This Privacy Policy describes how Overture Inc. ("Overture," "we," "us," or "our") collects, processes, stores, and safeguards personal information in connection with the Overture platform and related services. For privacy inquiries or rights requests, contact ',
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
@@ -1102,62 +1234,75 @@ export const copy = {
           ],
         },
         {
-          heading: "What we collect",
+          heading: "2. Categories of Personal Information Collected",
           blocks: [
+            {
+              kind: "paragraph",
+              text: "Depending on how you interact with the Service, Overture Inc. collects and processes the following categories of information:",
+            },
             {
               kind: "bullets",
               items: [
-                "Your account: your email and, if you sign in with Google or LinkedIn, the name and photo that Google or LinkedIn shares.",
-                "Your resume, the facts you save, your targets and your skip list.",
-                "Your forwarding address, and the job emails you forward to it.",
-                "Application records: what was filled in, what you approved, what was sent and when.",
-                "The consent versions you agreed to, and the records needed to keep the service running and secure.",
-                "Billing records: your plan, the invoices Stripe issues, the payment status, and the last four digits and expiry of the card Stripe holds. We never store the full card number.",
+                "Account and Identity Data: Your email address and, when authenticating through Google or LinkedIn, the name and profile image authorized by your identity provider.",
+                "Career and Application Data: Uploaded resumes, cover letters, work history, structured application answers, target roles, locations, compensation preferences, and employer skip lists.",
+                "Forwarding Mailbox Data: Your assigned Overture forwarding address and job correspondence or employer updates routed to that address.",
+                "Submission and Audit Records: Prepared application payloads, user approval states, timestamps, external submission outcomes, and the specific version identifiers of authorization disclosures you accepted.",
+                "Billing and Transaction Metadata: Active subscription tier, billing period allowances, invoice records, payment status, and limited card metadata (last four digits and expiration date) returned by our payment processor. Full card numbers are never transmitted to or stored on Overture servers.",
+                "Operational and Security Telemetry: Authentication session records, rate-limiting events, diagnostic error telemetry, and security audit logs necessary to operate and protect the platform.",
               ],
             },
           ],
         },
         {
-          heading: "Why we use it",
+          heading: "3. Purposes and Legal Bases of Processing",
           blocks: [
             {
               kind: "paragraph",
-              text: "To find jobs for you, prepare and send the applications you approve, email you what you asked for (sign-in and verification links, the daily recap), take and track your payments, and keep Overture safe.",
+              text: "We process personal data solely for specified, legitimate operational purposes:",
+            },
+            {
+              kind: "bullets",
+              items: [
+                "Contractual Performance: Authenticating your account, matching job opportunities, drafting tailored application responses, and transmitting applications you approve.",
+                "User Communications: Delivering authentication links, email verification notices, critical status alerts, and requested application recaps.",
+                "Billing and Fraud Prevention: Processing subscription charges, administering trial eligibility via decoupled card fingerprinting, and satisfying tax and financial accounting obligations.",
+                "Security and Reliability: Enforcing access controls, diagnosing technical failures, preventing abuse, and maintaining service availability.",
+              ],
             },
           ],
         },
         {
-          heading: "Who processes it for us",
+          heading: "4. Automated Matching and Submission Workflows",
           blocks: [
             {
               kind: "paragraph",
-              text: "These companies process data on our behalf. We update this list when it changes.",
+              text: "Overture uses automated parsing, job-matching algorithms, language generation, and controlled browser automation solely to prepare applications from your verified profile information and execute submissions you approve. When you approve an application, the relevant personal details and documents are transmitted directly to the prospective employer's designated application portal, where they become subject to that employer's privacy practices.",
+            },
+          ],
+        },
+        {
+          heading: "5. Infrastructure Categories and Sub-Processors",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture Inc. does not sell personal information or permit third-party model providers to train foundational models on your private career documents. To deliver the Service securely and reliably, we engage vetted service providers subject to strict contractual confidentiality, data protection, and security obligations across the following operational functions:",
+            },
+            {
+              kind: "bullets",
+              items: [
+                "Cloud Infrastructure and Encrypted Storage: Managed compute hosting, relational database storage, DNS routing, object storage, and background job orchestration.",
+                "Automated Browser Execution Environments: Isolated cloud execution environments used exclusively to load and complete employer application forms at your direction.",
+                "Language Model Inference Services: Enterprise API inference endpoints configured without data-retention for training to normalize job descriptions and draft application answers from your saved facts.",
+                "Transactional Messaging and Security Telemetry: Email delivery gateways, operational health monitoring, error diagnostics, and immutable security audit pipelines.",
+              ],
             },
             {
               kind: "processors",
-              companyLabel: "Company",
-              doesLabel: "What it does for Overture",
+              companyLabel: "Payment Sub-Processor",
+              doesLabel: "Role and Responsibilities",
               rows: [
-                { does: "Hosts the Overture app and its database.", name: "Fly" },
                 {
-                  does: "Domain name service, email, file storage and background workers.",
-                  name: "Cloudflare",
-                },
-                {
-                  does: "Cloud browsers that fill in job application forms for you.",
-                  name: "Browser Use",
-                },
-                {
-                  does: "A backup cloud browser, used only when the main one cannot be used.",
-                  name: "Kernel",
-                },
-                {
-                  does: "The language model that matches jobs and drafts answers from your facts.",
-                  name: "Anthropic",
-                },
-                { does: "Service logs and health monitoring.", name: "Grafana Cloud" },
-                {
-                  does: "Takes payments, holds the card details and calculates tax.",
+                  does: "Processes subscription payments, executes temporary trial card verification authorizations, issues invoices, calculates applicable taxes, and provides the self-service customer billing portal.",
                   name: "Stripe",
                 },
               ],
@@ -1165,51 +1310,196 @@ export const copy = {
           ],
         },
         {
-          heading: "Payments and card details",
+          heading: "6. Payment Processing and Trial Card Fingerprinting",
           blocks: [
             {
               kind: "paragraph",
-              text: "Stripe processes payments for Overture as a sub-processor; Overture is the seller and is responsible for the taxes on each charge. Card details go from your browser to Stripe and are never stored by Overture. Stripe sends us the plan, the invoices, the payment status and the last four digits and expiry of the card, and we keep those records to run your allowance, answer questions and meet tax and accounting rules.",
+              text: "Stripe processes payments on behalf of Overture Inc. as a payment sub-processor, while Overture Inc. remains the merchant of record responsible for applicable taxes. Payment card numbers flow directly from your browser to Stripe over encrypted channels and never touch Overture infrastructure. Stripe provides Overture with subscription status, invoice identifiers, and the card's last four digits and expiration date for account administration and accounting compliance.",
             },
             {
               kind: "paragraph",
-              text: "For the free trial we store a keyed fingerprint of the card, not the card number. It is not linked to your account and it survives deleting your account, so one card cannot start a second trial.",
+              text: "To enforce our limit of one free trial per payment instrument without storing raw card numbers, Overture generates and retains a keyed cryptographic fingerprint of the verified card. That fingerprint is stored independently of your user profile, contains no direct identity attributes, and survives account deletion solely to prevent repeat trial abuse.",
             },
           ],
         },
         {
-          heading: "How we keep it safe",
+          heading: "7. Security Safeguards and Access Governance",
           blocks: [
             {
               kind: "paragraph",
-              text: "Your files and answers are encrypted. Access to your data is limited to what the service needs, and every time staff open a user's data it is recorded.",
+              text: "Overture implements administrative, technical, and organizational safeguards proportionate to the sensitivity of career and identity records. Stored resumes, documents, and saved form answers are encrypted at rest, transport channels are secured with TLS, production access follows least-privilege controls, and any authorized staff access to user records is logged for security auditing.",
             },
           ],
         },
         {
-          heading: "Your rights",
+          heading: "8. Data Retention and Account Deletion",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "We retain your account profile, career materials, and application history for as long as your account remains active. You may delete your account at any time from Account Settings, which permanently removes your user profile, career documents, and associated billing metadata from Overture systems.",
+            },
+            {
+              kind: "paragraph",
+              text: "Following deletion, Stripe retains statutory invoice and transaction records required for tax, audit, and regulatory compliance, and Overture retains the non-identifiable keyed trial card fingerprint described in Section 6.",
+            },
+          ],
+        },
+        {
+          heading: "9. Your Privacy Rights and Data Controls",
           blocks: [
             {
               kind: "paragraphWithLink",
               before:
-                "You can export your data and delete your account from Profile \u2192 Settings. For anything else, write to ",
+                "You can export a copy of your account data or initiate self-service account deletion directly inside Account Settings. To request access, correction, restriction, or additional information regarding your personal data under applicable privacy laws, write to ",
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
             },
+          ],
+        },
+        {
+          heading: "10. International Data Transfers",
+          blocks: [
             {
               kind: "paragraph",
-              text: "Deleting your account removes your billing records with it. Stripe keeps the invoices it must keep for tax and accounting. The keyed card fingerprint used for the free trial is not linked to you and is kept so the same card cannot start a second trial.",
+              text: "Overture operates cloud infrastructure primarily in the United States and allied jurisdictions. Where personal data is transferred across borders, we rely on appropriate contractual safeguards and encryption controls to maintain consistent protection standards.",
             },
           ],
         },
         {
-          heading: "Changes and contact",
+          heading: "11. Children's Privacy",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "The Service is intended exclusively for adults seeking employment and is not directed to individuals under the age of 18. We do not knowingly collect personal data from minors.",
+            },
+          ],
+        },
+        {
+          heading: "12. Changes to This Privacy Policy",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "We may revise this Privacy Policy periodically to reflect changes in our data practices, operational architecture, or legal obligations. When material changes occur, we will notify you by email at your registered address prior to the effective date of the update.",
+            },
+          ],
+        },
+        {
+          heading: "13. Contact Information",
           blocks: [
             {
               kind: "paragraphWithLink",
               before:
-                "If we change this policy, we will tell you by email before the change takes effect. Questions: ",
+                "Questions, complaints, or privacy requests concerning this Privacy Policy may be sent to Overture Inc. at ",
+              after: ".",
+              href: "mailto:admin@tryoverture.com",
+              link: "admin@tryoverture.com",
+            },
+          ],
+        },
+      ],
+    },
+    consent: {
+      title: "Application Consent",
+      sections: [
+        {
+          heading: "1. Scope of Authorization and Directed Agency",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: 'By accepting this Application Consent and Submission Authorization ("Consent"), you expressly authorize Overture Inc. ("Overture," "we," "us," or "our") to act as your technical preparation and directed submission agent for employment applications you select or approve through the Overture platform.',
+            },
+            {
+              kind: "paragraph",
+              text: "This authorization covers matching open roles against your stated preferences, structuring candidate profile records, drafting role-specific responses and cover letters from your supplied materials, populating employer application fields, and transmitting completed applications solely following your explicit authorization.",
+            },
+          ],
+        },
+        {
+          heading: "2. Source Materials, Saved Facts, and Candidate Accuracy",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Overture prepares application payloads strictly from your uploaded resume PDF, configured targeting criteria, saved application answers, and explicit responses entered in Review Queue. You represent and warrant that all statements, employment dates, educational credentials, work authorization disclosures, contact details, and portfolio links provided to the Service are truthful, complete, and legally accurate.",
+            },
+            {
+              kind: "paragraph",
+              text: "When an external employer portal presents a required question not covered by your saved answers, Overture pauses preparation and routes the prompt to Review Queue rather than fabricating unverified eligibility or compliance disclosures.",
+            },
+          ],
+        },
+        {
+          heading: "3. Pre-Submission Review, Approval, and Irrevocability",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Before any prepared application is transmitted to a third-party employer, it is held in your Approval Queue so you may inspect generated prose, verify field values, adjust answers, or skip the role entirely. Clicking Approve grants affirmative, binding instruction to transmit the reviewed payload.",
+            },
+            {
+              kind: "paragraph",
+              text: "You acknowledge that once an approved submission is transmitted to an employer or external applicant tracking system, Overture cannot modify, intercept, or withdraw the submitted materials from that employer's systems.",
+            },
+          ],
+        },
+        {
+          heading: "4. Automated Form Completion, Browser Execution, and Verification Codes",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "To execute authorized submissions across third-party career portals, you consent to Overture interacting with employer forms through automated network requests and isolated browser execution sessions, including uploading your unmodified resume PDF and transmitting your approved form values.",
+            },
+            {
+              kind: "paragraph",
+              text: "Where an external portal challenges a submission with a one-time security or email verification passcode delivered to your personal inbox or forwarding address, Overture may suspend submission briefly so you can supply that verification code directly in the workspace to complete transmission.",
+            },
+          ],
+        },
+        {
+          heading: "5. Dedicated Job-Search Email Alias and Employer Correspondence",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Unless you elect in Account Settings to submit using your personal sign-in email address, Overture assigns and enters your dedicated Overture job-search email address on employer application forms so confirmations, recruiter replies, interview invitations, and assessment requests route cleanly into your Overture Inbox and Calendar.",
+            },
+            {
+              kind: "paragraph",
+              text: "When email forwarding from your personal inbox is configured, inbound employer messages matching supported hiring-system headers or forwarded threads are processed and indexed within your workspace strictly for your application tracking.",
+            },
+          ],
+        },
+        {
+          heading: "6. Trial Allowances, Subscription Deductions, and Failed Attempts",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "Confirmed submissions count against your complimentary three-application trial allowance (following card verification) or your active paid Week Plan (50 applications per 7-day cycle) or Month Plan (250 applications per 30-day cycle) in accordance with our Terms of Service.",
+            },
+            {
+              kind: "paragraph",
+              text: "If Overture encounters a system fault, network timeout, or unhandled portal failure prior to confirmed receipt by the employer, your application allowance is not consumed, and the item remains available for retry or withdrawal inside your Application Tracker.",
+            },
+          ],
+        },
+        {
+          heading: "7. Versioned Authorization Records and Audit Trail",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "To maintain verifiable compliance and submission integrity, Overture records the exact version identifier and acceptance timestamp of this Consent alongside each authorized application snapshot. Prior consent versions remain archived and immutable for historical auditability even when updated versions are published.",
+            },
+          ],
+        },
+        {
+          heading: "8. Revocation, Account Suspension, and Contact Information",
+          blocks: [
+            {
+              kind: "paragraph",
+              text: "You may pause automated preparation at any time from Home, withdraw queued applications prior to transmission, or permanently delete your account in Account Settings. Revoking authorization or deleting your account terminates future submissions without affecting applications previously transmitted to employers.",
+            },
+            {
+              kind: "paragraphWithLink",
+              before:
+                "Questions, compliance inquiries, or requests regarding this Application Consent may be sent to Overture Inc. at ",
               after: ".",
               href: "mailto:admin@tryoverture.com",
               link: "admin@tryoverture.com",
@@ -1219,27 +1509,10 @@ export const copy = {
       ],
     },
   },
-  consent: {
-    eyebrow: "Consent",
-    versionLabel: (version: string) => `Version ${version}`,
-    title: "What you agree to",
-    readNoticeBefore: "I have read the ",
-    readNoticeBetween: " and the ",
-    readNoticeEnd: ".",
-    agree: "I agree to this.",
-    footnote:
-      "Overture records the version you agreed to with each application you approve. Earlier versions stay on record, unchanged.",
-    accepted: (version: string, date: string) => `Version ${version} agreed ${date}.`,
-    acceptFailed: "That did not save. Do not start yet; try again in a moment.",
-    unavailable: "The consent text could not be loaded.",
-    earlierHeading: "Earlier versions",
-    earlierNote: "Every version stays on record exactly as it was published.",
-    publishedOn: (date: string) => `Published ${date}`,
-  },
   calendar: {
     lead: "Track interviews, check-ins, and milestones by day.",
-    titlePlain: "Job",
-    titleItalic: "Calendar",
+    titlePlain: "Calendar",
+    titleItalic: "",
     addEvent: "Add event",
     addEventTitle: "New event",
     eventTitleLabel: "Event title",
@@ -1253,6 +1526,9 @@ export const copy = {
       interview: "Interview",
       reminder: "Reminder",
     },
+    customEventCount: (count: number) =>
+      `${String(count)} custom ${count === 1 ? "event" : "events"}`,
+    itemCount: (count: number) => `${String(count)} ${count === 1 ? "item" : "items"}`,
     saveEvent: "Save event",
     cancelEvent: "Cancel",
     deleteEventAria: "Remove event",
@@ -1312,18 +1588,18 @@ export const copy = {
       reason === null ? "Closed" : `Closed · ${reason.replaceAll("_", " ")}`,
   },
   inbox: {
-    accountNote: "Mail from other senders stays in your own mailbox and never reaches Overture.",
+    accountNote: "Other mail stays in your personal inbox and never reaches Overture.",
     addressBody:
-      "Overture gives you one private address. You add one filter in your own mailbox that forwards only mail from employers' hiring systems to it. Overture reads replies and confirmations from there.",
+      "Overture gives you a private forwarding address. Add a filter in your own mailbox to forward only employer hiring messages there so Overture can track replies and confirmations.",
     addressCopied: "Address copied",
     addressCopy: "Copy address",
-    addressCopyFailed: "Copying did not work here. Select the address and copy it by hand.",
+    addressCopyFailed: "Could not copy automatically. Select the address and copy it manually.",
     addressEyebrow: "Your forwarding address",
     addressFilterGuide: "Read the filter guide",
     addressFilterHeading: "Add the",
     addressFilterItalic: "filter.",
     addressFilterSkip:
-      "Skipping this is fine. Without the filter, you paste each verification code by hand within ten minutes. The first forwarded mail shows here and on Profile.",
+      "This step is optional. Without a filter, you can paste verification codes manually within 10 minutes.",
     addressHowLink: "Email forwarding settings",
     addressLead:
       "Employer replies, interview invites, and confirmations forwarded from your email.",
@@ -1335,12 +1611,19 @@ export const copy = {
     filterUnread: "Unread",
     forwardingSectionTitle: "Email forwarding",
     forwardingSectionLead:
-      "Forward employer hiring emails to your private Overture address so replies and interview invites appear automatically in your Inbox.",
-    titleItalic: "Inbox",
-    titlePlain: "Employer ",
-    addressNeverType: "Never type this address on an application form.",
+      "Forward employer emails to your private Overture address so replies and interview invites appear in your Inbox.",
+    titleItalic: "",
+    titlePlain: "Inbox",
+    classifications: {
+      ack: "Confirmation",
+      interview: "Interview",
+      offer: "Offer",
+      rejection: "Closed",
+      screening: "Screening",
+    },
+    addressNeverType: "Do not enter this address on job forms.",
     addressNeverTypeDetail:
-      "Forms get your assigned apply address, or your personal email if you chose that in Profile.",
+      "Forms automatically use your job-search address (or personal email if enabled).",
     addressTitleItalic: "address.",
     addressTitlePlain: "Forwarding ",
     addressWhatHeading: "What it",
@@ -1353,9 +1636,9 @@ export const copy = {
     unverifiedLabel: "Couldn't verify sender",
     download: "Download",
     emptyBody:
-      "Once your ATS mail is forwarded, employer replies and confirmations appear here. Until then there is nothing to read.",
+      "Employer replies and application confirmations appear here once forwarding is set up.",
     emptyNote:
-      "Forwarding is optional. Without it, a verification code is asked for as a paste, within ten minutes.",
+      "Forwarding is optional. Without it, you can paste verification codes manually within 10 minutes.",
     emptyPrimary: "Set up forwarding",
     emptySecondary: "Read the filter guide",
     emptyTitleItalic: "yet.",
@@ -1388,39 +1671,38 @@ export const copy = {
     unreadAria: "Unread",
     unreadCount: (count: number) => `Unread ${String(count)}`,
     unverifiedNote:
-      "This mail did not pass the sender check, so Overture does not act on it: no codes are read from it and no stage moves. Check who sent it before you click a link or reply.",
+      "This email failed sender verification, so Overture will not act on it automatically. Verify the sender before clicking links or replying.",
     unverifiedTitle: "Couldn't verify sender.",
+    clearSearch: "Clear search",
+    messageCount: (count: number) => `${String(count)} ${count === 1 ? "message" : "messages"}`,
+    verifiedLabel: "Verified sender",
   },
   settings: {
     title: "Settings",
-    lead: "Your account, and how Overture works for you",
+    lead: "Your account and application preferences",
     titlePlain: "Your",
     titleItalic: "Settings",
-    limitsHeadingPlain: "How Overture",
-    limitsHeadingItalic: "paces itself",
-    limitsIntro:
-      "The same limits for everyone, so your applications arrive one at a time and never as a burst.",
-    limitDaily: "10 a day",
-    limitDailyDetail:
-      "At most ten applications a day. The count starts again at your local midnight.",
-    limitWindow: "08:00 to 20:00",
-    limitWindowDetail:
-      "Applications go out only in daytime, your local time, at least 20 minutes apart.",
+    limitsHeadingPlain: "Sending",
+    limitsHeadingItalic: "limits",
+    limitsIntro: "Shared pacing limits keep applications spaced naturally.",
+    limitDaily: "Up to 10 per day",
+    limitDailyDetail: "Daily count resets at midnight in your local time zone.",
+    limitWindow: "8:00 AM to 8:00 PM",
+    limitWindowDetail: "Applications send during daytime hours, spaced at least 20 minutes apart.",
     limitCompany: "1 company per 30 days",
-    limitCompanyDetail:
-      "After an application to a company, Overture waits 30 days before applying there again.",
-    limitRepost: "60 days",
-    limitRepostDetail: "A role that is reposted is skipped for 60 days after you applied to it.",
-    limitsFixed: "These limits are fixed. Nothing here can be turned up, down or off.",
+    limitCompanyDetail: "Overture waits 30 days before applying to the same company again.",
+    limitRepost: "60-day repost cooldown",
+    limitRepostDetail: "Reposted roles are skipped for 60 days after you apply.",
+    limitsFixed: "Fixed for all accounts.",
     timeLanguageHeading: "Time and language",
     timeZoneLabel: "Time zone",
     timeZoneHint:
-      "Your day, the 08:00 to 20:00 window and the midnight reset all follow this. A change takes effect after 7 days.",
+      "Controls your daytime sending window and midnight reset. Updates take effect after 7 days.",
     timeZoneToronto: "Eastern Time (Toronto)",
     timeZoneVancouver: "Pacific Time (Vancouver)",
     timeZoneBerlin: "Central European Time (Berlin)",
     languagesHeading: "Posting languages",
-    languagesHint: "Overture only applies to postings written in these languages.",
+    languagesHint: "Only match job postings written in these languages.",
     languagesGroup: "Posting languages",
     languageEnglish: "English",
     languageFrench: "French",
@@ -1428,39 +1710,38 @@ export const copy = {
     accountHeading: "Account and sign-in",
     providerNote: "Linking works when both sign-ins share the same verified email.",
     jobSearchAddress: "Job-search address",
-    addressDetail: "Created with your mailbox in a later milestone. Read-only then.",
     applyEmailHeading: "Job-search email",
     applyEmailLead:
-      "Applications use the apply address Overture assigned you, so replies and verification codes reach your Inbox.",
+      "Forms use your Overture address by default so employer replies and codes land in your Inbox.",
     applyEmailAliasLabel: "Apply address",
-    applyEmailAliasNote: "Assigned by Overture. Read-only, and never your sign-in email.",
-    applyEmailNotAssigned: "Assigned when inbound mail is switched on.",
+    applyEmailAliasNote: "Managed by Overture. Separate from your sign-in email.",
+    applyEmailNotAssigned: "Assigned once inbound email is active.",
     applyEmailToggle: "Use my personal email instead",
     applyEmailToggleDetail: (email: string) =>
-      `New applications will put ${email} on the form. Verification codes then arrive in your own inbox and you paste them by hand.`,
+      `New applications will use ${email} on forms. You will need to paste verification codes from your own inbox.`,
     applyEmailUsingAlias: (address: string) =>
-      `New applications put ${address} on the form, and codes are captured for you.`,
+      `New applications use ${address} and capture verification codes automatically.`,
     applyEmailUsingPersonal: (email: string) =>
-      `New applications put ${email} on the form, and you paste each verification code.`,
+      `New applications use ${email}. Paste verification codes when prompted.`,
     applyEmailLoading: "Reading your apply address…",
     applyEmailLoadFailed: "We could not read your apply address. Try again.",
     applyEmailRetry: "Try again",
     applyEmailSavedAlias: "Switched back to your apply address.",
     applyEmailSavedPersonal: "Switched to your personal email.",
-    applyEmailSaveError: "We could not save that change. Try again.",
+    applyEmailSaveError: "Could not save that change. Try again.",
     magicLinkTitle: "Magic link",
-    magicLinkDetail: "Always available. We email a one-time link, good for 15 minutes.",
+    magicLinkDetail: "Always available. We email a one-time link valid for 15 minutes.",
     exportRow: "Export your data",
     exportRowDetail:
-      "A zip of your profile, saved answers, Applications, messages, resume and attachments.",
+      "Download a zip archive of your profile, saved answers, applications, messages, resume, and attachments.",
     exportRowButton: "Export data",
     signOutThis: "Sign out of this device",
-    signOutThisDetail: "Ends this session in this browser. Your other devices stay signed in.",
+    signOutThisDetail: "Signs you out in this browser only.",
     signOutThisButton: "Sign out",
     signOutThisPending: "Signing out…",
-    signOutThisError: "We could not sign you out. Check your connection and try again.",
+    signOutThisError: "Could not sign out. Check your connection and try again.",
     signOutAll: "Sign out all devices",
-    signOutAllDetail: "Ends every session except this one.",
+    signOutAllDetail: "Signs you out on all other browsers and devices.",
     signOutAllButton: "Sign out everywhere",
     signedOutMessage: "You are signed out on your other devices.",
     signedOutToasts: "Signed out everywhere",
@@ -1471,7 +1752,7 @@ export const copy = {
       lead: "A copy of what Overture holds about you",
       requestHeading: "Request",
       requestBody:
-        "A zip of your profile, saved answers, Applications, messages, resume and attachments. The download link is valid for 24 hours.",
+        "A zip of your profile, saved answers, applications, messages, resume, and attachments. Download links remain valid for 24 hours.",
       requestButton: "Request export",
       preparingHeading: "Preparing",
       preparingPill: "Preparing",
@@ -1486,11 +1767,10 @@ export const copy = {
       expiredHeading: "Expired",
       expiredPill: "Expired",
       expiredBody: (expired: string) =>
-        `The link expired on ${expired}. Nothing was lost: request a new export to get a fresh link.`,
+        `The link expired on ${expired}. Request a new export to get a fresh link.`,
       expiredButton: "Request export",
       failedHeading: "Request",
-      failedBody:
-        "This export could not be prepared. Nothing was lost: request a new export to try again.",
+      failedBody: "This export could not be prepared. Request a new export to try again.",
       replacedNote: "The earlier export was replaced, so its link no longer works.",
       downloading: "Preparing the download",
       downloadReady: "Export downloaded",
@@ -1513,65 +1793,73 @@ export const copy = {
           "",
         ].join("\n"),
     },
-    legalHeading: "Terms and privacy",
+    legalHeading: "Terms, privacy, and consent",
     legalTerms: "Terms of Service",
-    legalTermsDetail: "What Overture promises, and what you agree to.",
+    legalTermsDetail: "Rules and terms for using Overture.",
     legalPrivacy: "Privacy Policy",
-    legalPrivacyDetail: "What Overture collects, who processes it and your rights.",
-    legalConsent: "Consent",
-    legalConsentVersion: (version: string) => `The version you agreed to: ${version}`,
-    legalConsentAccepted: (date: string) => `Agreed ${date}`,
-    legalConsentNotAgreed: "Not agreed yet.",
-    legalConsentRead: "Read the consent",
+    legalPrivacyDetail: "How your data is collected, used, and protected.",
+    legalConsent: "Application Consent",
+    legalConsentDetail: "Authorization terms for preparing and submitting applications.",
     legalOpen: "Open",
-    legalSeparator: " · ",
     notificationsHeading: "Notifications",
-    notificationsIntro:
-      "Turn the recap email or a kind of push off. Each switch takes effect at once.",
+    notificationsIntro: "Choose which email and push alerts you receive. Changes save right away.",
     recapTitle: "Recap email",
     recapDetail:
-      "Yesterday’s applications sent, replies, open Reviews and check-ins, once each morning.",
+      "A morning summary of applications sent, employer replies, open reviews, and check-ins.",
     pushTitle: "Push notifications",
-    pushIntro: "A push opens the app. Nothing is approved by a push or a link.",
+    pushIntro: "Push alerts open the app. Nothing is ever approved from a notification.",
     pushKinds: {
       ready: { label: "Ready to approve", detail: "Applications waiting for your approval." },
       review: { label: "New Review", detail: "A question that needs your answer." },
-      reply: { label: "Employer reply", detail: "An employer wrote back to an application." },
-      interview: { label: "Interview", detail: "An interview was detected." },
-      offer: { label: "Offer", detail: "An offer was detected." },
-      stage_move: { label: "Card moved", detail: "A card moved for you, with Undo." },
-      code_wait: { label: "Code to paste", detail: "A verification code is waiting." },
-      paused: { label: "Paused", detail: "Overture paused, with the reason." },
-      failed: { label: "Couldn’t apply", detail: "Applications that could not be sent." },
+      reply: { label: "Employer reply", detail: "An employer replied to an application." },
+      interview: { label: "Interview", detail: "An employer invited you to interview." },
+      offer: { label: "Offer", detail: "An employer sent an offer." },
+      stage_move: {
+        label: "Card moved",
+        detail: "An application moved automatically on your Tracker.",
+      },
+      code_wait: { label: "Code to paste", detail: "An application needs a verification code." },
+      paused: { label: "Paused", detail: "Application sending was paused." },
+      failed: { label: "Couldn’t apply", detail: "An application could not be submitted." },
     },
-    notificationsSaveError: "We could not save that. Check your connection and try again.",
+    notificationsSaveError: "Could not save that change. Check your connection and try again.",
+    notificationsSavedToast: "Notification preferences saved.",
+    timeLanguageSavedToast: "Time & language preferences saved.",
+    timeZonePlaceholder: "IANA time zone (e.g. America/New_York)",
+    forwardingSavedToast: "Forwarding preference updated.",
+    calendarFeedCreatedToast: "Calendar feed link created. Copy it now.",
+    calendarFeedRotatedToast: "Calendar feed link rotated. Copy the new link now.",
+    calendarFeedRevokedToast: "Calendar feed turned off.",
+    sectionGroups: {
+      mailboxHeading: "Mail & applications",
+      preferencesHeading: "Preferences & feeds",
+      securityHeading: "Security & sessions",
+    },
     calendarFeedHeading: "Calendar feed",
     calendarFeedIntro:
-      "Subscribe in Google Calendar, Apple Calendar or Outlook to see your applications, Stage moves, Check-ins and interviews there.",
+      "Subscribe in Google Calendar, Apple Calendar, or Outlook to see applications, interviews, and check-ins.",
     calendarFeedPrivacy:
-      "Anyone with the link can read the job titles, employers and Stages in it. Mail text and answers are never included.",
-    calendarFeedOff: "The feed is off. Turn it on to get a link for your calendar app.",
-    calendarFeedOn:
-      "The feed is on. For your privacy, the link is shown only when it is made or rotated.",
+      "Anyone with this URL can see job titles, companies, and stages. Message text and answers are never included.",
+    calendarFeedOff: "Turn on the feed to generate a private subscription link.",
+    calendarFeedOn: "Feed is active. For security, the link is only shown when created or rotated.",
     calendarFeedTurnOn: "Turn on feed",
     calendarFeedUrlLabel: "Calendar feed link",
-    calendarFeedNewLink: "Copy the link now. You won’t see it again; rotate to get a new one.",
+    calendarFeedNewLink: "Copy this link now. It will not be shown again unless you rotate it.",
     calendarFeedHowTo: "In your calendar app, add a calendar from a URL and paste the link.",
     calendarFeedCopy: "Copy link",
     calendarFeedCopied: "Link copied",
-    calendarFeedCopyFailed: "We could not copy the link. Select it and copy it by hand.",
+    calendarFeedCopyFailed: "Could not copy automatically. Select the link and copy it manually.",
     calendarFeedRotate: "Rotate link",
-    calendarFeedRotateDetail: "Makes a new link. The current one stops working at once.",
+    calendarFeedRotateDetail: "Generates a new link and immediately disables the old one.",
     calendarFeedRevoke: "Turn off feed",
-    calendarFeedRevokeDetail:
-      "Calendar apps stop getting updates, and the link stops working at once.",
+    calendarFeedRevokeDetail: "Stops calendar updates and immediately disables the current link.",
     calendarFeedPending: "Saving…",
-    calendarFeedSaveError: "We could not save that. Check your connection and try again.",
-    calendarFeedLoadError: "We could not load your calendar feed settings.",
+    calendarFeedSaveError: "Could not save that change. Check your connection and try again.",
+    calendarFeedLoadError: "Could not load calendar feed settings.",
     dangerHeading: "Danger zone",
     deleteTitle: "Delete account",
     deleteDetail:
-      "Permanently deletes your saved answers, letters and applications. This can’t be undone.",
+      "Permanently deletes your saved answers, cover letters, and application history. This cannot be undone.",
     deleteButton: "Delete account",
   },
   settingsBilling: {
@@ -1581,8 +1869,8 @@ export const copy = {
     planHeading: "Your plan",
     weekPlan: "Week plan",
     monthPlan: "Month plan",
-    weekDetail: "$9.99 for 50 Applications over 7 days. Renews every 7 days.",
-    monthDetail: "$29.99 for 250 Applications over 30 days. Renews every 30 days.",
+    weekDetail: "50 tailored applications every 7 days ($9.99/week).",
+    monthDetail: "250 tailored applications every 30 days ($29.99/month).",
     leftHeading: "Applications left",
     leftOf: (total: number) => `of ${String(total)} this period`,
     renews: "Renews",
@@ -1591,12 +1879,12 @@ export const copy = {
     choosePlan: "Choose a plan",
     switchHeading: "Switch plan",
     switchDetail: (date: string) =>
-      `A switch takes effect at renewal on ${date}. Applications you have not used expire at renewal. Plans do not roll over.`,
+      `A switch takes effect at renewal on ${date}, and unused applications expire when the current period ends.`,
     switchToWeek: "Switch to Week at renewal",
     switchToMonth: "Switch to Month at renewal",
     cancelHeading: "Cancel plan",
     cancelDetail: (date: string) =>
-      `Your plan stays on until ${date}. Overture prepares no Applications after that. Applications you have not used expire then.`,
+      `Your plan stays active until ${date}, after which Overture stops preparing new Applications and any unused balance expires.`,
     cancelButton: "Cancel at period end",
     paymentHeading: "Payment and invoices",
     paymentDetail: "Stripe hosts this page. Overture never sees your full card number.",
@@ -1607,6 +1895,28 @@ export const copy = {
     pricingLink: "See what each plan includes",
     portalError: "Stripe did not open. Try again in a moment.",
     billingOff: "Plan changes are not set up on this server yet.",
+    usageSummary: (left: number, total: number) => `${String(left)} of ${String(total)} remaining`,
+  },
+  profileWorkspace: {
+    resumeUploadedToast: "Resume uploaded and saved.",
+    resumePdfOnlyError: "Please select a PDF file.",
+    resumeNoFileLabel: "No resume on file",
+    resumeUploadHint: "Upload a PDF up to 10 MB",
+    resumeOpenLabel: "Open PDF",
+    pdfPreviewLabel: "PDF preview",
+    pdfPreviewEmpty: "No resume uploaded yet",
+    pdfPreviewTitle: "Resume PDF preview",
+    pdfPreviewFallbackTitle: "Resume PDF",
+    targetsSavedToast: "Job preferences saved.",
+    skipListSavedToast: "Skip list updated.",
+    skipListEmpty: "No skipped companies yet.",
+    factSavedToast: (label: string) => `Saved ${label}.`,
+    factReusedHint: "Reused on future applications",
+    factScopeAccount: "Account",
+    tier1Empty: "No Tier 1 facts saved yet. Upload a resume or save a fact to populate.",
+    addressNotAssigned: "Not assigned yet",
+    profileHubEmpty: "No completed items to show yet.",
+    readOnlyActionLabel: "Open Tracker",
   },
   billingPlans: {
     backLink: "Plan and billing",
@@ -1619,8 +1929,19 @@ export const copy = {
     monthPrice: "$29.99",
     weekUnit: "/ week",
     monthUnit: "/ month",
-    weekDetail: "50 Applications over 7 days. Renews every 7 days. No rollover.",
-    monthDetail: "250 Applications over 30 days. Renews every 30 days. No rollover.",
+    weekBullets: [
+      "50 tailored applications every 7 days",
+      "Renews automatically each week, cancel anytime",
+      "Unused applications expire at renewal",
+      "Failed submissions never count against your limit",
+    ],
+    monthBullets: [
+      "250 tailored applications every 30 days",
+      "40% lower cost per application than the Week plan",
+      "Renews automatically each month, cancel anytime",
+      "Unused applications expire at renewal",
+      "Failed submissions never count against your limit",
+    ],
     chooseWeek: "Choose Week",
     chooseMonth: "Choose Month",
     startError: "Checkout did not open. Try again in a moment.",
@@ -1648,7 +1969,6 @@ export const copy = {
       legal: "Terms and privacy",
       billing: "Plan and billing",
     },
-    unavailable: "This page arrives with its own ticket.",
     viewLog: "View log",
     supportAccessRow: "Support access log",
     supportAccessDetail:
@@ -1660,7 +1980,8 @@ export const copy = {
       lead: "Every time support opened your account, and why",
       headingPlain: "Your",
       headingItalic: "entries",
-      intro: "Each row is one Reveal of your data, with the date and the reason given.",
+      intro:
+        "Logs every time Overture support accesses your account, including the date and reason.",
       actions: {
         "reveal.open": "Opened your account",
         "reveal.view": "Viewed your data",
@@ -1668,10 +1989,10 @@ export const copy = {
         "reveal.expired": "Access expired",
       },
       reason: "Reason",
-      emptyTitle: "No access so far.",
-      emptyBody: "Nobody on the support team has opened your account.",
-      errorTitle: "The log did not load.",
-      errorBody: "Nothing was changed. Try again in a moment.",
+      emptyTitle: "No support access recorded",
+      emptyBody: "No one on the support team has accessed your account.",
+      errorTitle: "Could not load the access log.",
+      errorBody: "Try again in a moment.",
       retry: "Try again",
     },
   },
@@ -1750,17 +2071,10 @@ export const copy = {
     },
     resume: {
       sub: "One resume, sent exactly as you uploaded it.",
-      previewLabel: "Preview of the first page of Maya_Okafor_Resume.pdf",
-      pageOf: "Page 1 of 2",
       chip: "PDF",
-      fileName: "Maya_Okafor_Resume.pdf",
-      meta: "Uploaded 3 Nov 2026 · 2 pages · 184 KB",
       strongNote: "Sent unchanged with every application",
-      note: "Overture attaches this exact file. It never edits, restyles or rewrites it. Only the cover letter is written for each role, and it only says what your resume supports.",
-      sentWith: "Sent with",
-      sentWithValue: "22 applications",
+      note: "Overture attaches your exact PDF without editing or reformatting it. Only the cover letter is tailored for each role using details from your resume.",
       factsRead: "Saved answers read from it",
-      factsReadValue: "9, each confirmed by you",
       replace: "Replace resume",
       download: "Download PDF",
       newFileNote:
@@ -1768,96 +2082,27 @@ export const copy = {
     },
     facts: {
       intro:
-        "What Overture answers forms with, word for word. A question it cannot answer from these becomes a Review.",
+        "Answers Overture uses to fill out application forms. Questions not covered here go to Review.",
       titlePlain: "Your",
       titleItalic: "saved answers",
       tiersLabel: "Saved answers by tier",
       tier1: {
         label: "Tier 1 · Needed to start",
-        count: "17 of 17",
-        note: "Confirmed before Overture began. Eight of seventeen are shown; open any saved answer to edit it.",
-        foot: "Nine more Tier 1 saved answers are confirmed: phone, city, country, LinkedIn, years of experience, degree, employment history, education history and languages.",
-        rows: [
-          {
-            kind: "serif",
-            label: "Legal name",
-            value: "Maya Okafor",
-            chip: "fromResume",
-            note: "Used in 22 applications",
-            action: "edit",
-          },
-          {
-            label: "Job-search address",
-            kind: "mono",
-            value: "maya.okafor@mail.tryoverture.com",
-            chip: "assigned",
-            note: "Read-only. Never your sign-in email.",
-            action: "read-only",
-          },
-          {
-            kind: "serif",
-            label: "Work authorization",
-            value: "Canada: authorized. United States: not authorized.",
-            chip: "typed",
-            note: "Used in 23 applications",
-            action: "edit",
-          },
-          {
-            kind: "serif",
-            label: "Sponsorship required",
-            value: "Canada: no. United States: yes.",
-            chip: "typed",
-            note: "Used in 21 applications",
-            action: "edit",
-          },
-          {
-            kind: "serif",
-            label: "Notice period",
-            value: "Two weeks",
-            chip: "typed",
-            note: "Used in 9 applications",
-            action: "edit",
-          },
-          {
-            kind: "serif",
-            label: "Salary expectation",
-            value: "USD 110,000 to 128,000",
-            chip: "typed",
-            note: "Used in 12 applications",
-            action: "edit",
-          },
-          {
-            kind: "serif",
-            label: "Willing to relocate",
-            value: "Yes, within Canada",
-            chip: "typed",
-            note: "Used in 9 applications",
-            action: "edit",
-          },
-          {
-            kind: "serif",
-            label: "Current employer",
-            value: "Brightwave Analytics",
-            chip: "fromResume",
-            note: "Also on your Skip list",
-            action: "edit",
-          },
-        ],
+        note: "Core facts reused across application forms. Open any saved answer to edit it.",
+        foot: "Every saved Tier 1 fact synced to your account is shown above.",
       },
       tier2: {
         label: "Tier 2 · Strengthen your profile",
-        count: "2 of 5",
       },
       tier3: {
         label: "Tier 3 · Learned from Reviews",
-        count: "3",
       },
       strengthen: {
         empty:
-          "Nothing to add right now. When a question cannot be answered from your saved answers, it appears here with the number of queued applications it unlocks.",
+          "You are all caught up. Optional questions will appear here when they can unblock queued applications.",
         unlocks: (count: number) =>
           `Unlocks ${String(count)} queued ${plural(count, "application", "applications")}`,
-        note: "Optional. Each saved answer covers common questions, so the queued applications waiting on them can go ahead.",
+        note: "Optional questions that unblock multiple queued applications at once.",
         foot: "Saved answers you add here are used on every application that asks.",
         save: "Save answer",
         saveAria: (label: string) => `Save answer: ${label}`,
@@ -1870,21 +2115,16 @@ export const copy = {
       edit: "Edit",
       aria: (label: string, action: string) => `${action}: ${label}`,
       remove: (label: string) => `Remove ${label}`,
+      showMore: (count: number) => `Show ${String(count)} more`,
+      showLess: "Show fewer",
     },
     targets: {
-      intro: "Overture only scores postings that fit these.",
+      intro: "Overture matches and scores openings based on these criteria.",
       titlePlain: "Your",
       titleItalic: "targets",
-      matchedValue: "213",
       matchedLabel: "open postings match your targets",
-      matchedNote:
-        "Counted live from the postings Overture has read. Change a target and the number changes with it.",
+      matchedNote: "Updated live from open postings. Adjust any filter below to update the count.",
       roles: "Roles",
-      role: "Platform Engineer",
-      role2: "Senior Backend Engineer",
-      role3: "DevOps Engineer",
-      role4: "Infrastructure Engineer",
-      role5: "Site Reliability Engineer",
       addRole: "Add role",
       categoryLabel: "Category",
       categoryAny: "All categories",
@@ -1893,88 +2133,69 @@ export const copy = {
       pickRoleClear: "Clear role",
       add: "Add",
       locations: "Locations",
-      location1: "Toronto, ON",
-      location2: "Vancouver, BC",
-      location3: "Austin, TX",
       addLocation: "Add location",
       workplace: "Workplace",
       remote: "Remote",
-      remoteOn: true,
       hybrid: "Hybrid",
-      hybridOn: true,
       onSite: "On-site",
-      onSiteOn: false,
       seniority: "Seniority",
       mid: "Mid",
-      midOn: false,
       senior: "Senior",
-      seniorOn: true,
       staff: "Staff",
-      staffOn: true,
       lead: "Lead",
-      leadOn: false,
       employmentType: "Employment type",
       fullTime: "Full-time",
-      fullTimeOn: true,
       partTime: "Part-time",
-      partTimeOn: false,
       contract: "Contract",
-      contractOn: false,
       currencyLabel: "Currency",
       currencyCad: "CAD",
       currencyUsd: "USD",
       salaryFloor: "Salary floor",
-      salaryFloorValue: "140,000",
       salaryFloorUnit: "a year",
       salaryFloorNote: "Postings that state a lower salary are skipped.",
       submit: "Save targets",
-      submitNote: "Changes apply to postings Overture finds from now on.",
+      submitNote: "Applies to new postings found from now on.",
     },
     skipList: {
       intro:
-        "Companies Overture never applies to. Your current employer is on it from the start, read from your resume.",
+        "Companies Overture will never apply to. Your current employer is included automatically from your resume.",
       titlePlain: "Skip",
       titleItalic: "list",
-      company1: "Brightwave Analytics",
       currentEmployer: "Current employer",
-      company2: "Quillon Payments",
-      company3: "Fenwick & Marsh",
       addLabel: "Add a company to skip",
       add: "Add",
-      note: "A skipped company never gets an application, even when a posting there is a Strong match. Your current employer stays on the list.",
+      note: "Skipped companies never receive applications, even for strong matches.",
     },
     address: {
-      intro:
-        "The email on every application form. Employers reply to it, and the replies appear in your Inbox.",
+      intro: "Used on application forms so employer replies land in your Inbox.",
       titlePlain: "Job-search",
       titleItalic: "address",
-      alias: "maya.okafor@mail.tryoverture.com",
       chip: "Read-only",
       onEveryForm: "On every form",
-      onEveryFormValue: "This address. Your sign-in email is never used.",
+      onEveryFormValue: "Used on forms instead of your sign-in email.",
       repliesTo: "Replies go to",
       repliesToValue: "Your Inbox",
-      changeNote: "The address can only be changed through support.",
+      changeNote: "Contact support if you need to change this address.",
     },
   },
   ready: {
-    titlePlain: "Ready to",
-    titleItalic: "send",
+    titlePlain: "Approval",
+    titleItalic: "Queue",
     lead: "Overture filled these in. Nothing is sent until you press Send.",
     dateLocale: "en-US",
     summary: (ready: number, approved: number) =>
       `${String(ready)} ready · ${String(approved)} approved`,
     readyCountTitle: (count: number) =>
       `${plural(count, "application", "applications")} ready to send`,
-    readyHeroNote: "Review answers below or approve the ones with saved answers only.",
+    readyHeroNote: "Review each application below or approve saved-only applications together.",
     approveSavedOnly: (count: number) =>
       `Approve ${String(count)} saved-only ${plural(count, "application", "applications")}`,
-    batchGuardNote:
-      "Newly written answers are approved one card at a time below, so you can read each one.",
+    batchGuardNote: "Applications with drafted answers require individual review before approval.",
+    approve: "Approve",
     approveNext: "Approve & Next",
     approveLast: "Approve",
     writtenTitle: "Written for this role",
-    savedTitle: "From your saved answers",
+    savedTitle: "Prepared answers",
     savedOnlyNote:
       "All answers come directly from your saved answers. Nothing here was newly written.",
     showSaved: (count: number) =>
@@ -1984,6 +2205,10 @@ export const copy = {
     showSavedAria: (count: number, company: string) =>
       `Show ${String(count)} saved ${plural(count, "answer", "answers")}, ${company}`,
     resumeFile: "Resume",
+    cardInfo: (hasResume: boolean) =>
+      hasResume
+        ? "Unchanged resume PDF · Stops if the form changes · No charge if sending fails"
+        : "Stops if the form changes · No charge if sending fails",
     reassurance: (hasResume: boolean) =>
       [
         ...(hasResume ? ["Using your unchanged resume PDF"] : []),
@@ -1991,19 +2216,59 @@ export const copy = {
         "No charge if sending fails",
       ].join(" · "),
     shortcuts: "A approve · E edit · S skip",
+    queueAria: "Applications ready to send",
+    queueTitle: "Queue",
     summaryAria: "Ready summary",
-    showMore: (remaining: number) => `Show more (${String(remaining)} left)`,
+    table: {
+      actionsCol: "Actions",
+      answersCount: (count: number, hasResume: boolean) =>
+        hasResume
+          ? `${String(count)} ${plural(count, "answer", "answers")} · PDF`
+          : `${String(count)} ${plural(count, "answer", "answers")}`,
+      applicationCol: "Application",
+      drawerAria: "Inspect prepared application",
+      footerHint: "Select a row to inspect prepared answers",
+      inspect: "Inspect",
+      inspectAria: (company: string) => `Inspect ${company}`,
+      matchCol: "Match",
+      preparedCol: "Prepared",
+    },
+    metrics: {
+      allCaughtUp: "All caught up",
+      dailyLimitLabel: "Daily limit",
+      draftedAndSaved: (drafted: number, savedOnly: number) =>
+        `${String(drafted)} drafted · ${String(savedOnly)} saved-only`,
+      individualReview: "Review each drafted answer below",
+      nextScheduled: (time: string) => `Next · ${time}`,
+      noneQueued: "None queued",
+      pendingLabel: "Pending approval",
+      pendingUnit: (count: number) => plural(count, "application", "applications"),
+      queuedForWindow: "Queued for next window",
+      savedOnlyCount: (count: number) => `${String(count)} saved-only`,
+      scheduledLabel: "Scheduled",
+      scheduledUnit: "queued",
+    },
+    carousel: {
+      nextAria: "Next application",
+      position: (current: number, total: number) => `${String(current)} of ${String(total)}`,
+      previousAria: "Previous application",
+      selectAria: (company: string, index: number, total: number) =>
+        `${company} (${String(index)} of ${String(total)})`,
+    },
+    showAllScheduled: (count: number) => `Show all ${String(count)}`,
+    showFewerScheduled: "Show fewer",
+    showMore: (remaining: number) => `Show more (${String(remaining)} more)`,
     showLess: "Show less",
     confirm: {
-      singleTitle: (company: string) => `Send application to ${company}?`,
+      singleTitle: (company: string) => `Approve application to ${company}`,
       singleBody:
-        "Once sent, this application cannot be recalled. Overture will submit your saved resume and prepared answers directly to the employer.",
-      singleAction: "Yes, send application",
+        "This application will be queued for submission using your prepared answers and resume. Scheduled applications cannot be cancelled once confirmed.",
+      singleAction: "Approve & schedule",
       allTitle: (count: number) =>
-        `Send ${String(count)} ${plural(count, "application", "applications")} now?`,
+        `Approve ${String(count)} saved-only ${plural(count, "application", "applications")}`,
       allBody:
-        "Once sent, these applications cannot be recalled. Overture will submit each tailored application directly to the employers.",
-      allAction: (count: number) => `Yes, send all (${String(count)})`,
+        "These saved-only applications will be queued for submission in order. Scheduled applications cannot be cancelled once confirmed.",
+      allAction: (count: number) => `Approve & schedule (${String(count)})`,
     },
     dot: "·",
     sentToday: (sent: number, cap: number) => `${String(sent)} of ${String(cap)} sent today`,
@@ -2013,8 +2278,8 @@ export const copy = {
     skip: "Skip",
     undo: "Undo",
     approved: "Approved",
-    sendingAround: (time: string) => `Approved · sending around ${time}`,
-    approvedNoSlot: "Approved",
+    sendingAround: (time: string) => `Scheduled · ${time}`,
+    approvedNoSlot: "Queued",
     formChangedNote: "If the form has changed when we send, we stop and ask you first.",
     noPlan: "The plan is not ready to show yet.",
     edit: "Edit",
@@ -2058,7 +2323,7 @@ export const copy = {
     },
     scheduledTitle: "Scheduled to send",
     scheduledCount: (count: number) => `${String(count)} scheduled`,
-    scheduledNote: "Queued for the next sending window. Undo to move back to Ready.",
+    scheduledNote: "Queued for the next sending window.",
     scheduledUndo: "Undo",
     approvedSectionAria: "Scheduled applications",
   },
@@ -2067,15 +2332,14 @@ export const copy = {
       `${capitalize(countWord(applications))} ${applications === 1 ? "application" : "applications"} across six stages`,
     titlePlain: "Your",
     titleItalic: "Board",
-    trackerTitlePlain: "Your",
-    trackerTitleItalic: "Applications",
+    trackerTitlePlain: "Application",
+    trackerTitleItalic: "Tracker",
     trackerLead: "Every application from match to decision. Drag cards across stages to update.",
     listLead: "Every application from match to decision, newest update first.",
     views: {
       label: "Application views",
       board: "Board",
       list: "List",
-      calendar: "Calendar",
     },
     lanes: {
       applied: "Applied",
@@ -2100,6 +2364,10 @@ export const copy = {
     list: {
       label: "Applications list",
       all: "All",
+      applicationCol: "Application",
+      matchCol: "Match",
+      stageCol: "Stage",
+      updatedCol: "Updated",
       emptyTitle: "No applications here yet",
       emptyBody: "When Overture finds a match, it appears here and on the board.",
       count: (count: number) => `${String(count)} ${count === 1 ? "application" : "applications"}`,
@@ -2114,6 +2382,7 @@ export const copy = {
     showLess: "Show less",
     locationFallback: "Location not listed",
     matchPercent: (score: number) => `${String(score)}% match`,
+    matchShort: (score: number) => `${String(score)}%`,
     matchCardTitle: (score: number) => `${String(score)}% resume match`,
     matchStrongFit: "Strong fit",
     matchStandardFit: "Match score",
@@ -2230,7 +2499,7 @@ export const copy = {
       fileTitle: "The file is sent as-is",
       fileTitleMismatch: "The stored file is not the file that was sent",
       fileBody:
-        "The employer receives these bytes and nothing else. Overture never opens the PDF for editing; its text and file name stay as you uploaded them.",
+        "Employers receive your exact PDF file. Overture never edits or reformats your resume.",
       fileMatch: "The stored copy matches the bytes that were sent.",
       fileMismatch:
         "The stored copy does not match the bytes that were sent. Check this before you rely on it.",
@@ -2238,7 +2507,7 @@ export const copy = {
       fileKb: (kilobytes: number) => `${String(kilobytes)} KB`,
       traceTitle: "What Overture wrote from your saved answers",
       traceBody:
-        "Each sentence and answer names where it came from. Nothing was added to make the fit look better.",
+        "Each sentence and answer traces back to your resume or saved answers. Nothing is fabricated.",
       traceEmpty: "Nothing was written for this application.",
       traceLetter: "Cover letter",
       traceAnswers: "Answers",
@@ -2256,8 +2525,8 @@ export const copy = {
           title: "The PDF was not restyled or regenerated",
         },
         nothing_invented: {
-          body: "Every line above traces to a saved answer, a resume line or your own words.",
-          title: "No saved answer was invented",
+          body: "Every line above traces to a saved answer, a resume line, or your own words.",
+          title: "Nothing fabricated",
         },
       },
     },
@@ -2277,8 +2546,47 @@ export const copy = {
   review: {
     lead: (questions: number, applications: number) =>
       `${capitalize(countWord(questions))} ${plural(questions, "question", "questions")}, ${countWord(applications)} ${plural(applications, "application", "applications")} waiting`,
-    title: "Your",
-    titleAccent: "Review",
+    title: "Review",
+    titleAccent: "Queue",
+    summaryAria: "Review summary",
+    queueAria: "Questions waiting for your answer",
+    queueTitle: "Questions",
+    drawerAria: "Answer review question",
+    previousAria: "Previous question",
+    nextAria: "Next question",
+    position: (current: number, total: number) => `${String(current)} of ${String(total)}`,
+    unlocksBadge: (count: number) =>
+      `Unlocks ${String(count)} ${plural(count, "application", "applications")}`,
+    unlocksShort: (count: number) =>
+      `${String(count)} ${plural(count, "application", "applications")}`,
+    rolesCount: (count: number) => `${String(count)} ${plural(count, "role", "roles")}`,
+    appsShort: (count: number) => `${String(count)} ${plural(count, "app", "apps")}`,
+    showMoreApps: (remaining: number) => `Show more (${String(remaining)} more)`,
+    showLessApps: "Show less",
+    dismissedToast: "Question dismissed.",
+    metrics: {
+      allClear: "All clear",
+      answeredLabel: "Answered",
+      blockedLabel: "Blocked applications",
+      blockedUnit: "waiting",
+      companiesCount: (count: number) =>
+        `${String(count)} ${plural(count, "company", "companies")}`,
+      openLabel: "Open questions",
+      openUnit: "pending",
+      queueLabel: "Review queue",
+      remainingCount: (count: number) => `${String(count)} left`,
+      topicsCount: (count: number) => `${String(count)} ${plural(count, "topic", "topics")}`,
+      zeroQueue: "0 / 0",
+    },
+    table: {
+      actionsCol: "Actions",
+      answer: "Answer",
+      footerHint: "Click any question to answer and unblock its applications.",
+      questionCol: "Question",
+      shortcuts: "←/→ step · 1–9 pick option · Esc close",
+      topicCol: "Topic",
+      unlocksCol: "Unblocks",
+    },
     filters: "Filter questions",
     all: "All",
     groupMany: "Unlocks 3 or more jobs",
@@ -2287,7 +2595,7 @@ export const copy = {
     listNote: "Answer a missing field once to unblock every matching application.",
     blockedBadge: "Blocked",
     blockedRolesTitle: (count: number) =>
-      count === 1 ? "Blocked application" : `Blocked applications (${String(count)})`,
+      count === 1 ? "Waiting application" : `Waiting applications (${String(count)})`,
     missingFieldEyebrow: "Missing field",
     missingPrefix: (prompt: string) => `Missing: ${prompt}`,
     moreRoles: (count: number) => `+${String(count)} more`,
@@ -2299,7 +2607,7 @@ export const copy = {
     questionOf: (position: number, total: number) =>
       `Question ${String(position)} of ${String(total)}`,
     detailNote: (count: number) =>
-      `${capitalize(countWord(count))} postings ask this. Nothing on your resume or in your saved answers says either way, so Overture will not guess.`,
+      `${capitalize(countWord(count))} postings ask this question. Overture will not guess without a saved answer.`,
     unlocks: "Unlocks",
     jobs: "jobs",
     askedBy: "Asked by",
@@ -2314,9 +2622,9 @@ export const copy = {
     checkboxYes: "Yes",
     yourAnswer: "Your answer",
     answerNote:
-      "Nothing on the posting answers this for you. Your answer is what gets sent. The switch decides whether Overture may reuse it in future applications.",
+      "Your answer will be used on these applications. Use the switch below to save it for future forms.",
     saveForFuture: {
-      label: "Save to my saved answers for future applications",
+      label: "Save for future applications",
       reusableNote: "This is a reusable answer, so it is on by default.",
       specificNote: "This answer looks specific to these applications, so it is off by default.",
       onNote: "Overture reuses this answer whenever another form asks the same thing.",
@@ -2358,24 +2666,30 @@ export const copy = {
   },
   onboarding: {
     stepsLabel: "Setup steps",
-    setupTitlePlain: "Set up your",
-    setupTitleItalic: "workspace",
-    setupIntro:
-      "Four quick steps: add your resume and preferences, see real openings, then begin your first three applications. Progress saves automatically.",
-    steps: ["Sign in", "Resume & preferences", "Your matches", "Trial card"],
+    setupTitlePlain: "Set up your workspace",
+    setupIntro: "Upload your resume, pick your target roles, and see real openings matched to you.",
+    steps: ["Resume", "Preferences", "Matches"],
     stepPosition: (step: number, total: number) => `Step ${String(step)} of ${String(total)}`,
     stepSeparator: "·",
-    resumeTitlePlain: "Upload your",
-    resumeTitleItalic: "resume",
-    resumeIntro: "Upload a single PDF resume. Overture submits your exact file unchanged.",
+    resumeTitlePlain: "Upload your resume",
+    resumeIntro:
+      "Upload a single PDF resume. Overture uses it to match openings and submits your exact file unchanged.",
     resumeLabel: "Resume",
     resumeRequired: "Required to continue",
+    resumeDropTitle: "Drop your PDF resume here",
     resumeChoose: "Upload a PDF",
     resumeDropHint: "PDF format only, up to 10 MB.",
+    resumeScanningTitle: "Scanning your resume",
+    resumeScanningSteps: [
+      "Reading document layout and text",
+      "Extracting work history and skills",
+      "Checking current employer protection",
+      "Preparing your match profile",
+    ],
     resumeReplace: "Replace file",
     resumeKept: "Stored unchanged. Employers receive the exact PDF file you upload.",
     resumeReads:
-      "We extract your contact details, work history, and skills so you can verify them in the next step.",
+      "We read your contact details, work history, and skills so forms fill accurately later.",
     resumeUnreadable:
       "This PDF could not be parsed automatically. Upload another file, or continue and add the details from Profile → Saved answers after setup.",
     resumeUploadFailed: "Upload failed. Please select a valid PDF under 10 MB.",
@@ -2388,50 +2702,55 @@ export const copy = {
     uploadedToday: "Uploaded today",
     uploadedYesterday: "Uploaded yesterday",
     uploadedOn: (date: string) => `Uploaded ${date}`,
-    wantTitlePlain: "Job",
-    wantTitleItalic: "preferences",
+    backToWorkspace: "Back to workspace",
+    wantTitlePlain: "Job preferences",
     wantIntro:
-      "Pick the roles, locations and salary you want. Overture matches open roles against them, and you can change them anytime in Profile.",
+      "Choose your category, roles, locations, and work setup. You can update these anytime in Profile.",
     atLeastOne: "Select at least one",
     roles: "Roles",
     categoryLabel: "Category",
-    categoryAny: "All categories",
-    pickRoleLabel: "Add a specific role",
-    pickRolePlaceholder: "Search roles",
-    pickRoleClear: "Clear role",
+    categoryPlaceholder: "Choose a category",
+    categorySearchPlaceholder: "Search categories...",
+    categoryEmpty: "No matching categories.",
+    rolesInCategory: (category: string) => `Roles in ${category}`,
+    selectedRolesLabel: (count: number) => `Selected roles (${String(count)})`,
+    otherSelectedRolesLabel: (count: number) => `Also selected (${String(count)})`,
     cities: "Locations",
-    addLocationPlaceholder: "Add a city or region",
+    locationsPlaceholder: "Choose locations",
+    locationsSearchPlaceholder: "Search cities or remote regions...",
+    locationsEmpty: "No matching locations.",
+    locationsSelectedCount: (count: number) =>
+      `${String(count)} ${plural(count, "location", "locations")} selected`,
     workplace: "Workplace",
     seniority: "Seniority",
+    optionalToggle: "Optional: minimum salary & blocked employers",
+    optionalSavedBadge: (count: number) => `${String(count)} saved`,
     salaryFloor: "Minimum salary",
     salaryFloorUnit: "per year",
     salaryFloorNote: "Overture skips roles that advertise a salary below this.",
     companiesToSkip: "Blocked employers",
     addCompanyPlaceholder: "Add a company to block",
     companiesToSkipNote: "Overture never prepares or sends an application to a blocked employer.",
-    matchedLabel: "open positions match your preferences",
-    matchedNote: "Live estimate based on current openings. Updates as you refine your selections.",
     add: "Add",
     back: "Back",
     continue: "Continue",
+    seeMatches: "See my matches",
     currentEmployer: "Current employer",
     currentEmployerHint: "We will never apply here.",
     currentEmployerPlaceholder: "Add your current employer",
     currentEmployerSaved: (name: string) => `${name} · never applied to`,
     matches: {
-      titlePlain: "Your",
-      titleItalic: "matches",
+      titlePlain: "Your matches",
       intro:
-        "These are real openings from the job catalog that fit your resume and preferences. Pick the three you want Overture to prepare.",
+        "Real open roles ranked against your resume and preferences. Start with your top 3 for free.",
       loadFailed: "Your matches could not load. Try again in a moment.",
       emptyTitle: "No open roles match those preferences yet",
       emptyBody:
         "Nothing is charged. Widen a role, place, workplace or salary floor and the matches update right away.",
       adjustFilters: "Adjust preferences",
       poolCount: (count: number) =>
-        `${String(count)} open ${plural(count, "opening", "openings")} fit`,
-      pickNote: (picked: number, limit: number) =>
-        `Pick ${String(limit)} jobs. ${String(picked)} of ${String(limit)} selected.`,
+        `${String(count)} matching ${plural(count, "role", "roles")} found`,
+      pickNote: (picked: number, limit: number) => `${String(picked)} of ${String(limit)} selected`,
       pickOne: (title: string, company: string) => `Select ${title} at ${company}`,
       selectedOne: (title: string, company: string) => `Selected ${title} at ${company}`,
       selected: "Selected",
@@ -2442,8 +2761,15 @@ export const copy = {
       noSalary: "Salary not listed",
       remote: "Remote",
       strong: "Strong match",
-      continue: (limit: number) => `Prepare & review my first ${String(limit)} free applications`,
-      limitNote: "One free trial per card. You approve every application before it is sent.",
+      moreMatchesTitle: (count: number) =>
+        `+${String(count)} more matched ${plural(count, "opening", "openings")} waiting in your workspace`,
+      moreMatchesBody:
+        "Unlock your full match list as soon as you start your first 3 free applications.",
+      applyFree: (count: number) =>
+        count === 1
+          ? "Apply to this role for free"
+          : `Apply to these ${String(count)} roles for free`,
+      continueFallback: "Continue",
       saveFailed: "That selection did not save. Try again.",
       prepareFailed: "Overture could not prepare those applications. Try again.",
       back: "Back to preferences",
@@ -2468,36 +2794,38 @@ export const copy = {
       inbox: "Open your Inbox",
     },
     trial: {
-      eyebrow: "Overture · Set up",
-      titlePlain: "Verify a card for your",
-      titleItalic: "three",
-      titleRest: "free Applications",
-      kicker: "One free trial per card",
-      stepPill: "Step 4 of 4",
-      verifyTitle: "Verify a card",
-      intro:
-        "Stripe checks the card. Nothing is charged for the trial. Once it is verified, Overture prepares your first 3 free Applications and you approve each one before it is sent. One free trial per card.",
+      modalTitle: "Your first 3 applications are free",
+      modalBadge: "Free trial",
+      modalReassurance:
+        "Nothing is charged, and you will never be billed unless you choose to upgrade later.",
+      modalReason:
+        "We ask for a quick card confirmation through Stripe to keep free trials to one per person.",
+      modalSelectedSummary: (count: number) =>
+        `${String(count)} ${plural(count, "role", "roles")} ready to prepare`,
       consentBefore: "I agree to the ",
-      consentTerms: "Terms",
-      consentBetween: " and the ",
+      consentTerms: "Terms of Service",
+      consentComma: ", ",
       consentPrivacy: "Privacy Policy",
-      consentAfter:
-        ". Overture prepares these three applications from my resume and preferences, and sends only the ones I approve.",
-      consentRequired: "Agree to the Terms and Privacy Policy to continue.",
-      verifyButton: "Verify card",
-      verifying: "Checking the card…",
-      backButton: "Back",
-      declinedTitle: "Card declined",
+      consentAnd: ", and ",
+      consentLink: "Application Consent",
+      consentPeriod: ".",
+      consentRequired: "Check the box above to agree and continue.",
+      ctaButton: "Continue for free",
+      ctaReturnButton: "Start my 3 free applications",
+      ctaBusy: "Confirming…",
+      stripeNote: "Secured by Stripe · No charge",
+      returnReadyNote: "Card confirmed. Click below to start your first 3 free applications.",
+      declinedTitle: "Card could not be confirmed",
       declinedBody:
-        "Your bank declined this card. Nothing was charged and no Applications were prepared. Try another card, or choose a plan.",
+        "Your bank declined this card. Nothing was charged and no applications were started. Try another card or pick a plan.",
       tryAnother: "Try another card",
-      usedHeading: "Card already used",
+      usedHeading: "Free trial already used",
       usedTitle: "Trial used",
       usedBody:
-        "This card has already had its free trial. Choose a plan to prepare Applications with it, or use another card.",
+        "This card has already been used for a free trial. Choose a plan to continue, or use another card.",
       choosePlan: "Choose a plan",
       anotherCard: "Use another card",
-      loadFailed: "The card check did not go through. Try again in a moment.",
+      loadFailed: "Could not complete the confirmation. Try again in a moment.",
     },
     signOut: "Sign out",
     saveFailed: "That did not save. Try again.",
@@ -2516,12 +2844,18 @@ export const copy = {
       loadFailed: "Notifications could not be loaded right now.",
       today: "Today",
       earlier: "Earlier",
+      todayRegion: "Notifications from today",
+      earlierRegion: "Notifications from earlier",
       markAll: "Mark all as read",
+      allMarkedRead: "All notifications marked as read.",
+      stageMoveUndone: "Stage move undone.",
+      showMore: (count: number) => `Show ${String(count)} more`,
+      showLess: "Show fewer",
       emptyTitle: "Nothing yet.",
       emptyBody:
-        "Overture will list the daily recap, replies, interviews and anything that needs you here, as each push arrives.",
+        "Daily recaps, employer replies, interview invites, and updates needing your attention appear here.",
       emptyAction: "Notification settings",
-      footer: "Each push you turn on is listed here too. Turn kinds on or off in ",
+      footer: "Manage email and alert preferences in ",
       settings: "Settings",
       unread: "Unread",
       actions: {
@@ -2534,7 +2868,7 @@ export const copy = {
         ready: "Open Ready",
         reply: "Open Inbox",
         review: "Open Review",
-        stage_move: "Undo",
+        stage_move: "Open Tracker",
       },
     },
     push: {
@@ -2560,7 +2894,7 @@ export const copy = {
       title: (stage: string) => `Moved to ${stage}`,
       body: (input: { company: string; title: string; stage: string }) =>
         `${input.title} at ${input.company} is now in ${input.stage}. Open Applications to undo it.`,
-      url: "/applications",
+      url: "/tracker",
       kind: "stage_move",
     },
     review: {
@@ -2605,7 +2939,7 @@ export const copy = {
       title: "Closed as No response",
       body: (input: { company: string; title: string }) =>
         `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open Applications to undo it.`,
-      url: "/applications",
+      url: "/tracker",
       kind: "stage_move",
     },
   },
@@ -2675,7 +3009,7 @@ export const copy = {
   },
   notFound: {
     title: "Not found",
-    body: "This page does not exist yet.",
+    body: "The page you are looking for does not exist.",
   },
   search: {
     title: "Search",
