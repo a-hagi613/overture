@@ -1,5 +1,5 @@
-import type { Review } from "../lib/review-api";
 import type { ReviewCategory } from "../../shared/questions";
+import type { Review } from "../lib/review-api";
 
 import { copy } from "../../shared/copy.ts";
 import { REVIEW_CATEGORIES } from "../../shared/questions.ts";
@@ -25,8 +25,7 @@ export function ReviewFilters({
   return (
     <fieldset
       aria-label={copy.review.filters}
-      className="m-0 flex min-h-9 min-w-0 flex-nowrap gap-2 overflow-x-auto border-0 p-0 max-md:-mx-4 max-md:px-4 max-md:py-0.5 md:flex-wrap md:overflow-visible"
-      data-scroll-region
+      className="m-0 flex min-w-0 flex-wrap items-center gap-1.5 border-0 p-0"
     >
       {FILTER_ORDER.flatMap((category) => {
         const count = counts.get(category) ?? 0;
@@ -41,12 +40,12 @@ export function ReviewFilters({
         return [
           <Button
             ariaPressed={selected}
-            className="flex-none rounded-full"
+            className="flex-none rounded-md max-md:min-h-11"
             key={category}
             onClick={() => {
               onChange(category);
             }}
-            size="sm"
+            size="xs"
             variant={selected ? "primary" : "outline"}
           >
             <span>{label}</span>

@@ -61,6 +61,7 @@ const targets: Target[] = routerPaths.map((path) => ({
 const shellPaths = new Set([
   "/home",
   "/ready",
+  "/tracker",
   "/applications",
   "/board",
   "/review",
@@ -242,11 +243,11 @@ async function expectSidebarFixed(page: Page, path: string, width: number) {
   expect(["fixed", "sticky"], `${path} aside position`).toContain(metrics.position);
 
   if (width < 1280) {
-    expect(metrics.width, `${path} rail width`).toBe(76);
-  } else if (width >= 1700) {
-    expect(metrics.width, `${path} sidebar width`).toBe(296);
+    expect(metrics.width, `${path} rail width`).toBe(72);
+  } else if (width >= 1536) {
+    expect(metrics.width, `${path} sidebar width`).toBe(288);
   } else {
-    expect(metrics.width, `${path} sidebar width`).toBe(268);
+    expect(metrics.width, `${path} sidebar width`).toBe(256);
   }
 
   if (metrics.bottomLinkBottom !== null) {

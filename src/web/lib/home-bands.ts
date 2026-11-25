@@ -26,7 +26,6 @@ export function isHomeRangeKey(value: string): value is HomeRangeKey {
 }
 
 export interface HomeActionState {
-  checkIns: readonly unknown[];
   failed: readonly unknown[];
   readyCount: number;
   reviewTotal: number;
@@ -39,7 +38,6 @@ export interface HomeActionState {
  */
 export function homeActionStateOf(home: HomeResponse) {
   const state: HomeActionState = {
-    checkIns: home.checkIns,
     failed: home.activity.failed,
     readyCount: home.ready.ready,
     reviewTotal: home.reviews.total,
@@ -50,8 +48,7 @@ export function homeActionStateOf(home: HomeResponse) {
 
 /**
  * True when Home has nothing waiting for the person: no verification code to
- * paste, no open Review, no Ready approval, no due check-in and no recent
- * failure. The chart, Inbox and schedule are context, not actions.
+ * paste, no open Review, no Ready approval and no recent failure.
  * @param state The action counts.
  * @param codeWaitAsking Whether a code-wait card is asking for a paste.
  * @returns Whether the All caught up state applies.
@@ -61,7 +58,6 @@ export function isAllCaughtUp(state: HomeActionState, codeWaitAsking: boolean) {
     !codeWaitAsking &&
     state.reviewTotal === 0 &&
     state.readyCount === 0 &&
-    state.checkIns.length === 0 &&
     state.failed.length === 0
   );
 }

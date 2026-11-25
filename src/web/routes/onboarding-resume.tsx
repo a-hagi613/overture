@@ -1,10 +1,16 @@
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+import { copy } from "../../shared/copy.ts";
 import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingResumeCard } from "../components/onboarding-resume-card.tsx";
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
+import type { OnboardingState } from "../lib/onboarding-api.ts";
 import { useOnboardingState, useUploadOnboardingResume } from "../lib/onboarding-api.ts";
+import { resumeFileUrl } from "../lib/profile-api.ts";
+
+type ResumeView = NonNullable<OnboardingState["resume"]>;
 
 export function OnboardingResumePage() {
   const navigate = useNavigate();
@@ -13,9 +19,27 @@ export function OnboardingResumePage() {
   const suffix = preview ? "?preview=1" : "";
   const { data: state, isFetching, isPending, refetch } = useOnboardingState();
   const upload = useUploadOnboardingResume();
+  const [previewResume, setPreviewResume] = useState<ResumeView | null>(null);
+  const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null);
+
+  useEffect(
+    () => () => {
+      if (localPdfUrl !== null) {
+        URL.revokeObjectURL(localPdfUrl);
+      }
+    },
+    [localPdfUrl],
+  );
+
+  const effectiveResume = preview
+    ? (previewResume ?? state?.resume ?? null)
+    : (state?.resume ?? null);
+
+  const resolvedPdfUrl =
+    localPdfUrl ?? (effectiveResume === null ? null : resumeFileUrl(effectiveResume.id));
 
   return (
-    <OnboardingShell step={2}>
+    <OnboardingShell step={1}>
       {state === undefined ? (
         <OnboardingLoadState
           onRetry={() => {
@@ -26,21 +50,41 @@ export function OnboardingResumePage() {
         />
       ) : (
         <OnboardingResumeCard
-          backTo="/home"
+          backLabel={preview ? copy.onboarding.backToWorkspace : copy.onboarding.back}
+          backTo={preview ? "/home" : undefined}
           error={upload.isError && !preview}
           onContinue={async () => {
             await navigate(`/onboarding/targets${suffix}`);
           }}
           onUpload={(file) => {
+            if (localPdfUrl !== null) {
+              URL.revokeObjectURL(localPdfUrl);
+            }
+
+            setLocalPdfUrl(URL.createObjectURL(file));
+
+            if (preview) {
+              setPreviewResume({
+                bytes: Math.max(1024, file.size),
+                filename: file.name,
+                id: "preview-resume",
+                pages: 1,
+                unreadable: false,
+                uploadedAt: new Date().toISOString(),
+              });
+              toast.info(`Preview mode: ${file.name} selected.`);
+
+              return;
+            }
+
             upload.mutate(file, {
-              onError: () => {
-                if (preview) {
-                  toast.info(`Preview mode: ${file.name} selected.`);
-                }
+              onSuccess: () => {
+                setLocalPdfUrl(null);
               },
             });
           }}
-          resume={state.resume}
+          pdfUrl={resolvedPdfUrl}
+          resume={effectiveResume}
           uploading={upload.isPending}
         />
       )}

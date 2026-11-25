@@ -16,7 +16,7 @@ export function OnboardingLoadState({
 }) {
   if (state === "loading") {
     return (
-      <Card className="p-6 md:p-8" variant="elevated">
+      <Card className="p-6 md:p-7">
         <output aria-busy="true" className="block text-sm text-muted-foreground">
           {copy.onboarding.loading}
         </output>
@@ -30,7 +30,7 @@ export function OnboardingLoadState({
   const message = state === "error" ? copy.onboarding.loadFailedBody : copy.onboarding.emptyTargets;
 
   return (
-    <Card ariaLabelledBy="ob-load-h" className="p-6 md:p-8" variant="elevated">
+    <Card ariaLabelledBy="ob-load-h" className="p-6 md:p-7">
       <div role={state === "error" ? "alert" : undefined}>
         <h2 className={dsCardTitle} id="ob-load-h">
           {title}

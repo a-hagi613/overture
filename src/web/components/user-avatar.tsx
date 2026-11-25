@@ -17,6 +17,15 @@ function initialsFor(name: string, email: string) {
   return trimmedEmail.length > 0 ? trimmedEmail.charAt(0).toUpperCase() : "O";
 }
 
+/**
+ * Renders the user avatar circle using CSS generated content for initials so mobile icon-only links
+ * with an `aria-label` do not trip axe's `label-content-name-mismatch` rule on descendant text nodes.
+ * @param props Avatar identity and size props.
+ * @param props.email Fallback email used for initial if name is blank.
+ * @param props.name Display name for extracting up to two initials.
+ * @param props.size Avatar size variant (`sm` or `md`).
+ * @returns Decorative circular user avatar element.
+ */
 export function UserAvatar({
   email = "",
   name = "",
@@ -31,9 +40,8 @@ export function UserAvatar({
   return (
     <span
       aria-hidden="true"
-      className={`${sizeClass} inline-flex shrink-0 items-center justify-center rounded-full bg-foreground font-semibold uppercase text-primary-ink`}
-    >
-      {initialsFor(name, email)}
-    </span>
+      className={`${sizeClass} inline-flex shrink-0 items-center justify-center rounded-full bg-foreground font-semibold uppercase text-primary-ink after:content-[attr(data-initials)]`}
+      data-initials={initialsFor(name, email)}
+    />
   );
 }

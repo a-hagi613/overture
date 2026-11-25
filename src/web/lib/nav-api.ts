@@ -13,7 +13,7 @@ export type NavCounts = z.infer<typeof navCountsSchema>;
 
 export type NavKey =
   | "home"
-  | "applications"
+  | "tracker"
   | "ready"
   | "review"
   | "inbox"
@@ -22,22 +22,75 @@ export type NavKey =
   | "support";
 
 /**
- * The five primary destinations, in the same order on the phone tab bar and the desktop sidebar.
+ * The five primary destinations, in the same order on the phone tab bar.
  */
 export const NAV_DESTINATIONS = [
   { glyph: "home", to: "/home" },
   { glyph: "ready", to: "/ready" },
   { glyph: "review", to: "/review" },
-  { glyph: "applications", to: "/applications" },
+  { glyph: "tracker", to: "/tracker" },
   { glyph: "inbox", to: "/inbox" },
 ] as const satisfies readonly { glyph: NavKey; to: string }[];
 
 export type PrimaryNavKey = (typeof NAV_DESTINATIONS)[number]["glyph"];
 
+/**
+ * Workspace destinations rendered across the desktop sidebar and drawer.
+ */
+export const SIDEBAR_DESTINATIONS = [
+  ...NAV_DESTINATIONS,
+  { glyph: "calendar", to: "/calendar" },
+] as const satisfies readonly { glyph: NavKey; to: string }[];
+
+export type SidebarNavKey = (typeof SIDEBAR_DESTINATIONS)[number]["glyph"];
+
+/**
+ * Computes mutually exclusive active highlight state for sidebar destinations, keeping Tracker
+ * and Calendar distinct across `/calendar` and legacy `/tracker?view=calendar` links.
+ * @param key Sidebar destination key.
+ * @param pathname Current router pathname.
+ * @param search Current router search string.
+ * @returns Whether the destination should be shown as active.
+ */
+export function isSidebarNavActive(key: SidebarNavKey, pathname: string, search: string) {
+  const isTrackerPath = pathname.startsWith("/tracker") || pathname.startsWith("/applications");
+
+  const isCalendarView =
+    pathname === "/calendar" ||
+    (isTrackerPath && new URLSearchParams(search).get("view") === "calendar");
+
+  if (key === "calendar") {
+    return isCalendarView;
+  }
+
+  if (key === "tracker") {
+    return isTrackerPath && !isCalendarView;
+  }
+
+  if (key === "home") {
+    return pathname === "/home";
+  }
+
+  const base = `/${key}`;
+
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+export const APPLICATIONS_SUBMENU = [
+  { key: "ready", label: copy.nav.ready, to: "/ready" },
+  { key: "review", label: copy.nav.review, to: "/review" },
+  { key: "tracker", label: copy.nav.tracker, to: "/tracker" },
+] as const;
+
 export const JOB_PROFILE_SUBMENU = [
   { key: "resume", label: copy.nav.profileMenu.resume, to: "/profile/resume" },
   { key: "preferences", label: copy.nav.profileMenu.preferences, to: "/profile/preferences" },
   { key: "details", label: copy.nav.profileMenu.details, to: "/profile/details" },
+] as const;
+
+export const RESPONSES_SUBMENU = [
+  { key: "inbox", label: copy.nav.inbox, to: "/inbox" },
+  { key: "calendar", label: copy.nav.calendar, to: "/calendar" },
 ] as const;
 
 export const ACCOUNT_SUBMENU = [
@@ -117,10 +170,10 @@ export function navLabel(key: NavKey, count: number) {
  * @returns The destination title, or the product name for an unknown path.
  */
 export function navTitleForPath(pathname: string, search = "") {
-  if (pathname.startsWith("/applications")) {
+  if (pathname.startsWith("/tracker") || pathname.startsWith("/applications")) {
     return new URLSearchParams(search).get("view") === "calendar"
       ? copy.nav.calendar
-      : copy.nav.applications;
+      : copy.nav.tracker;
   }
 
   if (pathname.startsWith("/profile")) {

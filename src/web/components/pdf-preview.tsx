@@ -12,33 +12,36 @@ export function PdfPreview({
   pages: number | null;
   pdfUrl: string | null;
 }) {
+  const pw = copy.profileWorkspace;
   const safeUrl = safePdfUrl(pdfUrl);
-  const pageLabel = pages === null || pages <= 0 ? "PDF preview" : `Page 1 of ${String(pages)}`;
+
+  const pageLabel =
+    pages === null || pages <= 0 ? pw.pdfPreviewLabel : `Page 1 of ${String(pages)}`;
 
   return (
-    <div className="rounded-xl border border-border bg-muted p-4">
+    <div className="rounded-lg border border-border bg-muted/50 p-3">
       {safeUrl === null ? (
-        <div className="flex aspect-[8.5/11] w-full flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card px-6 text-center shadow-sh">
-          <FileText aria-hidden="true" className="text-muted-foreground" size={32} />
+        <div className="flex aspect-3/4 w-full flex-col items-center justify-center gap-3 rounded-md border border-border bg-card px-6 text-center">
+          <FileText aria-hidden="true" className="text-muted-foreground" size={28} />
           <p className="font-mono text-xs font-medium text-foreground">
-            {filename ?? "No resume uploaded yet"}
+            {filename ?? pw.pdfPreviewEmpty}
           </p>
           <p className="text-xs text-muted-foreground">
             {copy.nav.profilePages.resumePreviewEmptyHint}
           </p>
         </div>
       ) : (
-        <div className="aspect-[8.5/11] w-full overflow-hidden rounded-lg border border-border bg-card shadow-sh">
+        <div className="aspect-3/4 w-full overflow-hidden rounded-md border border-border bg-card">
           <object
-            aria-label={filename ?? "Resume PDF preview"}
+            aria-label={filename ?? pw.pdfPreviewTitle}
             className="h-full w-full"
             data={`${safeUrl}#toolbar=0&navpanes=0&scrollbar=0`}
             type="application/pdf"
           >
             <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-              <FileText aria-hidden="true" className="text-muted-foreground" size={32} />
+              <FileText aria-hidden="true" className="text-muted-foreground" size={28} />
               <p className="font-mono text-xs font-medium text-foreground">
-                {filename ?? "Resume PDF"}
+                {filename ?? pw.pdfPreviewFallbackTitle}
               </p>
               <a
                 className="text-xs font-medium text-signal-text underline underline-offset-4"

@@ -40,10 +40,7 @@ export function BoardSheetActions(props: {
         </Button>
 
         {menuOpen ? (
-          <Card
-            className="absolute left-0 top-full z-20 mt-1.5 min-w-[190px] p-1.5"
-            variant="elevated"
-          >
+          <Card className="absolute left-0 top-full z-20 mt-1.5 min-w-48 p-1.5" variant="default">
             <div role="menu">
               {STAGE_KEYS.map((stage) => {
                 const isCurrent = stage === props.detail.application.stage;

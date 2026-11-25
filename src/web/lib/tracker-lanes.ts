@@ -11,7 +11,7 @@ export interface CardBadge {
 }
 
 export const TRACKER_LANES: readonly {
-  accentClass: string;
+  dotClass: string;
   droppable: boolean;
   key: TrackerLaneKey;
   label: string;
@@ -19,7 +19,7 @@ export const TRACKER_LANES: readonly {
   targetStage: StageKey;
 }[] = [
   {
-    accentClass: "border-t-foreground",
+    dotClass: "bg-muted-foreground/60",
     droppable: false,
     key: "review",
     label: copy.board.lanes.review,
@@ -27,7 +27,7 @@ export const TRACKER_LANES: readonly {
     targetStage: "queued",
   },
   {
-    accentClass: "border-t-ok",
+    dotClass: "bg-ok",
     droppable: false,
     key: "ready",
     label: copy.board.lanes.ready,
@@ -35,7 +35,7 @@ export const TRACKER_LANES: readonly {
     targetStage: "ready",
   },
   {
-    accentClass: "border-t-signal",
+    dotClass: "bg-signal",
     droppable: true,
     key: "applied",
     label: copy.board.lanes.applied,
@@ -43,7 +43,7 @@ export const TRACKER_LANES: readonly {
     targetStage: "applied",
   },
   {
-    accentClass: "border-t-ok",
+    dotClass: "bg-foreground",
     droppable: true,
     key: "waiting",
     label: copy.board.lanes.waiting,
@@ -51,7 +51,7 @@ export const TRACKER_LANES: readonly {
     targetStage: "screening",
   },
   {
-    accentClass: "border-t-input",
+    dotClass: "bg-muted-foreground/40",
     droppable: true,
     key: "closed",
     label: copy.board.lanes.closed,

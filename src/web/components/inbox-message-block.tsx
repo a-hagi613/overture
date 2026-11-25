@@ -38,6 +38,17 @@ function senderName(from: string) {
   return open === -1 ? from.trim() : from.slice(0, open).trim().replaceAll(/^"|"$/gu, "");
 }
 
+function senderEmail(from: string) {
+  const open = from.indexOf("<");
+  const close = from.indexOf(">", open + 1);
+
+  if (open === -1 || close === -1) {
+    return null;
+  }
+
+  return from.slice(open + 1, close).trim();
+}
+
 export function InboxMessageBlock(props: {
   first: boolean;
   message: InboxMessage;
@@ -45,16 +56,23 @@ export function InboxMessageBlock(props: {
   zone: string;
 }) {
   const { first, message, now, zone } = props;
+  const email = senderEmail(message.from);
 
   return (
     <div className={first ? "" : "mt-6 border-t border-border pt-6"}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <p className="truncate text-sm font-semibold text-foreground">
             {senderName(message.from)}
           </p>
+          {email === null ? null : (
+            <span className="truncate font-mono text-xs text-muted-foreground">{email}</span>
+          )}
           {message.auth === "pass" ? (
-            <CheckCircle2 aria-hidden="true" className="shrink-0 text-ok" size={14} />
+            <span className="inline-flex items-center text-ok" title={copy.inbox.verifiedLabel}>
+              <CheckCircle2 aria-hidden="true" size={14} />
+              <span className="sr-only">{copy.inbox.verifiedLabel}</span>
+            </span>
           ) : (
             <Badge variant="need">{copy.inbox.unverifiedLabel}</Badge>
           )}
@@ -97,7 +115,7 @@ export function InboxMessageBlock(props: {
           <div className="mt-2.5 flex flex-col gap-2">
             {message.attachments.map((attachment) => (
               <Card
-                className="flex flex-wrap items-center justify-between gap-3 bg-background p-3 shadow-none"
+                className="flex flex-wrap items-center justify-between gap-3 bg-muted/40 p-3"
                 key={attachment.id}
               >
                 <div className="flex min-w-0 items-center gap-2.5">

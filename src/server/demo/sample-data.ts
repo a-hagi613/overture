@@ -119,6 +119,16 @@ export const DEMO_APPLICATIONS: readonly DemoApplication[] = [
     title: "Platform Engineer",
   },
   {
+    ageDays: 1,
+    company: "zephyr",
+    id: "demo-app-41",
+    questions: "form",
+    score: 91,
+    stage: "ready",
+    status: "ready",
+    title: "Staff Backend Engineer",
+  },
+  {
     ageDays: 3,
     company: "quarry",
     id: "demo-app-03",
@@ -689,7 +699,7 @@ export const DEMO_NOTIFICATIONS: readonly {
     kind: "offer",
     read: true,
     title: "An offer arrived",
-    url: "/applications",
+    url: "/tracker",
   },
   {
     atDaysAgo: 22,
@@ -697,7 +707,7 @@ export const DEMO_NOTIFICATIONS: readonly {
     kind: "stage_move",
     read: true,
     title: "Moved to Screening",
-    url: "/applications",
+    url: "/tracker",
   },
   {
     atDaysAgo: 19,

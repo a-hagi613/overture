@@ -47,7 +47,7 @@ export function OnboardingTargetsPage() {
     }
 
     if (state.data.step >= 4) {
-      void navigate("/onboarding/trial", { replace: true });
+      void navigate("/onboarding/matches?trial=1", { replace: true });
     } else if (state.data.step === 3) {
       void navigate("/onboarding/matches", { replace: true });
     }
@@ -103,13 +103,26 @@ export function OnboardingTargetsPage() {
           await navigate(`/onboarding/matches${suffix}`);
         }}
         preview={preview}
-        save={async (next) => save.mutateAsync(next)}
+        save={async (next) =>
+          preview ? { ...targets.data, targets: next } : save.mutateAsync(next)
+        }
         saveCurrentEmployer={async (name) => {
           if (!preview) {
             await saveCurrentEmployer.mutateAsync(name);
           }
         }}
-        saveSkip={async (companies) => saveSkip.mutateAsync(companies)}
+        saveSkip={async (companies) =>
+          preview
+            ? {
+                companies: companies.map((item, idx) => ({
+                  domain: item.domain,
+                  id: `preview-${String(idx)}`,
+                  name: item.name,
+                  reason: "user",
+                })),
+              }
+            : saveSkip.mutateAsync(companies)
+        }
         skipCompanies={state.data.skipCompanies}
         view={targets.data}
       />

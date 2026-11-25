@@ -20,10 +20,7 @@ export function RouteErrorCard({
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-need-soft text-need">
         <AlertTriangle aria-hidden="true" size={24} />
       </div>
-      <h1 className={`${dsPageTitle} mt-4`}>
-        {HEADING_PLAIN}
-        <em className="italic text-signal">{HEADING_ITALIC}</em>
-      </h1>
+      <h1 className={`${dsPageTitle} mt-4`}>{`${HEADING_PLAIN}${HEADING_ITALIC}`}</h1>
       <p className={`${dsBody} mx-auto mt-2 max-w-sm`}>{copy.calendar.errorBody}</p>
     </>
   );
@@ -44,7 +41,7 @@ export function RouteErrorCard({
   );
 
   const body = (
-    <Card className="w-full p-8 text-center" variant="elevated">
+    <Card className="w-full p-8 text-center">
       {message}
       {actions}
     </Card>
@@ -53,7 +50,7 @@ export function RouteErrorCard({
   if (insideShell) {
     return (
       <div
-        className="mx-auto flex min-h-[60vh] w-full max-w-xl items-center justify-center py-8"
+        className="mx-auto flex w-full max-w-xl flex-1 items-center justify-center py-8"
         role="alert"
       >
         {body}

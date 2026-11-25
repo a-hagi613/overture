@@ -65,17 +65,12 @@ export function ProfileHub() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <PageHeader
-        lead={copy.nav.profileHub.lead}
-        titleNode={
-          <>
-            {copy.nav.profileHub.titlePlain}
-            <em className="italic text-signal">{copy.nav.profileHub.titleItalic}</em>
-          </>
-        }
-      />
-      <nav aria-label={copy.nav.profileMenu.label} className="mt-6 flex flex-col gap-5">
+    <div className="flex min-w-0 flex-1 flex-col gap-6">
+      <PageHeader titleNode={copy.nav.profileHub.titlePlain} />
+      <nav
+        aria-label={copy.nav.profileMenu.label}
+        className="grid grid-cols-1 items-start gap-5 md:grid-cols-2"
+      >
         <Card className="flex flex-col p-1.5">
           <p className={`${dsEyebrow} px-3 pb-1 pt-2`}>{copy.nav.jobProfile}</p>
           {JOB_PROFILE_SUBMENU.map((item) => {
@@ -135,7 +130,7 @@ export function ProfileHub() {
           </button>
         </Card>
       </nav>
-      <div className="mt-5">
+      <div>
         <UsageCard />
       </div>
     </div>

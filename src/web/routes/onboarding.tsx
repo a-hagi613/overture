@@ -53,7 +53,7 @@ export function OnboardingPage() {
     }
 
     if (state.step >= 4) {
-      void navigate("/onboarding/trial", { replace: true });
+      void navigate("/onboarding/matches?trial=1", { replace: true });
 
       return;
     }
@@ -71,7 +71,7 @@ export function OnboardingPage() {
 
   if (isError) {
     return (
-      <OnboardingShell step={2}>
+      <OnboardingShell step={1}>
         <OnboardingLoadState
           onRetry={() => {
             void refetch();

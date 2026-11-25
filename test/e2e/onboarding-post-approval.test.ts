@@ -22,7 +22,7 @@ const test = appTest.extend<{ readyServer: AppServer }>({
 const IPHONE_SAFARI =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1";
 
-test("the first approval explains the apply address and shows the iOS Home Screen card once", async ({
+test("approving confirms without post-approval card and schedules without undo", async ({
   browser,
   readyServer,
 }) => {
@@ -44,31 +44,23 @@ test("the first approval explains the apply address and shows the iOS Home Scree
   const page = await context.newPage();
 
   await page.goto(`${readyServer.url}/ready`);
-  await page.getByRole("button", { name: "Approve & Next" }).first().click();
-  await page.getByRole("button", { name: "Yes, send application" }).click();
+  await page.getByRole("button", { exact: true, name: "Approve" }).first().click();
+  await page.getByRole("button", { name: "Approve & schedule" }).click();
 
+  await expect(page.getByText("Your applications send from your Overture address")).toHaveCount(0);
+  await expect(page.getByText("Add Overture to your Home Screen")).toHaveCount(0);
   await expect(
-    page.getByRole("heading", {
-      level: 2,
-      name: /Your applications send from your Overture address/u,
-    }),
+    page
+      .locator('section[aria-label="Scheduled applications"]')
+      .getByText("Northwind Labs", { exact: true })
+      .first(),
   ).toBeVisible();
-  await expect(page.getByText(/@/u).first()).toBeVisible();
-  await expect(page.getByText("Add Overture to your Home Screen")).toBeVisible();
-  await expect(page.getByText("Tap the Share button in Safari.")).toBeVisible();
-  await expect(page.getByText("Choose Add to Home Screen, then Add.")).toBeVisible();
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
 
   expect(overflow).toBeLessThanOrEqual(0);
-
-  await page.getByRole("button", { name: /Dismiss the address and Home Screen card/u }).click();
-  await expect(page.getByText("Add Overture to your Home Screen")).toHaveCount(0);
-
-  await page.reload();
-  await expect(page.getByText("Add Overture to your Home Screen")).toHaveCount(0);
 
   await context.close();
 });

@@ -1,4 +1,4 @@
-import { CircleHelp, Home, Inbox, Send, SquareKanban } from "lucide-react";
+import { CircleHelp, Columns3, Home, Inbox, ListChecks } from "lucide-react";
 import { NavLink } from "react-router";
 
 import type { PrimaryNavKey, NavCounts } from "../lib/nav-api.ts";
@@ -7,11 +7,11 @@ import { copy } from "../../shared/copy.ts";
 import { NAV_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
 
 const TAB_ICONS: Record<PrimaryNavKey, typeof Home> = {
-  applications: SquareKanban,
   home: Home,
   inbox: Inbox,
-  ready: Send,
+  ready: ListChecks,
   review: CircleHelp,
+  tracker: Columns3,
 };
 
 export function TabBar({ counts }: { counts: NavCounts }) {

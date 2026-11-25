@@ -73,6 +73,30 @@ test("a signed-out visitor reaches the Terms and the Privacy Policy from sign-in
   await page.getByRole("link", { name: "Terms of Service" }).click();
 
   await expect(page).toHaveURL(/\/terms$/u);
+
+  await page.getByRole("link", { name: "Application Consent" }).click();
+
+  await expect(page).toHaveURL(/\/consent$/u);
+  await expect(page.getByRole("heading", { level: 1, name: "Application Consent" })).toBeVisible();
+
+  await Promise.all(
+    [
+      /\bFly\b/u,
+      /\bCloudflare\b/u,
+      /\bBrowser Use\b/u,
+      /\bKernel\b/u,
+      /\bAnthropic\b/u,
+      /\bGrafana Cloud\b/u,
+    ].map(async (vendorPattern) =>
+      expect(page.locator("main").getByText(vendorPattern)).toHaveCount(0),
+    ),
+  );
+
+  await expect(page.getByRole("link", { name: "admin@tryoverture.com" }).first()).toBeVisible();
+
+  const consentResults = await new AxeBuilder({ page }).analyze();
+
+  expect(consentResults.violations).toEqual([]);
 });
 
 test("the legal pages cover billing, trial terms, and corporate disclosures without vendor leaks", async ({
@@ -165,38 +189,21 @@ test("the consent is versioned, the accepted version is on the profile, and olde
   const page = await context.newPage();
 
   await page.goto(`${legalServer.url}/consent`);
-
-  await expect(page.getByRole("heading", { level: 1, name: "What you agree to" })).toBeVisible();
-  await expect(page.getByText("Version 2")).toBeVisible();
-  await expect(page.getByText(first.current.text)).toBeVisible();
-
-  const consentResults = await new AxeBuilder({ page }).analyze();
-
-  expect(consentResults.violations).toEqual([]);
-
-  await page.getByRole("checkbox", { name: "I agree to this." }).click();
-
-  await expect(page.getByRole("checkbox", { name: "I agree to this." })).toBeChecked();
-
-  const acceptedFirst = async () => {
-    const state = await owner.get("/api/consent");
-
-    return consentStateSchema.parse(await state.json());
-  };
-
-  await expect.poll(async () => (await acceptedFirst()).accepted?.version).toBe("2");
+  await expect(page.getByRole("heading", { level: 1, name: "Application Consent" })).toBeVisible();
 
   await page.goto(`${legalServer.url}/settings`);
 
-  await expect(page.getByText("Terms and privacy")).toBeVisible();
-  await expect(page.getByText("The version you agreed to: 2")).toBeVisible();
-  await expect(page.getByText(/Agreed .*2026/u)).toBeVisible();
+  const legalSection = page.locator("#legal");
+
+  await expect(legalSection).toContainText("Terms of Service");
+  await expect(legalSection).toContainText("Privacy Policy");
+  await expect(legalSection).toContainText("Application Consent");
 
   const settingsResults = await new AxeBuilder({ page }).analyze();
 
   expect(settingsResults.violations).toEqual([]);
 
-  await page.locator("#legal").getByRole("link", { exact: true, name: "Open" }).first().click();
+  await legalSection.getByRole("link", { exact: true, name: "Open" }).first().click();
 
   await expect(page).toHaveURL(/\/terms$/u);
 
@@ -215,7 +222,7 @@ test("the consent is versioned, the accepted version is on the profile, and olde
   const afterBackwards = consentStateSchema.parse(await (await owner.get("/api/consent")).json());
 
   expect(afterBackwards.current.version).toBe("3");
-  expect(afterBackwards.accepted?.version).toBe("2");
+  expect(afterBackwards.accepted).toBeNull();
 
   const backwardsVersions = consentVersionsSchema.parse(
     await (await owner.get("/api/consent/versions")).json(),
@@ -234,7 +241,7 @@ test("the consent is versioned, the accepted version is on the profile, and olde
   const afterTie = consentStateSchema.parse(await (await owner.get("/api/consent")).json());
 
   expect(afterTie.current.version).toBe("4");
-  expect(afterTie.accepted?.version).toBe("2");
+  expect(afterTie.accepted).toBeNull();
 
   const versions = consentVersionsSchema.parse(
     await (await owner.get("/api/consent/versions")).json(),
@@ -255,16 +262,15 @@ test("the consent is versioned, the accepted version is on the profile, and olde
   expect(z.object({ refused: z.boolean() }).parse(await updateRefusal.json()).refused).toBe(true);
   expect(z.object({ refused: z.boolean() }).parse(await deleteRefusal.json()).refused).toBe(true);
 
-  await page.goto(`${legalServer.url}/consent`);
+  const acceptedResp = await owner.post("/api/consent/accept", { data: { version: "4" } });
 
-  await expect(page.getByRole("heading", { name: "Earlier versions" })).toBeVisible();
-  await expect(page.getByText("A third consent wording.")).toBeVisible();
-  await expect(page.getByText("A later consent wording for the next version.")).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: "I agree to this." })).not.toBeChecked();
-
-  await page.getByRole("checkbox", { name: "I agree to this." }).click();
-
-  await expect.poll(async () => (await acceptedFirst()).accepted?.version).toBe("4");
+  expect(acceptedResp.ok()).toBe(true);
+  await expect
+    .poll(
+      async () =>
+        consentStateSchema.parse(await (await owner.get("/api/consent")).json()).accepted?.version,
+    )
+    .toBe("4");
 
   await context.close();
   await owner.dispose();
@@ -286,7 +292,7 @@ async function expectNoSidewaysScroll(page: Page, url: string, label: string) {
   expect(layout.body, label).toBeLessThanOrEqual(layout.client);
 }
 
-test("the legal pages and the consent fit every width without sideways scroll", async ({
+test("the legal pages fit every width without sideways scroll", async ({
   browser,
   appServerUrl,
 }) => {
@@ -327,6 +333,7 @@ test("the legal page links are at least 44 CSS px tall at 390", async ({
     page.getByRole("link", { name: "Back to Overture" }),
     legalLinks.getByRole("link", { name: "Terms of Service" }),
     legalLinks.getByRole("link", { name: "Privacy Policy" }),
+    legalLinks.getByRole("link", { name: "Application Consent" }),
   ];
 
   const heights = await Promise.all(

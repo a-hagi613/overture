@@ -3,7 +3,14 @@ import { Check } from "lucide-react";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
-import { dsBody, dsCardTitle, dsContainer, dsMetric, dsMono, dsSectionHeading } from "../ui/ds.ts";
+import {
+  dsBody,
+  dsContainer,
+  dsDisplayCardTitle,
+  dsDisplayMetric,
+  dsMono,
+  dsSectionHeading,
+} from "../ui/ds.ts";
 import { Separator } from "../ui/separator.tsx";
 import { LANDING_COPY } from "./landing-copy.ts";
 
@@ -46,12 +53,16 @@ export function LandingPricingSection() {
                 <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-signal" />
               ) : null}
               <div className="flex items-center justify-between gap-3">
-                <h3 className={dsCardTitle}>{tier.name}</h3>
+                <h3 className={dsDisplayCardTitle}>{tier.name}</h3>
                 <Badge variant={tier.badgeVariant}>{tier.badge}</Badge>
               </div>
               <p className={`${dsBody} mt-2 sm:min-h-10`}>{tier.lead}</p>
               <div className="my-5 flex items-baseline gap-2">
-                <span className={tier.featured ? `${dsMetric} text-signal-text` : dsMetric}>
+                <span
+                  className={
+                    tier.featured ? `${dsDisplayMetric} text-signal-text` : dsDisplayMetric
+                  }
+                >
                   {tier.price}
                 </span>
                 <span className={dsMono}>{tier.unit}</span>

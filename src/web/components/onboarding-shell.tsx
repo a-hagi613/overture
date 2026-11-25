@@ -16,8 +16,8 @@ export function OnboardingShell({
   step,
 }: {
   children: ReactNode;
-  labels?: readonly string[];
-  step: number;
+  labels?: readonly string[] | undefined;
+  step: 1 | 2 | 3;
 }) {
   const navigate = useNavigate();
   const { data: session, isPending } = authClient.useSession();
@@ -28,11 +28,7 @@ export function OnboardingShell({
     }
   }, [navigate, session, isPending]);
 
-  if (isPending) {
-    return <RouteFallback fullScreen />;
-  }
-
-  if (session === null) {
+  if (isPending || session === null) {
     return <RouteFallback fullScreen />;
   }
 
@@ -42,16 +38,13 @@ export function OnboardingShell({
       <div className="relative z-10 flex min-h-screen flex-col">
         <OnboardingStepHeader />
         <main
-          className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-4 outline-none sm:px-6"
+          className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-6 outline-none sm:px-6"
           id="main-content"
           tabIndex={-1}
         >
-          <div className="text-center">
-            <h1 className={dsPageTitle}>
-              {`${copy.onboarding.setupTitlePlain} `}
-              <em className="italic text-signal">{copy.onboarding.setupTitleItalic}</em>
-            </h1>
-            <p className={`${dsBody} mx-auto mt-2 max-w-lg`}>{copy.onboarding.setupIntro}</p>
+          <div>
+            <h1 className={dsPageTitle}>{copy.onboarding.setupTitlePlain}</h1>
+            <p className={`${dsBody} mt-1`}>{copy.onboarding.setupIntro}</p>
           </div>
           <OnboardingStepRail labels={labels ?? copy.onboarding.steps} step={step} />
           {children}

@@ -54,8 +54,8 @@ export function SidebarContent({
       </div>
       <Separator />
       <SidebarSearchButton onOpen={onOpenSearch} />
-      <Separator />
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-0.5">
+      <Separator className="my-2" />
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-0.5" data-scroll-region>
         <SideNav
           counts={counts}
           onNavigate={onNavigate}

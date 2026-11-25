@@ -37,7 +37,8 @@ for (const width of [390, 1280] as const) {
         await expect(page.getByText("of 70 on your plan")).toHaveCount(1);
       } else {
         await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
-        await expect(page.getByText("Sending active").first()).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Application sending" })).toBeVisible();
+        await expect(page.getByText("Active", { exact: true }).first()).toBeVisible();
       }
 
       await page.evaluate(async () => {

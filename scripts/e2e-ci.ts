@@ -927,10 +927,9 @@ function visitedUiRoutes(
     }
   }
 
-  if (combined.includes('"/terms", "/privacy", "/consent"')) {
+  if (combined.includes('"/terms", "/privacy"')) {
     routes.add("/terms");
     routes.add("/privacy");
-    routes.add("/consent");
   }
 
   if (combined.includes("openBoard(")) {

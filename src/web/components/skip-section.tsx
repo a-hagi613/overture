@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { copy } from "../../shared/copy.ts";
 import { fetchSkipCompanies, saveSkipCompanies } from "../lib/profile-api.ts";
 import { SourceChip } from "./source-chip.tsx";
+import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
@@ -25,7 +26,7 @@ export function SkipSection() {
     mutationFn: saveSkipCompanies,
     onSuccess: (saved) => {
       queryClient.setQueryData(["profile-skip-companies"], saved);
-      toast.success("Skip list updated.");
+      toast.success(copy.profileWorkspace.skipListSavedToast);
     },
   });
 
@@ -60,7 +61,7 @@ export function SkipSection() {
   }
 
   return (
-    <Card ariaLabelledBy="profile-skip-heading" className="mt-6 p-5 md:p-6" id="profile-skip">
+    <Card ariaLabelledBy="profile-skip-heading" className="p-5 md:p-6" id="profile-skip">
       <h2 className={dsCardTitle} id="profile-skip-heading">
         {`${list.titlePlain} ${list.titleItalic}`}
       </h2>
@@ -68,10 +69,10 @@ export function SkipSection() {
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         {currentEmployer === undefined ? null : (
-          <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border bg-muted px-3.5 text-xs font-semibold text-foreground">
+          <Badge className="gap-2 py-1 pl-3 pr-2" variant="outline">
             <span>{currentEmployer.name}</span>
             <SourceChip variant="dashed">{list.currentEmployer}</SourceChip>
-          </span>
+          </Badge>
         )}
         {userCompanies.map((company) => (
           <Button
@@ -93,6 +94,9 @@ export function SkipSection() {
             <X aria-hidden="true" size={13} />
           </Button>
         ))}
+        {currentEmployer === undefined && userCompanies.length === 0 ? (
+          <p className="text-xs text-muted-foreground">{copy.profileWorkspace.skipListEmpty}</p>
+        ) : null}
       </div>
 
       <form
@@ -104,7 +108,7 @@ export function SkipSection() {
       >
         <Input
           ariaLabel={list.addLabel}
-          className="h-10 max-w-sm flex-1"
+          className="h-10 min-w-44 flex-1"
           onChange={(event) => {
             setCompanyName(event.currentTarget.value);
           }}

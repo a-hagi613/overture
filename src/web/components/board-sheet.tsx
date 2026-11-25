@@ -47,7 +47,7 @@ export function BoardSheet(props: {
     <dialog
       aria-label={copy.board.sheetLabel}
       aria-modal="true"
-      className="fixed inset-x-0 bottom-0 top-auto z-[60] m-0 flex h-[82dvh] max-h-none w-full max-w-none flex-col overflow-hidden rounded-t-2xl border-0 border-t border-border bg-card p-0 text-foreground shadow-lift outline-none md:inset-y-0 md:left-auto md:right-0 md:h-auto md:w-[500px] md:rounded-none md:border-l md:border-t-0 min-[1700px]:w-[540px]"
+      className="fixed inset-x-0 bottom-0 top-auto z-50 m-0 flex h-5/6 max-h-none w-full max-w-none flex-col overflow-hidden rounded-t-2xl border-0 border-t border-border bg-card p-0 text-foreground shadow-lift outline-none md:inset-y-0 md:left-auto md:right-0 md:h-auto md:w-full md:max-w-lg md:rounded-none md:border-l md:border-t-0 xl:max-w-xl"
       data-sheet-backdrop="lift"
       ref={sheetRef}
       tabIndex={-1}

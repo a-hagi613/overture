@@ -7,6 +7,7 @@ import type { CalendarDate } from "../lib/calendar-grid.ts";
 import { copy } from "../../shared/copy.ts";
 import { CalendarBoard } from "../components/calendar-board.tsx";
 import { CalendarDayPanel } from "../components/calendar-day-panel.tsx";
+import { PageHeader } from "../components/page-header.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { dsBody, dsCardTitle } from "../components/ui/ds.ts";
@@ -171,9 +172,10 @@ export function CalendarPage() {
   const initialLoading = data === undefined && !isError;
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader titleNode={copy.calendar.titlePlain} />
       {isError && data === undefined ? (
-        <Card className="mt-6 px-7 py-11 text-center">
+        <Card className="mt-4 px-7 py-11 text-center">
           <div role="alert">
             <h2 className={dsCardTitle}>{copy.calendar.errorTitle}</h2>
             <p className={`${dsBody} mt-2`}>{copy.calendar.errorBody}</p>
@@ -191,33 +193,38 @@ export function CalendarPage() {
         </Card>
       ) : null}
       {initialLoading ? (
-        <div className="mt-6">
+        <div className="mt-4">
           <RouteFallback />
         </div>
       ) : null}
       {loaded ? (
-        <div className="mt-6 grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <CalendarBoard
-            buckets={buckets}
-            customByDay={customByDay}
-            focus={focus}
-            isFetching={isFetching}
-            onFocusMonth={(next) => {
-              setNavigated(true);
-              setFocus(next);
-            }}
-            onSelectDate={selectDate}
-            onShiftMonth={(delta) => {
-              selectDate(shiftMonth(focus, delta));
-            }}
-            onToday={() => {
-              selectDate(today);
-            }}
-            selected={selected}
-            today={today}
-          />
+        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <CalendarBoard
+              buckets={buckets}
+              customByDay={customByDay}
+              focus={focus}
+              isFetching={isFetching}
+              onFocusMonth={(next) => {
+                setNavigated(true);
+                setFocus(next);
+              }}
+              onSelectDate={selectDate}
+              onShiftMonth={(delta) => {
+                selectDate(shiftMonth(focus, delta));
+              }}
+              onToday={() => {
+                selectDate(today);
+              }}
+              selected={selected}
+              today={today}
+            />
+          </div>
 
-          <aside aria-label={copy.calendar.dayPanel} className="min-w-0 lg:sticky lg:top-6">
+          <aside
+            aria-label={copy.calendar.dayPanel}
+            className="flex min-h-0 min-w-0 flex-col lg:w-96 lg:shrink-0"
+          >
             <CalendarDayPanel
               customEvents={selectedCustomEvents}
               date={selected}

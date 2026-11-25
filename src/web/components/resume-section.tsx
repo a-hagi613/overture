@@ -71,6 +71,8 @@ export function ResumeSection() {
     [localPreview],
   );
 
+  const pw = copy.profileWorkspace;
+
   const upload = useMutation({
     mutationFn: uploadResumeFile,
     onSuccess: (saved) => {
@@ -81,7 +83,7 @@ export function ResumeSection() {
       void queryClient.invalidateQueries({ queryKey: ["ready"] });
       void queryClient.invalidateQueries({ queryKey: ["nav"] });
       void queryClient.invalidateQueries({ queryKey: ["profile-strengthen"] });
-      toast.success("Resume uploaded and saved.");
+      toast.success(pw.resumeUploadedToast);
     },
   });
 
@@ -90,7 +92,9 @@ export function ResumeSection() {
   const bytes = localPreview?.bytes ?? current?.bytes ?? null;
   const pages = current?.pages ?? null;
   const uploadedText = current === null ? "" : formatUploadedDate(current.uploadedAt);
-  const factsCount = factsQuery.data?.facts.length ?? 0;
+
+  const factsCount =
+    factsQuery.data?.facts.filter((fact) => fact.key !== "cover_letter_template").length ?? 0;
 
   const pdfUrl = safePdfUrl(
     localPreview?.url ?? (current === null ? null : resumeFileUrl(current.id)),
@@ -112,7 +116,7 @@ export function ResumeSection() {
     }
 
     if (file.type !== "application/pdf") {
-      toast.error("Please select a PDF file.");
+      toast.error(pw.resumePdfOnlyError);
 
       return;
     }
@@ -154,7 +158,7 @@ export function ResumeSection() {
   }
 
   return (
-    <Card ariaLabelledBy="profile-resume-heading" className="mt-6 p-5 md:p-6" id="profile-resume">
+    <Card ariaLabelledBy="profile-resume-heading" className="p-5 md:p-6" id="profile-resume">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className={dsCardTitle} id="profile-resume-heading">
@@ -165,87 +169,83 @@ export function ResumeSection() {
         {statusBadge}
       </div>
 
-      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="mt-5 flex flex-col gap-5">
+        <div className="flex items-center gap-3.5">
+          <span
+            aria-hidden="true"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-foreground"
+          >
+            <FileText size={20} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-mono text-sm font-semibold text-foreground">
+              {filename ?? pw.resumeNoFileLabel}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+              {metaParts.length === 0 ? pw.resumeUploadHint : metaParts.join(" · ")}
+            </p>
+          </div>
+        </div>
+
         <PdfPreview filename={filename} pages={pages} pdfUrl={pdfUrl} />
 
-        <div className="min-w-0">
-          <div className="flex items-center gap-3.5">
-            <span
-              aria-hidden="true"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-foreground"
-            >
-              <FileText size={22} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-sm font-semibold text-foreground">
-                {filename ?? "No resume on file"}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                {metaParts.length === 0 ? "Upload a PDF up to 10 MB" : metaParts.join(" · ")}
-              </p>
-            </div>
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-3.5">
+          <CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0 text-ok" size={16} />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">{copyResume.strongNote}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+              {copyResume.note}
+            </p>
           </div>
-
-          <Card className="mt-5 flex items-start gap-3 p-4 shadow-none" variant="muted">
-            <CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0 text-ok" size={18} />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground">{copyResume.strongNote}</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                {copyResume.note}
-              </p>
-            </div>
-          </Card>
-
-          <dl className="mt-5 grid grid-cols-2 gap-4 border-y border-border py-4">
-            <div>
-              <dt className={dsEyebrow}>{copyResume.factsRead}</dt>
-              <dd className="mt-1 font-serif text-card-title tabular-nums text-foreground">
-                {`${String(factsCount)} saved`}
-              </dd>
-            </div>
-            <div>
-              <dt className={dsEyebrow}>{copy.nav.profilePages.resumeFormatLabel}</dt>
-              <dd className="mt-1 font-serif text-card-title text-foreground">
-                {copy.nav.profilePages.resumeFormatValue}
-              </dd>
-            </div>
-          </dl>
-
-          <input
-            accept="application/pdf"
-            className="hidden"
-            onChange={handleFileChange}
-            ref={fileInputRef}
-            type="file"
-          />
-
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <Button
-              disabled={upload.isPending}
-              onClick={() => {
-                fileInputRef.current?.click();
-              }}
-              size="default"
-              variant="primary"
-            >
-              <Upload aria-hidden="true" size={15} />
-              <span>{uploadButtonLabel}</span>
-            </Button>
-
-            {pdfUrl === null ? null : (
-              <Button asChild size="default" variant="outline">
-                <a download={filename ?? "resume.pdf"} href={pdfUrl}>
-                  <Download aria-hidden="true" size={15} />
-                  <span>{copyResume.download}</span>
-                </a>
-              </Button>
-            )}
-          </div>
-
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            {copyResume.newFileNote}
-          </p>
         </div>
+
+        <dl className="grid grid-cols-2 gap-4 border-y border-border py-3.5">
+          <div>
+            <dt className={dsEyebrow}>{copyResume.factsRead}</dt>
+            <dd className="mt-1 font-serif text-card-title tabular-nums text-foreground">
+              {`${String(factsCount)} saved`}
+            </dd>
+          </div>
+          <div>
+            <dt className={dsEyebrow}>{copy.nav.profilePages.resumeFormatLabel}</dt>
+            <dd className="mt-1 font-serif text-card-title text-foreground">
+              {copy.nav.profilePages.resumeFormatValue}
+            </dd>
+          </div>
+        </dl>
+
+        <input
+          accept="application/pdf"
+          className="hidden"
+          onChange={handleFileChange}
+          ref={fileInputRef}
+          type="file"
+        />
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            disabled={upload.isPending}
+            onClick={() => {
+              fileInputRef.current?.click();
+            }}
+            size="default"
+            variant="primary"
+          >
+            <Upload aria-hidden="true" size={15} />
+            <span>{uploadButtonLabel}</span>
+          </Button>
+
+          {pdfUrl === null ? null : (
+            <Button asChild size="default" variant="outline">
+              <a download={filename ?? "resume.pdf"} href={pdfUrl}>
+                <Download aria-hidden="true" size={15} />
+                <span>{copyResume.download}</span>
+              </a>
+            </Button>
+          )}
+        </div>
+
+        <p className="text-xs leading-relaxed text-muted-foreground">{copyResume.newFileNote}</p>
       </div>
     </Card>
   );

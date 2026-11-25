@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test";
 import { isAllCaughtUp, rangeDays } from "./home-bands.ts";
 
 const busy = {
-  checkIns: [],
   failed: [],
   readyCount: 0,
   reviewTotal: 0,
@@ -32,10 +31,6 @@ describe("isAllCaughtUp", () => {
 
   test("a Ready approval is an action", () => {
     expect(isAllCaughtUp({ ...busy, readyCount: 2 }, false)).toBe(false);
-  });
-
-  test("a due check-in is an action", () => {
-    expect(isAllCaughtUp({ ...busy, checkIns: [{}] }, false)).toBe(false);
   });
 
   test("an unresolved failure is an action", () => {

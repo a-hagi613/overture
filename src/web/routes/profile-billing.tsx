@@ -42,7 +42,7 @@ function upgradePlansFor(activePlan: BillingPlan | null) {
   }
 
   const monthOption: BillingUpgradeOption = {
-    detail: copy.billingPlans.monthDetail,
+    bullets: copy.billingPlans.monthBullets,
     featured: true,
     id: "month",
     name: copy.billingPlans.monthName,
@@ -56,7 +56,7 @@ function upgradePlansFor(activePlan: BillingPlan | null) {
   }
 
   const weekOption: BillingUpgradeOption = {
-    detail: copy.billingPlans.weekDetail,
+    bullets: copy.billingPlans.weekBullets,
     featured: false,
     id: "week",
     name: copy.billingPlans.weekName,
@@ -156,19 +156,11 @@ export function ProfileBillingPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <PageHeader
-        lead={bp.billingLead}
-        titleNode={
-          <>
-            {bp.billingTitlePlain}
-            <em className="italic text-signal">{bp.billingTitleItalic}</em>
-          </>
-        }
-      />
+    <div className="flex min-w-0 flex-1 flex-col gap-6">
+      <PageHeader titleNode={`${bp.billingTitlePlain}${bp.billingTitleItalic}`} />
 
       {returned === "success" ? (
-        <Card className="mt-6 border-ok/40 p-5" variant="elevated">
+        <Card className="border-ok/40 p-5">
           <p className="text-sm font-semibold text-foreground">
             {activePlan === null ? copy.billingPlans.checkingTitle : copy.billingPlans.startedTitle}
           </p>
@@ -185,7 +177,7 @@ export function ProfileBillingPage() {
       ) : null}
 
       {returned === "cancelled" ? (
-        <Card className="mt-6 p-5" variant="muted">
+        <Card className="p-5" variant="muted">
           <p className="text-sm font-semibold text-foreground">
             {copy.billingPlans.cancelledTitle}
           </p>
@@ -196,20 +188,20 @@ export function ProfileBillingPage() {
       {isPending ? (
         <output
           aria-busy="true"
-          className="mt-6 block animate-pulse space-y-5"
+          className="block animate-pulse space-y-5"
           data-testid="billing-loading"
         >
           <span className="sr-only">{copy.settingsBilling.loading}</span>
-          <div aria-hidden="true" className="h-32 rounded-xl border border-border bg-card" />
+          <div aria-hidden="true" className="h-32 rounded-lg border border-border bg-card" />
           <div aria-hidden="true" className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div className="h-48 rounded-xl border border-border bg-card" />
-            <div className="h-48 rounded-xl border border-border bg-card" />
+            <div className="h-48 rounded-lg border border-border bg-card" />
+            <div className="h-48 rounded-lg border border-border bg-card" />
           </div>
         </output>
       ) : null}
 
       {!isPending && isError && billing === undefined ? (
-        <Card className="mt-6 p-6" variant="elevated">
+        <Card className="p-6">
           <div role="alert">
             <h2 className={dsCardTitle}>{copy.settingsBilling.unavailable}</h2>
             <p className={`${dsBody} mt-1.5`}>{copy.calendar.errorBody}</p>
@@ -229,8 +221,8 @@ export function ProfileBillingPage() {
       ) : null}
 
       {!isPending && billing !== undefined ? (
-        <div className="mt-6 flex flex-col gap-5">
-          <Card ariaLabelledBy="billing-current-heading" className="p-6" variant="elevated">
+        <div className="flex flex-col gap-5">
+          <Card ariaLabelledBy="billing-current-heading" className="p-5 md:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 flex-1">
                 <p className={dsEyebrow}>{bp.billingCurrentPlan}</p>
@@ -262,6 +254,22 @@ export function ProfileBillingPage() {
                 <ExternalLink aria-hidden="true" size={14} />
               </Button>
             </div>
+            {planApplications > 0 ? (
+              <div className="mt-4 border-t border-border pt-4">
+                <div className="mb-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground tabular-nums">
+                  <span>{copy.settingsBilling.leftHeading}</span>
+                  <span>
+                    {copy.settingsBilling.usageSummary(applicationsLeft, planApplications)}
+                  </span>
+                </div>
+                <progress
+                  aria-label={copy.settingsBilling.leftHeading}
+                  className="ov-progress block h-2 w-full"
+                  max={planApplications}
+                  value={applicationsLeft}
+                />
+              </div>
+            ) : null}
           </Card>
 
           {upgradeOptions.length === 0 ? (

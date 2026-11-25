@@ -11,6 +11,7 @@ import {
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
+import { Input } from "./ui/input.tsx";
 
 function feedOnStatus(hasLink: boolean) {
   return hasLink ? copy.settings.calendarFeedNewLink : copy.settings.calendarFeedOn;
@@ -33,7 +34,9 @@ export function SettingsCalendarFeed() {
     issue.mutate(undefined, {
       onSuccess: (body) => {
         setPath(body.path);
-        toast.success("Calendar feed link generated.");
+        toast.success(
+          enabled ? copy.settings.calendarFeedRotatedToast : copy.settings.calendarFeedCreatedToast,
+        );
       },
     });
   };
@@ -43,7 +46,7 @@ export function SettingsCalendarFeed() {
     revoke.mutate(undefined, {
       onSuccess: () => {
         setPath(null);
-        toast.success("Calendar feed turned off.");
+        toast.success(copy.settings.calendarFeedRevokedToast);
       },
     });
   };
@@ -102,15 +105,14 @@ export function SettingsCalendarFeed() {
               >
                 {copy.settings.calendarFeedUrlLabel}
               </label>
-              <div className="flex items-center gap-2">
-                <input
-                  className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 font-mono text-xs text-foreground"
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  className="h-9 min-w-44 flex-1 font-mono text-xs"
                   id="calendar-feed-url"
                   onFocus={(event) => {
                     event.currentTarget.select();
                   }}
                   readOnly
-                  type="text"
                   value={url}
                 />
                 <Button

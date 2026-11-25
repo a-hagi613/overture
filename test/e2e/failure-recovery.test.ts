@@ -291,7 +291,7 @@ for (const [width, theme] of [
 
     const failures = page.getByTestId("home-failures");
 
-    await expect(failures).toContainText("Couldn't apply");
+    await expect(failures).toContainText("Not sent");
     await expect(failures).toContainText("Ferro Cloud, DevOps Engineer");
     await expect(failures).toContainText(LOGIN_WALL_REASON);
     await expect(failures).toContainText("Nothing was sent · 0 applications charged");

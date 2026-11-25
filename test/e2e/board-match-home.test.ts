@@ -93,9 +93,10 @@ async function expectHomeMatchesBoard(
   ).toBeVisible();
   await expect(page.getByText("Next one sends about 11:40")).toBeVisible();
   await expect(page.getByText("4 open")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Answer questions" })).toBeVisible();
-  await expect(page.getByText("09:12")).toBeVisible();
-  await expect(page.getByText("Moved from Screening to Interviewing")).toBeVisible();
+  await expect(page.getByRole("main").locator('a[href="/review"]').first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Applications sent" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ready to send" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Needs review" })).toBeVisible();
 
   await page.evaluate(async () => {
     await document.fonts.ready;

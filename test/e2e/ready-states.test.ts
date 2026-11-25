@@ -180,9 +180,7 @@ test("Ready keeps the cached cards and warns when a background refresh fails", a
 
   await expect(warning).toBeVisible({ timeout: 20_000 });
   await expect(northwind(page)).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: "Site Reliability Engineer" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Inspect Halden Systems" })).toBeVisible();
   await expect(errorAlert(page)).toHaveCount(0);
   await expect(page.getByText(emptyTitle)).toHaveCount(0);
 
@@ -215,7 +213,7 @@ test("keyboard Enter on Try again returns focus to the Ready heading after the e
   await page.keyboard.press("Enter");
 
   await expect(alert).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 1, name: "Approval Queue" })).toBeFocused();
 
   await context.close();
 });
@@ -243,7 +241,7 @@ test("keyboard Enter on Try again in the stale warning returns focus to the Read
   await page.keyboard.press("Enter");
 
   await expect(warning).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 1, name: "Ready to send" })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 1, name: "Approval Queue" })).toBeFocused();
 
   await context.close();
 });
@@ -253,7 +251,7 @@ test("a retry that fails again settles focus on the heading, and a later refresh
   seededReady,
 }) => {
   const { context, page } = await openReady(browser, seededReady.storageState, 1280, "light");
-  const heading = page.getByRole("heading", { level: 1, name: "Ready to send" });
+  const heading = page.getByRole("heading", { level: 1, name: "Approval Queue" });
 
   await page.route(readyApi, async (route) => route.fulfill({ status: 500 }));
   await gotoReadyWithEvents(page, `${seededReady.server.url}/ready`);

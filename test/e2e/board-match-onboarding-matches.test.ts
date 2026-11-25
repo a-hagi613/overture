@@ -71,10 +71,11 @@ async function expectOnboardingMatchesBoard(
     page.getByRole("heading", { level: 1, name: /Set up your workspace/u }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: /Your matches/u })).toBeVisible();
-  await expect(page.getByRole("status")).toContainText("0 of 3 selected");
-  await expect(page.getByText("Why this fits").first()).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("3 of 3 selected");
+  await expect(page.getByLabel("Why this fits").first()).toBeVisible();
   await expect(page.locator('[aria-label^="Match score"]').first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Select /u }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Selected /u }).first()).toBeVisible();
+  await expect(page.getByText(/more matched/u)).toBeVisible();
 
   await page.evaluate(async () => {
     await document.fonts.ready;

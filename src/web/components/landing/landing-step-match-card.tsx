@@ -1,6 +1,6 @@
 import { Badge } from "../ui/badge.tsx";
 import { Card } from "../ui/card.tsx";
-import { dsBody, dsCardTitle, dsMono } from "../ui/ds.ts";
+import { dsBody, dsDisplayCardTitle, dsMono } from "../ui/ds.ts";
 import { CompanyBrandTile } from "./company-brands.tsx";
 import { LANDING_COPY } from "./landing-copy.ts";
 
@@ -68,7 +68,7 @@ export function LandingStepMatchCard({ active }: { active: boolean }) {
         </div>
       </div>
       <div className="border-t border-border px-5 py-4 sm:px-6">
-        <h3 className={dsCardTitle}>{LANDING_COPY.howItWorks.step2.title}</h3>
+        <h3 className={dsDisplayCardTitle}>{LANDING_COPY.howItWorks.step2.title}</h3>
         <p className={`${dsBody} mt-1.5`}>{LANDING_COPY.howItWorks.step2.body}</p>
       </div>
     </Card>

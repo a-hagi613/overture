@@ -232,22 +232,22 @@ test("test@email.com signs in with one click and every main screen is populated"
 
   await page.goto(`${demoServer.url}/ready`);
   await expect(
-    page.getByRole("heading", { exact: true, level: 1, name: "Ready to send" }),
+    page.getByRole("heading", { exact: true, level: 1, name: "Approval Queue" }),
   ).toBeVisible();
   await expect(page.getByText("Paper Kite").first()).toBeVisible();
 
   await page.goto(`${demoServer.url}/applications`);
-  await expect(page.getByRole("heading", { name: "Your Applications" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Application Tracker" })).toBeVisible();
   await expect(page.getByText("Tidepool Analytics").first()).toBeVisible();
 
   await page.goto(`${demoServer.url}/review`);
-  await expect(page.getByRole("heading", { name: "Your Review" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Review Queue" })).toBeVisible();
   await expect(
     page.getByText("What are your salary expectations for this role?").first(),
   ).toBeVisible();
 
   await page.goto(`${demoServer.url}/inbox`);
-  await expect(page.getByRole("heading", { name: "Employer Inbox" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
 
   await page.goto(`${demoServer.url}/profile`);
   await expect(page).toHaveURL(/\/profile\/resume$/u);

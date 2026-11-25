@@ -963,6 +963,15 @@ function seedReviews(input: { db: AppDatabase; now: number; userId: string }) {
       options: ["Yes, active", "No"],
       scope: "",
     },
+    {
+      applicationIds: ["demo-app-05"],
+      factKey: "on_call_comfort",
+      fieldType: "select" as const,
+      id: "demo-review-03",
+      prompt: "Are you comfortable participating in an on-call rotation?",
+      options: ["Yes", "No"],
+      scope: "",
+    },
   ];
 
   for (const [index, review] of reviewRows.entries()) {

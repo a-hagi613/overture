@@ -33,7 +33,6 @@ const reviewsSchema = z.object({
   reviews: z.array(z.object({ id: z.string(), prompt: z.string() })),
 });
 
-const OFFERS_REGION = { name: "Offers" } as const;
 const LIST = 'ul[aria-label="Applications list"]';
 
 async function openSeeded(
@@ -115,9 +114,9 @@ test("the phone opens List by default, keeps Board one tap away, and hides Close
   const views = page.getByRole("group", { name: "Application views" });
 
   await expect(views.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
+  await expect(views.getByRole("button", { name: "Calendar" })).toHaveCount(0);
   await expect(page.locator(LIST)).toBeVisible();
   await expect(page.locator(LIST).getByRole("button").first()).toBeVisible();
-  await expect(page.getByRole("region", OFFERS_REGION)).toBeVisible();
   await expect(page.getByRole("button", { name: "Show closed (5)" })).toBeVisible();
   expect(await page.locator(LIST).getByRole("button").count()).toBeGreaterThan(20);
 
@@ -136,16 +135,11 @@ test("the phone opens List by default, keeps Board one tap away, and hides Close
     .click();
   await expect(page.locator('section[aria-label="Applied"]')).toBeVisible();
 
-  await views.getByRole("button", { name: "Calendar" }).click();
-  await expect(page).toHaveURL(/\/applications\?view=calendar&month=\d{4}-\d{2}$/u);
-  await expect(page.getByRole("heading", { level: 1, name: "Job Calendar" })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "Day panel" })).toBeVisible();
-
   await context.close();
   await request.dispose();
 });
 
-test("the desktop opens Board by default, pins Offers and keeps Closed behind a toggle", async ({
+test("the desktop opens Board by default and keeps Closed behind a toggle", async ({
   viewsServer,
   browser,
 }) => {
@@ -156,15 +150,10 @@ test("the desktop opens Board by default, pins Offers and keeps Closed behind a 
     "aria-pressed",
     "true",
   );
+  await expect(views.getByRole("button", { name: "Calendar" })).toHaveCount(0);
   await expect(page.locator('section[aria-label="Interviews"]')).toBeVisible();
   await expect(page.locator('section[aria-label="Closed"]')).toHaveCount(0);
   await expect(page.getByText("Waiting", { exact: true })).toHaveCount(0);
-
-  const offers = page.getByRole("region", OFFERS_REGION);
-
-  await expect(offers).toBeVisible();
-  await expect(offers.getByText("One offer is waiting for your decision.")).toBeVisible();
-  await expect(offers.getByText("Halden Systems").first()).toBeVisible();
 
   await expectAxeClean(page);
 
@@ -174,10 +163,6 @@ test("the desktop opens Board by default, pins Offers and keeps Closed behind a 
 
   await views.getByRole("button", { name: "List" }).click();
   await expect(page.locator(LIST)).toBeVisible();
-
-  await views.getByRole("button", { name: "Calendar" }).click();
-  await expect(page).toHaveURL(/\/applications\?view=calendar&month=\d{4}-\d{2}$/u);
-  await expect(page.getByRole("complementary", { name: "Day panel" })).toBeVisible();
 
   await context.close();
   await request.dispose();
@@ -205,7 +190,7 @@ test("Review defaults the save-for-future switch and confirms the save", async (
   const page = await context.newPage();
 
   const toggle = page.getByRole("switch", {
-    name: "Save to my saved answers for future applications",
+    name: "Save for future applications",
   });
 
   await page.setViewportSize({ width: 390, height: 844 });

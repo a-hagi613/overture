@@ -72,13 +72,10 @@ export function PostApprovalCard() {
   };
 
   return (
-    <Card className="mt-5 p-5 md:p-6" variant="elevated">
+    <Card className="mt-5 p-5 md:p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className={dsCardTitle}>
-            {`${text.titlePlain} `}
-            <em className="italic text-signal-text">{text.titleItalic}</em>
-          </h2>
+          <h2 className={dsCardTitle}>{`${text.titlePlain} ${text.titleItalic}`}</h2>
           <p className={`${dsBody} mt-2 max-w-2xl`}>{text.intro}</p>
         </div>
         <Button
@@ -92,7 +89,7 @@ export function PostApprovalCard() {
         </Button>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3.5">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3.5">
         <div className="min-w-0 flex-1">
           <p className={dsEyebrow}>{text.aliasLabel}</p>
           <p className="mt-1 break-all font-mono text-sm font-medium text-foreground">

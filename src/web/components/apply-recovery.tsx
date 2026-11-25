@@ -1,26 +1,24 @@
 import { ExternalLink } from "lucide-react";
 
 import { copy } from "../../shared/copy.ts";
-import { Button } from "./ui/button.tsx";
 
 export function ApplyRecovery(props: { applyUrl: string | null; company: string }) {
   const { applyUrl, company } = props;
 
   return (
-    <div className="mt-2">
-      <p className="text-xs leading-relaxed text-foreground">{copy.recovery.nothingSent}</p>
+    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <p className="text-xs text-muted-foreground">{copy.recovery.nothingSent}</p>
       {applyUrl === null ? null : (
-        <Button asChild className="mt-2" size="sm" variant="secondary">
-          <a
-            aria-label={copy.recovery.applyAria(company)}
-            href={applyUrl}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            <ExternalLink aria-hidden="true" size={14} />
-            <span>{copy.recovery.applyOnSite}</span>
-          </a>
-        </Button>
+        <a
+          aria-label={copy.recovery.applyAria(company)}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-foreground underline underline-offset-4 transition hover:opacity-80 max-md:min-h-11"
+          href={applyUrl}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <span>{copy.recovery.applyOnSite}</span>
+          <ExternalLink aria-hidden="true" size={12} />
+        </a>
       )}
     </div>
   );

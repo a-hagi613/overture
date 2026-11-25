@@ -5,7 +5,7 @@ export function Toaster() {
     <SonnerToaster
       closeButton
       position="bottom-right"
-      style={{ zIndex: 70 }}
+      style={{ pointerEvents: "auto", zIndex: 70 }}
       toastOptions={{
         classNames: {
           actionButton:
@@ -16,7 +16,7 @@ export function Toaster() {
           description: "!text-xs !text-muted-foreground",
           title: "!text-sm !font-semibold !text-foreground",
           toast:
-            "!rounded-xl !border !border-border !bg-card !text-foreground !shadow-lift !font-sans",
+            "!pointer-events-auto !rounded-lg !border !border-border !bg-card !text-foreground !shadow-lift !font-sans",
         },
       }}
     />

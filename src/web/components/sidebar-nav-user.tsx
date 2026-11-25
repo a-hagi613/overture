@@ -92,7 +92,7 @@ export function SidebarNavUser({
   ) : (
     <Trigger asChild>
       <button
-        className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 text-left transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground data-[state=open]:border-border data-[state=open]:bg-card data-[state=open]:shadow-sh"
+        className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 text-left transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground data-[state=open]:border-border data-[state=open]:bg-card"
         type="button"
       >
         <UserAvatar email={email} name={displayName} size="md" />
@@ -161,7 +161,7 @@ export function SidebarNavUser({
               }`}
             >
               <span
-                className={`block h-3.5 w-3.5 rounded-full bg-card shadow-sh transition-transform ${
+                className={`block h-3.5 w-3.5 rounded-full bg-card transition-transform ${
                   isDark ? "translate-x-4" : "translate-x-0"
                 }`}
               />

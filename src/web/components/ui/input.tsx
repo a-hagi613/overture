@@ -17,9 +17,11 @@ export interface InputProps {
   id?: string;
   inputMode?: ComponentProps<"input">["inputMode"];
   invalid?: boolean;
+  maxLength?: number | undefined;
   name?: string;
   onBlur?: FocusEventHandler<HTMLInputElement>;
   onChange?: ChangeEventHandler<HTMLInputElement>;
+  onFocus?: FocusEventHandler<HTMLInputElement>;
   onInput?: ComponentProps<"input">["onInput"];
   onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
   placeholder?: string;
@@ -39,9 +41,11 @@ export function Input({
   id,
   inputMode,
   invalid = false,
+  maxLength,
   name,
   onBlur,
   onChange,
+  onFocus,
   onInput,
   onKeyDown,
   placeholder,
@@ -65,9 +69,11 @@ export function Input({
       disabled={disabled}
       id={id}
       inputMode={inputMode}
+      maxLength={maxLength}
       name={name}
       onBlur={onBlur}
       onChange={onChange}
+      onFocus={onFocus}
       onInput={onInput}
       onKeyDown={onKeyDown}
       placeholder={placeholder}

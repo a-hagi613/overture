@@ -66,7 +66,7 @@ export function CalendarDayEntry(
     const { event, onDelete } = props;
 
     return (
-      <Card className="bg-background p-3.5 shadow-none">
+      <Card className="border-border bg-sidebar/35 p-3.5 shadow-none">
         <div className="flex items-start gap-2.5">
           <CompanyAvatar company={event.company || event.title} tone="signal" />
           <div className="min-w-0 flex-1">
@@ -106,7 +106,7 @@ export function CalendarDayEntry(
   const badge = apiBadgeFor(item);
 
   return (
-    <Card className="bg-background p-3.5 shadow-none">
+    <Card className="border-border bg-sidebar/35 p-3.5 shadow-none">
       <div className="flex items-start gap-2.5">
         <CompanyAvatar company={item.company} />
         <div className="min-w-0 flex-1">
@@ -119,7 +119,7 @@ export function CalendarDayEntry(
             <Badge variant={badge.variant}>{badge.label}</Badge>
             <Link
               className="inline-flex items-center gap-0.5 text-xs font-semibold text-signal-text hover:underline"
-              to={`/applications?card=${item.applicationId}`}
+              to={`/tracker?card=${item.applicationId}`}
             >
               <span>{copy.calendar.viewApplication}</span>
               <ArrowUpRight aria-hidden="true" size={12} />

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { expect, test } from "./app.fixture.ts";
 
-test("Career starts open, collapses cleanly, and Account menu opens Billing, Settings, Theme, and Sign out", async ({
+test("Applications, Profile, and Follow-ups groups start open, collapse cleanly, and Account menu opens Billing, Settings, Theme, and Sign out", async ({
   browser,
   appServerUrl,
   ownerStorageState,
@@ -18,9 +18,13 @@ test("Career starts open, collapses cleanly, and Account menu opens Billing, Set
   ).toBeVisible();
 
   const aside = page.locator("[data-shell-sidebar]");
-  const searchGroupToggle = aside.getByRole("button", { name: "Career" });
+  const applicationsToggle = aside.getByRole("button", { name: "Applications" });
+  const profileToggle = aside.getByRole("button", { name: "Profile" });
+  const followUpsToggle = aside.getByRole("button", { name: "Follow-ups" });
 
-  await expect(searchGroupToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(applicationsToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(profileToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(followUpsToggle).toHaveAttribute("aria-expanded", "true");
 
   await Promise.all(
     ["Resume & Cover Letter", "Job Preferences", "Application Answers"].map(async (item) => {
@@ -28,10 +32,20 @@ test("Career starts open, collapses cleanly, and Account menu opens Billing, Set
     }),
   );
 
-  await searchGroupToggle.click();
-  await expect(searchGroupToggle).toHaveAttribute("aria-expanded", "false");
-  await searchGroupToggle.click();
-  await expect(searchGroupToggle).toHaveAttribute("aria-expanded", "true");
+  await profileToggle.click();
+  await expect(profileToggle).toHaveAttribute("aria-expanded", "false");
+  await profileToggle.click();
+  await expect(profileToggle).toHaveAttribute("aria-expanded", "true");
+
+  await applicationsToggle.click();
+  await expect(applicationsToggle).toHaveAttribute("aria-expanded", "false");
+  await applicationsToggle.click();
+  await expect(applicationsToggle).toHaveAttribute("aria-expanded", "true");
+
+  await followUpsToggle.click();
+  await expect(followUpsToggle).toHaveAttribute("aria-expanded", "false");
+  await followUpsToggle.click();
+  await expect(followUpsToggle).toHaveAttribute("aria-expanded", "true");
 
   await aside.getByRole("button", { name: /Account menu/u }).click();
 
@@ -79,7 +93,9 @@ test("at tablet width (1024px) the Expand sidebar button stays visible and opens
   const drawer = page.getByRole("dialog", { name: "Workspace navigation" });
 
   await expect(drawer).toBeVisible();
-  await expect(drawer.getByRole("button", { name: "Career" })).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Applications" })).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Profile" })).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Follow-ups" })).toBeVisible();
   await expect(drawer.getByRole("button", { name: /Account menu/u })).toBeVisible();
 
   await drawer.getByRole("button", { name: "Collapse sidebar" }).click();

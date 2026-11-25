@@ -43,15 +43,11 @@ export function SettingsForwardingCard() {
   };
 
   return (
-    <Card
-      ariaLabelledBy="account-forwarding"
-      className="p-5 md:p-6 lg:col-span-2"
-      id="email-forwarding"
-    >
+    <Card ariaLabelledBy="account-forwarding" className="p-5 md:p-6" id="email-forwarding">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <Mail aria-hidden="true" className="text-signal-text" size={18} />
+            <Mail aria-hidden="true" className="shrink-0 text-signal-text" size={18} />
             <h2 className={dsCardTitle} id="account-forwarding">
               {copy.inbox.forwardingSectionTitle}
             </h2>
@@ -63,10 +59,10 @@ export function SettingsForwardingCard() {
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="mt-5 flex flex-col gap-5">
         <div className="flex flex-col gap-3">
           <p className={dsEyebrow}>{copy.inbox.addressEyebrow}</p>
-          <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-background px-3.5 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-muted/40 px-3.5 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <span className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">
               {addressText}
             </span>
@@ -106,13 +102,13 @@ export function SettingsForwardingCard() {
           <p className="text-xs text-muted-foreground">{copy.inbox.accountNote}</p>
         </div>
 
-        <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
-          <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p
               className={dsEyebrow}
             >{`${copy.inbox.addressFilterHeading} ${copy.inbox.addressFilterItalic}`}</p>
             <SegmentedControl
-              ariaLabel="Email service"
+              ariaLabel={copy.inbox.addressFilterHeading}
               onValueChange={(value) => {
                 if (value === "gmail" || value === "outlook") {
                   setProvider(value);

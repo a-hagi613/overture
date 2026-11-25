@@ -13,7 +13,9 @@ import { latestMailLink, requestMagicLink } from "./sign-in.ts";
 const test = appTest.extend<{ onboardingServer: AppServer }>({
   onboardingServer: [
     async ({ identityServer }, provide) => {
-      const server = await startFreshAppServer(identityServer);
+      const server = await startFreshAppServer(identityServer, {
+        ALLOWED_SIGNUP_EMAILS: "gated.onboarding.user@example.com",
+      });
 
       await provide(server);
       await server.stop();
@@ -182,6 +184,36 @@ test("an unreadable PDF still continues to preferences", async ({ browser, onboa
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
+
+  await context.close();
+  await request.dispose();
+});
+
+test("an un-onboarded regular user is redirected from /home to onboarding", async ({
+  browser,
+  onboardingServer,
+}) => {
+  const gatedEmail = "gated.onboarding.user@example.com";
+  const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
+
+  await requestMagicLink(onboardingServer.url, request, gatedEmail);
+
+  const link = await latestMailLink(onboardingServer.url, request, gatedEmail);
+
+  await request.get(link);
+
+  const storageState = await request.storageState();
+
+  const context = await browser.newContext({
+    storageState,
+    viewport: { height: 900, width: 1280 },
+  });
+
+  const page = await context.newPage();
+
+  await page.goto(`${onboardingServer.url}/home`);
+  await expect(page).toHaveURL(/\/onboarding\/resume$/u);
+  await expect(page.getByRole("heading", { level: 2, name: /Upload your resume/u })).toBeVisible();
 
   await context.close();
   await request.dispose();

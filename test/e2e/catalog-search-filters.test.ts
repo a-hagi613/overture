@@ -52,7 +52,7 @@ test("the role filter narrows search results to the tagged role and /search redi
   appServerUrl,
 }) => {
   await ownerPage.goto(`${appServerUrl}/search?q=${encodeURIComponent("Manager")}`);
-  await expect(ownerPage).toHaveURL(/\/applications\?q=Manager/u);
+  await expect(ownerPage).toHaveURL(/\/tracker\?q=Manager/u);
 
   const unfiltered = await apiSearchHits(
     ownerPage,

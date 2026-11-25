@@ -5,7 +5,6 @@ import { useState } from "react";
 import { copy } from "../../shared/copy.ts";
 import { monthName } from "../lib/calendar-format.ts";
 import { Calendar } from "./ui/calendar.tsx";
-import { dsCardTitle } from "./ui/ds.ts";
 
 export function CalendarDatePickerPopover({
   month,
@@ -34,14 +33,16 @@ export function CalendarDatePickerPopover({
     >
       <Trigger asChild>
         <button
-          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1 text-left transition hover:border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground md:min-h-0"
+          className="inline-flex min-h-11 min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border border-transparent px-1.5 py-1 text-left transition hover:border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground sm:gap-2 sm:px-2 md:min-h-0"
           id="calendar-month"
           type="button"
         >
-          <span className={dsCardTitle}>{`${monthName(monthNumber)} ${String(year)}`}</span>
-          <span className="sr-only">{` — ${copy.calendar.jumpToDate}`}</span>
-          <CalendarDays aria-hidden="true" className="text-muted-foreground" size={17} />
-          <ChevronDown aria-hidden="true" className="text-muted-foreground" size={14} />
+          <span className="whitespace-nowrap font-sans text-base font-semibold text-foreground sm:text-panel-title">
+            {`${monthName(monthNumber)} ${String(year)}`}
+          </span>
+          <span className="sr-only">{`: ${copy.calendar.jumpToDate}`}</span>
+          <CalendarDays aria-hidden="true" className="shrink-0 text-muted-foreground" size={16} />
+          <ChevronDown aria-hidden="true" className="shrink-0 text-muted-foreground" size={14} />
         </button>
       </Trigger>
       <Portal>

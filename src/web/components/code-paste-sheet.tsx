@@ -7,17 +7,11 @@ import { copy } from "../../shared/copy.ts";
 import { clockText, remainingMs, useServerTime } from "../lib/code-wait-api.ts";
 import { useModalSheet } from "../lib/use-modal-sheet.ts";
 import { CodePasteHeader } from "./code-paste-header.tsx";
+import { Badge } from "./ui/badge.tsx";
+import { Button } from "./ui/button.tsx";
+import { Input } from "./ui/input.tsx";
 
 export type CodePasteMode = "waiting" | "no_code" | "expired" | "accepted";
-
-const PRIMARY =
-  "inline-flex min-h-10 max-[767px]:min-h-11 flex-none cursor-pointer items-center justify-center rounded-md border border-foreground bg-foreground px-5 text-sm font-semibold text-primary-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] hover:bg-btn-hover disabled:opacity-60";
-
-const SECONDARY =
-  "inline-flex min-h-10 max-[767px]:min-h-11 flex-none cursor-pointer items-center justify-center rounded-md border border-input bg-card px-5 text-sm font-semibold hover:bg-muted";
-
-const PILL =
-  "inline-flex items-center rounded-full px-3 py-1 text-eyebrow font-semibold leading-normal";
 
 function stateCopy(mode: CodePasteMode, company: string) {
   switch (mode) {
@@ -91,7 +85,8 @@ export function CodePasteSheet({
     <dialog
       aria-labelledby="code-paste-title"
       aria-modal="true"
-      className="board m-0 fixed inset-x-4 bottom-4 z-60 flex max-h-[calc(100dvh-32px)] max-w-none flex-col overflow-y-auto rounded-[16px] border border-border bg-card px-6 pt-3 pb-6 text-foreground shadow-lift md:inset-x-auto md:inset-y-0 md:right-0 md:bottom-0 w-[520px] max-[1699px]:w-[468px] max-md:w-auto md:rounded-none md:border-y-0 md:border-r-0 md:px-7 md:pt-5"
+      className="fixed inset-x-4 bottom-4 z-50 m-0 flex max-h-5/6 w-auto max-w-none flex-col overflow-y-auto rounded-2xl border border-border bg-card px-6 pb-6 pt-3 text-foreground shadow-lift md:inset-y-0 md:left-auto md:right-0 md:bottom-0 md:max-h-none md:w-full md:max-w-lg md:rounded-none md:border-y-0 md:border-l md:border-r-0 md:px-7 md:pt-5 xl:max-w-xl"
+      data-scroll-region
       data-testid="code-paste-sheet"
       ref={sheet}
     >
@@ -101,47 +96,47 @@ export function CodePasteSheet({
         onClick={onClose}
         type="button"
       >
-        <span className="h-[4px] w-[42px] rounded-full bg-input" />
+        <span className="h-1 w-11 rounded-full bg-input" />
       </button>
 
       <CodePasteHeader onClose={onClose} wait={wait} />
 
       {typing ? (
-        <p className="mt-6 text-eyebrow font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+        <p className="mt-6 text-eyebrow font-semibold uppercase tracking-wider text-muted-foreground">
           {copy.codePaste.eyebrow}
         </p>
       ) : (
-        <p className="mt-4 flex flex-wrap gap-2">
-          <span className={`${PILL} ${closed ? "bg-need-soft text-need" : "bg-ok-soft text-ok"}`}>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Badge variant={closed ? "need" : "ok"}>
             {closed ? copy.codePaste.expired.pill : copy.codePaste.accepted.pill}
-          </span>
-          {closed ? null : (
-            <span className={`${PILL} bg-muted text-foreground`}>
-              {copy.codePaste.accepted.checking}
-            </span>
-          )}
-        </p>
+          </Badge>
+          {closed ? null : <Badge variant="outline">{copy.codePaste.accepted.checking}</Badge>}
+        </div>
       )}
 
-      <h3 className="serif mt-6 text-card-title leading-[1.15]" id="code-paste-title">
-        {entry.titlePlain} <span className="italic">{entry.titleItalic}</span>
+      <h3
+        className="mt-5 font-serif text-card-title leading-tight text-foreground"
+        id="code-paste-title"
+      >
+        {`${entry.titlePlain} ${entry.titleItalic}`}
       </h3>
 
-      <p className="mt-8 text-sm leading-[1.55] text-muted-foreground">{entry.body}</p>
+      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{entry.body}</p>
 
       {finished ? null : (
         <div className="mt-4">
-          <label className="text-xs font-semibold" htmlFor="code-paste-code">
+          <label className="text-xs font-semibold text-foreground" htmlFor="code-paste-code">
             {copy.codePaste.label}
           </label>
-          <input
-            aria-describedby={invalid || shownError !== null ? "code-paste-error" : undefined}
+          <Input
+            ariaDescribedBy={invalid || shownError !== null ? "code-paste-error" : undefined}
             autoComplete="one-time-code"
-            className={`mono mt-2 h-[50px] w-full rounded-md border border-input px-3 text-sm tracking-[0.3em] uppercase placeholder:normal-case placeholder:tracking-[0.28em] placeholder:text-muted-foreground focus:border-foreground ${
+            className={`mt-2 h-12 font-mono text-sm uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal ${
               closed ? "bg-muted text-muted-foreground" : "bg-card"
             }`}
             disabled={closed}
             id="code-paste-code"
+            invalid={invalid || shownError !== null}
             maxLength={8}
             onChange={(event) => {
               setCode(event.target.value);
@@ -159,9 +154,11 @@ export function CodePasteSheet({
             <>
               <div className="mt-4 flex items-baseline justify-between gap-3">
                 <span className="text-xs text-muted-foreground">{copy.codePaste.timeLeft}</span>
-                <span className="mono text-xs">{clockText(remaining)}</span>
+                <span className="font-mono text-xs tabular-nums text-foreground">
+                  {clockText(remaining)}
+                </span>
               </div>
-              <div aria-hidden="true" className="mt-2 h-[3px] w-full rounded-full bg-muted">
+              <div aria-hidden="true" className="mt-2 h-1 w-full rounded-full bg-muted">
                 <span
                   className="block h-full rounded-full bg-signal"
                   style={{ width: `${String(Math.min(100, (remaining / total) * 100))}%` }}
@@ -173,7 +170,7 @@ export function CodePasteSheet({
       )}
 
       {invalid || shownError !== null ? (
-        <p className="mt-2 text-xs leading-[1.5] text-need" id="code-paste-error" role="alert">
+        <p className="mt-2 text-xs leading-relaxed text-need" id="code-paste-error" role="alert">
           {invalid ? copy.codePaste.invalid : shownError}
         </p>
       ) : null}
@@ -181,16 +178,16 @@ export function CodePasteSheet({
       <div className="mt-6 flex flex-wrap items-center gap-2.5">
         {typing ? (
           <>
-            <button className={PRIMARY} disabled={pending} onClick={submit} type="button">
+            <Button disabled={pending} onClick={submit} size="default" variant="primary">
               {copy.codePaste.waiting.primary}
-            </button>
+            </Button>
             {shown === "waiting" ? (
-              <button className={SECONDARY} onClick={onNoCode} type="button">
+              <Button onClick={onNoCode} size="default" variant="secondary">
                 {copy.codePaste.waiting.secondary}
-              </button>
+              </Button>
             ) : (
               <Link
-                className="inline-flex min-h-11 items-center text-sm font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground md:min-h-10"
+                className="inline-flex min-h-11 items-center text-sm font-semibold text-foreground underline decoration-input underline-offset-4 hover:decoration-foreground md:min-h-10"
                 to="/profile/account"
               >
                 {copy.codePaste.noCode.secondary}
@@ -199,12 +196,14 @@ export function CodePasteSheet({
           </>
         ) : (
           <>
-            <Link className={PRIMARY} onClick={onClose} to="/home">
-              {copy.codePaste.expired.primary}
-            </Link>
-            <Link className={SECONDARY} to="/applications">
-              {copy.codePaste.expired.secondary}
-            </Link>
+            <Button asChild size="default" variant="primary">
+              <Link onClick={onClose} to="/home">
+                {copy.codePaste.expired.primary}
+              </Link>
+            </Button>
+            <Button asChild size="default" variant="secondary">
+              <Link to="/tracker">{copy.codePaste.expired.secondary}</Link>
+            </Button>
           </>
         )}
       </div>

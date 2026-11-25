@@ -1,27 +1,34 @@
-import { Bell, CircleHelp, Home, Inbox, MessageCircle, Send, SquareKanban } from "lucide-react";
-import { NavLink } from "react-router";
+import {
+  Bell,
+  Calendar,
+  CalendarClock,
+  CircleHelp,
+  ClipboardList,
+  Columns3,
+  Files,
+  FileText,
+  Home,
+  Inbox,
+  ListChecks,
+  MessageCircle,
+  SlidersHorizontal,
+  UserSearch,
+} from "lucide-react";
+import { Link, NavLink, useLocation } from "react-router";
 
-import type { NavCounts, PrimaryNavKey } from "../lib/nav-api.ts";
+import type { NavCounts } from "../lib/nav-api.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { NAV_DESTINATIONS, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
-import { SidebarJobProfile } from "./sidebar-job-profile.tsx";
-import { Badge } from "./ui/badge.tsx";
+import { isSidebarNavActive, navBadgeClass, navBadgeCount, navLabel } from "../lib/nav-api.ts";
+import { SidebarNavGroup } from "./sidebar-nav-group.tsx";
+import type { SidebarGroupItem } from "./sidebar-nav-group.tsx";
 import { Separator } from "./ui/separator.tsx";
 
-const NAV_ICONS: Record<PrimaryNavKey, typeof Home> = {
-  applications: SquareKanban,
-  home: Home,
-  inbox: Inbox,
-  ready: Send,
-  review: CircleHelp,
-};
-
 const ROW_CLASS =
-  "relative flex min-h-9 items-center gap-3 rounded-md border px-2.5 text-sm font-medium transition";
+  "relative flex min-h-8 items-center gap-3 rounded-md border px-2.5 text-sm font-medium transition";
 
 const ROW_IDLE = "border-transparent text-foreground hover:bg-muted";
-const ROW_ACTIVE = "border-border bg-card text-foreground shadow-sh";
+const ROW_ACTIVE = "border-border bg-card text-foreground";
 
 export function SideNav({
   counts,
@@ -34,59 +41,158 @@ export function SideNav({
   showLabels: boolean;
   unreadNotifications?: number;
 }) {
+  const { pathname, search } = useLocation();
+  const homeActive = isSidebarNavActive("home", pathname, search);
+  const readyCount = navBadgeCount(counts, "ready");
+  const reviewCount = navBadgeCount(counts, "review");
+  const inboxCount = navBadgeCount(counts, "inbox");
+
+  const applicationsItems: SidebarGroupItem[] = [
+    {
+      badgeClass: navBadgeClass("ready"),
+      badgeCount: readyCount,
+      badgeKey: "ready",
+      icon: ListChecks,
+      isActive: isSidebarNavActive("ready", pathname, search),
+      key: "ready",
+      label: copy.nav.ready,
+      srLabel: navLabel("ready", readyCount),
+      to: "/ready",
+    },
+    {
+      badgeClass: navBadgeClass("review"),
+      badgeCount: reviewCount,
+      badgeKey: "review",
+      icon: CircleHelp,
+      isActive: isSidebarNavActive("review", pathname, search),
+      key: "review",
+      label: copy.nav.review,
+      srLabel: navLabel("review", reviewCount),
+      to: "/review",
+    },
+    {
+      icon: Columns3,
+      isActive: isSidebarNavActive("tracker", pathname, search),
+      key: "tracker",
+      label: copy.nav.tracker,
+      srLabel: navLabel("tracker", 0),
+      to: "/tracker",
+    },
+  ];
+
+  const profileItems: SidebarGroupItem[] = [
+    {
+      icon: FileText,
+      isActive: pathname === "/profile/resume",
+      key: "resume",
+      label: copy.nav.profileMenu.resume,
+      to: "/profile/resume",
+    },
+    {
+      icon: SlidersHorizontal,
+      isActive: pathname === "/profile/preferences",
+      key: "preferences",
+      label: copy.nav.profileMenu.preferences,
+      to: "/profile/preferences",
+    },
+    {
+      icon: ClipboardList,
+      isActive: pathname === "/profile/details",
+      key: "details",
+      label: copy.nav.profileMenu.details,
+      to: "/profile/details",
+    },
+  ];
+
+  const followUpsItems: SidebarGroupItem[] = [
+    {
+      badgeClass: navBadgeClass("inbox"),
+      badgeCount: inboxCount,
+      badgeKey: "inbox",
+      icon: Inbox,
+      isActive: isSidebarNavActive("inbox", pathname, search),
+      key: "inbox",
+      label: copy.nav.inbox,
+      srLabel: navLabel("inbox", inboxCount),
+      to: "/inbox",
+    },
+    {
+      icon: Calendar,
+      isActive: isSidebarNavActive("calendar", pathname, search),
+      key: "calendar",
+      label: copy.nav.calendar,
+      srLabel: navLabel("calendar", 0),
+      to: "/calendar",
+    },
+  ];
+
+  const applicationsBadgeClass = reviewCount > 0 ? navBadgeClass("review") : navBadgeClass("ready");
+
   return (
     <nav aria-label={copy.nav.label} className="flex w-full flex-col gap-0.5">
-      {NAV_DESTINATIONS.map((destination) => {
-        const count = navBadgeCount(counts, destination.glyph);
-        const Icon = NAV_ICONS[destination.glyph];
+      <Link
+        aria-current={homeActive ? "page" : undefined}
+        className={`${ROW_CLASS} ${homeActive ? ROW_ACTIVE : ROW_IDLE} ${showLabels ? "" : "justify-center"}`}
+        onClick={onNavigate}
+        to="/home"
+      >
+        <span className="sr-only">{navLabel("home", 0)}</span>
+        {homeActive ? (
+          <span
+            aria-hidden="true"
+            className="absolute -left-px bottom-1.5 top-1.5 w-0.5 rounded-full bg-signal"
+          />
+        ) : null}
+        <Home aria-hidden="true" className="shrink-0" size={18} />
+        {showLabels ? (
+          <span aria-hidden="true" className="whitespace-nowrap">
+            {copy.nav.home}
+          </span>
+        ) : null}
+      </Link>
 
-        return (
-          <NavLink
-            end={destination.to === "/home"}
-            key={destination.to}
-            onClick={onNavigate}
-            to={destination.to}
-          >
-            {({ isActive }) => (
-              <span
-                className={`${ROW_CLASS} ${isActive ? ROW_ACTIVE : ROW_IDLE} ${showLabels ? "" : "justify-center"}`}
-              >
-                <span className="sr-only">{navLabel(destination.glyph, count)}</span>
-                {isActive ? (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -left-px bottom-2 top-2 w-0.5 rounded-full bg-signal"
-                  />
-                ) : null}
-                <Icon aria-hidden="true" className="shrink-0" size={20} />
-                {showLabels ? (
-                  <span aria-hidden="true" className="whitespace-nowrap">
-                    {copy.nav[destination.glyph]}
-                  </span>
-                ) : null}
-                {count === 0 ? null : (
-                  <span
-                    aria-hidden="true"
-                    className={`${
-                      showLabels
-                        ? "ml-auto inline-flex min-w-5 px-1.5"
-                        : "absolute right-1 top-0.5 inline-flex min-w-4 px-1"
-                    } ${navBadgeClass(
-                      destination.glyph,
-                    )} h-5 items-center justify-center rounded-full text-xs font-semibold tabular-nums`}
-                    data-nav-badge={destination.glyph}
-                  >
-                    {count}
-                  </span>
-                )}
-              </span>
-            )}
-          </NavLink>
-        );
-      })}
-      <Separator className="my-1" />
-      <SidebarJobProfile onNavigate={onNavigate} wide={showLabels} />
-      <Separator className="my-1" />
+      <Separator className="my-2.5" />
+
+      <SidebarNavGroup
+        badgeClass={applicationsBadgeClass}
+        badgeCount={readyCount + reviewCount}
+        icon={Files}
+        items={applicationsItems}
+        label={copy.nav.applicationsGroup}
+        menuLabel={copy.nav.applicationsMenuLabel}
+        onNavigate={onNavigate}
+        storageKey="overture.sidebar.applicationsOpen"
+        wide={showLabels}
+      />
+
+      <Separator className="my-1.5" />
+
+      <SidebarNavGroup
+        icon={UserSearch}
+        items={profileItems}
+        label={copy.nav.jobProfile}
+        menuLabel={copy.nav.jobProfileMenuLabel}
+        onNavigate={onNavigate}
+        storageKey="overture.jobProfileOpen"
+        wide={showLabels}
+      />
+
+      <Separator className="my-1.5" />
+
+      <SidebarNavGroup
+        badgeClass={navBadgeClass("inbox")}
+        badgeCount={inboxCount}
+        icon={CalendarClock}
+        items={followUpsItems}
+        label={copy.nav.followUpsGroup}
+        menuLabel={copy.nav.followUpsMenuLabel}
+        onNavigate={onNavigate}
+        storageKey="overture.sidebar.followUpsOpen"
+        wide={showLabels}
+      />
+
+      <Separator className="my-1.5" />
+
       <NavLink onClick={onNavigate} to="/notifications">
         {({ isActive }) => (
           <span className={`${ROW_CLASS} ${isActive ? ROW_ACTIVE : ROW_IDLE}`}>
@@ -98,23 +204,27 @@ export function SideNav({
             {isActive ? (
               <span
                 aria-hidden="true"
-                className="absolute -left-px bottom-2 top-2 w-0.5 rounded-full bg-signal"
+                className="absolute -left-px bottom-1.5 top-1.5 w-0.5 rounded-full bg-signal"
               />
             ) : null}
-            <Bell aria-hidden="true" className="shrink-0" size={20} />
+            <Bell aria-hidden="true" className="shrink-0" size={18} />
             {showLabels ? (
               <span aria-hidden="true" className="whitespace-nowrap">
                 {copy.shell.notificationsEmpty}
               </span>
             ) : null}
             {unreadNotifications > 0 ? (
-              <Badge ariaHidden className="ml-auto tabular-nums" variant="signal">
+              <span
+                aria-hidden="true"
+                className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-signal-soft px-1.5 text-xs font-semibold tabular-nums text-signal-text"
+              >
                 {unreadNotifications}
-              </Badge>
+              </span>
             ) : null}
           </span>
         )}
       </NavLink>
+
       <NavLink onClick={onNavigate} to="/support">
         {({ isActive }) => (
           <span
@@ -123,10 +233,10 @@ export function SideNav({
             {isActive ? (
               <span
                 aria-hidden="true"
-                className="absolute -left-px bottom-2 top-2 w-0.5 rounded-full bg-signal"
+                className="absolute -left-px bottom-1.5 top-1.5 w-0.5 rounded-full bg-signal"
               />
             ) : null}
-            <MessageCircle aria-hidden="true" className="shrink-0" size={20} />
+            <MessageCircle aria-hidden="true" className="shrink-0" size={18} />
             {showLabels ? (
               <span className="whitespace-nowrap">{copy.nav.support}</span>
             ) : (

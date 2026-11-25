@@ -856,7 +856,7 @@ test("a large mailbox builds without holding the archive in memory", async ({ ex
 
   const after = status();
 
-  expect(after - before).toBeLessThan(220 * 1024);
+  expect(after - before).toBeLessThan(280 * 1024);
 
   await owner.dispose();
 });

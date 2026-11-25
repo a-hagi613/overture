@@ -2,7 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import type { CompanyBrandKey } from "./company-brands-data.ts";
 
-import { dsCardTitle, dsEyebrow, dsMono } from "../ui/ds.ts";
+import { dsDisplayCardTitle, dsEyebrow, dsMono } from "../ui/ds.ts";
 import { companyBrands } from "./company-brands-data.ts";
 import { CompanyBrandTile } from "./company-brands.tsx";
 import { LANDING_COPY } from "./landing-copy.ts";
@@ -53,7 +53,7 @@ export function LandingHeroCard({
       <div className="flex items-center gap-3">
         <CompanyBrandTile brandKey={card.brandKey} />
         <div className="min-w-0 flex-1">
-          <p className={`${dsCardTitle} truncate`}>{card.role}</p>
+          <p className={`${dsDisplayCardTitle} truncate`}>{card.role}</p>
           <p className="truncate text-xs text-muted-foreground sm:text-sm">{companyName}</p>
         </div>
         <figure

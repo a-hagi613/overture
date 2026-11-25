@@ -1,5 +1,5 @@
 import { BrandMark } from "../brand-mark.tsx";
-import { dsCardTitle, dsContainer, dsNavLink } from "../ui/ds.ts";
+import { dsContainer, dsDisplayCardTitle, dsNavLink } from "../ui/ds.ts";
 import { LANDING_COPY } from "./landing-copy.ts";
 
 const FOOTER_LINKS = [
@@ -20,7 +20,7 @@ export function LandingFooter() {
         <div className="flex items-center justify-between gap-3 sm:justify-start">
           <div className="flex items-center gap-2.5">
             <BrandMark size={26} />
-            <span className={dsCardTitle}>{LANDING_COPY.brand}</span>
+            <span className={dsDisplayCardTitle}>{LANDING_COPY.brand}</span>
           </div>
           <span className="text-xs text-muted-foreground">{LANDING_COPY.footer.copyright}</span>
         </div>

@@ -6,14 +6,14 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "border border-foreground bg-foreground text-primary-ink shadow-sh hover:-translate-y-px hover:border-btn-hover hover:bg-btn-hover",
+          "border border-foreground bg-foreground text-primary-ink hover:border-btn-hover hover:bg-btn-hover",
         secondary:
-          "border border-input bg-card text-foreground shadow-sh hover:-translate-y-px hover:border-foreground/30 hover:bg-muted hover:text-foreground",
+          "border border-input bg-card text-foreground hover:border-foreground/30 hover:bg-muted hover:text-foreground",
         outline: "border border-input bg-transparent text-foreground hover:bg-muted",
         ghost:
           "border border-transparent bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
         destructive:
-          "border border-need bg-need text-primary-ink shadow-sh hover:-translate-y-px hover:border-need/85 hover:bg-need/85",
+          "border border-need bg-need text-primary-ink hover:border-need/85 hover:bg-need/85",
         link: "border-0 bg-transparent px-0 max-md:min-h-11 text-foreground underline decoration-input underline-offset-4 hover:decoration-foreground",
       },
       size: {

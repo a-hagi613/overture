@@ -4,7 +4,7 @@ import { copy } from "../../shared/copy.ts";
 import { BrandMark } from "./brand-mark.tsx";
 import { LandingHeroStack } from "./landing/landing-hero-stack.tsx";
 import { Badge } from "./ui/badge.tsx";
-import { dsBody, dsCardTitle, dsLead } from "./ui/ds.ts";
+import { dsBody, dsDisplayCardTitle, dsLead } from "./ui/ds.ts";
 import { Separator } from "./ui/separator.tsx";
 
 export function SignInStory({ mode = "signin" }: { mode?: "signin" | "signup" }) {
@@ -41,7 +41,7 @@ export function SignInStory({ mode = "signin" }: { mode?: "signin" | "signup" })
             to="/"
           >
             <BrandMark size={32} />
-            <span className={dsCardTitle}>{copy.app.name}</span>
+            <span className={dsDisplayCardTitle}>{copy.app.name}</span>
           </Link>
           <Badge size="eyebrow" variant="signal">
             {v.pill}

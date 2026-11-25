@@ -9,6 +9,7 @@ import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
+import { Textarea } from "./ui/textarea.tsx";
 
 const COVER_LETTER_FACT_KEY = "cover_letter_template";
 const cl = copy.nav.profilePages.coverLetter;
@@ -21,7 +22,7 @@ const DEFAULT_COVER_LETTER = [
 ].join("\n\n");
 
 const blankClass =
-  "inline rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-signal-text";
+  "inline rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-signal-text";
 
 function renderTemplateParagraph(paragraph: string, index: number) {
   const parts = paragraph.split(/(?<token>\{[a-z0-9_]+\})/giu);
@@ -101,7 +102,7 @@ export function CoverLetterTemplateCard() {
   const paragraphs = currentText.split(/\n{2,}/u).filter((part) => part.trim() !== "");
 
   return (
-    <Card ariaLabelledBy="cover-letter-template" className="mt-6 p-5 md:p-6">
+    <Card ariaLabelledBy="cover-letter-template" className="p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2.5">
@@ -123,9 +124,9 @@ export function CoverLetterTemplateCard() {
 
       {editing ? (
         <div className="mt-5 space-y-3">
-          <textarea
-            aria-label={cl.title}
-            className="min-h-64 w-full rounded-xl border border-input bg-background p-4 font-serif text-base leading-relaxed text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+          <Textarea
+            ariaLabel={cl.title}
+            className="min-h-64 rounded-xl bg-background p-4 font-serif text-base"
             onChange={(event) => {
               setDraft(event.target.value);
             }}

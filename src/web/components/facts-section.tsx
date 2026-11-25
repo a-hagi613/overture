@@ -5,7 +5,8 @@ import { Link, useLocation } from "react-router";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
-import { fetchProfileFacts, saveProfileFacts } from "../lib/profile-api.ts";
+import { factLabelFor, isTier2FactKey, TIER_1_FACT_KEYS } from "../../shared/facts.ts";
+import { fetchProfileFacts, fetchStrengthen, saveProfileFacts } from "../lib/profile-api.ts";
 import { FactRow } from "./fact-row.tsx";
 import { SourceChip } from "./source-chip.tsx";
 import { StrengthenFacts } from "./strengthen-facts.tsx";
@@ -18,29 +19,10 @@ import { SectionSkeleton } from "./section-skeleton.tsx";
 
 type Tier = "tier1" | "tier2" | "tier3";
 
+const TIER_1_ORDER: readonly string[] = [...TIER_1_FACT_KEYS];
+
 function isTier(value: string): value is Tier {
   return value === "tier1" || value === "tier2" || value === "tier3";
-}
-
-function chipForKind(kind: string) {
-  const { facts } = copy.profile;
-
-  if (kind === "fromResume") {
-    return <SourceChip>{facts.fromResume}</SourceChip>;
-  }
-
-  if (kind === "typed") {
-    return <SourceChip variant="dashed">{facts.typedHere}</SourceChip>;
-  }
-
-  return <SourceChip variant="dashed">{facts.assignedBy}</SourceChip>;
-}
-
-function keyForLabel(label: string) {
-  return label
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/gu, "_")
-    .replaceAll(/^_|_$/gu, "");
 }
 
 function readableFactKey(key: string) {
@@ -49,8 +31,29 @@ function readableFactKey(key: string) {
   return clean.replaceAll(/[_-]+/gu, " ").replace(/^\w/u, (letter) => letter.toUpperCase());
 }
 
+function chipForFactSource(source: string | undefined, key: string) {
+  const { facts } = copy.profile;
+
+  if (source === "resume") {
+    return <SourceChip>{facts.fromResume}</SourceChip>;
+  }
+
+  if (key === "apply_email") {
+    return <SourceChip variant="dashed">{facts.assignedBy}</SourceChip>;
+  }
+
+  return <SourceChip variant="dashed">{facts.typedHere}</SourceChip>;
+}
+
+function tier1SortOrder(key: string) {
+  const index = TIER_1_ORDER.indexOf(key);
+
+  return index === -1 ? TIER_1_ORDER.length : index;
+}
+
 export function FactsSection() {
   const { facts } = copy.profile;
+  const pw = copy.profileWorkspace;
   const { hash } = useLocation();
   const queryClient = useQueryClient();
   const [tier, setTier] = useState<Tier>(hash === "#profile-strengthen" ? "tier2" : "tier1");
@@ -59,6 +62,11 @@ export function FactsSection() {
   const factsQuery = useQuery({
     queryFn: fetchProfileFacts,
     queryKey: ["profile-facts"],
+  });
+
+  const strengthenQuery = useQuery({
+    queryFn: fetchStrengthen,
+    queryKey: ["profile-strengthen"],
   });
 
   const save = useMutation({
@@ -72,13 +80,33 @@ export function FactsSection() {
     },
   });
 
-  const allServerFacts = factsQuery.data?.facts ?? [];
+  const allServerFacts = (factsQuery.data?.facts ?? []).filter(
+    (entry) => entry.key !== "cover_letter_template",
+  );
 
   const learnedFacts = allServerFacts.filter(
     (entry) => entry.key.startsWith("q:") || entry.source === "review",
   );
 
-  const serverByKey = new Map(allServerFacts.map((entry) => [entry.key, entry.value]));
+  const tier2Answered = allServerFacts.filter(
+    (entry) =>
+      !entry.key.startsWith("q:") && entry.source !== "review" && isTier2FactKey(entry.key),
+  );
+
+  const tier1Facts = allServerFacts
+    .filter(
+      (entry) =>
+        !entry.key.startsWith("q:") && entry.source !== "review" && !isTier2FactKey(entry.key),
+    )
+    .toSorted((left, right) => tier1SortOrder(left.key) - tier1SortOrder(right.key));
+
+  const tier2RemainingCount = strengthenQuery.data?.facts.length ?? 0;
+  const tier2TotalCount = tier2Answered.length + tier2RemainingCount;
+
+  const tier2CountText =
+    strengthenQuery.data === undefined
+      ? String(tier2Answered.length)
+      : `${String(tier2Answered.length)}/${String(tier2TotalCount)}`;
 
   const clearLocalEdit = (key: string) => {
     setLocalEdits((current) =>
@@ -86,12 +114,12 @@ export function FactsSection() {
     );
   };
 
-  const persistFact = (key: string, label: string, nextValue: string) => {
+  const persistFact = (key: string, label: string, nextValue: string, scope: string) => {
     const previousValue = localEdits[key];
 
     setLocalEdits((current) => ({ ...current, [key]: nextValue }));
 
-    save.mutate([{ key, value: nextValue }], {
+    save.mutate([{ key, scope, value: nextValue }], {
       onError: () => {
         if (previousValue === undefined) {
           clearLocalEdit(key);
@@ -103,7 +131,7 @@ export function FactsSection() {
       },
       onSuccess: () => {
         clearLocalEdit(key);
-        toast.success(`Saved ${label}.`);
+        toast.success(pw.factSavedToast(label));
       },
     });
   };
@@ -113,7 +141,7 @@ export function FactsSection() {
   }
 
   return (
-    <Card ariaLabelledBy="profile-facts-heading" className="mt-6 p-5 md:p-6" id="profile-facts">
+    <Card ariaLabelledBy="profile-facts-heading" className="p-5 md:p-6" id="profile-facts">
       <h2 className={dsCardTitle} id="profile-facts-heading">
         {`${facts.titlePlain} ${facts.titleItalic}`}
       </h2>
@@ -131,19 +159,19 @@ export function FactsSection() {
           value={tier}
         >
           <SegmentedControlItem
-            className="flex-1 whitespace-nowrap max-md:w-full max-md:flex-none"
+            className="flex-1 px-2.5 text-xs whitespace-nowrap max-md:w-full max-md:flex-none"
             value="tier1"
           >
-            {`${facts.tier1.label} (${facts.tier1.count})`}
+            {`${facts.tier1.label} (${String(tier1Facts.length)})`}
           </SegmentedControlItem>
           <SegmentedControlItem
-            className="flex-1 whitespace-nowrap max-md:w-full max-md:flex-none"
+            className="flex-1 px-2.5 text-xs whitespace-nowrap max-md:w-full max-md:flex-none"
             value="tier2"
           >
-            {`${facts.tier2.label} (${facts.tier2.count})`}
+            {`${facts.tier2.label} (${tier2CountText})`}
           </SegmentedControlItem>
           <SegmentedControlItem
-            className="flex-1 whitespace-nowrap max-md:w-full max-md:flex-none"
+            className="flex-1 px-2.5 text-xs whitespace-nowrap max-md:w-full max-md:flex-none"
             value="tier3"
           >
             {`${facts.tier3.label} (${String(learnedFacts.length)})`}
@@ -154,29 +182,41 @@ export function FactsSection() {
       {tier === "tier1" ? (
         <div className="mt-4">
           <p className="max-w-2xl text-xs text-muted-foreground">{facts.tier1.note}</p>
-          <div className="mt-3">
-            {facts.tier1.rows.map((row) => {
-              const factKey = keyForLabel(row.label);
-              const resolvedValue = localEdits[factKey] ?? serverByKey.get(factKey) ?? row.value;
+          {tier1Facts.length === 0 ? (
+            <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/30 px-5 py-8 text-center">
+              <p className="text-sm text-muted-foreground">{pw.tier1Empty}</p>
+            </div>
+          ) : (
+            <div className="mt-3">
+              {tier1Facts.map((fact) => {
+                const label = factLabelFor(fact.key) || readableFactKey(fact.key);
+                const resolvedValue = localEdits[fact.key] ?? fact.value;
+                const readOnly = fact.key === "apply_email";
 
-              return (
-                <FactRow
-                  action={row.action}
-                  chip={chipForKind(row.chip)}
-                  key={row.label}
-                  kind={row.kind}
-                  label={row.label}
-                  note={row.note}
-                  onSave={(nextValue) => {
-                    persistFact(factKey, row.label, nextValue);
-                  }}
-                  saving={save.isPending}
-                  value={resolvedValue}
-                />
-              );
-            })}
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                const note =
+                  fact.scope === "" || fact.scope === "default"
+                    ? ""
+                    : `${pw.factScopeAccount} · ${fact.scope}`;
+
+                return (
+                  <FactRow
+                    action={readOnly ? "read-only" : "edit"}
+                    chip={chipForFactSource(fact.source, fact.key)}
+                    key={`${fact.key}:${fact.scope}`}
+                    kind={fact.key === "apply_email" || fact.key === "email" ? "mono" : "serif"}
+                    label={label}
+                    note={note}
+                    onSave={(nextValue) => {
+                      persistFact(fact.key, label, nextValue, fact.scope);
+                    }}
+                    saving={save.isPending}
+                    value={resolvedValue}
+                  />
+                );
+              })}
+            </div>
+          )}
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             <p className="text-xs text-muted-foreground">{facts.tier1.foot}</p>
             <div className="flex flex-wrap gap-2">
               <SourceChip>{facts.fromResume}</SourceChip>
@@ -198,7 +238,7 @@ export function FactsSection() {
       {tier === "tier3" ? (
         <div className="mt-4">
           {learnedFacts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-background px-5 py-8 text-center">
+            <div className="rounded-lg border border-dashed border-border bg-muted/30 px-5 py-8 text-center">
               <p className="text-sm font-semibold text-foreground">
                 {copy.nav.profilePages.tier3EmptyTitle}
               </p>
@@ -222,11 +262,11 @@ export function FactsSection() {
                   <FactRow
                     action="edit"
                     chip={<SourceChip variant="dashed">{facts.typedHere}</SourceChip>}
-                    key={fact.key}
+                    key={`${fact.key}:${fact.scope}`}
                     label={label}
-                    note="Reused on future applications"
+                    note={pw.factReusedHint}
                     onSave={(nextValue) => {
-                      persistFact(fact.key, label, nextValue);
+                      persistFact(fact.key, label, nextValue, fact.scope);
                     }}
                     saving={save.isPending}
                     value={resolvedValue}

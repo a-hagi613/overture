@@ -7,7 +7,7 @@ import { copy } from "../../shared/copy.ts";
 import { PAUSE_FIX_PATH } from "../lib/pause-paths.ts";
 import { useRunning } from "../lib/home-api.ts";
 import { Button } from "./ui/button.tsx";
-import { Card } from "./ui/card.tsx";
+import { StatusStrip } from "./ui/status-strip.tsx";
 
 export function HomePauseBanner({ reason }: { reason: PauseReason }) {
   const entry = copy.home.pauseReasons[reason];
@@ -44,19 +44,13 @@ export function HomePauseBanner({ reason }: { reason: PauseReason }) {
   }
 
   return (
-    <Card
+    <StatusStrip
+      action={fix}
       ariaLabelledBy="home-pause"
-      className={`mt-5 flex flex-wrap items-center justify-between gap-x-5 gap-y-3 px-5 py-4 ${
-        needsAttention ? "border-need bg-need-soft" : "border-input bg-card"
-      }`}
-    >
-      <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground" id="home-pause">
-        <span className={`font-semibold ${needsAttention ? "text-need" : "text-foreground"}`}>
-          {entry.title}
-        </span>{" "}
-        {entry.copy}
-      </p>
-      {fix}
-    </Card>
+      className={needsAttention ? "mt-3 border-need/35 bg-need-soft/45" : "mt-3"}
+      description={entry.copy}
+      title={entry.title}
+      titleId="home-pause"
+    />
   );
 }

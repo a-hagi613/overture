@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react";
 
 import { Badge } from "../ui/badge.tsx";
-import { dsBody, dsCardTitle, dsContainer, dsLead, dsSectionHeading } from "../ui/ds.ts";
+import { dsBody, dsContainer, dsDisplayCardTitle, dsLead, dsSectionHeading } from "../ui/ds.ts";
 import { LANDING_COPY } from "./landing-copy.ts";
 
 export function LandingFaqSection() {
@@ -32,7 +32,7 @@ export function LandingFaqSection() {
               open={item.open}
             >
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 py-6 transition hover:underline [&::-webkit-details-marker]:hidden">
-                <span className={dsCardTitle}>{item.q}</span>
+                <span className={dsDisplayCardTitle}>{item.q}</span>
                 <Plus
                   aria-hidden="true"
                   className="h-5 w-5 flex-none text-foreground transition-transform duration-300 group-open:rotate-45"

@@ -4,7 +4,7 @@ import { copy } from "../../shared/copy.ts";
 import { LegalSections } from "./legal-sections.tsx";
 import { LegalShell } from "./legal-shell.tsx";
 import { Card } from "./ui/card.tsx";
-import { dsEyebrow, dsPageTitle } from "./ui/ds.ts";
+import { dsDisplayPageTitle, dsEyebrow } from "./ui/ds.ts";
 
 function splitAccentTitle(title: string) {
   const parts = title.trim().split(/\s+/u);
@@ -31,14 +31,14 @@ export function LegalPage({
   return (
     <LegalShell>
       <p className={dsEyebrow}>{copy.legal.eyebrow}</p>
-      <h1 className={`${dsPageTitle} mt-2`}>
+      <h1 className={`${dsDisplayPageTitle} mt-2`}>
         {plain}
         <em className="italic text-signal">{accent}</em>
       </h1>
       <p className="mt-2 text-xs text-muted-foreground">
         {`${copy.legal.lastUpdated}${copy.legal.metaSeparator}${copy.legal.effective}`}
       </p>
-      <Card className="mt-6 p-6 md:p-8" variant="elevated">
+      <Card className="mt-6 p-6 md:p-8" variant="default">
         <LegalSections sections={sections} />
       </Card>
     </LegalShell>

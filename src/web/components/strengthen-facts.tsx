@@ -8,6 +8,7 @@ import type { StrengthenFact } from "../lib/profile-api.ts";
 import { copy } from "../../shared/copy.ts";
 import { fetchStrengthen, saveStrengthen } from "../lib/profile-api.ts";
 import { ReviewAnswer } from "./review-answer.tsx";
+import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 
 export function StrengthenFacts() {
@@ -52,7 +53,7 @@ export function StrengthenFacts() {
 
     try {
       await save.mutateAsync({ key: fact.key, value });
-      toast.success(`Saved ${fact.label}.`);
+      toast.success(copy.profileWorkspace.factSavedToast(fact.label));
     } catch {
       toast.error(copy.profile.saveFailed);
     }
@@ -99,9 +100,9 @@ export function StrengthenFacts() {
                     value={value}
                   />
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground tabular-nums">
+                <Badge className="mt-2.5" variant="signal">
                   {strengthen.unlocks(fact.unlocked)}
-                </p>
+                </Badge>
               </div>
               <Button
                 ariaLabel={strengthen.saveAria(fact.label)}

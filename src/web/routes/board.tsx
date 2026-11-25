@@ -21,7 +21,7 @@ import {
 } from "../../shared/board.ts";
 import { copy } from "../../shared/copy.ts";
 import { BoardSheet } from "../components/board-sheet.tsx";
-import { OffersBanner } from "../components/offers-banner.tsx";
+import { PageHeader } from "../components/page-header.tsx";
 import { TrackerColumn } from "../components/tracker-column.tsx";
 import { TrackerList } from "../components/tracker-list.tsx";
 import { TrackerMobileTab } from "../components/tracker-mobile-tab.tsx";
@@ -29,6 +29,7 @@ import { TrackerOverlayCard } from "../components/tracker-overlay-card.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { SegmentedControl } from "../components/ui/segmented-control.tsx";
+import { SegmentedControlItem } from "../components/ui/segmented-control-item.tsx";
 import {
   useApplication,
   useBoard,
@@ -56,7 +57,13 @@ const detectLaneCollision: CollisionDetection = (args) => {
 
 const DROPPABLE_LANES = TRACKER_LANES.filter((lane) => lane.droppable);
 
-export function BoardPage({ view }: { view: "board" | "list" }) {
+export function BoardPage({
+  onChangeView,
+  view,
+}: {
+  onChangeView: (next: string) => void;
+  view: "board" | "list";
+}) {
   const {
     data: board,
     isError: boardError,
@@ -108,7 +115,6 @@ export function BoardPage({ view }: { view: "board" | "list" }) {
   const grouped = groupCardsByLane(board, laneOverrides);
   const allCards = TRACKER_LANES.flatMap((lane) => grouped[lane.key]);
   const visibleLanes = TRACKER_LANES.filter((lane) => lane.key !== "closed" || showClosed);
-  const offers = grouped.waiting.filter((card) => card.stage === "offer");
   const closedCount = grouped.closed.length;
 
   const listCards = visibleLanes
@@ -469,14 +475,47 @@ export function BoardPage({ view }: { view: "board" | "list" }) {
   }
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader
+        actions={
+          <div className="flex flex-wrap items-center gap-2 max-md:w-full">
+            {!boardPending && !boardError && closedCount > 0 ? (
+              <Button
+                ariaExpanded={showClosed}
+                ariaPressed={showClosed}
+                className="max-md:min-h-11"
+                onClick={toggleClosed}
+                size="sm"
+                variant="outline"
+              >
+                {showClosed ? copy.board.closed.hide : copy.board.closed.show(closedCount)}
+              </Button>
+            ) : null}
+
+            <SegmentedControl
+              ariaLabel={copy.board.views.label}
+              className="gap-1 max-md:flex-1"
+              onValueChange={onChangeView}
+              value={view}
+            >
+              <SegmentedControlItem className="flex-1 md:flex-none" value="board">
+                {copy.board.views.board}
+              </SegmentedControlItem>
+              <SegmentedControlItem className="flex-1 md:flex-none" value="list">
+                {copy.board.views.list}
+              </SegmentedControlItem>
+            </SegmentedControl>
+          </div>
+        }
+        titleNode={`${copy.board.trackerTitlePlain} ${copy.board.trackerTitleItalic}`}
+      />
+
       {boardPending ? (
-        <Card ariaBusy className="mt-6 p-6">
+        <Card ariaBusy className="mt-3 flex-1 p-5">
           <div className="animate-pulse space-y-3">
             <span className="sr-only">{copy.shell.loadingPage}</span>
             <div className="h-5 w-1/4 rounded bg-muted" />
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-              <div className="h-64 rounded bg-muted" />
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
               <div className="h-64 rounded bg-muted" />
               <div className="h-64 rounded bg-muted" />
               <div className="h-64 rounded bg-muted" />
@@ -487,7 +526,7 @@ export function BoardPage({ view }: { view: "board" | "list" }) {
       ) : null}
 
       {boardError ? (
-        <Card className="mt-6 flex flex-wrap items-center justify-between gap-4 p-6">
+        <Card className="mt-3 flex flex-wrap items-center justify-between gap-4 p-6">
           <p className="text-sm font-semibold text-foreground" role="alert">
             {copy.board.loadFailed}
           </p>
@@ -503,161 +542,137 @@ export function BoardPage({ view }: { view: "board" | "list" }) {
         </Card>
       ) : null}
 
-      {!boardPending && !boardError ? (
-        <>
-          <OffersBanner cards={offers} onOpen={openCard} />
+      {!boardPending && !boardError && view === "list" ? (
+        <div className="mt-3 flex min-h-0 flex-1 flex-col">
+          <fieldset
+            aria-label={copy.board.stagesLabel}
+            className="m-0 flex min-w-0 shrink-0 flex-wrap gap-2 border-0 p-0"
+          >
+            {(["all", ...visibleLanes.map((lane) => lane.key)] as const).map((key) => {
+              const selected = listFilter === key;
+              const count = key === "all" ? visibleCount : (laneCounts.get(key) ?? 0);
 
-          {closedCount > 0 ? (
-            <div className="mt-4 flex justify-end">
-              <Button
-                ariaExpanded={showClosed}
-                ariaPressed={showClosed}
-                className="max-md:min-h-11"
-                onClick={toggleClosed}
-                size="sm"
-                variant="outline"
-              >
-                {showClosed ? copy.board.closed.hide : copy.board.closed.show(closedCount)}
-              </Button>
-            </div>
-          ) : null}
+              const label =
+                key === "all"
+                  ? copy.board.list.all
+                  : (TRACKER_LANES.find((lane) => lane.key === key)?.label ?? key);
 
-          {view === "list" ? (
-            <div className="mt-4">
-              <fieldset
-                aria-label={copy.board.stagesLabel}
-                className="m-0 flex min-h-9 min-w-0 flex-nowrap gap-2 overflow-x-auto border-0 p-0 max-md:-mx-4 max-md:px-4 max-md:py-0.5 md:flex-wrap md:overflow-visible"
-                data-scroll-region
-              >
-                {(["all", ...visibleLanes.map((lane) => lane.key)] as const).map((key) => {
-                  const selected = listFilter === key;
-                  const count = key === "all" ? visibleCount : (laneCounts.get(key) ?? 0);
+              return (
+                <Button
+                  ariaPressed={selected}
+                  className="flex-none"
+                  key={key}
+                  onClick={() => {
+                    writeParam("filter", key === "all" ? null : key, true);
+                  }}
+                  size="sm"
+                  variant={selected ? "primary" : "outline"}
+                >
+                  <span>{label}</span>
+                  <span className="text-xs opacity-75 tabular-nums">{count}</span>
+                </Button>
+              );
+            })}
+          </fieldset>
 
-                  const label =
-                    key === "all"
-                      ? copy.board.list.all
-                      : (TRACKER_LANES.find((lane) => lane.key === key)?.label ?? key);
+          <TrackerList cards={listCards} onOpen={openCard} selectedId={selectedId} />
+        </div>
+      ) : null}
 
-                  return (
-                    <Button
-                      ariaPressed={selected}
-                      className="flex-none rounded-full"
-                      key={key}
-                      onClick={() => {
-                        writeParam("filter", key === "all" ? null : key, true);
-                      }}
-                      size="sm"
-                      variant={selected ? "primary" : "outline"}
-                    >
-                      <span>{label}</span>
-                      <span className="text-xs opacity-75 tabular-nums">{count}</span>
-                    </Button>
-                  );
-                })}
-              </fieldset>
-
-              <TrackerList cards={listCards} onOpen={openCard} selectedId={selectedId} />
+      {!boardPending && !boardError && view === "board" ? (
+        <DndContext
+          collisionDetection={detectLaneCollision}
+          onDragCancel={() => {
+            setActiveDrag(null);
+          }}
+          onDragEnd={handleDragEnd}
+          onDragStart={handleDragStart}
+          sensors={sensors}
+        >
+          {isDesktopBoard ? (
+            <div
+              className={`mt-3 grid min-h-0 flex-1 gap-3 ${
+                showClosed ? "grid-cols-5" : "grid-cols-4"
+              }`}
+            >
+              {visibleLanes.map((lane) => (
+                <TrackerColumn
+                  activeDragLane={activeDrag?.lane ?? null}
+                  cards={grouped[lane.key]}
+                  dotClass={lane.dotClass}
+                  droppable={lane.droppable}
+                  keyboardDragCardId={keyboardDrag?.card.id ?? null}
+                  keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
+                  key={lane.key}
+                  label={lane.label}
+                  lane={lane.key}
+                  linkTo={lane.linkTo}
+                  onCardKeyDown={handleCardKeyDown}
+                  onOpen={openCard}
+                  selectedId={selectedId}
+                />
+              ))}
             </div>
           ) : (
-            <DndContext
-              collisionDetection={detectLaneCollision}
-              onDragCancel={() => {
-                setActiveDrag(null);
-              }}
-              onDragEnd={handleDragEnd}
-              onDragStart={handleDragStart}
-              sensors={sensors}
-            >
-              {isDesktopBoard ? (
-                <div className="mt-6 overflow-x-auto pb-3" data-scroll-region>
-                  <div
-                    className={`grid items-start gap-4 ${
-                      showClosed
-                        ? "grid-cols-[repeat(5,minmax(264px,1fr))]"
-                        : "grid-cols-[repeat(4,minmax(264px,1fr))]"
-                    }`}
-                  >
-                    {visibleLanes.map((lane) => (
-                      <TrackerColumn
-                        accentClass={lane.accentClass}
-                        activeDragLane={activeDrag?.lane ?? null}
-                        cards={grouped[lane.key]}
-                        droppable={lane.droppable}
-                        keyboardDragCardId={keyboardDrag?.card.id ?? null}
-                        keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
-                        key={lane.key}
-                        label={lane.label}
-                        lane={lane.key}
-                        linkTo={lane.linkTo}
-                        onCardKeyDown={handleCardKeyDown}
-                        onOpen={openCard}
-                        selectedId={selectedId}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-5">
-                  <div className="-mx-4 overflow-x-auto px-4" data-scroll-region>
-                    <SegmentedControl
-                      ariaLabel={copy.board.stagesLabel}
-                      className="flex w-full gap-1"
-                      onValueChange={(value) => {
-                        if (isTrackerLaneKey(value)) {
-                          writeParam("filter", value, true);
-                        }
-                      }}
-                      value={mobileLane}
-                    >
-                      {visibleLanes.map((lane) => (
-                        <TrackerMobileTab
-                          activeDragLane={activeDrag?.lane ?? null}
-                          droppable={lane.droppable}
-                          key={lane.key}
-                          label={lane.label}
-                          lane={lane.key}
-                        />
-                      ))}
-                    </SegmentedControl>
-                  </div>
+            <div className="mt-4">
+              <div className="scrollbar-none -mx-4 overflow-x-auto px-4" data-scroll-region>
+                <SegmentedControl
+                  ariaLabel={copy.board.stagesLabel}
+                  className="flex w-full gap-1"
+                  onValueChange={(value) => {
+                    if (isTrackerLaneKey(value)) {
+                      writeParam("filter", value, true);
+                    }
+                  }}
+                  value={mobileLane}
+                >
+                  {visibleLanes.map((lane) => (
+                    <TrackerMobileTab
+                      activeDragLane={activeDrag?.lane ?? null}
+                      droppable={lane.droppable}
+                      key={lane.key}
+                      label={lane.label}
+                      lane={lane.key}
+                    />
+                  ))}
+                </SegmentedControl>
+              </div>
 
-                  <p className="mt-2 text-center text-xs text-muted-foreground">
-                    {copy.board.mobileDropHint}
-                  </p>
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                {copy.board.mobileDropHint}
+              </p>
 
-                  {activeMobileLane === undefined ? null : (
-                    <div className="mt-3">
-                      <TrackerColumn
-                        accentClass={activeMobileLane.accentClass}
-                        activeDragLane={activeDrag?.lane ?? null}
-                        cards={grouped[activeMobileLane.key]}
-                        droppable={activeMobileLane.droppable}
-                        keyboardDragCardId={keyboardDrag?.card.id ?? null}
-                        keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
-                        label={activeMobileLane.label}
-                        lane={activeMobileLane.key}
-                        linkTo={activeMobileLane.linkTo}
-                        onCardKeyDown={handleCardKeyDown}
-                        onOpen={openCard}
-                        selectedId={selectedId}
-                      />
-                    </div>
-                  )}
+              {activeMobileLane === undefined ? null : (
+                <div className="mt-3">
+                  <TrackerColumn
+                    activeDragLane={activeDrag?.lane ?? null}
+                    cards={grouped[activeMobileLane.key]}
+                    dotClass={activeMobileLane.dotClass}
+                    droppable={activeMobileLane.droppable}
+                    keyboardDragCardId={keyboardDrag?.card.id ?? null}
+                    keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
+                    label={activeMobileLane.label}
+                    lane={activeMobileLane.key}
+                    linkTo={activeMobileLane.linkTo}
+                    onCardKeyDown={handleCardKeyDown}
+                    onOpen={openCard}
+                    selectedId={selectedId}
+                  />
                 </div>
               )}
-
-              <DragOverlay>
-                {activeDrag === null ? null : (
-                  <TrackerOverlayCard
-                    card={activeDrag.card}
-                    compact={!isDesktopBoard}
-                    lane={activeDrag.lane}
-                  />
-                )}
-              </DragOverlay>
-            </DndContext>
+            </div>
           )}
-        </>
+
+          <DragOverlay>
+            {activeDrag === null ? null : (
+              <TrackerOverlayCard
+                card={activeDrag.card}
+                compact={!isDesktopBoard}
+                lane={activeDrag.lane}
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
       ) : null}
 
       <output aria-live="polite" className="sr-only">

@@ -73,7 +73,7 @@ export function FactRow(props: {
             >
               <Input
                 ariaLabel={props.label}
-                className="h-9 max-w-md text-sm"
+                className="h-9 min-w-44 flex-1 text-sm sm:max-w-md"
                 onChange={(event) => {
                   setDraft(event.target.value);
                 }}
@@ -97,8 +97,8 @@ export function FactRow(props: {
             <p
               className={
                 props.kind === "mono"
-                  ? "mt-1 break-words font-mono text-sm text-foreground"
-                  : "mt-1 text-base font-medium text-foreground"
+                  ? "mt-1 break-all font-mono text-sm text-foreground"
+                  : "mt-1 break-words text-base font-medium text-foreground"
               }
             >
               {props.value}

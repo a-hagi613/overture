@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Outlet, useNavigate } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { Backdrop } from "./components/backdrop.tsx";
 import { BoardRail } from "./components/board-rail.tsx";
@@ -17,13 +17,16 @@ import { useLiveUpdates } from "./lib/live-events.ts";
 import { useMediaQuery } from "./lib/media-query.ts";
 import { useNavCounts } from "./lib/nav-api.ts";
 import { useUnreadNotificationCount } from "./lib/notifications-api.ts";
+import { useOnboardingState } from "./lib/onboarding-api.ts";
 import { closeTopLayerHost, useTopLayerHost } from "./lib/top-layer-host.ts";
 
 const collapsedStorageKey = "overture.rail";
 
 export function AppShell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: session, isPending } = authClient.useSession();
+  const onboarding = useOnboardingState(session !== null);
   const navCounts = useNavCounts();
   const unreadNotifications = useUnreadNotificationCount();
   const desktop = useMediaQuery("(min-width: 1280px)");
@@ -51,13 +54,19 @@ export function AppShell() {
 
   useLiveUpdates();
 
+  const allowUnonboarded = location.pathname === "/profile/billing";
+  const onboardingBlocked = onboarding.data?.needsOnboarding === true && !allowUnonboarded;
+  const waitingForOnboarding = session !== null && onboarding.isPending && !allowUnonboarded;
+
   useEffect(() => {
     if (!isPending && session === null) {
       void navigate("/signin");
+    } else if (onboardingBlocked) {
+      void navigate("/onboarding", { replace: true });
     }
-  }, [isPending, navigate, session]);
+  }, [isPending, navigate, onboardingBlocked, session]);
 
-  if (isPending || session === null) {
+  if (isPending || session === null || waitingForOnboarding || onboardingBlocked) {
     return <RouteFallback fullScreen />;
   }
 
@@ -124,11 +133,11 @@ export function AppShell() {
           }
         />
         <main
-          className="min-w-0 flex-1 px-4 pb-7 pt-5 outline-none md:px-7 md:pb-10 md:pt-7 2xl:px-14 2xl:pt-8"
+          className="flex min-w-0 flex-1 flex-col px-4 pb-6 pt-5 outline-none md:px-7 md:pb-6 md:pt-6 2xl:px-14 2xl:pt-7"
           id="main-content"
           tabIndex={-1}
         >
-          <div className="mx-auto w-full max-w-7xl">
+          <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col">
             <RouteErrorBoundary insideShell>
               <Suspense fallback={<RouteFallback />}>
                 <Outlet />

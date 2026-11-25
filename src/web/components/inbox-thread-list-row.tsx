@@ -7,19 +7,19 @@ import { dsMono } from "./ui/ds.ts";
 
 function rowBadge(row: InboxThreadRow) {
   if (row.classification === "offer") {
-    return { label: "Offer", variant: "signal" as const };
+    return { label: copy.inbox.classifications.offer, variant: "signal" as const };
   }
 
   if (row.classification === "interview") {
-    return { label: "Interview", variant: "ok" as const };
+    return { label: copy.inbox.classifications.interview, variant: "ok" as const };
   }
 
   if (row.classification === "screening") {
-    return { label: "Screening", variant: "secondary" as const };
+    return { label: copy.inbox.classifications.screening, variant: "secondary" as const };
   }
 
   if (row.classification === "ack") {
-    return { label: "Confirmation", variant: "outline" as const };
+    return { label: copy.inbox.classifications.ack, variant: "outline" as const };
   }
 
   return null;
@@ -43,14 +43,20 @@ export function InboxThreadListRow({
   return (
     <button
       aria-current={selected ? "true" : undefined}
-      className={`flex w-full cursor-pointer items-start gap-3 px-4 py-3.5 text-left transition ${
-        selected ? "bg-card" : "bg-sidebar hover:bg-card"
-      }`}
+      className={`relative flex w-full cursor-pointer items-start gap-3 px-4 py-3.5 text-left transition ${
+        selected ? "bg-card" : "hover:bg-card/60"
+      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground`}
       onClick={() => {
         onSelect(row.id);
       }}
       type="button"
     >
+      {selected ? (
+        <span
+          aria-hidden="true"
+          className="absolute bottom-2 left-0 top-2 w-0.5 rounded-full bg-signal"
+        />
+      ) : null}
       <CompanyAvatar company={row.company} tone={selected ? "signal" : "neutral"} />
       <span className="min-w-0 flex-1">
         <span className="flex items-center justify-between gap-2">
