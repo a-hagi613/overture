@@ -538,6 +538,8 @@ export function createStripePayments(config: StripePaymentsConfig) {
     createSetupSession: async (request: SetupSessionRequest) => {
       const form = new URLSearchParams({
         client_reference_id: request.userId,
+        // Checkout needs a currency to select payment methods in setup mode.
+        currency: "usd",
         mode: "setup",
         "metadata[user_id]": request.userId,
         "setup_intent_data[metadata][user_id]": request.userId,
