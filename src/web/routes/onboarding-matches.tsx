@@ -277,7 +277,8 @@ export function OnboardingMatchesPage() {
     }
   };
 
-  const autoModalOpen = !preview && !modalDismissed && (trialParam || returned || cancelledParam);
+  const autoModalOpen =
+    !modalDismissed && (trialParam || (!preview && (returned || cancelledParam)));
 
   const effectiveModalOpen = modalOpen || autoModalOpen;
 
