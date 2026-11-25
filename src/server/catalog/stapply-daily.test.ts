@@ -14,6 +14,7 @@ import {
   STAPPLY_PROJECTED_COLUMNS,
   buildCatalogManifest,
   buildStapplyIngestQuery,
+  catalogVersionAt,
   isRowDrop,
   mapStapplyRecord,
   seedFreshnessCutoffMs,
@@ -549,6 +550,32 @@ describe("manifest", () => {
       rowCount: 12,
       supportedCount: 7,
     });
+  });
+
+  test("names a build by its time to the second, so a second build on the same day is newer", () => {
+    const morning = catalogVersionAt("2026-11-25T00:01:02.345Z");
+    const afternoon = catalogVersionAt("2026-11-25T08:53:14.012Z");
+
+    expect(morning).toBe("2026-11-25T000102Z");
+    expect(afternoon).toBe("2026-11-25T085314Z");
+    expect(["2026-11-26", afternoon, "2026-11-25", morning].toSorted()).toEqual([
+      "2026-11-25",
+      morning,
+      afternoon,
+      "2026-11-26",
+    ]);
+
+    for (const version of ["2026-11-25", afternoon]) {
+      expect(
+        buildCatalogManifest({
+          version,
+          builtAt: "2026-11-25T08:53:14.012Z",
+          sqliteBytes: new Uint8Array([1]),
+          rowCount: 1,
+          supportedCount: 1,
+        }).version,
+      ).toBe(version);
+    }
   });
 
   test("refuses a version that is not a date", () => {

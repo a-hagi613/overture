@@ -288,6 +288,36 @@ describe("PUT /internal/catalog/snapshot", () => {
     hotSwap.close();
   });
 
+  test("archives and applies a second build of the same day over a date-only catalog", async () => {
+    const { app, hotSwap, objects, directory } = setup();
+    const first = buildCatalog(join(directory, "v1.sqlite"), "Alpha");
+    const second = buildCatalog(join(directory, "v2.sqlite"), "Beta");
+
+    await objects.put(CATALOG_LATEST_KEY, compressCatalogSnapshot(first));
+    expect((await signedPost(app, manifestFor("2026-11-25", first), NOW)).status).toBe(200);
+
+    const compressed = compressCatalogSnapshot(second);
+
+    const upload = await app.request(CATALOG_SNAPSHOT_PATH, {
+      body: compressed,
+      headers: {
+        "content-type": "application/zstd",
+        "x-overture-catalog-version": "2026-11-25T085314Z",
+        ...catalogRefreshHeaders(SECRET, NOW + 1, catalogSha256(compressed)),
+      },
+      method: "PUT",
+    });
+
+    expect(upload.status).toBe(204);
+
+    const refresh = await signedPost(app, manifestFor("2026-11-25T085314Z", second), NOW + 2);
+
+    expect(await refresh.json()).toEqual({ status: "applied", version: "2026-11-25T085314Z" });
+    expect(hotSwap.activeVersion()).toBe("2026-11-25T085314Z");
+
+    hotSwap.close();
+  });
+
   test("refuses to move the published snapshot backwards", async () => {
     const { app, hotSwap, objects, directory } = setup();
     const newer = buildCatalog(join(directory, "v2.sqlite"), "Beta");

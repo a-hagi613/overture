@@ -524,9 +524,10 @@ workflow (`.github/workflows/stapply-daily.yml`) runs at **15:30 UTC** and on `w
   still publishes. The classifier's own Haiku tier runs only when `CATALOG_LLM_MAX_ITEMS` is a positive cap, so no
   daily AI spend happens by default. Last, every open Posting's role tags are rewritten in the role taxonomy (§6.4).
 - **Publish:** `VACUUM`, `PRAGMA optimize` and `PRAGMA integrity_check` run before the file leaves the runner. The
-  workflow publishes `catalog/snapshots/YYYY-MM-DD.sqlite.zst`, `catalog/latest.sqlite.zst` and `catalog/latest.json`
+  workflow publishes `catalog/snapshots/<version>.sqlite.zst`, `catalog/latest.sqlite.zst` and `catalog/latest.json`
   (`{version, sha256, builtAt, rowCount, supportedCount}`, SHA-256 of the **uncompressed** SQLite) to R2, newest seven
-  dated snapshots kept. A repository without R2 credentials relays instead: a signed `PUT /internal/catalog/snapshot`
+  snapshots kept. The version is the build's UTC time to the second (`2026-11-25T085314Z`), so a second build on the
+  same day replaces the first (issue #664). A repository without R2 credentials relays instead: a signed `PUT /internal/catalog/snapshot`
   uploads the compressed file and a signed `POST /internal/catalog/refresh` carries the manifest, both HMAC-SHA256 over
   `<timestamp>\n<body>` and refused when stale, replayed or out of order (docs/DEPLOY.md, the daily catalog ETL;
   `WS-8`, issue #576). A snapshot more than 20 % smaller than the previous manifest is refused unless `allow_row_drop`
