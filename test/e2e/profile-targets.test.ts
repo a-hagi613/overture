@@ -219,15 +219,15 @@ test("the live count changes as targets change, and a draft count stores nothing
   expect(saved.targets.salaryFloorMinor).toBe(14_000_000);
   expect(saved.targets.salaryCurrency).toBe("CAD");
 
-  const midDraft = matchCountSchema.parse(
+  const internDraft = matchCountSchema.parse(
     await (
       await owner.post("/api/profile/targets/match-count", {
-        data: { ...baseTargets, seniorities: ["mid"] },
+        data: { ...baseTargets, seniorities: ["intern"] },
       })
     ).json(),
   );
 
-  expect(midDraft.matchedCount).toBe(0);
+  expect(internDraft.matchedCount).toBe(0);
 
   const unchanged = targetsResponseSchema.parse(
     await (await owner.get("/api/profile/targets")).json(),

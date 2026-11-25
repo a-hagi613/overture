@@ -23,6 +23,7 @@ import { flaggedPostingIds } from "./posting-flags.ts";
 import {
   employmentAccepted,
   languageAccepted,
+  nearestSeniorityDistance,
   optionalFieldConditions,
   seniorityAccepted,
   workplaceAccepted,
@@ -33,17 +34,6 @@ import type { SkipTarget } from "./skip-match.ts";
 const DAY_MS = 86_400_000;
 const POOL_TTL_MS = 30_000;
 const POOL_CACHE_MAX_ENTRIES = 50;
-
-const SENIORITY_ORDER: readonly string[] = [
-  "intern",
-  "entry",
-  "mid",
-  "senior",
-  "staff",
-  "principal",
-  "manager",
-  "director",
-];
 
 type TagDimension = "role" | "subrole" | "granular_role" | "seniority";
 
@@ -162,37 +152,16 @@ function locationMatch(
 }
 
 function seniorityScore(posting: CandidatePosting, targetSeniorities: readonly string[]) {
-  const postingSeniorities: string[] = [];
+  const distance = nearestSeniorityDistance(
+    posting.tags.filter((tag) => tag.dimension === "seniority").map((tag) => tag.value),
+    targetSeniorities,
+  );
 
-  for (const tag of posting.tags) {
-    if (tag.dimension === "seniority") {
-      postingSeniorities.push(tag.value);
-    }
-  }
-
-  if (postingSeniorities.some((value) => targetSeniorities.includes(value))) {
+  if (distance === 0) {
     return 20;
   }
 
-  for (const value of postingSeniorities) {
-    const index = SENIORITY_ORDER.indexOf(value);
-
-    if (index === -1) {
-      continue;
-    }
-
-    const neighbours = [SENIORITY_ORDER[index - 1], SENIORITY_ORDER[index + 1]];
-
-    if (
-      neighbours.some(
-        (neighbour) => neighbour !== undefined && targetSeniorities.includes(neighbour),
-      )
-    ) {
-      return 10;
-    }
-  }
-
-  return 0;
+  return distance === 1 ? 10 : 0;
 }
 
 function recencyScore(postedAt: number | null, at: number) {

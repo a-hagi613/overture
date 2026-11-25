@@ -765,8 +765,9 @@ answers snapshot records the derivation key next to the value.
 
 A posting is a candidate for a user when all hold: open (`status='open'` and `closed_at IS NULL`) and
 `apply_supported=1` (a board without a deterministic apply adapter never matches; issue #563); tags intersect
-`targets.roles` (or subroles); its seniority tag, when it has one, ∈ `seniorities` (a title with no seniority
-word is not excluded); workplace ∈ targets (an unknown workplace passes for a user open to on-site or hybrid work,
+`targets.roles` (or subroles); its seniority tag, when it has one, is fewer than three levels from a wanted
+seniority (levels: intern 0, entry 1, mid 2, senior 3, staff and manager 4, principal and director 5; a title with
+no seniority word is not excluded, and an exact seniority ranks above one level away); workplace ∈ targets (an unknown workplace passes for a user open to on-site or hybrid work,
 never for a remote-only user); location matches a target location (a remote posting matches when its country
 is a target country, or when it names no country and the user has an unscoped `work_auth=yes` (a country-scoped
 answer is never used for a posting that names no country); a

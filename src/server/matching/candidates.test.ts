@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { Seniority } from "../../shared/tag-taxonomy.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 
 import { createCandidateService } from "./candidates.ts";
@@ -286,5 +287,67 @@ describe("a Posting missing an optional field is still matched", () => {
     const ids = await idsFor({ seniority: null });
 
     expect(ids.indexOf("registered-nurse")).toBeLessThan(ids.indexOf("gap"));
+  });
+});
+
+describe("seniority is a ranking signal, blocked only three or more levels away", () => {
+  const nurse = [
+    { dimension: "role", value: "Healthcare" },
+    { dimension: "granular_role", value: "Registered Nurse" },
+  ] as const satisfies readonly SeedTag[];
+
+  async function rankedWith(seeds: readonly [string, Seniority][], seniorities: Seniority[]) {
+    const { candidates, catalog } = fresh();
+
+    for (const [id, seniority] of seeds) {
+      seedPosting(catalog, id, "Registered Nurse", nurse, { seniority });
+    }
+
+    const rows = await candidates.ranked(
+      "user-1",
+      { ...BASE_TARGETS, roles: ["Registered Nurse"], seniorities },
+      ["English"],
+    );
+
+    return rows.map((row) => row.id).filter((id) => seeds.some(([seeded]) => seeded === id));
+  }
+
+  test("one or two levels away still matches; three away is blocked", async () => {
+    const ids = await rankedWith(
+      [
+        ["staff", "staff"],
+        ["entry", "entry"],
+        ["director", "director"],
+        ["intern", "intern"],
+      ],
+      ["senior"],
+    );
+
+    expect(ids).toContain("staff");
+    expect(ids).toContain("entry");
+    expect(ids).toContain("director");
+    expect(ids).not.toContain("intern");
+  });
+
+  test("exact ranks above one level away, which ranks above two", async () => {
+    expect(
+      await rankedWith(
+        [
+          ["two-away", "mid"],
+          ["exact", "staff"],
+          ["one-away", "principal"],
+        ],
+        ["staff"],
+      ),
+    ).toEqual(["exact", "one-away", "two-away"]);
+  });
+
+  test("the nearest of several target seniorities decides", async () => {
+    expect(await rankedWith([["intern", "intern"]], ["entry", "senior"])).toEqual(["intern"]);
+  });
+
+  test("a manager Posting sits level with staff, so an entry-level target never sees it", async () => {
+    expect(await rankedWith([["manager", "manager"]], ["entry"])).toEqual([]);
+    expect(await rankedWith([["manager", "manager"]], ["mid"])).toEqual(["manager"]);
   });
 });
