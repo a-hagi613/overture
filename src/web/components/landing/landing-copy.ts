@@ -29,7 +29,7 @@ export const LANDING_COPY = {
     ctaPrimary: "Start free trial",
     ctaSecondary: "See how it works",
     headlineItalic: "handled.",
-    headlinePlain: "The job hunt,",
+    headlinePlain: "The job search,",
     lead: "Overture watches company career pages and picks out roles that actually fit your resume. For each one, it writes a tailored cover letter and applies straight on the employer's site.",
     liveCounterSuffix: "jobs applied through Overture",
   },

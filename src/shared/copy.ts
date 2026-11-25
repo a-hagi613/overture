@@ -395,7 +395,7 @@ export const copy = {
     notificationsEmpty: "Notifications",
   },
   signIn: {
-    brandTagline: "The job hunt, handled.",
+    brandTagline: "The job search, handled.",
     back: "Back to Overture",
     adminPortalKicker: "The owner's portal",
     adminPortalSignIn: (email: string) => `Sign in with ${email}.`,

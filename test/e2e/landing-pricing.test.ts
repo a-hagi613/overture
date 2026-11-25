@@ -19,7 +19,7 @@ const PUBLIC_ATS = ["Greenhouse", "Lever", "Ashby", "Personio", "Workable"];
 const widths = [390, 768, 1280, 1440, 1920, 2560] as const;
 const themes = ["light", "dark"] as const;
 
-const landingHeadline = "The job hunt, handled.";
+const landingHeadline = "The job search, handled.";
 const annotationPattern = /\bfig(?:ure)?\.?\s*\d|\bfolio\b|§|\bartboard\b|\bboard note\b/iu;
 
 async function noScriptPage(browser: Browser, url: string) {
@@ -46,7 +46,7 @@ test.describe("public landing and embedded pricing, readable without JavaScript"
   }) => {
     const { html, text } = await noScriptPage(browser, `${appServerUrl}/`);
 
-    expect(text).toContain("The job hunt,");
+    expect(text).toContain("The job search,");
     expect(text).toContain("handled.");
     expect(text).toContain("Pay only for applications sent.");
     expect(text).toContain(PLAN.weekPrice);

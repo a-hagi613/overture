@@ -679,7 +679,7 @@ test("test@email.com signs out of this device from Settings without demo_locked"
   await page.goto(`${demoServer.url}/`);
   await expect(page).toHaveURL(`${demoServer.url}/`);
   await expect(
-    page.getByRole("heading", { level: 1, name: /The job hunt, handled\./u }),
+    page.getByRole("heading", { level: 1, name: /The job search, handled\./u }),
   ).toBeVisible();
 
   await page.goto(`${demoServer.url}/applications`);

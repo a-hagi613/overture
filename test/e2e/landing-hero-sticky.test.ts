@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./app.fixture.ts";
 
-const landingHeadline = "The job hunt, handled.";
+const landingHeadline = "The job search, handled.";
 const screenshotDir = process.env.LANDING_SCREENSHOT_DIR;
 
 async function headerTop(page: Page) {

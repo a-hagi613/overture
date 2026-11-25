@@ -34,7 +34,7 @@ test("the owner signs out of this device from Settings and cannot return to the 
   await page.goto(`${appServerUrl}/`);
   await expect(page).toHaveURL(`${appServerUrl}/`);
   await expect(
-    page.getByRole("heading", { level: 1, name: /The job hunt, handled\./u }),
+    page.getByRole("heading", { level: 1, name: /The job search, handled\./u }),
   ).toBeVisible();
 
   await page.goto(`${appServerUrl}/board`);
