@@ -298,6 +298,7 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
     .first()
     .waitFor({ state: "detached", timeout: 10_000 })
     .catch(() => undefined);
+  await expect(page.locator("main").first()).toBeVisible({ timeout: 15_000 });
 
   const hasExpectedDialog =
     target.path === "/onboarding/trial" &&

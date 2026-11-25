@@ -38,7 +38,7 @@ const pauseReasons = [
   },
   {
     action: "Finish setup",
-    copy: "Sending starts once your saved answers, forwarding and consent are in.",
+    copy: "Finish setting up your profile and email forwarding to start sending applications.",
     href: "/onboarding",
     reason: "onboarding",
     title: "Setup isn't finished.",
