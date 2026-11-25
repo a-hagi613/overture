@@ -251,10 +251,15 @@ interface GeoDataset {
   cities: CompactCity[];
 }
 
-const LATIN_NAME = /^[A-Za-z][A-Za-z '.-]{2,39}$/u;
+const LATIN_NAME = /^[A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F '.-]{2,39}$/u;
+
+const CODE_LIKE = /^[A-Z]{2,5}$/u;
+
+const FULL_ALTERNATES_POPULATION = 50_000;
 
 function compactCityLine(
   geonameId: string,
+  localName: string,
   name: string,
   country: string,
   admin1: string,
@@ -281,19 +286,25 @@ function compactCityLine(
   const normalizedName = normalizeTitle(name);
   const seen = new Set([normalizedName]);
   const keptAlternates: string[] = [];
+  const limit = residents >= FULL_ALTERNATES_POPULATION ? Number.POSITIVE_INFINITY : 3;
 
-  for (const alternate of alternates.split(",")) {
+  for (const alternate of [localName, ...alternates.split(",")]) {
     const trimmed = alternate.trim();
     const normalized = normalizeTitle(trimmed);
 
-    if (!LATIN_NAME.test(trimmed) || normalized === "" || seen.has(normalized)) {
+    if (
+      !LATIN_NAME.test(trimmed) ||
+      CODE_LIKE.test(trimmed) ||
+      normalized === "" ||
+      seen.has(normalized)
+    ) {
       continue;
     }
 
     seen.add(normalized);
     keptAlternates.push(trimmed);
 
-    if (keptAlternates.length >= 3) {
+    if (keptAlternates.length >= limit) {
       break;
     }
   }
@@ -374,6 +385,7 @@ async function buildGeoPlaces() {
   for (const line of citiesText.split("\n")) {
     const columns = line.split("\t");
     const geonameid = columns.at(0);
+    const localName = columns.at(1);
     const name = columns.at(2);
     const alternates = columns.at(3);
     const lat = columns.at(4);
@@ -400,6 +412,7 @@ async function buildGeoPlaces() {
 
     const city = compactCityLine(
       geonameid,
+      localName ?? "",
       name,
       country,
       admin1 ?? "",
@@ -516,6 +529,12 @@ async function buildOnet() {
   );
 }
 
-await buildGeoPlaces();
+const only = process.argv.at(2);
 
-await buildOnet();
+if (only === undefined || only === "geo") {
+  await buildGeoPlaces();
+}
+
+if (only === undefined || only === "onet") {
+  await buildOnet();
+}
