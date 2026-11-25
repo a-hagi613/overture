@@ -14,6 +14,7 @@ on:
           - seed-catalog
           - setup-stripe
           - live-diagnostics
+          - match-probe
           - vacuum-db
           - reset-catalog
           - sync-ops-secrets
@@ -433,6 +434,21 @@ jobs:
           fi
           set -e
           timeout 120s flyctl ssh console -a overture-web -C "bun run /app/scripts/live-diagnostics.ts"
+
+      - name: Rank live matches for five sample Targets on overture-web (read-only)
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'match-probe'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          output="$(timeout 300s flyctl ssh console -a overture-web -C "gosu app bun run /app/scripts/match-probe.ts" 2>&1)"
+          printf '%s\n' "$output"
+          {
+            echo "### Match probe (read-only, no user data)"
+            echo '```'
+            printf '%s\n' "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check the database sizes before a vacuum on overture-web
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'vacuum-db'
