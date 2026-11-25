@@ -96,7 +96,11 @@ test("a fresh account has no Applications until a verified trial card is recorde
 
     expect(setup.status()).toBe(200);
     expect(setupSchema.parse(await setup.json()).url.startsWith("https://")).toBe(true);
-    expect(stripe.requests.some((r) => r.path === "/v1/checkout/sessions")).toBe(true);
+    const checkout = stripe.requests.find((r) => r.path === "/v1/checkout/sessions");
+    const params = new URLSearchParams(checkout?.body);
+
+    expect(params.get("mode")).toBe("setup");
+    expect(params.get("currency")).toBe("usd");
   } finally {
     await server.stop();
     await stripe.stop();
