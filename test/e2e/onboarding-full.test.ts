@@ -91,7 +91,7 @@ test("a brand-new user picks three matches and the trial prepares them", async (
 
   const saved = targetsSchema.parse(await (await request.get("/api/profile/targets")).json());
 
-  expect(saved.targets.roles).toEqual(["Platform Engineer"]);
+  expect(saved.targets.roles).toEqual(["DevOps / SRE / Platform Engineer"]);
   expect(saved.targets.locations).toEqual(["London"]);
 
   await context.close();

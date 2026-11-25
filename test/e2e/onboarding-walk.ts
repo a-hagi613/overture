@@ -23,7 +23,7 @@ export async function walkOnboardingSteps1To4(page: Page, baseUrl: string) {
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
 
-  const roles = page.getByRole("button", { name: "Platform Engineer" });
+  const roles = page.getByRole("button", { exact: true, name: "DevOps / SRE / Platform Engineer" });
 
   if ((await roles.getAttribute("aria-pressed")) === "false") {
     await roles.click();

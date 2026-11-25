@@ -3,12 +3,14 @@ import { useRef, useState } from "react";
 import { Link } from "react-router";
 
 import type { OnboardingTargetChoices, OnboardingTargetsView } from "../../shared/onboarding.ts";
-import type { RoleGroup, Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
+import type { RoleCategoryId } from "../../shared/role-taxonomy.ts";
+import type { Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 import type { SkipCompany } from "../lib/profile-api.ts";
 
 import { copy } from "../../shared/copy.ts";
 import {
+  DEFAULT_ONBOARDING_CATEGORY,
   ONBOARDING_SENIORITIES,
   ONBOARDING_WORKPLACES,
   onboardingCategoryForRole,
@@ -75,9 +77,7 @@ function floorFromInput(raw: string) {
 function initialCategoryFor(roles: readonly string[]) {
   const [first] = roles;
 
-  return first === undefined
-    ? ("Software Engineering" satisfies RoleGroup)
-    : onboardingCategoryForRole(first);
+  return first === undefined ? DEFAULT_ONBOARDING_CATEGORY : onboardingCategoryForRole(first);
 }
 
 export function OnboardingTargetsCard({
@@ -106,7 +106,9 @@ export function OnboardingTargetsCard({
   const [draft, setDraft] = useState<TargetsInput>(view.targets);
   const [salary, setSalary] = useState(() => salaryText(view.targets.salaryFloorMinor));
 
-  const [category, setCategory] = useState<RoleGroup>(() => initialCategoryFor(view.targets.roles));
+  const [category, setCategory] = useState<RoleCategoryId>(() =>
+    initialCategoryFor(view.targets.roles),
+  );
 
   const [failed, setFailed] = useState(false);
   const [continuing, setContinuing] = useState(false);

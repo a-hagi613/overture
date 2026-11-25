@@ -1,10 +1,9 @@
 import { useState } from "react";
 
-import type { RoleGroup } from "../../../shared/tag-taxonomy.ts";
+import type { RoleCategoryId } from "../../../shared/role-taxonomy.ts";
 import type { ComboboxOption } from "../ui/combobox.tsx";
 
-import { escoGranularRolesFor } from "../../../shared/esco-roles.ts";
-import { ROLE_GROUPS } from "../../../shared/tag-taxonomy.ts";
+import { ROLE_CATEGORIES, pickableRoles, roleCategoryById } from "../../../shared/role-taxonomy.ts";
 import { useLocationSuggestions } from "../../lib/supply-api.ts";
 import { Combobox } from "../ui/combobox.tsx";
 import { dsEyebrow } from "../ui/ds.ts";
@@ -13,12 +12,11 @@ import { Switch } from "../ui/switch.tsx";
 import { LANDING_COPY } from "./landing-copy.ts";
 
 /**
- * The landing supply preview's filters: Level-1 ESCO category select, searchable Level-2 role
- * picker, debounced global GeoNames location combobox, and remote-only toggle built on shared
- * UI primitives.
+ * The landing supply preview's filters: a role-taxonomy category select, a searchable role picker, a debounced
+ * global GeoNames location combobox, and a remote-only toggle built on shared UI primitives.
  * @param props Current filter selections and change handlers.
- * @param props.category The chosen Level-1 category, or null for every category.
- * @param props.granularRole The chosen Level-2 ESCO role, or null for any role.
+ * @param props.category The chosen category id, or null for every category.
+ * @param props.granularRole The chosen role name, or null for any role.
  * @param props.location Currently selected city, country, metro, region, or continent, or null.
  * @param props.onCategoryChange Called with the chosen category, or null for all categories.
  * @param props.onGranularRoleChange Called with the chosen granular role, or null for any role.
@@ -37,10 +35,10 @@ export function LandingSupplyFilters({
   onRemoteChange,
   remote,
 }: {
-  category: RoleGroup | null;
+  category: RoleCategoryId | null;
   granularRole: string | null;
   location: string | null;
-  onCategoryChange: (value: RoleGroup | null) => void;
+  onCategoryChange: (value: RoleCategoryId | null) => void;
   onGranularRoleChange: (value: string | null) => void;
   onLocationSelect: (value: string | null) => void;
   onRemoteChange: (value: boolean) => void;
@@ -54,10 +52,10 @@ export function LandingSupplyFilters({
     locationOpen,
   );
 
-  const roleOptions: readonly ComboboxOption[] = escoGranularRolesFor(category).map((option) => ({
-    label: option.role,
-    meta: option.category,
-    value: option.role,
+  const roleOptions: readonly ComboboxOption[] = pickableRoles(category).map((role) => ({
+    label: role.name,
+    meta: roleCategoryById(role.categoryId)?.name,
+    value: role.name,
   }));
 
   const locationOptions: readonly ComboboxOption[] = suggestions.map((item) => ({
@@ -78,15 +76,15 @@ export function LandingSupplyFilters({
           onChange={(event) => {
             const next = event.currentTarget.value;
 
-            onCategoryChange(ROLE_GROUPS.find((group) => group === next) ?? null);
+            onCategoryChange(roleCategoryById(next)?.id ?? null);
           }}
           selectClassName="h-12 pl-3.5 pr-10"
           value={category ?? ""}
         >
           <option value="">{LANDING_COPY.supply.categoryAny}</option>
-          {ROLE_GROUPS.map((option) => (
-            <option key={option} value={option}>
-              {option}
+          {ROLE_CATEGORIES.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
             </option>
           ))}
         </Select>

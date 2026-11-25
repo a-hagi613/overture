@@ -2254,3 +2254,48 @@ const NAME_BY_ID = new Map<string, string>([
 export function roleTaxonomyName(value: string) {
   return NAME_BY_ID.get(value) ?? value;
 }
+
+const PICKABLE_ROLES = ROLES.filter((role) => !role.broad);
+
+/**
+ * The roles a person can pick: every specific role, never a catch-all, which is reached by choosing its category.
+ * @param categoryId A category to keep, or null for every category.
+ * @returns The roles in taxonomy order.
+ */
+export function pickableRoles(categoryId: RoleCategoryId | null) {
+  return categoryId === null
+    ? PICKABLE_ROLES
+    : PICKABLE_ROLES.filter((role) => role.categoryId === categoryId);
+}
+
+/**
+ * @param id A category id from a picker's value.
+ * @returns The category, or undefined when the value is not a category id.
+ */
+export function roleCategoryById(id: string) {
+  return ROLE_CATEGORIES.find((category) => category.id === id);
+}
+
+const CATEGORY_BY_VALUE = new Map<string, RoleCategoryId>([
+  ...ROLE_CATEGORIES.flatMap((category) => [
+    [category.id, category.id] as const,
+    [category.name, category.id] as const,
+  ]),
+  ...ROLE_SUBCATEGORIES.flatMap((sub) => [
+    [sub.id, sub.categoryId] as const,
+    [sub.name, sub.categoryId] as const,
+  ]),
+  ...ROLES.flatMap((role) => [
+    [role.id, role.categoryId] as const,
+    [role.name, role.categoryId] as const,
+  ]),
+]);
+
+/**
+ * The category a saved target belongs to, so a picker opens on it.
+ * @param value A category, subcategory or role id or name.
+ * @returns Its category id, or null for a retired label or free text.
+ */
+export function roleCategoryOf(value: string) {
+  return CATEGORY_BY_VALUE.get(value) ?? null;
+}

@@ -53,22 +53,19 @@ async function expectOnboardingMatchesBoard(
     page.getByRole("heading", { level: 1, name: /Set up your workspace/u }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Platform Engineer" })).toHaveAttribute(
+  await expect(
+    page.getByRole("button", { exact: true, name: "Platform Engineer" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { exact: true, name: "Backend Engineer" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect(page.getByRole("button", { name: "Backend Engineer" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(page.getByRole("button", { name: "Site Reliability Engineer" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(page.getByRole("button", { name: "Software Engineer" })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
+  await expect(
+    page.getByRole("button", { exact: true, name: "Site Reliability Engineer" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { exact: true, name: "Software Engineer (general)" }),
+  ).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("button", { name: "London" })).toHaveAttribute(
     "aria-pressed",
     "true",

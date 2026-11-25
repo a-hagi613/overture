@@ -129,7 +129,8 @@ broad role, and level words such as `Senior` or `II` do not hide a role's name),
 matching (`taxonomy-tags.test.ts`, `role-targets.test.ts` and `judge-input.test.ts` over a real migrated catalog and
 the committed label seed: a label writes ids, `JUNK` clears the role, a title naming one exact role overrides a label
 outside its subcategory, a second pass changes nothing, a role target never reaches a neighbour role, and the scorer
-reads the description and the targets, #660), the admin gate's
+reads the description and the targets, #660), the role pickers (`role-taxonomy.test.ts`: a category offers its
+specific roles and never its catch-all, and a saved role opens the picker on its own category), the admin gate's
 fail-closed parsing (a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented
 issuer), the capped request-body reader (an unauthenticated webhook body stops at its byte cap and is never buffered
 whole, so a sender cannot choose how much memory it costs), the unhandled-rejection alert (a public alert carries the

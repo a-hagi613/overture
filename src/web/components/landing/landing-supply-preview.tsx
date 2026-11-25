@@ -1,9 +1,9 @@
 import { useState } from "react";
 
 import type { SupplyCounts } from "../../../shared/supply.ts";
-import type { RoleGroup } from "../../../shared/tag-taxonomy.ts";
+import type { RoleCategoryId } from "../../../shared/role-taxonomy.ts";
 
-import { escoRoleCategory } from "../../../shared/esco-roles.ts";
+import { roleCategoryOf } from "../../../shared/role-taxonomy.ts";
 import { LANDING_COPY } from "./landing-copy.ts";
 import { LandingSupplyFilters } from "./landing-supply-filters.tsx";
 import { LandingSupplyStatus } from "./landing-supply-status.tsx";
@@ -34,7 +34,7 @@ function statusOf(counts: SupplyCounts | null, failed: boolean, loading: boolean
  * @returns The Live Jobs preview section on the landing.
  */
 export function LandingSupplyPreview() {
-  const [category, setCategory] = useState<RoleGroup | null>(null);
+  const [category, setCategory] = useState<RoleCategoryId | null>(null);
   const [granularRole, setGranularRole] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
   const [remote, setRemote] = useState(false);
@@ -91,7 +91,7 @@ export function LandingSupplyPreview() {
             onCategoryChange={(next) => {
               setCategory(next);
               setGranularRole((current) =>
-                current !== null && next !== null && escoRoleCategory(current) !== next
+                current !== null && next !== null && roleCategoryOf(current) !== next
                   ? null
                   : current,
               );

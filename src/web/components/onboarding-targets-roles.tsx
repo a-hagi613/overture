@@ -2,14 +2,14 @@ import { X } from "lucide-react";
 
 import { copy } from "../../shared/copy.ts";
 import { onboardingRolesForCategory } from "../../shared/onboarding-options.ts";
-import type { RoleGroup } from "../../shared/tag-taxonomy.ts";
-import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
+import type { RoleCategoryId } from "../../shared/role-taxonomy.ts";
+import { ROLE_CATEGORIES, roleCategoryById } from "../../shared/role-taxonomy.ts";
 import { OnboardingTargetChip } from "./onboarding-target-chip.tsx";
 import { Button } from "./ui/button.tsx";
 import { Combobox } from "./ui/combobox.tsx";
 import { dsEyebrow } from "./ui/ds.ts";
 
-const categoryOptions = ROLE_GROUPS.map((group) => ({ label: group, value: group }));
+const categoryOptions = ROLE_CATEGORIES.map((option) => ({ label: option.name, value: option.id }));
 
 export function OnboardingTargetsRoles({
   category,
@@ -17,8 +17,8 @@ export function OnboardingTargetsRoles({
   onToggleRole,
   selectedRoles,
 }: {
-  category: RoleGroup;
-  onCategoryChange: (next: RoleGroup) => void;
+  category: RoleCategoryId;
+  onCategoryChange: (next: RoleCategoryId) => void;
   onToggleRole: (role: string) => void;
   selectedRoles: readonly string[];
 }) {
@@ -40,10 +40,10 @@ export function OnboardingTargetsRoles({
           emptyText={copy.onboarding.categoryEmpty}
           id="w-category"
           onSelect={(value) => {
-            const matched = ROLE_GROUPS.find((group) => group === value);
+            const matched = roleCategoryById(value);
 
             if (matched !== undefined) {
-              onCategoryChange(matched);
+              onCategoryChange(matched.id);
             }
           }}
           options={categoryOptions}
@@ -55,7 +55,7 @@ export function OnboardingTargetsRoles({
 
       <div>
         <h3 className={`${dsEyebrow} mb-2.5`} id="w-roles">
-          {copy.onboarding.rolesInCategory(category)}
+          {copy.onboarding.rolesInCategory(roleCategoryById(category)?.name ?? category)}
         </h3>
         <fieldset
           aria-labelledby="w-roles"

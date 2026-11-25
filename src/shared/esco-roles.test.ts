@@ -5,14 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 
 import { ROLE_GROUPS } from "./tag-taxonomy.ts";
-import {
-  ESCO_GRANULAR_ROLE_OPTIONS,
-  ESCO_ROLE_NAMES,
-  ESCO_ROLE_OPTIONS,
-  escoGranularRolesFor,
-  escoRoleCategory,
-  isEscoRole,
-} from "./esco-roles.ts";
+import { ESCO_ROLE_NAMES, ESCO_ROLE_OPTIONS, isEscoRole } from "./esco-roles.ts";
 
 const datasetSchema = z.object({
   occupations: z.array(z.object({ c: z.enum(ROLE_GROUPS), r: z.string() })),
@@ -47,34 +40,9 @@ describe("the compact ESCO role vocabulary", () => {
     expect(ESCO_ROLE_NAMES.length).toBeLessThanOrEqual(160);
   });
 
-  test("offers every real granular role once and hides category-equal fallbacks", () => {
-    expect(ESCO_GRANULAR_ROLE_OPTIONS).not.toContainEqual(
-      expect.objectContaining({ category: "Software Engineering", role: "Software Engineering" }),
-    );
-    expect(ESCO_GRANULAR_ROLE_OPTIONS.length).toBe(
-      ESCO_ROLE_OPTIONS.filter((option) => option.role !== option.category).length,
-    );
-    expect(new Set(ESCO_GRANULAR_ROLE_OPTIONS.map((option) => option.role)).size).toBe(
-      ESCO_GRANULAR_ROLE_OPTIONS.length,
-    );
-  });
-
-  test("narrows roles by category and answers both lookup helpers", () => {
-    const administrative = escoGranularRolesFor("Administrative");
-
-    expect(administrative.map((option) => option.role)).toEqual([
-      "Administrative Assistant",
-      "Data Entry Clerk",
-      "Executive Assistant",
-      "Office Clerk",
-      "Office Manager",
-      "Receptionist",
-      "Secretary",
-    ]);
-    expect(escoGranularRolesFor(null)).toHaveLength(ESCO_GRANULAR_ROLE_OPTIONS.length);
-    expect(escoRoleCategory("Backend Engineer")).toBeNull();
-    expect(escoRoleCategory("Software Engineer")).toBe("Software Engineering");
+  test("recognises a retired ESCO role name and nothing else", () => {
     expect(isEscoRole("Registered Nurse")).toBe(true);
+    expect(isEscoRole("Software Engineer")).toBe(true);
     expect(isEscoRole("Wizard")).toBe(false);
   });
 

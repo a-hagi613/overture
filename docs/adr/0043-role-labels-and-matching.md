@@ -81,5 +81,8 @@ different stack), not label errors. Labelling the week cost $6.59 with the Batch
   Workable pass reads it with its targets, before it measures the feed's memory, so its budget still measures the
   streaming parse (ADR 0032).
 - Embeddings are not used. They stay a candidate for ranking inside a role, not for filtering.
-- The pickers still offer the retired 28 groups and ESCO roles until the front end moves to `role-taxonomy.ts`; their
-  values resolve to taxonomy ids, coarser than a direct choice (`Software Engineering` reaches all of Software & IT).
+- The pickers (onboarding, profile targets, the landing count) offer the 29 categories and each category's specific
+  roles from `role-taxonomy.ts` and save role names, which resolve to exactly that role. A catch-all role (`Other
+  Health Practitioner`) is never offered; it is reached by choosing its category. Targets saved before the move keep
+  their retired names, which still resolve to taxonomy ids, coarser than a direct choice (`Software Engineering`
+  reaches all of Software & IT).
