@@ -15,6 +15,7 @@ import type { CodePasteMode } from "../components/code-paste-sheet.tsx";
 import { HomeBillingNotice } from "../components/home-billing-notice.tsx";
 import { HomeCaughtUp } from "../components/home-caught-up.tsx";
 import { HomeChart } from "../components/home-chart.tsx";
+import { HomeCheckIn } from "../components/home-checkin.tsx";
 import { HomeCodeWait } from "../components/home-code-wait.tsx";
 import { HomeControlBand } from "../components/home-control-band.tsx";
 import { HomeFailures } from "../components/home-failures.tsx";
@@ -116,6 +117,7 @@ export function HomePage() {
   const showReady = home !== undefined && home.ready.ready > 0;
   const showNeedsYou = home !== undefined && home.reviews.total > 0;
   const showFailures = home !== undefined && home.activity.failed.length > 0;
+  const showCheckIn = home !== undefined && home.checkIns.length > 0;
   const caughtUp = home !== undefined && isAllCaughtUp(homeActionStateOf(home), codeWaitAsking);
 
   const closeSheet = useCallback(() => {
@@ -296,6 +298,12 @@ export function HomePage() {
                   total={home.reviews.total}
                 />
               ) : null}
+            </div>
+          ) : null}
+
+          {showCheckIn ? (
+            <div className="mt-3">
+              <HomeCheckIn checkIns={home.checkIns} />
             </div>
           ) : null}
 

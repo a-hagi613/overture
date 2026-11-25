@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "./cn.ts";
 
-const cardVariants = cva("rounded-lg border bg-card text-foreground", {
+const cardVariants = cva("rounded-xl border bg-card text-foreground", {
   variants: {
     variant: {
       default: "border-border",

@@ -115,7 +115,7 @@ async function expectCardMatchesBoard(
     };
   });
 
-  expect(headingStyles.fontFamily).toContain("Instrument Serif");
+  expect(headingStyles.fontFamily).toContain("Plus Jakarta Sans");
 
   await expect(page.getByTestId("settings-time-zone-row")).toBeVisible();
   await expect(page.getByTestId("settings-posting-languages-row")).toBeVisible();
