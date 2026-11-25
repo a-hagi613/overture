@@ -15,6 +15,7 @@ on:
           - setup-stripe
           - live-diagnostics
           - match-probe
+          - lab-run
           - vacuum-db
           - reset-catalog
           - sync-ops-secrets
@@ -449,6 +450,23 @@ jobs:
             printf '%s\n' "$output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fill three synthetic lab forms with real Browser Use on overture-web
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'lab-run'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          status=0
+          output="$(timeout 1080s flyctl ssh console -a overture-web -C "gosu app bun run /app/scripts/lab-run.ts form 3 browser_use" 2>&1)" || status=$?
+          printf '%s\n' "$output"
+          {
+            echo "### Synthetic lab run (Overture's own forms, no employer)"
+            echo '```'
+            printf '%s\n' "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
       - name: Check the database sizes before a vacuum on overture-web
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'vacuum-db'

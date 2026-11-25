@@ -323,6 +323,8 @@ export const adminPersonRowSchema = z.object({
   kind: z.enum(["user", "invite"]),
   lastActiveAt: z.number().nullable(),
   name: z.string().nullable(),
+  online: z.boolean().default(false),
+  signedIn: z.boolean().default(false),
   status: z.enum(["active", "suspended", "invited"]),
 });
 
@@ -334,9 +336,11 @@ export const adminUsersResponseSchema = z.object({
     suspended: z.number(),
   }),
   now: z.number(),
+  onlineNow: z.number().default(0),
   page: z.number(),
   pageSize: z.number(),
   rows: z.array(adminPersonRowSchema),
+  signedInNow: z.number().default(0),
   total: z.number(),
 });
 
@@ -1128,6 +1132,23 @@ export const loadUsers = async (input: { page: number; q: string; status: AdminS
 export const loadUser = async (id: string) =>
   adminGet(`/admin/api/users/${encodeURIComponent(id)}`, adminUserDetailSchema);
 
+export const adminDashboardsSchema = z.object({
+  links: z.array(
+    z.object({
+      group: z.enum(["metrics", "edge", "spend"]),
+      href: z.url(),
+      id: z.string(),
+    }),
+  ),
+  now: z.number(),
+  onlineNow: z.number(),
+  signedInNow: z.number(),
+});
+
+export type AdminDashboards = z.infer<typeof adminDashboardsSchema>;
+
+export const loadDashboards = async () => adminGet("/admin/api/dashboards", adminDashboardsSchema);
+
 export const loadAdminSession = async () => adminGet("/admin/api/session", adminSessionSchema);
 
 export const loadInvites = async () => adminGet("/admin/api/invites", invitesResponseSchema);
@@ -1206,6 +1227,94 @@ export const attemptOutcomeSchema = z.enum([
   "crash",
   "interrupted",
 ]);
+
+const insightActivitySchema = z.object({
+  at: z.number(),
+  detail: z.string(),
+  kind: z.enum([
+    "admin",
+    "application",
+    "attempt",
+    "grant",
+    "onboarded",
+    "resume",
+    "signed_in",
+    "subscription",
+    "targets",
+  ]),
+});
+
+export const adminUserInsightSchema = z.object({
+  insight: z.object({
+    applications: z.record(z.string(), z.number()),
+    attempts: z.array(
+      z.object({
+        applicationId: z.string(),
+        browserMs: z.number().nullable(),
+        company: z.string(),
+        costMicros: z.number().nullable(),
+        endedAt: z.number().nullable(),
+        errorCode: z.string().nullable(),
+        id: z.string(),
+        outcome: attemptOutcomeSchema.nullable(),
+        provider: z.string(),
+        providerSessionId: z.string().nullable(),
+        startedAt: z.number(),
+        title: z.string(),
+      }),
+    ),
+    credits: z.object({ available: z.number(), reserved: z.number(), used: z.number() }),
+    onboarding: z.object({
+      onboardedAt: z.number().nullable(),
+      pauseReason: z.string().nullable(),
+      running: z.boolean(),
+      step: z.number(),
+    }),
+    presence: z.object({
+      lastSeenAt: z.number().nullable(),
+      lastSignInAt: z.number().nullable(),
+      online: z.boolean(),
+      signedInSessions: z.number(),
+    }),
+    queue: z.object({
+      scored: z.number(),
+      top: z.array(
+        z.object({
+          codeRank: z.number(),
+          company: z.string().nullable(),
+          location: z.string().nullable(),
+          open: z.boolean(),
+          postingId: z.string(),
+          score: z.number().nullable(),
+          scoredAt: z.number().nullable(),
+          title: z.string().nullable(),
+        }),
+      ),
+      total: z.number(),
+    }),
+    spend: z.object({
+      browser: z.array(
+        z.object({
+          attempts: z.number(),
+          browserMs: z.number(),
+          costMicros: z.number(),
+          provider: z.string(),
+        }),
+      ),
+      browserMicros: z.number(),
+      llm: z.array(z.object({ calls: z.number(), costMicros: z.number(), purpose: z.string() })),
+      llmMicros: z.number(),
+      totalMicros: z.number(),
+    }),
+    timeline: z.array(insightActivitySchema),
+  }),
+  now: z.number(),
+});
+
+export type AdminUserInsight = z.infer<typeof adminUserInsightSchema>["insight"];
+
+export const loadUserInsight = async (id: string) =>
+  adminGet(`/admin/api/users/${encodeURIComponent(id)}/insight`, adminUserInsightSchema);
 
 export const attemptRowSchema = z.object({
   applicationId: z.string(),

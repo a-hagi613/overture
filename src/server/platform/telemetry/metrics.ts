@@ -19,6 +19,7 @@ export const METRIC_NAMES = {
   catalogSwapBytes: "overture_catalog_swap_bytes",
   catalogSwapDuration: "overture_catalog_swap_duration_ms",
   catalogSwapFailures: "overture_catalog_swap_failures_total",
+  credits: "overture_credits",
   eventLoopLag: "overture_event_loop_lag_ms",
   formSelfHeal: "overture_form_self_heal_total",
   httpDuration: "overture_http_duration_ms",
@@ -27,9 +28,13 @@ export const METRIC_NAMES = {
   llmRequests: "overture_llm_requests_total",
   llmTokens: "overture_llm_tokens_total",
   mailEvents: "overture_mail_events_total",
+  matchQueue: "overture_match_queue",
+  productApplications: "overture_applications",
+  spendUsd: "overture_spend_usd",
   sqliteQueryDuration: "overture_sqlite_query_duration_ms",
   supplyQueryDuration: "overture_supply_query_duration_ms",
   tagCoverageRatio: "overture_tag_coverage_ratio",
+  users: "overture_users",
 } as const;
 
 export type MetricName = (typeof METRIC_NAMES)[keyof typeof METRIC_NAMES];
@@ -59,6 +64,36 @@ export const METRIC_ATTRIBUTE_NAMES = [
 ] as const;
 
 export type MetricAttributes = Readonly<Record<string, string | number>>;
+
+/**
+ * The product gauges the stats sampler fills from the database every minute: people, applications,
+ * the match queue, credits and spend. Each carries one bounded label (a status or a kind).
+ */
+export const PRODUCT_GAUGES = [
+  {
+    description: "People by state: total, verified, onboarded, running, signed in, online",
+    key: "users",
+    label: "status",
+  },
+  { description: "Applications by status", key: "productApplications", label: "status" },
+  {
+    description: "Match queue rows across all users: pooled and scored",
+    key: "matchQueue",
+    label: "status",
+  },
+  { description: "Credits across all users by ledger account", key: "credits", label: "kind" },
+  {
+    description: "Spend to date in US dollars, by kind (llm, browser)",
+    key: "spendUsd",
+    label: "kind",
+  },
+] as const satisfies readonly {
+  description: string;
+  key: keyof typeof METRIC_NAMES;
+  label: string;
+}[];
+
+export type ProductGauge = (typeof PRODUCT_GAUGES)[number]["key"];
 
 const ALLOWED_METRIC_ATTRIBUTES = new Set<string>(METRIC_ATTRIBUTE_NAMES);
 
@@ -165,6 +200,7 @@ export class MetricsRecorder {
   private readonly sqliteQueryDuration: Histogram;
   private readonly supplyQueryDuration: Histogram;
   private readonly tagCoverage: ObservableGauge;
+  private readonly productGauges = new Map<ProductGauge, Map<string, number>>();
   private readonly queueDepthByKind = new Map<string, number>();
   private readonly tagCoverageByTier = new Map<string, number>();
 
@@ -238,6 +274,19 @@ export class MetricsRecorder {
     this.tagCoverage = meter.createObservableGauge(METRIC_NAMES.tagCoverageRatio, {
       description: "Share of open postings with a role tag, by tagging tier",
     });
+
+    for (const gauge of PRODUCT_GAUGES) {
+      const values = new Map<string, number>();
+
+      this.productGauges.set(gauge.key, values);
+      meter
+        .createObservableGauge(METRIC_NAMES[gauge.key], { description: gauge.description })
+        .addCallback((result) => {
+          for (const [label, value] of values) {
+            result.observe(value, sanitizeMetricAttributes({ [gauge.label]: label }));
+          }
+        });
+    }
 
     this.bgQueueDepth.addCallback((result) => {
       for (const [kind, depth] of this.queueDepthByKind) {
@@ -380,6 +429,30 @@ export class MetricsRecorder {
 
   setBgQueueDepth(kind: string, depth: number) {
     this.queueDepthByKind.set(kind, Math.max(0, depth));
+  }
+
+  /**
+   * Replaces every value of one product gauge, so a status that dropped to nothing stops reporting
+   * its old count.
+   * @param gauge Which product gauge.
+   * @param values Its value per label.
+   */
+  setProductGauge(gauge: ProductGauge, values: Readonly<Record<string, number>>) {
+    const current = this.productGauges.get(gauge);
+
+    if (current === undefined) {
+      return;
+    }
+
+    current.clear();
+
+    for (const [label, value] of Object.entries(values)) {
+      current.set(label, Math.max(0, value));
+    }
+  }
+
+  productGaugeValues(gauge: ProductGauge) {
+    return Object.fromEntries(this.productGauges.get(gauge) ?? []);
   }
 
   setTagCoverageRatio(tier: string, ratio: number) {

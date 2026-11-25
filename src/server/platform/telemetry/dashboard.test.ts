@@ -65,6 +65,7 @@ test("the committed Grafana dashboard is valid JSON importable by fly-metrics.ne
   const titles = rows.map((row) => row.title);
 
   expect(titles).toEqual([
+    "Users & Spend",
     "Runtime & Catalog",
     "API Latency",
     "Apply & ATS Health",

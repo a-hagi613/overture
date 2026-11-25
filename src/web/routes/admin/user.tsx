@@ -13,6 +13,7 @@ import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
 import { AdminStatRow } from "./stat-row.tsx";
 import { AdminStatusPill } from "./status-pill.tsx";
+import { UserInsight } from "./user-insight.tsx";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -323,6 +324,7 @@ export function UserPage() {
           </section>
         )}
       </div>
+      <UserInsight userId={user.id} />
     </>
   );
 }

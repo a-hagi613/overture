@@ -74,6 +74,7 @@ import {
   prometheusExporter,
 } from "./platform/telemetry/prometheus.ts";
 import { createEventLoopLagStats } from "./platform/telemetry/runtime-stats.ts";
+import { startProductStatsSampler } from "./platform/telemetry/product-stats.ts";
 import { createDiskObjectStore } from "./platform/ports/object-store.ts";
 import { createR2ObjectStore } from "./platform/ports/r2-object-store.ts";
 import {
@@ -1246,6 +1247,7 @@ function startMetricsServer() {
 }
 
 const metricsServer = startMetricsServer();
+const stopProductStats = env.METRICS_ENABLED ? startProductStatsSampler(db, clock) : null;
 
 let shuttingDown = false;
 
@@ -1292,6 +1294,7 @@ function handleShutdown(signal: string) {
     try {
       await Promise.race([server.stop(false), quietGrace(budgetMs)]);
       await server.stop(true);
+      stopProductStats?.();
       await metricsServer?.stop(true);
       await worker?.drain(Math.max(0, drainDeadline - performance.now()));
       catalogWorker.stop();

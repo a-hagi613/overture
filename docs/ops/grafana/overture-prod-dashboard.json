@@ -23,15 +23,165 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 700,
+      "title": "Users & Spend",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+          "id": 701,
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum by (status) (overture_users{status=~\"total|verified|onboarded|running\"})",
+              "legendFormat": "{{status}}",
+              "refId": "A"
+            }
+          ],
+          "title": "People",
+          "type": "stat",
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "horizontal",
+            "textMode": "value_and_name"
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+          "id": 702,
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum by (status) (overture_users{status=~\"online|signed_in\"})",
+              "legendFormat": "{{status}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Online now and signed in",
+          "type": "timeseries",
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": ["lastNotNull", "max"]
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+          "id": 703,
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum by (status) (overture_applications)",
+              "legendFormat": "{{status}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Applications by status",
+          "type": "bargauge",
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "horizontal",
+            "textMode": "value_and_name"
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
+          "id": 704,
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum by (kind) (overture_spend_usd)",
+              "legendFormat": "{{kind}} (stored)",
+              "refId": "A"
+            },
+            {
+              "editorMode": "code",
+              "expr": "sum(overture_llm_cost_usd_total)",
+              "legendFormat": "llm (since restart)",
+              "refId": "B"
+            }
+          ],
+          "title": "Spend to date (USD)",
+          "type": "timeseries",
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": ["lastNotNull", "max"]
+            }
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
+          "id": 705,
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum by (kind) (delta(overture_spend_usd[24h]))",
+              "legendFormat": "{{kind}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Spend in the last 24 hours (USD)",
+          "type": "stat",
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "horizontal",
+            "textMode": "value_and_name"
+          }
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 9 },
+          "id": 706,
+          "targets": [
+            {
+              "editorMode": "code",
+              "expr": "sum by (kind) (overture_credits)",
+              "legendFormat": "credits {{kind}}",
+              "refId": "A"
+            },
+            {
+              "editorMode": "code",
+              "expr": "sum by (status) (overture_match_queue)",
+              "legendFormat": "queue {{status}}",
+              "refId": "B"
+            }
+          ],
+          "title": "Credits and match queue",
+          "type": "timeseries",
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": ["lastNotNull", "max"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
       "id": 100,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ms" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
           "id": 101,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [
@@ -47,11 +197,8 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "short" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
           "id": 102,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [
@@ -67,11 +214,8 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ms" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
           "id": 103,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [
@@ -93,11 +237,8 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "bytes" },
-            "overrides": []
-          },
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 9 },
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 26 },
           "id": 104,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [
@@ -113,11 +254,8 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ms" },
-            "overrides": []
-          },
-          "gridPos": { "h": 7, "w": 16, "x": 8, "y": 9 },
+          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+          "gridPos": { "h": 7, "w": 16, "x": 8, "y": 26 },
           "id": 105,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [
@@ -137,18 +275,17 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
       "id": 200,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "reqps" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
           "id": 201,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -162,13 +299,12 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ms" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
           "id": 202,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -182,11 +318,8 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ms" },
-            "overrides": []
-          },
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 25 },
+          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 42 },
           "id": 203,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [
@@ -202,11 +335,8 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "percentunit" },
-            "overrides": []
-          },
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 25 },
+          "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 42 },
           "id": 204,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [
@@ -226,18 +356,17 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
       "id": 300,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ops" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+          "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
           "id": 301,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -251,13 +380,12 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ms" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
           "id": 302,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -271,13 +399,12 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ops" },
-            "overrides": []
-          },
-          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 41 },
+          "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 58 },
           "id": 303,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -295,18 +422,17 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 48 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 65 },
       "id": 400,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "reqps" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 49 },
+          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 66 },
           "id": 401,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -320,13 +446,12 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "short" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 49 },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 66 },
           "id": 402,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -340,13 +465,12 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "currencyUSD" },
-            "overrides": []
-          },
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 57 },
+          "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 74 },
           "id": 403,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -364,9 +488,11 @@
             "defaults": { "max": 1, "min": 0, "unit": "percentunit" },
             "overrides": []
           },
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 57 },
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 74 },
           "id": 404,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -384,18 +510,21 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 64 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 81 },
       "id": 500,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "short" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 65 },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 82 },
           "id": 501,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] } },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": ["lastNotNull", "max"]
+            }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -409,13 +538,12 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ms" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 65 },
+          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 82 },
           "id": 502,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -429,13 +557,12 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "ops" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 65 },
+          "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 82 },
           "id": 503,
-          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -460,7 +587,7 @@
     {
       "collapsed": false,
       "description": "Fly's own node-exporter-compatible fly_instance_* series. Enable the built-in Prometheus metrics for the app in fly.toml ([metrics]) and select the same datasource.",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 72 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 89 },
       "id": 600,
       "panels": [
         {
@@ -469,7 +596,7 @@
             "defaults": { "max": 1, "min": 0, "unit": "percentunit" },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 73 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 90 },
           "id": 601,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [
@@ -489,7 +616,7 @@
             "defaults": { "max": 1, "min": 0, "unit": "percentunit" },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 73 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 90 },
           "id": 602,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [
@@ -505,11 +632,8 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": {
-            "defaults": { "unit": "percent" },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 73 },
+          "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 90 },
           "id": 603,
           "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
           "targets": [

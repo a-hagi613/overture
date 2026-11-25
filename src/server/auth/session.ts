@@ -1,5 +1,10 @@
 import type { Auth } from "./index.ts";
 
+import { createClock } from "../platform/ports/clock.ts";
+import { notePresence } from "./presence.ts";
+
+const clock = createClock();
+
 /**
  * Reads the Better Auth session behind a request's headers.
  * @param auth The Better Auth instance the request arrived on.
@@ -7,7 +12,13 @@ import type { Auth } from "./index.ts";
  * @returns The session, or null when the request carries none that is valid.
  */
 export async function readSession(auth: Auth, headers: Headers) {
-  return auth.api.getSession({ headers }).catch(() => null);
+  const session = await auth.api.getSession({ headers }).catch(() => null);
+
+  if (session !== null) {
+    notePresence(session.user.id, clock.now());
+  }
+
+  return session;
 }
 
 /**

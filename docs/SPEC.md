@@ -1899,6 +1899,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/platform/outbound-interception.test.ts` | a fetch or node `https` request to an unmocked non-loopback host rejects with `UnhandledRequestError`, while a mocked host still answers, so the test interceptor fails closed |
 | `src/server/platform/ports/replica-listing.test.ts` | the newest replica transaction is read from the first non-empty Litestream level (#281) |
 | `src/server/platform/telemetry/otel.test.ts` | `http.url` loses its query string and fragment, metrics export every 60 s, span and log batches carry the 2048/512/5 s bounds, and no metric instrument attaches `http.url`, `job.id`, `sse.user_id` or `admin.target_user_id` (#580) |
+| `src/server/platform/telemetry/product-stats.test.ts` | People, applications, the match queue, credits and spend are read from the shipped schema into product gauges that carry only a status or kind label, never a user id, and a status that empties stops reporting its old count |
 | `src/server/profile/apply-email.test.ts` | the personal-email preference defaults to the assigned apply alias, saves with a `profile.updated` announcement, and a read-only check provisions no mailbox (#566) |
 | `src/server/profile/facts.test.ts` | a Fact's scope is validated against its key |
 | `src/server/profile/onboarding-step.test.ts` | the onboarding step's salary and EEO reading |

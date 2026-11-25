@@ -6,6 +6,7 @@ import type { AdminPersonRow } from "../../lib/admin-api.ts";
 import { adminDay, adminDayTime } from "../../lib/admin-date.ts";
 import { AdminCellLabel } from "./cell-label.tsx";
 import { AdminStatusPill } from "./status-pill.tsx";
+import { UserPresenceBadge } from "./user-presence-badge.tsx";
 
 function grantDetail(row: AdminPersonRow, now: number) {
   if (row.status === "invited") {
@@ -56,7 +57,10 @@ export function UserRow({ now, row }: { now: number; row: AdminPersonRow }) {
       </span>
       <span className="mt-3 block md:mt-0">
         <AdminCellLabel label={copy.admin.usersColumnStatus} />
-        <AdminStatusPill status={row.status} />
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <AdminStatusPill status={row.status} />
+          <UserPresenceBadge online={row.online} signedIn={row.signedIn} />
+        </span>
       </span>
       <span className="mt-3 block md:mt-0">
         <AdminCellLabel label={copy.admin.usersColumnInvite} />
