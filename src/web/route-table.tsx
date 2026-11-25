@@ -130,6 +130,11 @@ const AdminSettingsPage = lazyRoute(
 const CatalogPage = lazyRoute(async () => import("./routes/admin/catalog.tsx"), "CatalogPage");
 const SystemPage = lazyRoute(async () => import("./routes/admin/system.tsx"), "SystemPage");
 
+const DashboardsPage = lazyRoute(
+  async () => import("./routes/admin/dashboards.tsx"),
+  "DashboardsPage",
+);
+
 const MailHealthPage = lazyRoute(
   async () => import("./routes/admin/mail-health.tsx"),
   "MailHealthPage",
@@ -211,6 +216,7 @@ const adminShellChildren: RouteObject[] = withRouteError([
   { path: "/admin/settings", element: <AdminSettingsPage /> },
   { path: "/admin/catalog", element: <CatalogPage /> },
   { path: "/admin/system", element: <SystemPage /> },
+  { path: "/admin/dashboards", element: <DashboardsPage /> },
   { path: "/admin/mail-health", element: <MailHealthPage /> },
   { path: "/admin/grants", element: <GrantsPage /> },
   { path: "/admin/billing/margin", element: <MarginPage /> },

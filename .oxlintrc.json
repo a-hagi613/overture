@@ -319,6 +319,7 @@
           "src/server/platform/telemetry/dashboard.test.ts",
           "src/server/platform/telemetry/metrics.test.ts",
           "src/server/platform/telemetry/otel.test.ts",
+          "src/server/platform/telemetry/product-stats.test.ts",
           "src/server/platform/telemetry/runtime-stats.test.ts",
           "src/server/platform/telemetry/sqlite-metrics.test.ts",
           "src/server/profile/apply-email.test.ts",

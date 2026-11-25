@@ -186,7 +186,9 @@ the interception canary (`outbound-interception.test.ts`: a fetch or node `https
 the interceptor's own error while a mocked host still answers, so a request that leaks fails instead of reaching DNS),
 and the OTel bounds and redaction (`telemetry/otel.test.ts`: an `http.url` loses its query string and fragment, metrics
 export every 60 s, the span and log queues carry fixed bounds, and no metric instrument names a high-cardinality
-identifier, #580). They
+identifier, #580), and the product gauges (`telemetry/product-stats.test.ts`: people, applications, the match queue,
+credits and spend are read from the shipped schema into gauges that carry only a status or kind label, never a user
+id, and a status that empties stops reporting its old count). They
 import `bun:test`, run with `bun test src scripts`, and keep the Vitest lint plugin, whose test-shape rules do not
 depend on the runner. The mail count runs the real SQLite file and the real migrations, so the invariant is exercised
 against the shipped schema rather than a stand-in. CI stays under two minutes on pull requests: one to twelve shards

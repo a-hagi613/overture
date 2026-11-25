@@ -88,6 +88,10 @@ test("the owner invites, grants and suspends a person from the admin", async ({
 
   await expect(page.getByText(guestEmail)).toBeVisible();
   await expect(page.locator("main").getByText(authTestIdentity.ownerEmail)).toHaveCount(0);
+  await expect(page.getByTestId("admin-users-presence")).toHaveText(
+    /^\d+ online now · \d+ signed in$/u,
+  );
+  await expect(page.getByTestId("admin-user-online")).toHaveText("Online");
 
   await page.getByText(guestEmail).locator("..").click();
   await expect(page).toHaveURL(new RegExp(`${adminIsolatedAppUrl}/admin/users/`, "u"));
@@ -98,6 +102,20 @@ test("the owner invites, grants and suspends a person from the admin", async ({
   await expect(page.getByText("Admin grant")).toBeVisible();
   await expect(page.getByText("of 300 left")).toBeVisible();
   await expect(page.getByText("Accepted by sign-in", { exact: false })).toBeVisible();
+
+  const insight = page.getByTestId("admin-user-insight");
+
+  await expect(insight.getByRole("heading", { name: "Status" })).toBeVisible();
+  await expect(page.getByTestId("admin-user-presence")).toHaveText("Online now");
+  await expect(insight.getByText("On step 2 of 4: resume and job targets")).toBeVisible();
+  await expect(page.getByTestId("admin-user-queue-summary")).toHaveText("0 matched jobs, 0 scored");
+  await expect(page.getByTestId("admin-user-spend-total")).toHaveText("$0.0000");
+  await expect(insight.getByText("No browser sends yet.")).toBeVisible();
+
+  const timeline = page.getByTestId("admin-user-timeline");
+
+  await expect(timeline.getByText("Signed in", { exact: true }).first()).toBeVisible();
+  await expect(timeline.getByText("300 applications granted (admin)")).toBeVisible();
 
   await page.setViewportSize({ height: 844, width: 390 });
   await expectAxeClean(page, "390px user detail");
@@ -126,6 +144,8 @@ test("the owner invites, grants and suspends a person from the admin", async ({
 
   await expect(page.getByRole("button", { name: "Reinstate account" })).toBeVisible();
   await expect(page.getByText("Suspended", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId("admin-user-timeline").getByText("users.suspend")).toBeVisible();
 
   const audit = auditSchema.parse(
     await (await page.request.get(`${adminIsolatedAppUrl}/admin/api/audit`)).json(),
@@ -158,4 +178,47 @@ test("the owner invites, grants and suspends a person from the admin", async ({
   await page.getByRole("button", { name: /^Suspended 1$/u }).click();
 
   await expect(page.getByText(guestEmail)).toBeVisible();
+});
+
+test("the owner opens every outside dashboard from the admin Dashboards page", async ({
+  page,
+  adminIsolatedAppUrl,
+  accessServer,
+}) => {
+  await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
+  await page.goto(`${adminIsolatedAppUrl}/admin`);
+  await page.getByRole("link", { name: "Dashboards" }).first().click();
+
+  await expect(page).toHaveURL(new RegExp(`${adminIsolatedAppUrl}/admin/dashboards`, "u"));
+  await expect(page.getByRole("heading", { level: 1, name: "Dashboards" })).toBeVisible();
+  await expect(page.getByTestId("admin-dashboards-presence")).toHaveText(
+    /^\d+ online now · \d+ signed in$/u,
+  );
+
+  const outside = ["stripe", "browser_use", "anthropic"].map((id) =>
+    page.getByTestId(`admin-dashboard-${id}`),
+  );
+
+  await Promise.all(
+    outside.flatMap((link) => [
+      expect(link).toBeVisible(),
+      expect(link).toHaveAttribute("target", "_blank"),
+      expect(link).toHaveAttribute("rel", "noopener noreferrer"),
+    ]),
+  );
+
+  await expect(page.getByTestId("admin-dashboard-stripe")).toHaveAttribute(
+    "href",
+    "https://dashboard.stripe.com/test/payments",
+  );
+
+  await page.locator("main").getByRole("link", { name: "LLM spend" }).click();
+  await expect(page).toHaveURL(new RegExp(`${adminIsolatedAppUrl}/admin/llm`, "u"));
+  await page.goBack();
+
+  await page.setViewportSize({ height: 844, width: 390 });
+  await expectAxeClean(page, "390px dashboards");
+
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await expectAxeClean(page, "1280px dashboards");
 });

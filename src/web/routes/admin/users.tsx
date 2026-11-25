@@ -133,6 +133,9 @@ export function UsersPage() {
             {copy.admin.usersTitlePlain}{" "}
             <span className="italic">{copy.admin.usersTitleItalic}</span>
           </h1>
+          <p className="mt-1.5 text-xs text-muted-foreground" data-testid="admin-users-presence">
+            {copy.admin.usersPresence(data.onlineNow, data.signedInNow)}
+          </p>
         </div>
         <div className="flex min-w-0 flex-[1_1_420px] flex-wrap items-center justify-end gap-2.5">
           <label className="flex h-10 min-w-[200px] flex-[1_1_260px] items-center gap-2.5 rounded-md border border-input bg-card px-3">

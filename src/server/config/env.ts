@@ -345,6 +345,7 @@ const envSchema = z
     ANTHROPIC_BATCH_WAIT_MS: z.coerce.number().int().min(1000).default(3_600_000),
     FLY_APP_NAME: z.string().min(1).optional(),
     FLY_MACHINE_ID: z.string().min(1).optional(),
+    GRAFANA_DASHBOARD_URL: z.url().optional(),
   })
   .superRefine((value, context) => {
     if (value.ENABLE_TEST_ROUTES && (value.NODE_ENV === "production" || value.FLY_APP_NAME)) {

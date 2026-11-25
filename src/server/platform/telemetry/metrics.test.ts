@@ -73,6 +73,11 @@ test("every dashboard metric name is exported over the private scrape", async ()
     recorder.recordBgJob({ durationMs: 6, kind: "catalog.sweep", status: "done" });
     recorder.setBgQueueDepth("catalog.sweep", 3);
     recorder.setTagCoverageRatio("rules", 0.75);
+    recorder.setProductGauge("users", { online: 1, total: 2 });
+    recorder.setProductGauge("productApplications", { sent: 3 });
+    recorder.setProductGauge("matchQueue", { pooled: 40, scored: 5 });
+    recorder.setProductGauge("credits", { available: 7 });
+    recorder.setProductGauge("spendUsd", { browser: 0.5, llm: 0.25 });
   });
 
   for (const name of Object.values(METRIC_NAMES)) {

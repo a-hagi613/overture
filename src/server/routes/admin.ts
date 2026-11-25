@@ -15,6 +15,9 @@ import type { InviteRow } from "../auth/invites.ts";
 import { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 import type { AdminEnv } from "./admin-refusals.ts";
 import { resolveAdminAccessOwner } from "../admin/access-owner.ts";
+import { buildUserInsight, signedInUserIds } from "../admin/user-insight.ts";
+import { dashboardLinks } from "../admin/dashboards.ts";
+import { isOnline, onlineUserIds } from "../auth/presence.ts";
 import { createAdminRevealRoutes } from "./admin-reveal.ts";
 import type { JobActionOutcome } from "../admin/jobs.ts";
 import { cancelAdminJob, JOB_STATUS_FILTERS, listAdminJobs, retryAdminJob } from "../admin/jobs.ts";
@@ -159,6 +162,8 @@ interface AdminPersonRow {
   kind: "invite" | "user";
   lastActiveAt: number | null;
   name: string | null;
+  online: boolean;
+  signedIn: boolean;
   status: "active" | "invited" | "suspended";
 }
 
@@ -618,6 +623,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
     };
 
     const rows: AdminPersonRow[] = [];
+    const signedIn = signedInUserIds(db, now);
 
     for (const row of pageRows) {
       if (row.kind === "invite") {
@@ -638,6 +644,8 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
           kind: "invite",
           lastActiveAt: null,
           name: null,
+          online: false,
+          signedIn: false,
           status: "invited",
         });
 
@@ -665,6 +673,8 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
         kind: "user",
         lastActiveAt: lastActivityAt(row.id),
         name: row.name,
+        online: isOnline(row.id, now),
+        signedIn: signedIn.has(row.id),
         status: row.status,
       });
     }
@@ -672,9 +682,11 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
     return context.json({
       counts,
       now,
+      onlineNow: onlineUserIds(now).length,
       page,
       pageSize: USERS_PAGE_SIZE,
       rows,
+      signedInNow: signedIn.size,
       total: status === "all" ? counts.all : (totalByStatus.get(status) ?? 0),
     });
   });
@@ -785,6 +797,36 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
               },
       },
     });
+  });
+
+  routes.get("/dashboards", (context) => {
+    const now = clock.now();
+
+    return context.json({
+      links: dashboardLinks({
+        appOrigin: env.APP_ORIGIN,
+        cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID,
+        flyAppName: env.FLY_APP_NAME,
+        grafanaDashboardUrl: env.GRAFANA_DASHBOARD_URL,
+        stripeLive: env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ?? false,
+      }),
+      now,
+      onlineNow: onlineUserIds(now).length,
+      signedInNow: signedInUserIds(db, now).size,
+    });
+  });
+
+  routes.get("/users/:id/insight", (context) => {
+    const userId = context.req.param("id");
+    const user = db.select({ id: users.id }).from(users).where(eq(users.id, userId)).get();
+
+    if (user === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const now = clock.now();
+
+    return context.json({ insight: buildUserInsight(db, deps.catalogDb, user.id, now), now });
   });
 
   routes.post("/users/:id/suspend", validJson(suspendBody), async (context) => {
