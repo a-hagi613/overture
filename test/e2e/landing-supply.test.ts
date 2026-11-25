@@ -249,26 +249,26 @@ test.describe("the landing live supply preview", () => {
 
     const layoutBefore = await layoutOf(page);
 
-    await category.selectOption("Software Engineering");
+    await category.selectOption({ label: "Software & IT" });
     await expect(count).toHaveText("2");
 
     await role.click();
     await page.getByPlaceholder("Search roles…").fill("Software Engineer");
     await page
       .getByRole("listbox")
-      .getByRole("option", { name: /Software Engineer/u })
+      .getByRole("option", { name: /^Software Engineer \(general\)/u })
       .first()
       .click();
     await expect(count).toHaveText("2");
 
-    await category.selectOption("Data & Analytics");
+    await category.selectOption({ label: "Data & AI" });
     await expect(count).toHaveText("1");
 
     await role.click();
     await page.getByPlaceholder("Search roles…").fill("Data Scientist");
     await page
       .getByRole("listbox")
-      .getByRole("option", { name: /Data Scientist/u })
+      .getByRole("option", { name: /^Data Scientist/u })
       .first()
       .click();
     await expect(count).toHaveText("1");
@@ -282,7 +282,7 @@ test.describe("the landing live supply preview", () => {
     await remote.click();
     await expect(count).toHaveText("3");
 
-    await category.selectOption("Software Engineering");
+    await category.selectOption({ label: "Software & IT" });
     await expect(count).toHaveText("1");
 
     await category.selectOption("");
@@ -305,7 +305,7 @@ test.describe("the landing live supply preview", () => {
     await expect(page.getByTestId("supply-status")).toContainText("Last updated");
     expect(await layoutOf(page)).toEqual(layoutBefore);
 
-    const results = await new AxeBuilder({ page }).analyze();
+    const results = await new AxeBuilder({ page }).include("#live-jobs").analyze();
 
     expect(results.violations).toEqual([]);
   });

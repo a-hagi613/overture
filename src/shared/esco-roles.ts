@@ -154,41 +154,17 @@ export const ESCO_ROLE_OPTIONS: readonly EscoRoleOption[] = [
   { category: "Administrative", role: "Secretary" },
 ];
 
-/** The picker vocabulary: roles that say more than their category, so a duplicate category name is never offered. */
-export const ESCO_GRANULAR_ROLE_OPTIONS: readonly EscoRoleOption[] = ESCO_ROLE_OPTIONS.filter(
-  (option) => option.role !== option.category,
-);
-
 /** Every Level-2 role name the dataset records, unique and sorted, for a closed query enum. */
 export const ESCO_ROLE_NAMES: readonly string[] = [
   ...new Set(ESCO_ROLE_OPTIONS.map((option) => option.role)),
 ].toSorted((left, right) => left.localeCompare(right, "en"));
 
-const CATEGORY_BY_ROLE = new Map(ESCO_ROLE_OPTIONS.map((option) => [option.role, option.category]));
-
-/**
- * @param role A Level-2 role name.
- * @returns Its Level-1 category, or null when the name is not in the baked vocabulary.
- */
-export function escoRoleCategory(role: string) {
-  return CATEGORY_BY_ROLE.get(role) ?? null;
-}
-
-/**
- * The roles a picker offers, optionally narrowed to one category. Category-equal fallback roles are excluded.
- * @param category The Level-1 category to narrow to, or null for every granular role.
- * @returns The matching granular roles.
- */
-export function escoGranularRolesFor(category: RoleGroup | null) {
-  return category === null
-    ? ESCO_GRANULAR_ROLE_OPTIONS
-    : ESCO_GRANULAR_ROLE_OPTIONS.filter((option) => option.category === category);
-}
+const ROLE_NAME_SET = new Set(ESCO_ROLE_NAMES);
 
 /**
  * @param value A query or stored target string.
  * @returns True when it is one of the 134 baked ESCO Level-2 role names.
  */
 export function isEscoRole(value: string) {
-  return CATEGORY_BY_ROLE.has(value);
+  return ROLE_NAME_SET.has(value);
 }

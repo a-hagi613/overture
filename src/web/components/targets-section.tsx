@@ -4,11 +4,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import type { TargetsInput } from "../../shared/targets.ts";
-import type { RoleGroup } from "../../shared/tag-taxonomy.ts";
+import type { RoleCategoryId } from "../../shared/role-taxonomy.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { escoGranularRolesFor } from "../../shared/esco-roles.ts";
-import { ROLE_GROUPS } from "../../shared/tag-taxonomy.ts";
+import { ROLE_CATEGORIES, pickableRoles, roleCategoryById } from "../../shared/role-taxonomy.ts";
 import { fetchTargets, previewTargetsCount, saveTargets } from "../lib/profile-api.ts";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
@@ -93,7 +92,7 @@ export function TargetsSection() {
     },
   });
 
-  const [roleCategory, setRoleCategory] = useState<RoleGroup | null>(null);
+  const [roleCategory, setRoleCategory] = useState<RoleCategoryId | null>(null);
   const [newLocation, setNewLocation] = useState<string | null>(null);
   const matchedCount = countQuery.data?.matchedCount ?? targetsQuery.data?.matchedCount ?? 0;
 
@@ -171,15 +170,15 @@ export function TargetsSection() {
               onChange={(event) => {
                 const next = event.currentTarget.value;
 
-                setRoleCategory(ROLE_GROUPS.find((group) => group === next) ?? null);
+                setRoleCategory(roleCategoryById(next)?.id ?? null);
               }}
               selectClassName="h-12 pl-3.5 pr-10"
               value={roleCategory ?? ""}
             >
               <option value="">{targets.categoryAny}</option>
-              {ROLE_GROUPS.map((group) => (
-                <option key={group} value={group}>
-                  {group}
+              {ROLE_CATEGORIES.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
                 </option>
               ))}
             </Select>
@@ -194,9 +193,12 @@ export function TargetsSection() {
                 update({ roles: [...draft.roles, role] });
               }
             }}
-            options={escoGranularRolesFor(roleCategory)
-              .filter((option) => !(draft?.roles ?? []).includes(option.role))
-              .map((option) => ({ hint: option.category, value: option.role }))}
+            options={pickableRoles(roleCategory)
+              .filter((role) => !(draft?.roles ?? []).includes(role.name))
+              .map((role) => ({
+                hint: roleCategoryById(role.categoryId)?.name ?? "",
+                value: role.name,
+              }))}
             placeholder={targets.pickRolePlaceholder}
             value={null}
           />

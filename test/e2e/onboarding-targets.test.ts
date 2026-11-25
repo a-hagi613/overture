@@ -64,13 +64,13 @@ test("the category-first role chips, multi-select locations, and optional settin
 
   await page.goto(`${onboardingServer.url}/onboarding/targets`);
 
-  const platform = page.getByRole("button", { name: "Platform Engineer" });
+  const backend = page.getByRole("button", { exact: true, name: "Backend Engineer" });
   const remote = page.getByRole("button", { exact: true, name: "Remote" });
   const hybrid = page.getByRole("button", { exact: true, name: "Hybrid" });
   const senior = page.getByRole("button", { name: "Senior" });
 
-  await platform.click();
-  await expect(platform).toHaveAttribute("aria-pressed", "true");
+  await backend.click();
+  await expect(backend).toHaveAttribute("aria-pressed", "true");
 
   await page.getByLabel("Locations").click();
   await page.getByRole("option", { exact: true, name: "London" }).click();
@@ -139,13 +139,13 @@ test("choices persist across reload, optional salary saves, and browser zone is 
   await page.goto(`${onboardingServer.url}/onboarding/targets`);
 
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Platform Engineer" })).toBeVisible();
+  await expect(page.getByRole("button", { exact: true, name: "Backend Engineer" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ghost Role" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Platform Engineer" }).click();
+  await page.getByRole("button", { exact: true, name: "Backend Engineer" }).click();
 
   await page.getByLabel("Category").click();
-  await page.getByRole("option", { exact: true, name: "Product Management" }).click();
+  await page.getByRole("option", { exact: true, name: "Product & Design" }).click();
   await page.getByRole("button", { exact: true, name: "Product Manager" }).click();
 
   await page.getByLabel("Locations").click();
@@ -157,7 +157,7 @@ test("choices persist across reload, optional salary saves, and browser zone is 
   await page.getByRole("button", { name: "Hybrid" }).click();
   await page.getByRole("button", { name: "Senior" }).click();
 
-  await page.getByRole("button", { name: "Platform Engineer" }).click();
+  await page.getByRole("button", { exact: true, name: "Backend Engineer" }).click();
 
   await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
   await page.getByLabel("Minimum salary").fill("120,000");

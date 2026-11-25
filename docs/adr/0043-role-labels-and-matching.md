@@ -51,7 +51,9 @@ different stack), not label errors. Labelling the week cost $6.59 with the Batch
   build, the tag store behind the board poll and imports, the test routes), so a title the rules could not place still
   gets its label before the paid fallback sees it, and a second pass changes nothing.
 - **Matching.** A saved target is read as taxonomy ids: an id, a current name, a retired category or ESCO name, or one
-  clear part of a combined name (`Nurse Practitioner` of `Nurse Practitioner / Anesthetist / Midwife`). A role target
+  clear part of a combined name (`Nurse Practitioner` of `Nurse Practitioner / Anesthetist / Midwife`). A category
+  name wins over a subcategory that shares it (`Engineering`, `Healthcare` also name subcategories under Management),
+  and a subcategory name used in several categories (`Supervision`, `Other`) names none and stays free text. A role target
   matches only that role; a neighbour in the same subcategory is not admitted, because it often needs another licence
   or level, and that widening was never measured. A subcategory or category target reaches every role inside it. Other
   text is free text and matches a title holding every one of its words. Role depth ranks: exact role 40, subcategory
@@ -81,5 +83,8 @@ different stack), not label errors. Labelling the week cost $6.59 with the Batch
   Workable pass reads it with its targets, before it measures the feed's memory, so its budget still measures the
   streaming parse (ADR 0032).
 - Embeddings are not used. They stay a candidate for ranking inside a role, not for filtering.
-- The pickers still offer the retired 28 groups and ESCO roles until the front end moves to `role-taxonomy.ts`; their
-  values resolve to taxonomy ids, coarser than a direct choice (`Software Engineering` reaches all of Software & IT).
+- The pickers (onboarding, profile targets, the landing count) offer the 29 categories and each category's specific
+  roles from `role-taxonomy.ts` and save role names, which resolve to exactly that role. A catch-all role (`Other
+  Health Practitioner`) is never offered; it is reached by choosing its category. Targets saved before the move keep
+  their retired names, which still resolve to taxonomy ids, coarser than a direct choice (`Software Engineering`
+  reaches all of Software & IT).

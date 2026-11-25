@@ -121,9 +121,13 @@ export function LandingHeroCard({
           <motion.div
             animate={{ opacity: 1, scale: 1 }}
             className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
-            exit={{ opacity: 0, scale: 0.96 }}
-            initial={{ opacity: 0, scale: 2.1 }}
-            transition={{ damping: 21, mass: 0.68, stiffness: 460, type: "spring" }}
+            exit={reducedMotion ? { opacity: 1 } : { opacity: 0, scale: 0.96 }}
+            initial={reducedMotion ? false : { opacity: 0, scale: 2.1 }}
+            transition={
+              reducedMotion
+                ? { duration: 0 }
+                : { damping: 21, mass: 0.68, stiffness: 460, type: "spring" }
+            }
           >
             <span className="-rotate-10 inline-flex items-center justify-center rounded-lg border-[3px] border-signal bg-card/95 p-1.5 shadow-lift">
               <span className="inline-flex items-center justify-center rounded border border-dashed border-signal px-7 py-2.5 font-sans text-page-title font-extrabold uppercase leading-none tracking-[0.2em] text-signal">

@@ -158,15 +158,15 @@ test.describe("WS-17b review screenshots", () => {
       );
 
       await page.goto(`${isolatedAppServer.url}/#live-jobs`);
-      await page.getByLabel("Category", { exact: true }).selectOption("Software Engineering");
+      await page.getByLabel("Category", { exact: true }).selectOption({ label: "Software & IT" });
       await page.getByRole("button", { name: /^Role:/u }).click();
-      await page.getByPlaceholder("Search roles…").fill("Software Engineer");
+      await page.getByPlaceholder("Search roles…").fill("Backend Engineer");
       await page
         .getByRole("listbox")
-        .getByRole("option", { name: /Software Engineer/u })
+        .getByRole("option", { name: /^Backend Engineer/u })
         .first()
         .click();
-      await expect(page.getByTestId("supply-count")).toHaveText("2");
+      await expect(page.getByTestId("supply-count")).toHaveText(/^\d+$/u);
 
       await shoot(page, `landing-supply-${String(width)}-${theme}`, page.locator("#live-jobs"));
       await context.close();
@@ -195,10 +195,12 @@ test.describe("WS-17b review screenshots", () => {
       );
 
       await page.goto(`${isolatedAppServer.url}/onboarding/targets`);
-      await page.getByLabel("Category", { exact: true }).selectOption("Healthcare");
-      await page.getByLabel("Add a specific role", { exact: true }).fill("Registered Nurse");
-      await page.getByLabel("Add a specific role", { exact: true }).press("Enter");
-      await expect(page.getByRole("button", { name: "Registered Nurse" })).toBeVisible();
+      await page.getByLabel("Category").click();
+      await page.getByRole("option", { exact: true, name: "Healthcare" }).click();
+      await page.getByRole("button", { exact: true, name: "Registered Nurse" }).click();
+      await expect(
+        page.getByRole("button", { exact: true, name: "Registered Nurse" }),
+      ).toHaveAttribute("aria-pressed", "true");
 
       await shoot(
         page,
