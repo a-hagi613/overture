@@ -137,7 +137,46 @@ function adminHostSharesMainHostname() {
   }
 }
 
-export async function staticResponseFrom(root: string, url: string) {
+const BYTE_RANGE = /^bytes=(?<start>\d*)-(?<end>\d*)$/u;
+
+function parseByteRange(rangeHeader: string, size: number) {
+  if (size <= 0) {
+    return null;
+  }
+
+  const match = BYTE_RANGE.exec(rangeHeader.trim());
+  const startRaw = match?.groups?.start ?? "";
+  const endRaw = match?.groups?.end ?? "";
+
+  if (match === null || (startRaw === "" && endRaw === "")) {
+    return null;
+  }
+
+  if (startRaw === "") {
+    const suffix = Number(endRaw);
+
+    if (!Number.isSafeInteger(suffix) || suffix <= 0) {
+      return null;
+    }
+
+    return { end: size - 1, start: Math.max(0, size - suffix) };
+  }
+
+  const start = Number(startRaw);
+  const end = endRaw === "" ? size - 1 : Math.min(Number(endRaw), size - 1);
+
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) {
+    return null;
+  }
+
+  if (start >= size || start > end) {
+    return "unsatisfiable" as const;
+  }
+
+  return { end, start };
+}
+
+export async function staticResponseFrom(root: string, url: string, rangeHeader?: string | null) {
   const { pathname } = new URL(url);
   const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/u, "");
   const resolvedRoot = resolve(root);
@@ -154,11 +193,36 @@ export async function staticResponseFrom(root: string, url: string) {
   const match = found.find((candidate) => candidate !== null);
 
   if (match !== undefined) {
-    const headers = staticCacheHeaders(pathname);
+    const file = Bun.file(match);
+    const cacheHeaders = staticCacheHeaders(pathname);
+    const headers = new Headers(cacheHeaders);
 
-    return headers === undefined
-      ? new Response(Bun.file(match))
-      : new Response(Bun.file(match), { headers });
+    headers.set("Accept-Ranges", "bytes");
+
+    if (rangeHeader !== undefined && rangeHeader !== null && rangeHeader !== "") {
+      const parsed = parseByteRange(rangeHeader, file.size);
+
+      if (parsed === "unsatisfiable") {
+        headers.set("Content-Range", `bytes */${String(file.size)}`);
+
+        return new Response(null, { headers, status: 416 });
+      }
+
+      if (parsed !== null) {
+        const { end, start } = parsed;
+
+        if (file.type !== "") {
+          headers.set("Content-Type", file.type);
+        }
+
+        headers.set("Content-Length", String(end - start + 1));
+        headers.set("Content-Range", `bytes ${String(start)}-${String(end)}/${String(file.size)}`);
+
+        return new Response(file.slice(start, end + 1), { headers, status: 206 });
+      }
+    }
+
+    return new Response(file, { headers });
   }
 
   if (isHashedAssetPath(pathname)) {
@@ -225,6 +289,24 @@ export function isHashedAssetPath(pathname: string) {
 export function staticCacheHeaders(pathname: string) {
   if (pathname.startsWith("/assets/")) {
     return { "Cache-Control": "public, max-age=31536000, immutable" };
+  }
+
+  if (pathname.startsWith("/videos/")) {
+    return {
+      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+      "CDN-Cache-Control": "public, max-age=2592000, stale-while-revalidate=86400",
+    };
+  }
+
+  if (
+    pathname.startsWith("/icons/") ||
+    pathname === "/favicon.svg" ||
+    pathname === "/manifest.webmanifest"
+  ) {
+    return {
+      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+      "CDN-Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
+    };
   }
 
   if (pathname === "/sw.js") {
@@ -663,7 +745,11 @@ export function createApp(deps: AppDependencies) {
   app.get("/sw", async () => serviceWorkerResponse(deps.staticRoot));
 
   app.get("*", async (context) => {
-    const page = await staticResponseFrom(deps.staticRoot, context.req.url);
+    const page = await staticResponseFrom(
+      deps.staticRoot,
+      context.req.url,
+      context.req.header("range"),
+    );
 
     return page ?? context.notFound();
   });
@@ -671,7 +757,11 @@ export function createApp(deps: AppDependencies) {
   adminHost.get("/sw", async () => serviceWorkerResponse(deps.staticRoot));
 
   adminHost.get("*", async (context) => {
-    const page = await staticResponseFrom(deps.staticRoot, context.req.url);
+    const page = await staticResponseFrom(
+      deps.staticRoot,
+      context.req.url,
+      context.req.header("range"),
+    );
 
     return page ?? context.notFound();
   });

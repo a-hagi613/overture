@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -51,14 +51,13 @@ export function CalendarPage() {
   const customEventsQuery = useCalendarCustomEvents();
   const createCustomEvent = useCreateCalendarCustomEvent();
   const deleteCustomEvent = useDeleteCalendarCustomEvent();
-  const customEvents = customEventsQuery.data ?? [];
 
   const { month, year } = focus;
   const range = monthRange(year, month, localZone);
   const { data, isError, isFetching, refetch } = useCalendar(range, localZone);
   const zone = data?.timeZone ?? localZone;
   const today = dateIn(currentTime(), zone);
-  const buckets = bucketByDay(data?.items ?? [], zone);
+  const buckets = useMemo(() => bucketByDay(data?.items ?? [], zone), [data?.items, zone]);
   const monthKey = monthKeyOf(focus);
 
   if (data !== undefined && data.timeZone !== zoneSynced) {
@@ -93,14 +92,18 @@ export function CalendarPage() {
     }
   }, [monthKey, params, setParams]);
 
-  const customByDay = new Map<string, CustomCalendarEvent[]>();
+  const customByDay = useMemo(() => {
+    const grouped = new Map<string, CustomCalendarEvent[]>();
 
-  for (const event of customEvents) {
-    const existing = customByDay.get(event.dayKey) ?? [];
+    for (const event of customEventsQuery.data ?? []) {
+      const existing = grouped.get(event.dayKey) ?? [];
 
-    existing.push(event);
-    customByDay.set(event.dayKey, existing);
-  }
+      existing.push(event);
+      grouped.set(event.dayKey, existing);
+    }
+
+    return grouped;
+  }, [customEventsQuery.data]);
 
   const selectedKey = dayKeyOf(selected);
   const selectedApiItems = buckets.get(selectedKey) ?? [];

@@ -170,7 +170,13 @@ test("test-only diffs select only the touched test and single-route UI edits sta
   });
 
   const boardVisitors = allTests.filter((file) =>
-    map.tests[file]?.routes.includes("/applications"),
+    map.tests[file]?.routes.some(
+      (route) =>
+        route === "/applications" ||
+        route === "/tracker" ||
+        route === "/board" ||
+        route === "/search",
+    ),
   );
 
   expect(boardCardPlan.full).toBe(false);
@@ -378,7 +384,13 @@ test("oxlint and oxfmt config edits do not trigger full e2e runs", () => {
   expect(lintWithUnitTestPlan.selected).toEqual([]);
 
   const boardVisitors = allTests.filter((file) =>
-    map.tests[file]?.routes.includes("/applications"),
+    map.tests[file]?.routes.some(
+      (route) =>
+        route === "/applications" ||
+        route === "/tracker" ||
+        route === "/board" ||
+        route === "/search",
+    ),
   );
 
   const lintWithBoardCardPlan = computePlan({

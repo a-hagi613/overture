@@ -271,7 +271,7 @@ export function LandingHeroStack({
   }
 
   const displayPct = scrubPct ?? currentCard.progressPct;
-  const motionClass = scrubPct === null ? "transition-all duration-300" : "";
+  const motionClass = scrubPct === null ? "transition-[width,left] duration-300" : "";
 
   return (
     <section

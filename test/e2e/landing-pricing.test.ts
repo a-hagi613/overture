@@ -80,19 +80,8 @@ test.describe("public landing and embedded pricing, readable without JavaScript"
   });
 });
 
-async function inSequence<T>(items: readonly T[], run: (item: T) => Promise<void>) {
-  const [first, ...rest] = items;
-
-  if (first === undefined) {
-    return;
-  }
-
-  await run(first);
-  await inSequence(rest, run);
-}
-
 test.describe("public landing served and checked in the browser", () => {
-  test("the landing screen is reachable, axe clean, shows pricing and interactive workspace tabs", async ({
+  test("the landing screen is reachable, axe clean, shows pricing and the workspace walkthrough", async ({
     page,
     appServerUrl,
   }) => {
@@ -103,13 +92,11 @@ test.describe("public landing served and checked in the browser", () => {
       page.getByRole("heading", { level: 2, name: "Pay only for applications sent." }),
     ).toBeVisible();
 
-    await inSequence(["Home", "Applications", "Inbox", "Calendar", "Profile"], async (tabLabel) => {
-      const tab = page.getByRole("button", { name: tabLabel });
+    const workspace = page.locator("#dashboard-preview");
 
-      await expect(tab).toBeVisible();
-      await tab.click();
-      await expect(tab).toHaveAttribute("aria-pressed", "true");
-    });
+    await workspace.scrollIntoViewIfNeeded();
+    await expect(workspace.locator("video")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Play walkthrough" })).toBeVisible();
 
     const landing = await new AxeBuilder({ page }).analyze();
 

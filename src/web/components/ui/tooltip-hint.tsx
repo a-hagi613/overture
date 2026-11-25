@@ -15,7 +15,7 @@ export function TooltipHint({
       <Trigger asChild>{children}</Trigger>
       <Portal>
         <Content
-          className="z-50 rounded-md border border-input bg-card px-2.5 py-1 text-xs font-medium text-foreground shadow-sh"
+          className="ov-tooltip-in z-50 rounded-md border border-input bg-card px-2.5 py-1 text-xs font-medium text-foreground shadow-sh"
           side={side}
           sideOffset={8}
         >

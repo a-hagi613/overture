@@ -142,7 +142,7 @@ export function HomeControlBand({ home }: { home: HomeResponse }) {
       <div className="flex items-center gap-3 border-t border-border pt-2.5">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <div
-            className={`h-full rounded-full transition-all ${running ? "bg-ok" : "bg-signal"}`}
+            className={`h-full rounded-full transition-[width] ${running ? "bg-ok" : "bg-signal"}`}
             style={{ width: `${String(pct)}%` }}
           />
         </div>

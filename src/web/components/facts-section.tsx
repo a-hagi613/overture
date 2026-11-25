@@ -20,6 +20,7 @@ import { SectionSkeleton } from "./section-skeleton.tsx";
 type Tier = "tier1" | "tier2" | "tier3";
 
 const TIER_1_ORDER: readonly string[] = [...TIER_1_FACT_KEYS];
+const INITIAL_VISIBLE_FACTS = 6;
 
 function isTier(value: string): value is Tier {
   return value === "tier1" || value === "tier2" || value === "tier3";
@@ -58,6 +59,11 @@ export function FactsSection() {
   const queryClient = useQueryClient();
   const [tier, setTier] = useState<Tier>(hash === "#profile-strengthen" ? "tier2" : "tier1");
   const [localEdits, setLocalEdits] = useState<Record<string, string>>({});
+
+  const [expandedTiers, setExpandedTiers] = useState<{ tier1: boolean; tier3: boolean }>({
+    tier1: false,
+    tier3: false,
+  });
 
   const factsQuery = useQuery({
     queryFn: fetchProfileFacts,
@@ -99,6 +105,14 @@ export function FactsSection() {
         !entry.key.startsWith("q:") && entry.source !== "review" && !isTier2FactKey(entry.key),
     )
     .toSorted((left, right) => tier1SortOrder(left.key) - tier1SortOrder(right.key));
+
+  const visibleTier1 = expandedTiers.tier1
+    ? tier1Facts
+    : tier1Facts.slice(0, INITIAL_VISIBLE_FACTS);
+
+  const visibleTier3 = expandedTiers.tier3
+    ? learnedFacts
+    : learnedFacts.slice(0, INITIAL_VISIBLE_FACTS);
 
   const tier2RemainingCount = strengthenQuery.data?.facts.length ?? 0;
   const tier2TotalCount = tier2Answered.length + tier2RemainingCount;
@@ -188,7 +202,7 @@ export function FactsSection() {
             </div>
           ) : (
             <div className="mt-3">
-              {tier1Facts.map((fact) => {
+              {visibleTier1.map((fact) => {
                 const label = factLabelFor(fact.key) || readableFactKey(fact.key);
                 const resolvedValue = localEdits[fact.key] ?? fact.value;
                 const readOnly = fact.key === "apply_email";
@@ -214,6 +228,21 @@ export function FactsSection() {
                   />
                 );
               })}
+              {tier1Facts.length > INITIAL_VISIBLE_FACTS ? (
+                <div className="border-t border-border pt-3">
+                  <Button
+                    onClick={() => {
+                      setExpandedTiers((current) => ({ ...current, tier1: !current.tier1 }));
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {expandedTiers.tier1
+                      ? facts.showLess
+                      : facts.showMore(tier1Facts.length - INITIAL_VISIBLE_FACTS)}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           )}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
@@ -254,7 +283,7 @@ export function FactsSection() {
             </div>
           ) : (
             <div>
-              {learnedFacts.map((fact) => {
+              {visibleTier3.map((fact) => {
                 const label = readableFactKey(fact.key);
                 const resolvedValue = localEdits[fact.key] ?? fact.value;
 
@@ -273,6 +302,21 @@ export function FactsSection() {
                   />
                 );
               })}
+              {learnedFacts.length > INITIAL_VISIBLE_FACTS ? (
+                <div className="border-t border-border pt-3">
+                  <Button
+                    onClick={() => {
+                      setExpandedTiers((current) => ({ ...current, tier3: !current.tier3 }));
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {expandedTiers.tier3
+                      ? facts.showLess
+                      : facts.showMore(learnedFacts.length - INITIAL_VISIBLE_FACTS)}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           )}
         </div>

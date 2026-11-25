@@ -1,4 +1,5 @@
 import { Bell, CheckCheck } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 
@@ -17,6 +18,7 @@ import {
 } from "../lib/notifications-api.ts";
 
 const BROWSER_TIME_ZONE = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+const INITIAL_VISIBLE_NOTIFICATIONS = 5;
 const PERIOD = ".";
 
 export function NotificationsPage() {
@@ -24,11 +26,15 @@ export function NotificationsPage() {
   const home = useHomeData();
   const markAll = useMarkAllNotificationsRead();
   const markRead = useMarkNotificationRead();
+  const [showAllToday, setShowAllToday] = useState(false);
+  const [showAllEarlier, setShowAllEarlier] = useState(false);
   const now = data?.now ?? 0;
   const rows = data?.notifications ?? [];
   const timeZone = home.data?.timeZone ?? BROWSER_TIME_ZONE;
   const today = rows.filter((row) => dateKey(row.at, timeZone) === dateKey(now, timeZone));
   const earlier = rows.filter((row) => dateKey(row.at, timeZone) !== dateKey(now, timeZone));
+  const visibleToday = showAllToday ? today : today.slice(0, INITIAL_VISIBLE_NOTIFICATIONS);
+  const visibleEarlier = showAllEarlier ? earlier : earlier.slice(0, INITIAL_VISIBLE_NOTIFICATIONS);
 
   const empty = !isPending && !isError && rows.length === 0;
   const populated = !isPending && !isError && rows.length > 0;
@@ -95,7 +101,7 @@ export function NotificationsPage() {
           className="mt-6 flex flex-col items-center gap-3 px-6 py-12 text-center"
           dataTestId="notifications-empty"
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
             <Bell aria-hidden="true" size={20} />
           </span>
           <h2 className={dsCardTitle}>{copy.notifications.page.emptyTitle}</h2>
@@ -117,7 +123,7 @@ export function NotificationsPage() {
                 dataTestId="notifications-today"
               >
                 <ul className="list-none">
-                  {today.map((row) => (
+                  {visibleToday.map((row) => (
                     <NotificationItem
                       key={row.id}
                       now={now}
@@ -129,6 +135,23 @@ export function NotificationsPage() {
                     />
                   ))}
                 </ul>
+                {today.length > INITIAL_VISIBLE_NOTIFICATIONS ? (
+                  <div className="border-t border-border py-3">
+                    <Button
+                      onClick={() => {
+                        setShowAllToday((open) => !open);
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {showAllToday
+                        ? copy.notifications.page.showLess
+                        : copy.notifications.page.showMore(
+                            today.length - INITIAL_VISIBLE_NOTIFICATIONS,
+                          )}
+                    </Button>
+                  </div>
+                ) : null}
               </Card>
             </div>
           ) : null}
@@ -142,7 +165,7 @@ export function NotificationsPage() {
                 dataTestId="notifications-earlier"
               >
                 <ul className="list-none">
-                  {earlier.map((row) => (
+                  {visibleEarlier.map((row) => (
                     <NotificationItem
                       key={row.id}
                       now={now}
@@ -154,6 +177,23 @@ export function NotificationsPage() {
                     />
                   ))}
                 </ul>
+                {earlier.length > INITIAL_VISIBLE_NOTIFICATIONS ? (
+                  <div className="border-t border-border py-3">
+                    <Button
+                      onClick={() => {
+                        setShowAllEarlier((open) => !open);
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {showAllEarlier
+                        ? copy.notifications.page.showLess
+                        : copy.notifications.page.showMore(
+                            earlier.length - INITIAL_VISIBLE_NOTIFICATIONS,
+                          )}
+                    </Button>
+                  </div>
+                ) : null}
               </Card>
             </div>
           ) : null}

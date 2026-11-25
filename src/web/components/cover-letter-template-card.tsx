@@ -102,8 +102,8 @@ export function CoverLetterTemplateCard() {
   const paragraphs = currentText.split(/\n{2,}/u).filter((part) => part.trim() !== "");
 
   return (
-    <Card ariaLabelledBy="cover-letter-template" className="p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <Card ariaLabelledBy="cover-letter-template" className="flex h-full min-h-0 flex-col p-5">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2.5">
             <h2 className={dsCardTitle} id="cover-letter-template">
@@ -123,16 +123,16 @@ export function CoverLetterTemplateCard() {
       </div>
 
       {editing ? (
-        <div className="mt-5 space-y-3">
+        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">
           <Textarea
             ariaLabel={cl.title}
-            className="min-h-64 rounded-xl bg-background p-4 font-serif text-base"
+            className="min-h-56 flex-1 rounded-xl bg-background p-4 font-serif text-sm md:text-base"
             onChange={(event) => {
               setDraft(event.target.value);
             }}
             value={draft}
           />
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2.5">
             <Button
               onClick={() => {
                 setDraft(DEFAULT_COVER_LETTER);
@@ -166,12 +166,13 @@ export function CoverLetterTemplateCard() {
           </div>
         </div>
       ) : (
-        <div className="mt-5 flex flex-col gap-4 rounded-xl border border-border bg-background p-5 font-serif text-base leading-relaxed text-foreground md:p-6">
+        <div
+          className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-background p-4 font-serif text-sm leading-relaxed text-foreground md:p-5"
+          data-scroll-region
+        >
           {paragraphs.map((paragraph, index) => renderTemplateParagraph(paragraph, index))}
         </div>
       )}
-
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{cl.note}</p>
     </Card>
   );
 }

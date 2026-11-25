@@ -81,6 +81,7 @@ const shellPaths = new Set([
 
 const redirectedPaths = new Map<string, string>([
   ["/onboarding", "/onboarding/resume"],
+  ["/onboarding/trial", "/onboarding/matches"],
   ...[
     ...routeSource.matchAll(
       /path:\s*"(?<from>[^"]+)"[^}]*?<(?:Navigate replace|PreserveSearchRedirect)\s+to="(?<to>[^"#]+)/gu,

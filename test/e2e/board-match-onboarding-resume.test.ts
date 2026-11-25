@@ -80,7 +80,7 @@ async function screenshotPage(
   ).toBeVisible();
 
   if (path === "/onboarding/resume") {
-    await expect(page.getByText("resume.pdf")).toBeVisible();
+    await expect(page.getByText("resume.pdf").first()).toBeVisible();
     await expect(page.getByText("PDF · 2 pages · 184 KB")).toBeVisible();
   } else {
     await expect(page.getByText("Overture finds jobs")).toBeVisible();

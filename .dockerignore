@@ -16,6 +16,7 @@ profile
 docs
 tmp
 test/e2e/.tmp
+scripts/demo-video/assets/captures
 *.log
 *.db
 *.sqlite

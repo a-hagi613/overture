@@ -1,23 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Download, FileText, Upload } from "lucide-react";
+import { Download, FileText, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
-import {
-  fetchCurrentResume,
-  fetchProfileFacts,
-  resumeFileUrl,
-  uploadResumeFile,
-} from "../lib/profile-api.ts";
+import { fetchCurrentResume, resumeFileUrl, uploadResumeFile } from "../lib/profile-api.ts";
 import { safePdfUrl } from "../lib/pdf-url.ts";
+import { OnboardingResumeScan } from "./onboarding-resume-scan.tsx";
 import { PdfPreview } from "./pdf-preview.tsx";
 import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
-import { dsBody, dsCardTitle, dsEyebrow } from "./ui/ds.ts";
+import { dsBody, dsCardTitle } from "./ui/ds.ts";
 import { SectionSkeleton } from "./section-skeleton.tsx";
+
+const SCAN_MIN_MS = 2200;
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) {
@@ -45,6 +43,7 @@ export function ResumeSection() {
   const { resume: copyResume } = copy.profile;
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scanTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
 
   const [localPreview, setLocalPreview] = useState<{
     bytes: number;
@@ -52,20 +51,21 @@ export function ResumeSection() {
     url: string;
   } | null>(null);
 
+  const [scanningFile, setScanningFile] = useState<string | null>(null);
+
   const resumeQuery = useQuery({
     queryFn: fetchCurrentResume,
     queryKey: ["profile-resume"],
-  });
-
-  const factsQuery = useQuery({
-    queryFn: fetchProfileFacts,
-    queryKey: ["profile-facts"],
   });
 
   useEffect(
     () => () => {
       if (localPreview !== null) {
         URL.revokeObjectURL(localPreview.url);
+      }
+
+      if (scanTimerRef.current !== null) {
+        globalThis.clearTimeout(scanTimerRef.current);
       }
     },
     [localPreview],
@@ -93,9 +93,6 @@ export function ResumeSection() {
   const pages = current?.pages ?? null;
   const uploadedText = current === null ? "" : formatUploadedDate(current.uploadedAt);
 
-  const factsCount =
-    factsQuery.data?.facts.filter((fact) => fact.key !== "cover_letter_template").length ?? 0;
-
   const pdfUrl = safePdfUrl(
     localPreview?.url ?? (current === null ? null : resumeFileUrl(current.id)),
   );
@@ -121,6 +118,10 @@ export function ResumeSection() {
       return;
     }
 
+    if (scanTimerRef.current !== null) {
+      globalThis.clearTimeout(scanTimerRef.current);
+    }
+
     const previewUrl = URL.createObjectURL(file);
 
     setLocalPreview({
@@ -128,14 +129,29 @@ export function ResumeSection() {
       filename: file.name,
       url: previewUrl,
     });
+    setScanningFile(file.name);
+
+    scanTimerRef.current = globalThis.setTimeout(() => {
+      setScanningFile(null);
+      scanTimerRef.current = null;
+    }, SCAN_MIN_MS);
 
     upload.mutate(file, {
       onError: () => {
+        if (scanTimerRef.current !== null) {
+          globalThis.clearTimeout(scanTimerRef.current);
+          scanTimerRef.current = null;
+        }
+
+        setScanningFile(null);
         setLocalPreview(null);
         toast.error(copy.onboarding.resumeUploadFailed);
       },
     });
   };
+
+  const showScanner = upload.isPending || scanningFile !== null;
+  const activeScanName = scanningFile ?? filename ?? copy.onboarding.resumeLabel;
 
   let statusBadge = null;
 
@@ -147,7 +163,7 @@ export function ResumeSection() {
 
   let uploadButtonLabel: string = copyResume.replace;
 
-  if (upload.isPending) {
+  if (showScanner) {
     uploadButtonLabel = copy.nav.profilePages.resumeUploading;
   } else if (filename === null) {
     uploadButtonLabel = copy.nav.profilePages.resumeUploadPdf;
@@ -158,9 +174,13 @@ export function ResumeSection() {
   }
 
   return (
-    <Card ariaLabelledBy="profile-resume-heading" className="p-5 md:p-6" id="profile-resume">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <Card
+      ariaLabelledBy="profile-resume-heading"
+      className="flex h-full min-h-0 flex-col p-5"
+      id="profile-resume"
+    >
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <h2 className={dsCardTitle} id="profile-resume-heading">
             {copy.profile.tabs.resume}
           </h2>
@@ -169,13 +189,13 @@ export function ResumeSection() {
         {statusBadge}
       </div>
 
-      <div className="mt-5 flex flex-col gap-5">
-        <div className="flex items-center gap-3.5">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex shrink-0 items-center gap-3">
           <span
             aria-hidden="true"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-foreground"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-foreground"
           >
-            <FileText size={20} />
+            <FileText size={18} />
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate font-mono text-sm font-semibold text-foreground">
@@ -187,32 +207,13 @@ export function ResumeSection() {
           </div>
         </div>
 
-        <PdfPreview filename={filename} pages={pages} pdfUrl={pdfUrl} />
-
-        <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-3.5">
-          <CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0 text-ok" size={16} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground">{copyResume.strongNote}</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              {copyResume.note}
-            </p>
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col">
+          {showScanner ? (
+            <OnboardingResumeScan filename={activeScanName} />
+          ) : (
+            <PdfPreview compact filename={filename} pages={pages} pdfUrl={pdfUrl} />
+          )}
         </div>
-
-        <dl className="grid grid-cols-2 gap-4 border-y border-border py-3.5">
-          <div>
-            <dt className={dsEyebrow}>{copyResume.factsRead}</dt>
-            <dd className="mt-1 font-serif text-card-title tabular-nums text-foreground">
-              {`${String(factsCount)} saved`}
-            </dd>
-          </div>
-          <div>
-            <dt className={dsEyebrow}>{copy.nav.profilePages.resumeFormatLabel}</dt>
-            <dd className="mt-1 font-serif text-card-title text-foreground">
-              {copy.nav.profilePages.resumeFormatValue}
-            </dd>
-          </div>
-        </dl>
 
         <input
           accept="application/pdf"
@@ -222,9 +223,9 @@ export function ResumeSection() {
           type="file"
         />
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
           <Button
-            disabled={upload.isPending}
+            disabled={showScanner}
             onClick={() => {
               fileInputRef.current?.click();
             }}
@@ -244,8 +245,6 @@ export function ResumeSection() {
             </Button>
           )}
         </div>
-
-        <p className="text-xs leading-relaxed text-muted-foreground">{copyResume.newFileNote}</p>
       </div>
     </Card>
   );

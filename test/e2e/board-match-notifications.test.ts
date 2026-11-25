@@ -170,6 +170,10 @@ for (const width of [390, 1280] as const) {
 
       await page.goto(`${notificationServer.url}/notifications`);
       await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+      const showMore = page.getByRole("button", { name: "Show 3 more" });
+
+      await expect(showMore).toBeVisible();
+      await showMore.click();
       await expect(page.getByText("Recap: 10 ready to approve, 2 need an answer")).toBeVisible();
       await page.evaluate(async () => {
         await document.fonts.ready;

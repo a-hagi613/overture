@@ -112,8 +112,8 @@ export function OnboardingTrialModal({
   return (
     <Root onOpenChange={onOpenChange} open={open}>
       <Portal>
-        <Overlay className="fixed inset-0 z-50 bg-scrim backdrop-blur-xs" />
-        <Content className="fixed left-1/2 top-1/2 z-50 w-11/12 max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-6 shadow-lift focus:outline-none">
+        <Overlay className="ov-overlay-in fixed inset-0 z-50 bg-scrim backdrop-blur-xs" />
+        <Content className="ov-pop-in fixed left-1/2 top-1/2 z-50 w-11/12 max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-6 shadow-lift focus:outline-none">
           <div className="flex items-start justify-between gap-3">
             <Badge variant={badgeVariant}>{badgeLabel}</Badge>
             <Button

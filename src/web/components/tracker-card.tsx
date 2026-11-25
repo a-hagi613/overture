@@ -104,7 +104,7 @@ export function TrackerCard(props: {
           ) : null}
         </div>
 
-        <h3 className="mt-1.5 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+        <h3 className="mt-1.5 line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground">
           {card.title}
         </h3>
 

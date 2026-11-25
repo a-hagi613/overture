@@ -115,18 +115,18 @@ export function NotificationItem({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
             {unread ? (
               <>
                 <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-signal" />
                 <span className="sr-only">{copy.notifications.page.unread}</span>
               </>
             ) : null}
-            <span>{row.title}</span>
+            <span className="break-words">{row.title}</span>
           </p>
           <span className={dsMono}>{stampFor(row, now, zone)}</span>
         </div>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{row.body}</p>
+        <p className="mt-1 break-words text-sm leading-relaxed text-muted-foreground">{row.body}</p>
         {label === null ? null : (
           <div className="mt-3">
             <Button asChild size="sm" variant="outline">

@@ -43,7 +43,7 @@ export function SlideOverDrawer({
         {open ? (
           <div
             aria-hidden="true"
-            className="fixed inset-0 z-40 bg-foreground/25 backdrop-blur-xs"
+            className="ov-overlay-in fixed inset-0 z-40 bg-foreground/25 backdrop-blur-xs"
             onClick={() => {
               onOpenChange(false);
             }}
@@ -51,7 +51,7 @@ export function SlideOverDrawer({
         ) : null}
         <Content
           aria-label={ariaLabel}
-          className="fixed inset-y-0 right-0 z-40 flex w-full max-w-xl flex-col border-l border-border bg-card text-foreground shadow-lift outline-none"
+          className="ov-drawer-in fixed inset-y-0 right-0 z-40 flex w-full max-w-xl flex-col border-l border-border bg-card text-foreground shadow-lift outline-none"
           onInteractOutside={(event) => {
             if (isToastTarget(event.target)) {
               event.preventDefault();

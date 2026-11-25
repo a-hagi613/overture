@@ -9,7 +9,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { CollisionDetection, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -112,15 +112,24 @@ export function BoardPage({
 
   const detail = detailData ?? null;
 
-  const grouped = groupCardsByLane(board, laneOverrides);
-  const allCards = TRACKER_LANES.flatMap((lane) => grouped[lane.key]);
-  const visibleLanes = TRACKER_LANES.filter((lane) => lane.key !== "closed" || showClosed);
+  const grouped = useMemo(() => groupCardsByLane(board, laneOverrides), [board, laneOverrides]);
+  const allCards = useMemo(() => TRACKER_LANES.flatMap((lane) => grouped[lane.key]), [grouped]);
+
+  const visibleLanes = useMemo(
+    () => TRACKER_LANES.filter((lane) => lane.key !== "closed" || showClosed),
+    [showClosed],
+  );
+
   const closedCount = grouped.closed.length;
 
-  const listCards = visibleLanes
-    .filter((lane) => listFilter === "all" || lane.key === listFilter)
-    .flatMap((lane) => grouped[lane.key])
-    .toSorted((left, right) => right.updatedAt - left.updatedAt);
+  const listCards = useMemo(
+    () =>
+      visibleLanes
+        .filter((lane) => listFilter === "all" || lane.key === listFilter)
+        .flatMap((lane) => grouped[lane.key])
+        .toSorted((left, right) => right.updatedAt - left.updatedAt),
+    [grouped, listFilter, visibleLanes],
+  );
 
   const navigableCards = view === "list" ? listCards : allCards;
   const selectedIndex = navigableCards.findIndex((card) => card.id === selectedId);

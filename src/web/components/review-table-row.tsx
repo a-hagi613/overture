@@ -81,7 +81,9 @@ export function ReviewTableRow({
         >
           <CompanyAvatar company={leadCompany} size="sm" />
           <div className="min-w-0 flex-1">
-            <h2 className="line-clamp-2 text-sm font-semibold text-foreground">{review.prompt}</h2>
+            <h2 className="line-clamp-2 break-words text-sm font-semibold text-foreground">
+              {review.prompt}
+            </h2>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{companySummary}</p>
           </div>
         </button>

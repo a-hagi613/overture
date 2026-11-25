@@ -240,7 +240,7 @@ test.describe("the landing live supply preview", () => {
     const count = page.getByTestId("supply-count");
     const caption = page.getByTestId("supply-caption");
     const category = page.getByLabel("Category", { exact: true });
-    const role = page.getByLabel("Role", { exact: true });
+    const role = page.getByRole("button", { name: /^Role:/u });
     const location = page.getByRole("button", { name: /^Location:/u });
     const remote = page.getByRole("switch", { name: "Remote only" });
 
@@ -252,22 +252,31 @@ test.describe("the landing live supply preview", () => {
     await category.selectOption("Software Engineering");
     await expect(count).toHaveText("3");
 
-    await role.fill("Software Engineer");
-    await role.press("Enter");
+    await role.click();
+    await page.getByPlaceholder("Search roles…").fill("Software Engineer");
+    await page
+      .getByRole("listbox")
+      .getByRole("option", { name: /Software Engineer/u })
+      .first()
+      .click();
     await expect(count).toHaveText("3");
 
     await category.selectOption("Data & Analytics");
     await expect(count).toHaveText("1");
 
-    await role.fill("Data Scientist");
-    await role.press("Enter");
+    await role.click();
+    await page.getByPlaceholder("Search roles…").fill("Data Scientist");
+    await page
+      .getByRole("listbox")
+      .getByRole("option", { name: /Data Scientist/u })
+      .first()
+      .click();
     await expect(count).toHaveText("1");
 
     await category.selectOption("");
     await expect(count).toHaveText("1");
 
-    await role.fill("");
-    await role.press("Enter");
+    await page.getByRole("button", { name: "Clear role" }).click();
     await expect(count).toHaveText("5");
 
     await remote.click();
@@ -280,6 +289,7 @@ test.describe("the landing live supply preview", () => {
     await location.click();
     await page.getByPlaceholder("Type a city, country, or continent…").fill("London");
     await page
+      .getByRole("listbox")
       .getByRole("option", { name: /London/u })
       .first()
       .click();

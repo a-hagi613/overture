@@ -66,7 +66,7 @@ export function MetricStrip({
               {item.progress === undefined ? null : (
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-ok transition-all"
+                    className="h-full rounded-full bg-ok transition-[width]"
                     style={{ width: `${String(item.progress)}%` }}
                   />
                 </div>

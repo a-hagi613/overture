@@ -1,13 +1,7 @@
-import { lazy } from "react";
 import { Navigate, useSearchParams } from "react-router";
 
 import { useMediaQuery } from "../lib/media-query.ts";
-
-const BoardPage = lazy(async () => {
-  const loaded = await import("./board.tsx");
-
-  return { default: loaded.BoardPage };
-});
+import { BoardPage } from "./board.tsx";
 
 type ApplicationsView = "board" | "list";
 

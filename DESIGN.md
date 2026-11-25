@@ -344,7 +344,7 @@ is the only live mark.
 | Travel | ≤12px for reveals (stamp 6, summary 10) |
 | Rotation | ≤6° (stack offsets 1.6–2.6, glide 4, stamp 3) |
 | Tick | 800ms state timer drives every loop |
-| Forbidden | springs, bounce, overshoot, parallax, auto-playing video |
+| Forbidden | springs, bounce, overshoot, parallax, auto-playing video (the workspace walkthrough below is the one recorded exception) |
 
 The four choreographed surfaces, so nobody re-invents them:
 
@@ -364,6 +364,15 @@ The four choreographed surfaces, so nobody re-invents them:
 4. **Path** (How it works) — a dotted path threads the six tiles through the gutters with a numbered
    node at each. One orange dot walks it at ~520px/s and rests .55s on each node, which lights with an
    orange ring.
+
+**The workspace walkthrough.** "Inside the workspace" is the one recorded surface: two silent, muted H.264
+recordings of the seeded workspace (1280×800 desktop, 720×1280 phone), each with a poster frame, rendered directly
+in a frameless `HoverPlayCard` with no surrounding toolbar, duration label, or sample-data chrome. The desktop
+recording plays on `lg` and up, the phone recording below it. Hovering or pressing Play starts playback with a centered Play/Pause overlay and subtle bottom-left
+Playing/Paused badge. Inside the desktop recording, the sidebar stays pinned at 1:1 while spring-eased zoom
+and camera moves focus on the right workspace pane across the 90-day momentum chart, Approval Queue, Review
+Queue, Application Tracker, Resume & Cover Letter, Inbox, and Calendar. The video never autoplays on load; it
+plays only on intentional hover or an explicit Play click.
 
 **Reduced motion.** Every animation has a static state. With `animate` off or under
 `prefers-reduced-motion`, transitions and keyframes are disabled and each loop shows one finished frame

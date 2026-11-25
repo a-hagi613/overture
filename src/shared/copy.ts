@@ -2115,6 +2115,8 @@ export const copy = {
       edit: "Edit",
       aria: (label: string, action: string) => `${action}: ${label}`,
       remove: (label: string) => `Remove ${label}`,
+      showMore: (count: number) => `Show ${String(count)} more`,
+      showLess: "Show fewer",
     },
     targets: {
       intro: "Overture matches and scores openings based on these criteria.",
@@ -2847,6 +2849,8 @@ export const copy = {
       markAll: "Mark all as read",
       allMarkedRead: "All notifications marked as read.",
       stageMoveUndone: "Stage move undone.",
+      showMore: (count: number) => `Show ${String(count)} more`,
+      showLess: "Show fewer",
       emptyTitle: "Nothing yet.",
       emptyBody:
         "Daily recaps, employer replies, interview invites, and updates needing your attention appear here.",

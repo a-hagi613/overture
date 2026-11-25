@@ -121,13 +121,15 @@ export function InboxThreadPane({
             <CompanyAvatar company={thread.company} size="lg" tone="signal" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className={dsCardTitle}>{thread.company}</h2>
+                <h2 className={`${dsCardTitle} break-words`}>{thread.company}</h2>
                 {tag === null ? null : <Badge variant={tag.variant}>{tag.label}</Badge>}
                 <Badge variant="outline">{copy.inbox.messageCount(messages.length)}</Badge>
               </div>
-              <p className="mt-1 text-sm font-medium text-foreground">{thread.subject}</p>
+              <p className="mt-1 break-words text-sm font-medium text-foreground">
+                {thread.subject}
+              </p>
               {thread.title === null ? null : (
-                <p className="mt-0.5 text-xs text-muted-foreground">{thread.title}</p>
+                <p className="mt-0.5 break-words text-xs text-muted-foreground">{thread.title}</p>
               )}
             </div>
           </div>

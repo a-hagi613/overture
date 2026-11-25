@@ -53,7 +53,7 @@ export function UsageCard() {
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
         <div
-          className={`h-full rounded-full transition-all ${barTone}`}
+          className={`h-full rounded-full transition-[width] ${barTone}`}
           style={{ width: `${Number(usedShare.toFixed(2))}%` }}
         />
       </div>

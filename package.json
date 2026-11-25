@@ -90,6 +90,8 @@
     "@interfere/landmines": "^0.1.1",
     "@oxlint/plugins": "^1.94.0",
     "@playwright/test": "^1.65.1",
+    "@remotion/cli": "4.0.547",
+    "@remotion/fonts": "4.0.547",
     "@tailwindcss/vite": "^4.3.5",
     "@types/bun": "^1.4.4",
     "@types/react": "^19.3.0",
@@ -98,6 +100,7 @@
     "drizzle-kit": "^0.31.11",
     "oxlint": "^1.94.0",
     "oxlint-tsgolint": "^7.0.2007",
+    "remotion": "4.0.547",
     "tailwindcss": "^4.3.5",
     "vite": "^8.3.8"
   },

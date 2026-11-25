@@ -1,4 +1,3 @@
-import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import type { RoleGroup } from "../../../shared/tag-taxonomy.ts";
@@ -9,7 +8,7 @@ import { ROLE_GROUPS } from "../../../shared/tag-taxonomy.ts";
 import { useLocationSuggestions } from "../../lib/supply-api.ts";
 import { Combobox } from "../ui/combobox.tsx";
 import { dsEyebrow } from "../ui/ds.ts";
-import { RolePicker } from "../ui/role-picker.tsx";
+import { Select } from "../ui/select.tsx";
 import { Switch } from "../ui/switch.tsx";
 import { LANDING_COPY } from "./landing-copy.ts";
 
@@ -55,8 +54,9 @@ export function LandingSupplyFilters({
     locationOpen,
   );
 
-  const roleOptions = escoGranularRolesFor(category).map((option) => ({
-    hint: option.category,
+  const roleOptions: readonly ComboboxOption[] = escoGranularRolesFor(category).map((option) => ({
+    label: option.role,
+    meta: option.category,
     value: option.role,
   }));
 
@@ -72,41 +72,45 @@ export function LandingSupplyFilters({
         <label className={`${dsEyebrow} block`} htmlFor="supply-category">
           {LANDING_COPY.supply.categoryLabel}
         </label>
-        <div className="relative mt-2">
-          <select
-            className="h-12 w-full cursor-pointer appearance-none rounded-md border border-input bg-card pl-3.5 pr-10 text-sm font-medium text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-            id="supply-category"
-            onChange={(event) => {
-              const next = event.currentTarget.value;
+        <Select
+          className="mt-2"
+          id="supply-category"
+          onChange={(event) => {
+            const next = event.currentTarget.value;
 
-              onCategoryChange(ROLE_GROUPS.find((group) => group === next) ?? null);
+            onCategoryChange(ROLE_GROUPS.find((group) => group === next) ?? null);
+          }}
+          selectClassName="h-12 pl-3.5 pr-10"
+          value={category ?? ""}
+        >
+          <option value="">{LANDING_COPY.supply.categoryAny}</option>
+          {ROLE_GROUPS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      <div>
+        <span className={`${dsEyebrow} block`}>{LANDING_COPY.supply.roleLabel}</span>
+        <div className="mt-2">
+          <Combobox
+            ariaLabel={LANDING_COPY.supply.roleLabel}
+            clearLabel={LANDING_COPY.supply.roleClear}
+            clearable
+            emptyText={LANDING_COPY.supply.roleEmpty}
+            id="supply-role"
+            onSelect={(nextValue) => {
+              onGranularRoleChange(nextValue === "" ? null : nextValue);
             }}
-            value={category ?? ""}
-          >
-            <option value="">{LANDING_COPY.supply.categoryAny}</option>
-            {ROLE_GROUPS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            aria-hidden="true"
-            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            size={16}
+            options={roleOptions}
+            placeholder={LANDING_COPY.supply.rolePlaceholder}
+            searchPlaceholder={LANDING_COPY.supply.roleSearchPlaceholder}
+            value={granularRole ?? ""}
           />
         </div>
       </div>
-
-      <RolePicker
-        clearLabel={LANDING_COPY.supply.roleClear}
-        id="supply-role"
-        label={LANDING_COPY.supply.roleLabel}
-        onChange={onGranularRoleChange}
-        options={roleOptions}
-        placeholder={LANDING_COPY.supply.rolePlaceholder}
-        value={granularRole}
-      />
 
       <div>
         <span className={`${dsEyebrow} block`}>{LANDING_COPY.supply.locationLabel}</span>
