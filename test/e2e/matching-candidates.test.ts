@@ -50,15 +50,15 @@ test("targets and languages keep only postings that fit", async ({
   });
 
   await seedPosting(owner, {
-    atsJobId: "mid",
+    atsJobId: "intern",
     boardId,
     companyId,
     tags: [
       { dimension: "subrole", value: "Backend" },
-      { dimension: "seniority", value: "mid" },
+      { dimension: "seniority", value: "intern" },
     ],
-    title: "Mid Backend Engineer",
-    url: "https://target-guild.example/mid",
+    title: "Backend Engineering Intern",
+    url: "https://target-guild.example/intern",
   });
 
   await seedPosting(owner, {

@@ -3,6 +3,7 @@ import { and, eq, exists, inArray, isNull, notExists, or, sql } from "drizzle-or
 import type { CatalogDatabase } from "../platform/db/client.ts";
 
 import { postingTags, postings } from "../platform/db/catalog-schema.ts";
+import { SENIORITIES } from "../../shared/tag-taxonomy.ts";
 
 /**
  * A Posting that leaves an optional field blank is still a candidate: most feeds never say the workplace,
@@ -59,18 +60,77 @@ export function languageAccepted(language: string | null, wanted: readonly strin
   return wanted.some((candidate) => candidate.toLowerCase() === folded);
 }
 
+const SENIORITY_LEVEL = new Map<string, number>([
+  ["intern", 0],
+  ["entry", 1],
+  ["mid", 2],
+  ["senior", 3],
+  ["staff", 4],
+  ["manager", 4],
+  ["principal", 5],
+  ["director", 5],
+]);
+
+/** Levels apart at which a stated seniority blocks a Posting. */
+export const SENIORITY_BLOCK_DISTANCE = 3;
+
+/**
+ * How far a seniority sits from the nearest wanted one. Managers sit level with staff and directors with
+ * principals, so the two career tracks compare.
+ * @param value A seniority tag.
+ * @param wanted The seniorities the Targets allow.
+ * @returns 0 for a wanted seniority, the level gap otherwise, or Infinity when either side has no level.
+ */
+export function seniorityDistance(value: string, wanted: readonly string[]) {
+  if (wanted.includes(value)) {
+    return 0;
+  }
+
+  const level = SENIORITY_LEVEL.get(value);
+
+  if (level === undefined) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Math.min(
+    Number.POSITIVE_INFINITY,
+    ...wanted.flatMap((target) => {
+      const targetLevel = SENIORITY_LEVEL.get(target);
+
+      return targetLevel === undefined ? [] : [Math.abs(targetLevel - level)];
+    }),
+  );
+}
+
 /**
  * @param postingSeniorities The Posting's seniority tags.
  * @param wanted The seniorities the Targets allow.
- * @returns Whether the Posting passes the seniority filter; a Posting with no seniority tag always does.
+ * @returns The smallest distance among the Posting's tags, or null when it has none.
+ */
+export function nearestSeniorityDistance(
+  postingSeniorities: readonly string[],
+  wanted: readonly string[],
+) {
+  if (postingSeniorities.length === 0) {
+    return null;
+  }
+
+  return Math.min(...postingSeniorities.map((value) => seniorityDistance(value, wanted)));
+}
+
+/**
+ * @param postingSeniorities The Posting's seniority tags.
+ * @param wanted The seniorities the Targets allow.
+ * @returns Whether the Posting passes the seniority filter: it has no seniority tag, or one fewer than
+ * {@link SENIORITY_BLOCK_DISTANCE} levels from a wanted seniority.
  */
 export function seniorityAccepted(
   postingSeniorities: readonly string[],
   wanted: readonly string[],
 ) {
-  return (
-    postingSeniorities.length === 0 || postingSeniorities.some((value) => wanted.includes(value))
-  );
+  const distance = nearestSeniorityDistance(postingSeniorities, wanted);
+
+  return distance === null || distance < SENIORITY_BLOCK_DISTANCE;
 }
 
 /**
@@ -117,6 +177,18 @@ export function optionalFieldConditions(
         filters.languages.map((language) => language.toLowerCase()),
       ),
     ),
-    or(exists(seniorityTag(filters.seniorities)), notExists(seniorityTag())),
+    or(
+      exists(
+        seniorityTag([
+          ...new Set([
+            ...filters.seniorities,
+            ...SENIORITIES.filter(
+              (value) => seniorityDistance(value, filters.seniorities) < SENIORITY_BLOCK_DISTANCE,
+            ),
+          ]),
+        ]),
+      ),
+      notExists(seniorityTag()),
+    ),
   ];
 }
