@@ -123,12 +123,13 @@ and a closed Posting a crashed sweep never reported is still reconciled; the bro
 classification key preserves seniority and level while dropping gender markers and a trailing location, the Pass-2
 dedupe never collapses two same-board openings, the baked ESCO v1.2.1 dataset carries the Administrative roles, the
 three tiers and the Haiku strict-JSON contract behave, and a corrupt, missing or version-mismatched cache is an empty
-cache, #628), the role taxonomy bridge (`legacy-roles.test.ts`: every retired category, Level-2 role and subrole
-maps to a real role or category id, an ambiguous old category is never guessed onto a tag, and a vague old role only
-reaches a broad role), the role taxonomy rewrite and matching (`taxonomy-tags.test.ts`, `role-targets.test.ts` and
-`judge-input.test.ts` over a real migrated catalog and the committed label seed: a label writes ids, `JUNK` clears the
-role, a second pass changes nothing, a role target never reaches a neighbour role, and the scorer reads the
-description and the targets, #660), the admin gate's
+cache, #628), the role taxonomy bridge (`legacy-roles.test.ts`: every retired category, Level-2 role and subrole maps
+to a real role or category id, an ambiguous old category is never guessed onto a tag, a vague old role only reaches a
+broad role, and level words such as `Senior` or `II` do not hide a role's name), the role taxonomy rewrite and
+matching (`taxonomy-tags.test.ts`, `role-targets.test.ts` and `judge-input.test.ts` over a real migrated catalog and
+the committed label seed: a label writes ids, `JUNK` clears the role, a title naming one exact role overrides a label
+outside its subcategory, a second pass changes nothing, a role target never reaches a neighbour role, and the scorer
+reads the description and the targets, #660), the admin gate's
 fail-closed parsing (a malformed Access cookie or a missing team domain answers 401, never a 500 or an invented
 issuer), the capped request-body reader (an unauthenticated webhook body stops at its byte cap and is never buffered
 whole, so a sender cannot choose how much memory it costs), the unhandled-rejection alert (a public alert carries the

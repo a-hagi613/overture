@@ -1,15 +1,16 @@
 import { readFileSync } from "node:fs";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { CatalogDatabase, DatabaseWriter } from "../platform/db/client.ts";
 
 import { postings, postingTags } from "../platform/db/catalog-schema.ts";
 import { classificationKey } from "./classification-key.ts";
-import { legacyTagToTaxonomy } from "./legacy-roles.ts";
+import { legacyTagToTaxonomy, titleNamedRole } from "./legacy-roles.ts";
 import { ROLE_CATEGORIES, ROLE_SUBCATEGORIES, ROLES } from "../../shared/role-taxonomy.ts";
-import { SENIORITIES } from "../../shared/tag-taxonomy.ts";
+import { SENIORITIES, TAG_SOURCE_PRECEDENCE, TAG_SOURCES } from "../../shared/tag-taxonomy.ts";
+import type { TagSource } from "../../shared/tag-taxonomy.ts";
 
 /** The label set the committed seed and the tags it writes belong to. */
 export const ROLE_LABEL_VERSION = "roles-272-v1";
@@ -93,6 +94,7 @@ export interface TaxonomyTagReport {
   readonly postings: number;
   readonly labelled: number;
   readonly categoryOnly: number;
+  readonly titled: number;
   readonly bridged: number;
   readonly junk: number;
   readonly untagged: number;
@@ -114,27 +116,52 @@ const postingRowSchema = z.object({
   primaryRole: z.string().nullable(),
 });
 
-const tagRowSchema = z.object({ postingId: z.string(), dimension: z.string(), value: z.string() });
+const tagRowSchema = z.object({
+  postingId: z.string(),
+  dimension: z.string(),
+  value: z.string(),
+  source: z.enum(TAG_SOURCES),
+});
 
-/** A Posting's retired role tags: the old category, software subrole and ESCO role. */
+/**
+ * A Posting's role tags as written before the rewrite (the old category, software subrole and ESCO role, or ids) and
+ * the source that wrote them. Only the strongest source's tags are kept (`TAG_SOURCE_PRECEDENCE`), so an operator's
+ * import is never mixed with a weaker label; `source` is null when the Posting has no role tag.
+ */
 export interface LegacyTags {
   readonly role: string | null;
   readonly subrole: string | null;
   readonly granularRole: string | null;
+  readonly source: TagSource | null;
 }
 
-const NO_LEGACY_TAGS: LegacyTags = { role: null, subrole: null, granularRole: null };
+const NO_LEGACY_TAGS: LegacyTags = { role: null, subrole: null, granularRole: null, source: null };
 
 const LEGACY_FIELD = { role: "role", subrole: "subrole", granular_role: "granularRole" } as const;
 
-function withLegacyTag(entry: LegacyTags, dimension: string, value: string) {
-  if (dimension !== "role" && dimension !== "subrole" && dimension !== "granular_role") {
+function withLegacyTag(
+  entry: LegacyTags,
+  tag: { dimension: string; value: string; source: TagSource },
+) {
+  if (
+    tag.dimension !== "role" &&
+    tag.dimension !== "subrole" &&
+    tag.dimension !== "granular_role"
+  ) {
     return entry;
   }
 
-  const field = LEGACY_FIELD[dimension];
+  const held = entry.source === null ? 0 : TAG_SOURCE_PRECEDENCE[entry.source];
+  const rank = TAG_SOURCE_PRECEDENCE[tag.source];
 
-  return entry[field] === null ? { ...entry, [field]: value } : entry;
+  if (rank < held) {
+    return entry;
+  }
+
+  const base = rank > held ? { ...NO_LEGACY_TAGS, source: tag.source } : entry;
+  const field = LEGACY_FIELD[tag.dimension];
+
+  return base[field] === null ? { ...base, [field]: tag.value } : base;
 }
 
 const categoryIds = new Set<string>(ROLE_CATEGORIES.map((category) => category.id));
@@ -145,7 +172,7 @@ interface TaxonomyTags {
   readonly subcategoryId: string | null;
   readonly roleId: string | null;
   readonly weight: number;
-  readonly source: "llm" | "rules";
+  readonly source: TagSource;
 }
 
 function fromLabel(label: RoleLabel) {
@@ -177,6 +204,7 @@ function fromLabel(label: RoleLabel) {
 }
 
 function fromLegacy(posting: PostingRow, legacy: LegacyTags) {
+  const source = legacy.source ?? "rules";
   const written = legacy.granularRole === null ? undefined : roleById.get(legacy.granularRole);
 
   if (written !== undefined) {
@@ -185,7 +213,7 @@ function fromLegacy(posting: PostingRow, legacy: LegacyTags) {
       subcategoryId: written.subcategoryId,
       roleId: written.id,
       weight: 0.5,
-      source: "rules",
+      source,
     } satisfies TaxonomyTags;
   }
 
@@ -196,7 +224,20 @@ function fromLegacy(posting: PostingRow, legacy: LegacyTags) {
         legacy.subrole !== null && subcategoryIds.has(legacy.subrole) ? legacy.subrole : null,
       roleId: null,
       weight: 0.5,
-      source: "rules",
+      source,
+    } satisfies TaxonomyTags;
+  }
+
+  const namedId = titleNamedRole(legacy.granularRole ?? "") ?? titleNamedRole(legacy.role ?? "");
+  const named = namedId === null ? undefined : roleById.get(namedId);
+
+  if (named !== undefined) {
+    return {
+      categoryId: named.categoryId,
+      subcategoryId: named.subcategoryId,
+      roleId: named.id,
+      weight: 0.5,
+      source,
     } satisfies TaxonomyTags;
   }
 
@@ -213,16 +254,33 @@ function fromLegacy(posting: PostingRow, legacy: LegacyTags) {
     subcategoryId: role?.subcategoryId ?? null,
     roleId: role?.id ?? null,
     weight: 0.5,
+    source,
+  } satisfies TaxonomyTags;
+}
+
+type TaxonomyOutcome = "labelled" | "categoryOnly" | "titled" | "bridged" | "junk" | "untagged";
+
+function fromTitle(posting: PostingRow) {
+  const id = titleNamedRole(posting.title);
+  const role = id === null ? undefined : roleById.get(id);
+
+  if (role === undefined) {
+    return null;
+  }
+
+  return {
+    categoryId: role.categoryId,
+    subcategoryId: role.subcategoryId,
+    roleId: role.id,
+    weight: 1,
     source: "rules",
   } satisfies TaxonomyTags;
 }
 
-type TaxonomyOutcome = "labelled" | "categoryOnly" | "bridged" | "junk" | "untagged";
-
 interface TagRow {
   readonly dimension: "role" | "subrole" | "granular_role" | "seniority";
   readonly value: string;
-  readonly source: "llm" | "rules";
+  readonly source: TagSource;
   readonly weight: number;
 }
 
@@ -233,12 +291,22 @@ interface PlannedTags {
 
 const NO_ROWS: readonly TagRow[] = [];
 
-function taxonomyRows(posting: PostingRow, legacy: LegacyTags, label: RoleLabel | undefined) {
+function taxonomyRows(posting: PostingRow, legacy: LegacyTags, seedLabel: RoleLabel | undefined) {
+  const label = legacy.source === "import" ? undefined : seedLabel;
+
   if (label?.role === JUNK) {
     return { outcome: "junk", rows: NO_ROWS } satisfies PlannedTags;
   }
 
-  const tags = (label === undefined ? null : fromLabel(label)) ?? fromLegacy(posting, legacy);
+  const named = legacy.source === "import" ? null : fromTitle(posting);
+  const fromSeed = label === undefined ? null : fromLabel(label);
+
+  const refines =
+    named !== null && fromSeed?.roleId !== null && fromSeed?.subcategoryId === named.subcategoryId;
+
+  const titled = refines ? null : named;
+  const labelled = titled === null ? fromSeed : null;
+  const tags = titled ?? labelled ?? fromLegacy(posting, legacy);
 
   if (tags.categoryId === null) {
     return { outcome: "untagged", rows: NO_ROWS } satisfies PlannedTags;
@@ -275,10 +343,10 @@ function taxonomyRows(posting: PostingRow, legacy: LegacyTags, label: RoleLabel 
     });
   }
 
-  let outcome: TaxonomyOutcome = "bridged";
+  let outcome: TaxonomyOutcome = titled === null ? "bridged" : "titled";
 
-  if (tags.source === "llm") {
-    outcome = tags.roleId === null ? "categoryOnly" : "labelled";
+  if (labelled !== null) {
+    outcome = labelled.roleId === null ? "categoryOnly" : "labelled";
   }
 
   return { outcome, rows } satisfies PlannedTags;
@@ -309,12 +377,17 @@ export function taxonomyRoleTags(
 }
 
 /**
- * Rewrites every open Posting's role tags in the role taxonomy (category → subcategory → role ids, issue #660). The
- * AI label for the Posting's title template wins; a low-confidence one sets only the category, so a shaky label never
+ * Rewrites every open Posting's role tags in the role taxonomy (category → subcategory → role ids, issue #660). A
+ * title that is a role's own name (`titleNamedRole`) takes that role when the label would move it to another
+ * subcategory, because the label was read from one sample job of the template and the title states what every job
+ * sharing it is; a label inside the title's own subcategory is a refinement the description earned and stays.
+ * Otherwise the AI label for the title template wins; a low-confidence one sets only the category, so a shaky label never
  * claims an exact role. Without a label the retired rule and classifier tags go through the legacy bridge, which
  * keeps only what they say safely, and tags already in the taxonomy stay as they are, so a second pass changes
  * nothing. A `JUNK` label (talent pool, open application, test posting) clears the role tags so the Posting matches no
- * one. An AI seniority replaces the title-rule one.
+ * one. An AI seniority replaces the title-rule one. A bridged tag keeps the source that wrote it. An operator's
+ * imported role tags outrank the label: they go through the bridge as `import`, and the label's seniority leaves
+ * theirs alone.
  * @param db The catalog database the run builds.
  * @param labels The AI labels by `roleLabelKey`.
  * @returns How each Posting was tagged.
@@ -336,15 +409,13 @@ export function writeTaxonomyTags(db: CatalogDatabase, labels: ReadonlyMap<strin
   for (const tag of z.array(tagRowSchema).parse(
     client
       .query(
-        `SELECT posting_id AS postingId, dimension, value FROM posting_tags
-            WHERE dimension IN ('role', 'subrole', 'granular_role')`,
+        `SELECT posting_id AS postingId, dimension, value, source FROM posting_tags
+            WHERE dimension IN ('role', 'subrole', 'granular_role')
+            ORDER BY posting_id, coalesce(weight, 1) DESC, value`,
       )
       .all(),
   )) {
-    legacy.set(
-      tag.postingId,
-      withLegacyTag(legacy.get(tag.postingId) ?? NO_LEGACY_TAGS, tag.dimension, tag.value),
-    );
+    legacy.set(tag.postingId, withLegacyTag(legacy.get(tag.postingId) ?? NO_LEGACY_TAGS, tag));
   }
 
   const clear = client.prepare(
@@ -363,6 +434,7 @@ export function writeTaxonomyTags(db: CatalogDatabase, labels: ReadonlyMap<strin
     postings: rows.length,
     labelled: 0,
     categoryOnly: 0,
+    titled: 0,
     bridged: 0,
     junk: 0,
     untagged: 0,
@@ -426,7 +498,11 @@ export function retagPosting(
   const roleDimensions = ["role", "subrole", "granular_role"] as const;
 
   const written = db
-    .select({ dimension: postingTags.dimension, value: postingTags.value })
+    .select({
+      dimension: postingTags.dimension,
+      value: postingTags.value,
+      source: postingTags.source,
+    })
     .from(postingTags)
     .where(
       and(
@@ -434,12 +510,13 @@ export function retagPosting(
         inArray(postingTags.dimension, [...roleDimensions]),
       ),
     )
+    .orderBy(desc(sql`coalesce(${postingTags.weight}, 1)`), postingTags.value)
     .all();
 
   let legacy = NO_LEGACY_TAGS;
 
   for (const tag of written) {
-    legacy = withLegacyTag(legacy, tag.dimension, tag.value);
+    legacy = withLegacyTag(legacy, tag);
   }
 
   const planned = taxonomyRows(

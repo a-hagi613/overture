@@ -16,6 +16,7 @@ import {
   workableManifestSchema,
   workableTargetsSchema,
 } from "../src/server/catalog/workable-feed.ts";
+import { committedRoleLabels } from "../src/server/catalog/taxonomy-tags.ts";
 
 import type { IncomingMessage } from "node:http";
 import type { ObjectStore } from "../src/server/platform/ports/object-store.ts";
@@ -71,6 +72,7 @@ if (Number.isNaN(fetchedAtMs)) {
 const fetchedAt = new Date(fetchedAtMs).toISOString();
 const datePart = fetchedAt.slice(0, 10);
 const snapshotKey = `workable/${datePart}.jsonl.gz`;
+const roleLabels = committedRoleLabels();
 const baselineRss = process.memoryUsage.rss();
 const startedAt = performance.now();
 
@@ -273,6 +275,7 @@ async function main() {
   const stats = await streamWorkablePass({
     source: feed.body,
     targets,
+    labels: roleLabels,
     onMatch: async (_row, line) => {
       hash.update(line);
 

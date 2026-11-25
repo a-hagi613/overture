@@ -39,7 +39,7 @@ interface SeedPosting {
   primaryCategory?: string | null;
   primaryRole?: string | null;
   closed?: boolean;
-  tags?: readonly [string, string][];
+  tags?: readonly (readonly [string, string, string?, number?])[];
 }
 
 function catalogWith(seeds: readonly SeedPosting[]) {
@@ -92,12 +92,12 @@ function catalogWith(seeds: readonly SeedPosting[]) {
       })
       .run();
 
-    for (const [dimension, value] of seed.tags ?? []) {
+    for (const [dimension, value, source = "rules", weight = null] of seed.tags ?? []) {
       catalog.sqlite
         .prepare(
-          "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, ?, ?, 'rules')",
+          "INSERT INTO posting_tags (posting_id, dimension, value, source, weight) VALUES (?, ?, ?, ?, ?)",
         )
-        .run(seed.id, dimension, value);
+        .run(seed.id, dimension, value, source, weight);
     }
   }
 
@@ -153,6 +153,7 @@ describe("writeTaxonomyTags", () => {
       postings: 1,
       labelled: 1,
       categoryOnly: 0,
+      titled: 0,
       bridged: 0,
       junk: 0,
       untagged: 0,
@@ -184,6 +185,47 @@ describe("writeTaxonomyTags", () => {
 
     expect(tagsOf(catalog, "pool")).toEqual([]);
     expect(report.junk).toBe(1);
+  });
+
+  test("a title that is a role's own name overrides a label that moves it to another subcategory", () => {
+    const catalog = catalogWith([
+      { id: "pm", title: "Project Manager" },
+      { id: "slp", title: "Speech Language Pathologist", department: "Clinic" },
+      { id: "pool", title: "Data Engineer", department: "Talent" },
+      { id: "broad", title: "Backend Engineer, Payments" },
+      { id: "refined", title: "Senior Software Engineer" },
+    ]);
+
+    const report = writeTaxonomyTags(
+      catalog.db,
+      labels([
+        ["Project Manager", null, { role: "prod.pm", confidence: "m", seniority: "senior" }],
+        [
+          "Speech Language Pathologist",
+          "Clinic",
+          { role: "health.np", confidence: "h", seniority: null },
+        ],
+        ["Data Engineer", "Talent", { role: "JUNK", confidence: "h", seniority: null }],
+        [
+          "Backend Engineer, Payments",
+          null,
+          { role: "sw.backend", confidence: "h", seniority: null },
+        ],
+        [
+          "Senior Software Engineer",
+          null,
+          { role: "sw.backend", confidence: "m", seniority: null },
+        ],
+      ]),
+    );
+
+    expect(tagsOf(catalog, "pm")).toContain("granular_role=ops.pm:rules");
+    expect(tagsOf(catalog, "pm")).toContain("seniority=senior:llm");
+    expect(tagsOf(catalog, "slp")).toContain("granular_role=health.slp:rules");
+    expect(tagsOf(catalog, "pool")).toEqual([]);
+    expect(tagsOf(catalog, "broad")).toContain("granular_role=sw.backend:llm");
+    expect(tagsOf(catalog, "refined")).toContain("granular_role=sw.backend:llm");
+    expect(report).toMatchObject({ titled: 2, junk: 1, labelled: 2 });
   });
 
   test("the department is part of the key, so one title can carry two labels", () => {
@@ -230,6 +272,41 @@ describe("writeTaxonomyTags", () => {
     expect(report).toMatchObject({ postings: 3, bridged: 2, untagged: 1 });
   });
 
+  test("a retired tag that names a current role by its own name bridges to that role", () => {
+    const catalog = catalogWith([
+      { id: "named", title: "Mystery Role", tags: [["role", "Platform Engineer", "import"]] },
+    ]);
+
+    writeTaxonomyTags(catalog.db, new Map());
+
+    expect(tagsOf(catalog, "named")).toEqual([
+      "granular_role=infra.devops:import",
+      "role=software-it:import",
+      "subrole=software-it/infrastructure:import",
+    ]);
+  });
+
+  test("of two role tags from one source the heavier one is read, not the first in key order", () => {
+    const primary = {
+      title: "Mystery Role",
+      tags: [
+        ["role", "Software Engineering", "rules", 1],
+        ["role", "Data & Analytics", "rules", 0.4],
+      ],
+    } as const;
+
+    const catalog = catalogWith([
+      { id: "bulk", ...primary },
+      { id: "one", ...primary },
+    ]);
+
+    writeTaxonomyTags(catalog.db, new Map());
+    retagPosting(catalog.db, "one", new Map());
+
+    expect(tagsOf(catalog, "bulk")).toEqual(["role=software-it:rules"]);
+    expect(tagsOf(catalog, "one")).toEqual(["role=software-it:rules"]);
+  });
+
   test("a second pass changes nothing, so a rebuilt or retagged catalog keeps its ids", () => {
     const catalog = catalogWith([
       {
@@ -255,6 +332,62 @@ describe("writeTaxonomyTags", () => {
     writeTaxonomyTags(catalog.db, seed);
 
     expect(["backend", "category", "rn"].map((id) => tagsOf(catalog, id))).toEqual(first);
+  });
+
+  test("a bridged tag keeps the source that wrote it, and only the strongest source's tags are read", () => {
+    const catalog = catalogWith([
+      { id: "haiku", title: "Wardrobe Stylist Coordinator", tags: [["role", "Design", "llm"]] },
+      {
+        id: "mixed",
+        title: "Mystery Role",
+        tags: [
+          ["role", "Software Engineering", "rules"],
+          ["granular_role", "health.rn", "llm"],
+        ],
+      },
+    ]);
+
+    const report = writeTaxonomyTags(catalog.db, new Map());
+
+    expect(tagsOf(catalog, "haiku")).toEqual(["role=product-design:llm"]);
+    expect(tagsOf(catalog, "mixed")).toEqual(["role=software-it:rules"]);
+    expect(report).toMatchObject({ bridged: 2, labelled: 0 });
+  });
+
+  test("an operator import outranks the AI label: its tags go through the bridge and keep their source", () => {
+    const imported = {
+      title: "Full Stack Developer",
+      tags: [
+        ["granular_role", "sw.fullstack", "llm"],
+        ["role", "Software Engineering", "import"],
+        ["subrole", "Backend", "import"],
+        ["seniority", "senior", "import"],
+      ],
+    } as const;
+
+    const catalog = catalogWith([
+      { id: "bulk", ...imported },
+      { id: "one", ...imported },
+    ]);
+
+    const seed = labels([
+      ["Full Stack Developer", null, { role: "sw.fullstack", confidence: "h", seniority: "mid" }],
+    ]);
+
+    const expected = [
+      "granular_role=sw.backend:import",
+      "role=software-it:import",
+      "seniority=senior:import",
+      "subrole=software-it/software-engineering:import",
+    ];
+
+    writeTaxonomyTags(catalog.db, seed);
+    expect(tagsOf(catalog, "bulk")).toEqual(expected);
+    expect(retagPosting(catalog.db, "one", seed)).toBe("bridged");
+    expect(tagsOf(catalog, "one")).toEqual(expected);
+
+    writeTaxonomyTags(catalog.db, seed);
+    expect(tagsOf(catalog, "bulk")).toEqual(expected);
   });
 
   test("leaves closed Postings alone", () => {
@@ -301,12 +434,12 @@ describe("retagPosting", () => {
 
   test("applies an AI label, clears a JUNK posting, and answers null for an unknown id", () => {
     const catalog = catalogWith([
-      { id: "rn", title: "Registered Nurse", tags: [["role", "Healthcare"]] },
+      { id: "rn", title: "ICU Nurse, Nights", tags: [["role", "Healthcare"]] },
       { id: "pool", title: "Talent Pool", tags: [["role", "Healthcare"]] },
     ]);
 
     const seed = labels([
-      ["Registered Nurse", null, { role: "health.rn", confidence: "m", seniority: "mid" }],
+      ["ICU Nurse, Nights", null, { role: "health.rn", confidence: "m", seniority: "mid" }],
       ["Talent Pool", null, { role: "JUNK", confidence: "h", seniority: null }],
     ]);
 
@@ -338,6 +471,19 @@ describe("the role label seed", () => {
 
     expect([...parsed.keys()]).toEqual(["a", "b"]);
     expect(parsed.get("a")).toEqual({ role: "health.rn", confidence: "h", seniority: "senior" });
+  });
+
+  test("rejects a malformed label", () => {
+    for (const label of [
+      ["health.rn", "x", null],
+      ["", "h", null],
+      ["health.rn", "h", "boss"],
+      ["health.rn", "h"],
+    ]) {
+      expect(() =>
+        parseRoleLabelSeed(JSON.stringify({ version: ROLE_LABEL_VERSION, labels: { a: label } })),
+      ).toThrow("a");
+    }
   });
 
   test("rejects a seed from another label set", () => {

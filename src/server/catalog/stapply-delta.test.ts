@@ -235,7 +235,9 @@ describe("applyStapplyDelta", () => {
     expect(report.unchanged).toBe(1);
     expect(report.tagged).toBe(0);
     expect(postingFor(db, "job-1")?.id).toBe(posting?.id);
+    expect(tagsBefore).toContainEqual({ dimension: "role", value: "legal", source: "import" });
     expect(tagsFor(db, posting?.id ?? "")).toEqual(tagsBefore);
+    expect(postingFor(db, "job-1")?.tag_source).toBe("import");
   });
 
   test("a changed content hash rewrites the row and re-tags it", () => {
@@ -550,10 +552,11 @@ describe("runStapplyLlmTagging", () => {
 
     const tagged = postingFor(db, "job-2");
 
+    expect(tagged?.tag_source).toBe("llm");
     expect(tagsFor(db, tagged?.id ?? "")).toContainEqual({
       dimension: "role",
       value: "legal",
-      source: "rules",
+      source: "llm",
     });
   });
 

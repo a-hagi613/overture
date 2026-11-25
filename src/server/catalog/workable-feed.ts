@@ -7,7 +7,7 @@ import {
   WORKPLACES,
   postingTagsSchema,
 } from "../../shared/tag-taxonomy.ts";
-import { committedRoleLabels, taxonomyRoleTags } from "./taxonomy-tags.ts";
+import { taxonomyRoleTags } from "./taxonomy-tags.ts";
 import { planRoleTargets, roleMatchScore } from "../matching/role-targets.ts";
 import { resolveLocation } from "./geo.ts";
 import { DESCRIPTION_CAP, htmlToText } from "./html-to-text.ts";
@@ -15,6 +15,7 @@ import { normalizeTitle } from "./normalize.ts";
 import { tagPosting } from "./tag-rules.ts";
 
 import type { PostingTags, Seniority } from "../../shared/tag-taxonomy.ts";
+import type { RoleLabel } from "./taxonomy-tags.ts";
 
 export const WORKABLE_TARGETS_KEY = "workable-targets.json";
 export const WORKABLE_MANIFEST_KEY = "workable/manifest.json";
@@ -174,16 +175,18 @@ function locationMatches(place: string, tags: PostingTags, locationRaw: string) 
  * its rule tags through the retired-tag bridge, scored the way catalog matching scores a Posting.
  * @param job The job's title, department and rule tags.
  * @param roles The saved role targets.
+ * @param labels The committed role labels by key, loaded once by the caller.
  * @returns True when the role matches.
  */
 export function workableRoleMatches(
   job: { title: string; department: string | null; tags: PostingTags },
   roles: readonly string[],
+  labels: ReadonlyMap<string, RoleLabel>,
 ) {
   const roleTags = taxonomyRoleTags(
     { title: job.title, department: job.department, primaryCategory: null, primaryRole: null },
-    { role: job.tags.role, subrole: job.tags.subrole, granularRole: null },
-    committedRoleLabels(),
+    { role: job.tags.role, subrole: job.tags.subrole, granularRole: null, source: "rules" },
+    labels,
   );
 
   return (
@@ -201,16 +204,18 @@ export function workableRoleMatches(
  * @param job The job's title, department and rule tags.
  * @param locationRaw The job's location text.
  * @param targets The targets the pass keeps jobs for.
+ * @param labels The committed role labels by key.
  * @returns True when the job should be kept.
  */
 export function workableTargetMatches(
   job: { title: string; department: string | null; tags: PostingTags },
   locationRaw: string,
   targets: WorkableTargets,
+  labels: ReadonlyMap<string, RoleLabel>,
 ) {
   const { tags } = job;
 
-  if (targets.roles.length === 0 || !workableRoleMatches(job, targets.roles)) {
+  if (targets.roles.length === 0 || !workableRoleMatches(job, targets.roles, labels)) {
     return false;
   }
 
@@ -289,6 +294,7 @@ function toSnapshotRow(fields: WorkableJobFields) {
 export interface WorkablePassDeps {
   source: AsyncIterable<Uint8Array>;
   targets: WorkableTargets;
+  labels: ReadonlyMap<string, RoleLabel>;
   onMatch: (row: WorkableSnapshotRow, line: string) => Promise<void> | void;
 }
 
@@ -340,7 +346,7 @@ export async function streamWorkablePass(deps: WorkablePassDeps) {
       return;
     }
 
-    if (workableTargetMatches(row, row.locationRaw ?? "", deps.targets)) {
+    if (workableTargetMatches(row, row.locationRaw ?? "", deps.targets, deps.labels)) {
       pending.push(row);
     }
   }

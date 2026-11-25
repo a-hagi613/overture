@@ -6,11 +6,7 @@ import type { CatalogDatabase } from "../db/client.ts";
 import type { EmploymentType, Seniority, Workplace } from "../../../shared/tag-taxonomy.ts";
 
 import { resolvedLocationCondition } from "../../catalog/location-filter.ts";
-import {
-  planRoleTargets,
-  roleFilterTagValues,
-  roleTargetCondition,
-} from "../../matching/role-targets.ts";
+import { roleFilterCondition, roleFilterTagValues } from "../../matching/role-targets.ts";
 
 export interface SearchFilters {
   /** A category: a role-taxonomy id or name, or a retired category name (issue #660). */
@@ -97,19 +93,12 @@ function tagMatches(dimensions: readonly string[], value: string) {
   )`;
 }
 
-function roleMatches(db: CatalogDatabase, value: string) {
-  const asGiven = tagMatches(["role", "subrole", "granular_role"], value.trim());
-  const inTaxonomy = roleTargetCondition(db, planRoleTargets([value]));
-
-  return inTaxonomy === null ? asGiven : sql`(${inTaxonomy} or ${asGiven})`;
-}
-
 function filterConditions(db: CatalogDatabase, filters: SearchFilters, nowMs: number) {
   const parts: SQL[] = [];
   const roleValue = filters.granularRole ?? filters.role;
 
   if (roleValue !== null) {
-    parts.push(roleMatches(db, roleValue));
+    parts.push(roleFilterCondition(roleValue));
   }
 
   if (filters.seniority !== null) {

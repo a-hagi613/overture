@@ -516,7 +516,7 @@ async function main() {
   const taxonomyTags = writeTaxonomyTags(catalog.db, committedRoleLabels());
 
   progress(
-    `role taxonomy: ${String(taxonomyTags.labelled)} AI labelled, ${String(taxonomyTags.categoryOnly)} AI category only, ${String(taxonomyTags.bridged)} bridged, ${String(taxonomyTags.junk)} junk, ${String(taxonomyTags.untagged)} untagged`,
+    `role taxonomy: ${String(taxonomyTags.labelled)} AI labelled, ${String(taxonomyTags.categoryOnly)} AI category only, ${String(taxonomyTags.titled)} named by title, ${String(taxonomyTags.bridged)} bridged, ${String(taxonomyTags.junk)} junk, ${String(taxonomyTags.untagged)} untagged`,
   );
 
   rebuildSupplyFacets(catalog.db);

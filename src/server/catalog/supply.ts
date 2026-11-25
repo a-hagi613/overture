@@ -1,12 +1,12 @@
-import { and, count, eq, exists, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { CatalogDatabase } from "../platform/db/client.ts";
 import type { SupplyFilters } from "../../shared/supply.ts";
 import type { SupplyTotals } from "./supply-facets.ts";
 
-import { postings, postingTags } from "../platform/db/catalog-schema.ts";
-import { planRoleTargets, roleTargetCondition } from "../matching/role-targets.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
+import { roleFilterCondition } from "../matching/role-targets.ts";
 import { resolvedLocationCondition } from "./location-filter.ts";
 import { catalogRevision } from "./revision.ts";
 import { supplyFacetTotals } from "./supply-facets.ts";
@@ -32,25 +32,6 @@ function cacheKeyOf(filters: SupplyFilters) {
   ]);
 }
 
-function roleCondition(db: CatalogDatabase, value: string) {
-  const asGiven = exists(
-    db
-      .select({ one: sql`1` })
-      .from(postingTags)
-      .where(
-        and(
-          eq(postingTags.postingId, postings.id),
-          inArray(postingTags.dimension, ["role", "subrole", "granular_role"]),
-          eq(postingTags.value, value.trim()),
-        ),
-      ),
-  );
-
-  const inTaxonomy = roleTargetCondition(db, planRoleTargets([value]));
-
-  return inTaxonomy === null ? asGiven : (or(inTaxonomy, asGiven) ?? asGiven);
-}
-
 function filtersCondition(db: CatalogDatabase, filters: SupplyFilters) {
   const conditions: SQL[] = [
     isNull(postings.closedAt),
@@ -61,7 +42,7 @@ function filtersCondition(db: CatalogDatabase, filters: SupplyFilters) {
   const roleValue = filters.granularRole ?? filters.role;
 
   if (roleValue !== null) {
-    conditions.push(roleCondition(db, roleValue));
+    conditions.push(roleFilterCondition(roleValue));
   }
 
   if (filters.location !== null) {

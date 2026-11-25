@@ -667,10 +667,14 @@ Order of precedence for role/seniority: `import` (hiring.cafe file, if the owner
   Claude Haiku pass over the catalog's title templates (title + department, `classificationKey`), committed as
   `src/server/catalog/tag-data/role-labels.json`: a high- or medium-confidence label sets all three ids, a
   low-confidence one only the category, and `JUNK` (talent pool, open application, test posting) clears the role so
-  the Posting matches no one. A title with no label goes through the retired-tag bridge (`legacy-roles.ts`), which
-  keeps only what the old tags say safely. Every writer ends in the same rewrite (`taxonomy-tags.ts`), so no stored
-  role tag uses a retired label. The 28 retired role groups and 134 ESCO roles are still read as input: a saved
-  target or a filter that names one resolves to its ids.
+  the Posting matches no one. A title that names one exact role (`Project Manager`, `Senior Backend Engineer`, with
+  level words set aside) takes that role over the label, unless the label names another role in the same subcategory.
+  A title with no label goes through the retired-tag bridge (`legacy-roles.ts`), which keeps only what the old tags
+  say safely and keeps the source that wrote them. An operator's tag import outranks the label (its tags are bridged
+  as `import`, and its seniority stays). A Posting carries one role. Every writer ends in the same rewrite
+  (`taxonomy-tags.ts`), so no stored role tag uses a retired label and a title the rules could not place still gets
+  its label before the paid fallback sees it. The 28 retired role groups and 134 ESCO roles are still read as input:
+  a saved target or a filter that names one resolves to its ids.
 - **Seniority**: Intern, Entry, Mid, Senior, Staff/Principal, Manager, Director+.
 - **Workplace**: Remote, Hybrid, On-site. **Employment**: Full-time, Part-time, Contract, Internship, Temporary.
 - Onboarding offers only values that have ≥ 1 open posting; the live count applies the user's locations.
@@ -1837,7 +1841,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/catalog/hot-swap.test.ts` | cold boot adopts a verified local file or hydrates from R2, a checksum or integrity failure keeps the active catalog serving, a swap keeps the stable handle and drains the previous one, and reads keep working while a swap is in flight (#576) |
 | `src/server/catalog/question-normalize.test.ts` | question normalisation |
 | `src/server/catalog/stapply-daily.test.ts` | the 28-board DuckDB query projects only catalog columns and a capped description and never `all.parquet`, applies the https/title/deadline/freshness filters (7 days by default, undated rows only on request), dedupes by `(company_norm, requisition_id)` preferring an apply-supported board, stores the description as plain text, and maps the feed's salary and employment spellings |
-| `src/server/catalog/taxonomy-tags.test.ts` | a confident AI label writes the category, subcategory and role ids and its seniority, a low-confidence one only the category, `JUNK` clears the role, the department is part of the label key, an unlabelled Posting goes through the retired-tag bridge, a second pass changes nothing, one Posting retags exactly as the whole catalog does, and the committed seed parses with known roles (#660) |
+| `src/server/catalog/taxonomy-tags.test.ts` | a confident AI label writes the category, subcategory and role ids and its seniority, a low-confidence one only the category, `JUNK` clears the role, the department is part of the label key, an unlabelled Posting goes through the retired-tag bridge keeping the source that wrote its tags, an operator import outranks the label, a title naming one exact role overrides a label outside its subcategory, the heaviest retired tag is read first, a second pass changes nothing, one Posting retags exactly as the whole catalog does, and the committed seed parses with known roles and rejects a malformed label (#660) |
 | `src/server/matching/role-targets.test.ts` | saved targets read as ids, names, retired names or free text; a role target scores only that role and never a neighbour; the closest match wins (exact 40, subcategory 30, free text 30, category 20); free text needs whole title words (#660) |
 | `src/server/matching/judge-input.test.ts` | the scorer reads role names rather than ids, the first 200 words (≤ 2,000 characters) of the description, and a targets line naming roles, levels, places, workplaces and the pay floor (#660) |
 | `src/server/catalog/stapply-delta.test.ts` | a rerun with the same `content_hash` inserts nothing and keeps its tags (including an import tag), a changed hash rewrites and re-tags, a missing posting closes at once, a closed row older than 30 days is pruned, a returned posting reopens, and an ingest-only posting is not tag-written |

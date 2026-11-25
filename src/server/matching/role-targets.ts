@@ -1,7 +1,5 @@
-import { and, eq, exists, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-
-import type { CatalogDatabase } from "../platform/db/client.ts";
 
 import { postingTags, postings } from "../platform/db/catalog-schema.ts";
 import { legacyTargetToTaxonomy } from "../catalog/legacy-roles.ts";
@@ -15,6 +13,8 @@ export const ROLE_MATCH_SCORE = {
   freeText: 30,
   category: 20,
 } as const;
+
+const ROLE_TAG_DIMENSIONS = ["role", "subrole", "granular_role"] as const;
 
 const STOP_WORDS = new Set(["and", "or", "the", "of", "at", "in", "on", "for", "to", "a", "an"]);
 
@@ -91,27 +91,26 @@ export function roleFilterTagValues(value: string) {
   ];
 }
 
-function tagExists(
-  db: CatalogDatabase,
-  dimension: "role" | "subrole" | "granular_role",
-  values: ReadonlySet<string>,
-) {
-  if (values.size === 0) {
-    return null;
-  }
+function tagValueIn(dimension: (typeof ROLE_TAG_DIMENSIONS)[number], values: ReadonlySet<string>) {
+  return values.size === 0
+    ? null
+    : and(eq(postingTags.dimension, dimension), inArray(postingTags.value, [...values]));
+}
 
-  return exists(
-    db
-      .select({ one: sql`1` })
-      .from(postingTags)
-      .where(
-        and(
-          eq(postingTags.postingId, postings.id),
-          eq(postingTags.dimension, dimension),
-          inArray(postingTags.value, [...values]),
-        ),
-      ),
+function planTagClauses(plan: RoleTargetPlan) {
+  return [
+    tagValueIn("granular_role", plan.exactRoleIds),
+    tagValueIn("subrole", plan.subcategoryIds),
+    tagValueIn("role", plan.categoryIds),
+  ].filter((clause) => clause !== null && clause !== undefined);
+}
+
+function postingsTagged(clauses: readonly SQL[]) {
+  const searches = clauses.map(
+    (clause) => sql`select ${postingTags.postingId} from ${postingTags} where ${clause}`,
   );
+
+  return sql`${postings.id} in (${sql.join(searches, sql` union `)})`;
 }
 
 function titleHasWords(words: readonly string[]) {
@@ -123,19 +122,34 @@ function titleHasWords(words: readonly string[]) {
 /**
  * The SQL condition a Posting must meet to enter the person's pool: its role is a target role, it sits in a target
  * subcategory or category, or its title holds every word of a free-text target.
- * @param db The catalog database.
  * @param plan A plan from `planRoleTargets`.
  * @returns The condition, or null when the plan names nothing.
  */
-export function roleTargetCondition(db: CatalogDatabase, plan: RoleTargetPlan) {
+export function roleTargetCondition(plan: RoleTargetPlan) {
+  const tagClauses = planTagClauses(plan);
+
   const parts = [
-    tagExists(db, "granular_role", plan.exactRoleIds),
-    tagExists(db, "subrole", plan.subcategoryIds),
-    tagExists(db, "role", plan.categoryIds),
+    tagClauses.length === 0 ? null : postingsTagged(tagClauses),
     ...plan.freeTextWords.map((words) => titleHasWords(words)),
-  ].filter((part): part is SQL => part !== null && part !== undefined);
+  ].filter((part) => part !== null && part !== undefined);
 
   return parts.length === 0 ? null : or(...parts);
+}
+
+/**
+ * The SQL condition for one role filter on the catalog counts and search: the filter read as taxonomy ids, or a role
+ * tag holding the value exactly as given, so a catalog built before the taxonomy still answers while it is rebuilt.
+ * @param value The filter value: a taxonomy id or name, or a retired category or ESCO name.
+ * @returns The condition.
+ */
+export function roleFilterCondition(value: string) {
+  const plan = planRoleTargets([value]);
+
+  const asGiven = sql`${inArray(postingTags.dimension, [...ROLE_TAG_DIMENSIONS])} and ${eq(postingTags.value, value.trim())}`;
+
+  const tagged = postingsTagged([asGiven, ...planTagClauses(plan)]);
+
+  return or(tagged, ...plan.freeTextWords.map((words) => titleHasWords(words))) ?? tagged;
 }
 
 /**

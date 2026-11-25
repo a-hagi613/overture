@@ -171,7 +171,7 @@ test("a crash mid-batch resumes the recorded Anthropic batch without submitting 
 
     for (const rows of rowSets) {
       expect(rows.length).toBe(1);
-      expect(rows[0]?.value).toBe("Design");
+      expect(rows[0]?.value).toBe("product-design");
       expect(rows[0]?.source).toBe("llm");
     }
   } finally {

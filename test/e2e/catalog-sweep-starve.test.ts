@@ -111,7 +111,11 @@ test("the health route keeps answering while the sweep reads multi-megabyte feed
     expect(heavyPostings.length).toBe(HEAVY_GREENHOUSE_JOBS);
     expect(heavyPostings.every((posting) => posting.descriptionHash !== null)).toBe(true);
     expect(ashbyPostings.length).toBe(ASHBY_JOBS * ASHBY_BOARDS.length);
-    expect(ashbyPostings.every((posting) => posting.tagSource === "rules")).toBe(true);
+    expect(
+      ashbyPostings.every(
+        (posting) => posting.tagSource === "rules" || posting.tagSource === "llm",
+      ),
+    ).toBe(true);
   } finally {
     await harness.close();
   }

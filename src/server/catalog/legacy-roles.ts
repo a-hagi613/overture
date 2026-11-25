@@ -192,6 +192,13 @@ function nameKey(name: string) {
 
 const PERSON_WORD = /(?:er|or|ist|ian|ic)$/u;
 
+const LEVEL_WORDS =
+  /\b(?:senior|sr|junior|jr|staff|principal|lead|mid|mid level|entry level|intern|graduate|i{1,3}|iv)\b/gu;
+
+function withoutLevel(key: string) {
+  return key.replaceAll(LEVEL_WORDS, " ").replaceAll(/\s+/gu, " ").trim();
+}
+
 function isAliasPart(part: string) {
   if (part.includes(" ")) {
     return true;
@@ -200,27 +207,52 @@ function isAliasPart(part: string) {
   return PERSON_WORD.test(part) || /^[A-Z]{3,}$/u.test(part);
 }
 
-function roleNameAliases() {
-  const owners = new Map<string, Set<string>>();
+function sharedHeadParts(parts: readonly string[]) {
+  const lastWords = (parts.at(-1) ?? "").split(" ");
+  const head = lastWords.length > 1 ? (lastWords.at(-1) ?? "") : "";
 
-  for (const role of ROLES) {
-    const parts = role.name.split("/").map((part) => part.trim());
-
-    if (parts.length < 2) {
-      continue;
-    }
-
-    for (const part of parts.filter((candidate) => isAliasPart(candidate))) {
-      const ids = owners.get(nameKey(part)) ?? new Set<string>();
-
-      ids.add(role.id);
-      owners.set(nameKey(part), ids);
-    }
+  if (!/^\p{L}+$/u.test(head)) {
+    return [];
   }
 
-  return [...owners].flatMap(([key, ids]) =>
-    ids.size === 1 && key.length > 1 ? [[key, [...ids][0] ?? ""] as const] : [],
+  return parts
+    .slice(0, -1)
+    .flatMap((part) => (part.includes(" ") || PERSON_WORD.test(part) ? [] : [`${part} ${head}`]));
+}
+
+function uniqueOwners(entries: readonly (readonly [string, string])[]) {
+  const owners = new Map<string, Set<string>>();
+
+  for (const [key, id] of entries) {
+    owners.set(key, new Set([...(owners.get(key) ?? []), id]));
+  }
+
+  return new Map(
+    [...owners].flatMap(([key, ids]) =>
+      ids.size === 1 && key.length > 1 ? [[key, [...ids][0] ?? ""] as const] : [],
+    ),
   );
+}
+
+function roleNameAliases() {
+  const combined = ROLES.map((role) => ({
+    id: role.id,
+    parts: role.name.split("/").map((part) => part.trim()),
+  })).filter((role) => role.parts.length > 1);
+
+  const direct = combined.flatMap((role) =>
+    role.parts.filter((part) => isAliasPart(part)).map((part) => [nameKey(part), role.id] as const),
+  );
+
+  const directKeys = new Set(direct.map(([key]) => key));
+
+  const shared = combined.flatMap((role) =>
+    sharedHeadParts(role.parts)
+      .map((part) => [nameKey(part), role.id] as const)
+      .filter(([key]) => !directKeys.has(key)),
+  );
+
+  return [...uniqueOwners(direct), ...uniqueOwners(shared)];
 }
 
 const wholeNames = [
@@ -235,6 +267,22 @@ const taxonomyIdByName = new Map<string, string>([
   ...roleNameAliases().filter(([key]) => !wholeNameKeys.has(key)),
   ...wholeNames,
 ]);
+
+/**
+ * The role a Posting's title names outright: the whole title, with or without its level words (`Senior`, `II`), is a
+ * role's own name or one clear part of a combined name (`Optometrist`, `Senior Data Engineer`, `CNA`). Retired and
+ * ESCO names are not read here, and a broad role (`Other …`) is never named, so only a title that says exactly what
+ * the job is gets a role from its wording.
+ * @param title The Posting's title.
+ * @returns The role id, or null when the title is not a role's name.
+ */
+export function titleNamedRole(title: string) {
+  const key = nameKey(title);
+  const id = taxonomyIdByName.get(key) ?? taxonomyIdByName.get(withoutLevel(key));
+  const role = id === undefined ? undefined : roleById.get(id);
+
+  return role === undefined || role.broad ? null : role.id;
+}
 
 /**
  * Converts one Posting's retired tags (28 tech-leaning categories, 134 ESCO Level-2 roles, six software subroles) to
@@ -300,7 +348,8 @@ export function legacyTargetToTaxonomy(value: string) {
     return [...category.target];
   }
 
-  const current = taxonomyIdByName.get(nameKey(trimmed));
+  const key = nameKey(trimmed);
+  const current = taxonomyIdByName.get(key) ?? taxonomyIdByName.get(withoutLevel(key));
 
   return current === undefined ? [trimmed] : [current];
 }

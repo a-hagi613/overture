@@ -4,7 +4,7 @@ import { ESCO_ROLE_OPTIONS } from "../../shared/esco-roles.ts";
 import { ROLE_CATEGORIES, ROLES, ROLE_SUBCATEGORIES } from "../../shared/role-taxonomy.ts";
 import { ROLE_GROUPS, SUBROLES } from "../../shared/tag-taxonomy.ts";
 
-import { legacyTagToTaxonomy, legacyTargetToTaxonomy } from "./legacy-roles.ts";
+import { legacyTagToTaxonomy, legacyTargetToTaxonomy, titleNamedRole } from "./legacy-roles.ts";
 
 const roleIds = new Set(ROLES.map((role) => role.id));
 const categoryIds = new Set<string>(ROLE_CATEGORIES.map((category) => category.id));
@@ -140,6 +140,21 @@ describe("current taxonomy names resolve to their ids", () => {
     expect(legacyTargetToTaxonomy("nurse practitioner")).toEqual(["health.np"]);
     expect(legacyTargetToTaxonomy("Paramedic")).toEqual(["health.ems"]);
     expect(legacyTargetToTaxonomy("Help Desk")).toEqual(["it.support"]);
+  });
+
+  test("a level word does not hide the role it qualifies, and a role named with one keeps it", () => {
+    expect(legacyTargetToTaxonomy("Senior Backend Engineer")).toEqual(["sw.backend"]);
+    expect(legacyTargetToTaxonomy("Sr. Data Engineer II")).toEqual(["data.engineer"]);
+    expect(legacyTargetToTaxonomy("Shift Lead")).toEqual(["food.supervisor"]);
+    expect(legacyTargetToTaxonomy("Lead Project Manager")).toEqual(["ops.pm"]);
+    expect(legacyTargetToTaxonomy("Principal Engineer")).toEqual(["Principal Engineer"]);
+  });
+
+  test("a title names a role only by a role's own name, never a broad one", () => {
+    expect(titleNamedRole("Staff Software Engineer")).toBe("sw.general");
+    expect(titleNamedRole("Registered Nurse")).toBe("health.rn");
+    expect(titleNamedRole("Registered Nurse - ICU Nights")).toBeNull();
+    expect(titleNamedRole("Head of Sales")).toBeNull();
   });
 
   test("a vague or shared part stays free text, so it never claims one role", () => {

@@ -374,7 +374,15 @@ test("opening a posting scores it once, and manual apply works below the thresho
   const rescored = postingSchema.parse(await (await owner.get(`/api/postings/${strong}`)).json());
 
   expect(rescored.score).toBe(87);
-  expect(matching.anthropic.requests()).toHaveLength(2);
+  expect(matching.anthropic.requests()).toHaveLength(3);
+  expect(matching.anthropic.requests().at(2)?.user).toContain("Toronto, ON or Vancouver, BC");
+
+  const reopenedAgain = postingSchema.parse(
+    await (await owner.get(`/api/postings/${strong}`)).json(),
+  );
+
+  expect(reopenedAgain.score).toBe(87);
+  expect(matching.anthropic.requests()).toHaveLength(3);
 
   await owner.dispose();
 });

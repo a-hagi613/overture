@@ -349,7 +349,7 @@ export function createCandidateService(deps: CandidateDeps) {
 
   function loadPool(targets: TargetsInput, languages: readonly string[]) {
     const rolePlan = planRoleTargets(targets.roles);
-    const roleCondition = roleTargetCondition(catalogDb, rolePlan);
+    const roleCondition = roleTargetCondition(rolePlan);
 
     if (
       roleCondition === null ||

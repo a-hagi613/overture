@@ -186,7 +186,7 @@ test("postings poll records tags from the rules and the filters search them", as
     const roleRows = tagsBody.postingTags.filter((row) => row.dimension === "role");
 
     expect(roleRows.length).toBe(4);
-    expect(roleRows.every((row) => row.value === "Sales" && row.source === "rules")).toBe(true);
+    expect(roleRows.every((row) => row.value === "sales" && row.source === "rules")).toBe(true);
 
     const remoteSearch = await searchHits(
       `${harness.app.url}/__test__/search?q=${encodeURIComponent("Account Executive")}&workplace=remote&limit=10`,

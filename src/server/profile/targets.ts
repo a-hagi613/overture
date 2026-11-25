@@ -142,7 +142,7 @@ function salaryCondition(floorMinor: number | null, currency: string | null) {
 }
 
 function countMatches(db: CatalogDatabase, filters: MatchFilters) {
-  const roleCondition = roleTargetCondition(db, planRoleTargets(filters.roles));
+  const roleCondition = roleTargetCondition(planRoleTargets(filters.roles));
 
   if (roleCondition === null) {
     return 0;

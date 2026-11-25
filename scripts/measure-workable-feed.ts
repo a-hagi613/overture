@@ -9,6 +9,7 @@ import { Parser } from "htmlparser2";
 import { DESCRIPTION_CAP, htmlToText } from "../src/server/catalog/html-to-text.ts";
 import { resolveLocation } from "../src/server/catalog/geo.ts";
 import { tagPosting } from "../src/server/catalog/tag-rules.ts";
+import { committedRoleLabels } from "../src/server/catalog/taxonomy-tags.ts";
 import { workableRoleMatches } from "../src/server/catalog/workable-feed.ts";
 import { targetsInputSchema } from "../src/shared/targets.ts";
 
@@ -177,7 +178,7 @@ function targetConditions(
     employment: targets.employmentTypes.includes(tags.employmentType),
     language: tags.language !== null && languages.has(tags.language),
     seniority: tags.seniority !== null && targets.seniorities.includes(tags.seniority),
-    role: workableRoleMatches({ ...job, tags }, targets.roles),
+    role: workableRoleMatches({ ...job, tags }, targets.roles, committedRoleLabels()),
     location: targets.locations.some((place) => locationMatches(place, tags, locationRaw)),
     salary: salaryMeets,
   };

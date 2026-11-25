@@ -26,9 +26,10 @@ export function salaryPeriodForColumn(period: SalaryPeriod | null) {
 }
 
 /**
- * Writes a Posting's tags, keeping a stronger source's tag over a weaker one. When the writes touch the role, the
- * Posting is then retagged in the role taxonomy (issue #660), so a writer that still speaks the retired labels (the
- * board poll's title rules) never leaves an old label for matching to miss.
+ * Writes a Posting's tags, keeping a stronger source's tag over a weaker one, then retags the Posting in the role
+ * taxonomy (issue #660): a writer that still speaks the retired labels (the board poll's title rules) never leaves an
+ * old label for matching to miss, and a title the rules could not place still gets its AI label, so it never waits on
+ * the paid fallback.
  * @param db The catalog database or an open transaction on it.
  * @param postingId The Posting.
  * @param writes The tags to write.
@@ -65,9 +66,7 @@ export function writePostingTags(
       .run();
   }
 
-  if (writes.some((write) => write.dimension === "role" || write.dimension === "subrole")) {
-    retagPosting(db, postingId, committedRoleLabels());
-  }
+  retagPosting(db, postingId, committedRoleLabels());
 
   const rows = db.select().from(postingTags).where(eq(postingTags.postingId, postingId)).all();
 
