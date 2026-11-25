@@ -136,6 +136,62 @@ describe("resolvePlaceQuery", () => {
   });
 });
 
+describe("local and alternate place names", () => {
+  test.each([
+    ["München", "Munich", "DE"],
+    ["Köln", "Koeln", "DE"],
+    ["Düsseldorf", "Duesseldorf", "DE"],
+    ["Zürich", "Zuerich", "CH"],
+    ["Göteborg", "Gothenburg", "SE"],
+    ["Lisboa", "Lisbon", "PT"],
+    ["Bangalore", "Bengaluru", "IN"],
+    ["Frankfurt", "Frankfurt am Main", "DE"],
+    ["Metro Manila", "Manila", "PH"],
+    ["Sandton", "Johannesburg", "ZA"],
+    ["Annapolis Junction, MD", "Fort Meade", "US"],
+  ])("%s resolves to %s", (raw, city, country) => {
+    const resolved = resolvePlaceQuery(raw);
+
+    expect(resolved.kind).toBe("city");
+    expect(resolved.cityName).toBe(city);
+    expect(resolved.countryCodes).toEqual([country]);
+    expect(resolved.lat).not.toBeNull();
+  });
+
+  test("a capital that shares its name with a province resolves to the city", () => {
+    expect(resolvePlaceQuery("Sofia").cityName).toBe("Sofia");
+    expect(resolvePlaceQuery("Sofia, Bulgaria").cityName).toBe("Sofia");
+    expect(resolvePlaceQuery("Sofia, Bulgaria").regionIsoCode).toBe(
+      resolvePlaceQuery("Sofia").regionIsoCode,
+    );
+    expect(resolvePlaceQuery("Buenos Aires").cityName).toBe("Buenos Aires");
+    expect(resolvePlaceQuery("Buenos Aires").countryCodes).toEqual(["AR"]);
+  });
+
+  test("a smaller city still loses to its same-named region", () => {
+    expect(resolvePlaceQuery("Washington").kind).toBe("region");
+  });
+
+  test("a country written in its own language", () => {
+    const resolved = resolvePlaceQuery("-, - München, Bayern, Deutschland");
+
+    expect(resolved.cityName).toBe("Munich");
+    expect(resolved.countryCodes).toEqual(["DE"]);
+    expect(resolvePlaceQuery("Deutschland").countryCodes).toEqual(["DE"]);
+    expect(resolvePlaceQuery("España").countryCodes).toEqual(["ES"]);
+  });
+
+  test("a postcode next to the city is ignored", () => {
+    expect(resolvePlaceQuery("10115 Berlin, Deutschland").cityName).toBe("Berlin");
+    expect(resolvePlaceQuery("75008 Paris, France").cityName).toBe("Paris");
+
+    const sf = resolvePlaceQuery("San Francisco, CA 94105");
+
+    expect(sf.cityName).toBe("San Francisco");
+    expect(sf.regionIsoCode).toBe("US-CA");
+  });
+});
+
 describe("resolveLocationQuery", () => {
   test("parses every group of a multi-location string", () => {
     const groups = resolveLocationQuery("Toronto; Vancouver | Berlin");

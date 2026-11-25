@@ -251,10 +251,18 @@ interface GeoDataset {
   cities: CompactCity[];
 }
 
-const LATIN_NAME = /^[A-Za-z][A-Za-z '.-]{2,39}$/u;
+/** Latin-script names, accented letters included, so endonyms such as "München" and "Göteborg" are kept. */
+const LATIN_NAME = /^[A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F '.-]{2,39}$/u;
+
+/** All-capital tokens such as "MUC" or "EDDM" are airport codes, not place names. */
+const CODE_LIKE = /^[A-Z]{2,5}$/u;
+
+/** Cities this big get every Latin alternate (the resolver only reads alternates at this size). */
+const FULL_ALTERNATES_POPULATION = 50_000;
 
 function compactCityLine(
   geonameId: string,
+  localName: string,
   name: string,
   country: string,
   admin1: string,
@@ -281,19 +289,26 @@ function compactCityLine(
   const normalizedName = normalizeTitle(name);
   const seen = new Set([normalizedName]);
   const keptAlternates: string[] = [];
+  const limit = residents >= FULL_ALTERNATES_POPULATION ? Number.POSITIVE_INFINITY : 3;
 
-  for (const alternate of alternates.split(",")) {
+  // The local spelling ("Köln" for "Koeln") goes first, then GeoNames' alternates.
+  for (const alternate of [localName, ...alternates.split(",")]) {
     const trimmed = alternate.trim();
     const normalized = normalizeTitle(trimmed);
 
-    if (!LATIN_NAME.test(trimmed) || normalized === "" || seen.has(normalized)) {
+    if (
+      !LATIN_NAME.test(trimmed) ||
+      CODE_LIKE.test(trimmed) ||
+      normalized === "" ||
+      seen.has(normalized)
+    ) {
       continue;
     }
 
     seen.add(normalized);
     keptAlternates.push(trimmed);
 
-    if (keptAlternates.length >= 3) {
+    if (keptAlternates.length >= limit) {
       break;
     }
   }
@@ -374,6 +389,7 @@ async function buildGeoPlaces() {
   for (const line of citiesText.split("\n")) {
     const columns = line.split("\t");
     const geonameid = columns.at(0);
+    const localName = columns.at(1);
     const name = columns.at(2);
     const alternates = columns.at(3);
     const lat = columns.at(4);
@@ -400,6 +416,7 @@ async function buildGeoPlaces() {
 
     const city = compactCityLine(
       geonameid,
+      localName ?? "",
       name,
       country,
       admin1 ?? "",
@@ -516,6 +533,13 @@ async function buildOnet() {
   );
 }
 
-await buildGeoPlaces();
+// `bun scripts/build-tag-data.ts geo` (or `onet`) rebuilds one file; no argument rebuilds both.
+const only = process.argv[2];
 
-await buildOnet();
+if (only === undefined || only === "geo") {
+  await buildGeoPlaces();
+}
+
+if (only === undefined || only === "onet") {
+  await buildOnet();
+}

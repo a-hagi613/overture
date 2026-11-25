@@ -89,6 +89,28 @@ const countryAliases = new Map([
   ["scotland", "GB"],
   ["wales", "GB"],
   ["republic of ireland", "IE"],
+  // Country names in their own language, as non-English job boards print them.
+  ["deutschland", "DE"],
+  ["osterreich", "AT"],
+  ["schweiz", "CH"],
+  ["suisse", "CH"],
+  ["svizzera", "CH"],
+  ["espana", "ES"],
+  ["italia", "IT"],
+  ["nederland", "NL"],
+  ["belgie", "BE"],
+  ["belgique", "BE"],
+  ["sverige", "SE"],
+  ["norge", "NO"],
+  ["danmark", "DK"],
+  ["suomi", "FI"],
+  ["polska", "PL"],
+  ["cesko", "CZ"],
+  ["ceska republika", "CZ"],
+  ["magyarorszag", "HU"],
+  ["turkiye", "TR"],
+  ["brasil", "BR"],
+  ["eire", "IE"],
 ]);
 
 const remoteKeywords = new Set([
@@ -273,7 +295,15 @@ const CITY_ALIASES = [
   { alias: "washington d c", country: "US", name: "Washington" },
   { alias: "ho chi minh", country: "VN", name: "Ho Chi Minh City" },
   { alias: "saigon", country: "VN", name: "Ho Chi Minh City" },
-] as const;
+  { alias: "frankfurt", country: "DE", name: "Frankfurt am Main" },
+  { alias: "metro manila", country: "PH", name: "Manila" },
+  // Business districts GeoNames files as sections of a bigger city, so they are not rows of their own.
+  { alias: "sandton", country: "ZA", name: "Johannesburg" },
+  { alias: "annapolis junction", admin1: "MD", country: "US", name: "Fort Meade" },
+] as const satisfies readonly { alias: string; admin1?: string; country: string; name: string }[];
+
+/** A single place name that is both a region and a city this big means the city ("Sofia", "Buenos Aires"). */
+const CITY_OVER_REGION_POPULATION = 1_000_000;
 
 let cityTopIndex: Map<string, number> | null = null;
 let cityOtherIndexes: Map<string, number[]> | null = null;
@@ -348,7 +378,9 @@ function cityIndex() {
     const canonical = candidates.find((index) => {
       const city = cityAt(index);
 
-      return city.country === alias.country;
+      return (
+        city.country === alias.country && (!("admin1" in alias) || city.admin1 === alias.admin1)
+      );
     });
 
     if (canonical !== undefined) {
@@ -371,11 +403,20 @@ function segmentsOf(text: string) {
   return text
     .replaceAll(/[[\]()]/gu, ",")
     .split(/[,;|•·/]|\s[-–—]\s/gu)
-    .map((segment) => segment.trim().replaceAll(/\s+/gu, " "))
+    .map((segment) => withoutPostcode(segment.trim().replaceAll(/\s+/gu, " ")))
     .filter((segment) => segment.length > 1)
     .map((segment) => ({ normalized: normalizePlaceName(segment), raw: segment }))
     .filter((segment) => segment.normalized !== "")
     .filter((segment) => !remoteKeywords.has(segment.normalized));
+}
+
+/**
+ * Drops a postcode printed beside a place: "10115 Berlin" → "Berlin", "CA 94105" → "CA".
+ * @param segment One trimmed location segment.
+ * @returns The segment without a leading or trailing postcode; a bare number is left alone.
+ */
+function withoutPostcode(segment: string) {
+  return segment.replace(/^\d{4,6}\s+(?=\D)/u, "").replace(/(?<=\D)\s+\d{4,6}(?:-\d{4})?$/u, "");
 }
 
 /**
@@ -471,6 +512,18 @@ function findCity(normalized: string, countryCode: string | null, regionIsoCode:
   return null;
 }
 
+/**
+ * A city of at least {@link CITY_OVER_REGION_POPULATION} with this name in the country, wherever its region.
+ * @param normalized The folded place name.
+ * @param countryCode The country the city must be in.
+ * @returns The city's index, or null.
+ */
+function bigCityNamed(normalized: string, countryCode: string) {
+  const index = findCity(normalized, countryCode, null);
+
+  return index !== null && cityAt(index).population >= CITY_OVER_REGION_POPULATION ? index : null;
+}
+
 function cityWithRegionToken(segments: readonly PlaceSegment[]) {
   for (let index = 0; index < segments.length - 1; index += 1) {
     const citySegment = segments[index];
@@ -506,6 +559,25 @@ function cityRegionIso(index: number) {
   const legacy = `${city.country}.${city.admin1}`;
 
   return dataset.regionIso[legacy] ?? null;
+}
+
+function cityResult(index: number, remote: boolean) {
+  const city = cityAt(index);
+  const legacy = regionByLegacy.get(`${city.country}.${city.admin1}`);
+
+  return resolvedQuery({
+    kind: "city",
+    continentCodes: [countryContinents.get(city.country) ?? "NA"],
+    countryCodes: [city.country],
+    regionIsoCode: cityRegionIso(index),
+    legacyRegionCode: legacy?.legacy ?? null,
+    regionName: legacy?.name ?? null,
+    cityName: city.name,
+    cityGeonameId: city.id,
+    lat: city.lat,
+    lon: city.lon,
+    remote,
+  });
 }
 
 function emptyQuery() {
@@ -667,6 +739,14 @@ export function resolvePlaceQuery(group: string) {
     }
   }
 
+  if (segments.length === 1 && region !== null) {
+    const bigCity = bigCityNamed(normalizedGroup, region.country);
+
+    if (bigCity !== null) {
+      return cityResult(bigCity, remote);
+    }
+  }
+
   if (segments.length === 1 && countryIndex === 0 && countryCode !== null) {
     const cityStateIndex = findCity(normalizedGroup, countryCode, null);
 
@@ -712,7 +792,16 @@ export function resolvePlaceQuery(group: string) {
       continue;
     }
 
-    const match = findCity(segment.normalized, countryCode, regionIsoCode);
+    let match = findCity(segment.normalized, countryCode, regionIsoCode);
+
+    if (match === null && index === regionIndex && countryCode !== null) {
+      // "Sofia, Bulgaria": the segment read as Sofia Province names the capital, which sits in its own region.
+      match = bigCityNamed(segment.normalized, countryCode);
+
+      if (match !== null) {
+        region = null;
+      }
+    }
 
     if (match !== null) {
       matchedCityIndex = match;
