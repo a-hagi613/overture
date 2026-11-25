@@ -119,11 +119,29 @@ export function boardPriorityFor(ats: Ats) {
 const DAY_MS = 86_400_000;
 
 /**
+ * A catalog version: the build's UTC time to the second (`2026-11-25T085314Z`), or a bare date from builds before
+ * issue #664. Both sort in build order as plain strings, which the hot-swap and snapshot pruning rely on.
+ */
+export const CATALOG_VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}(?:T\d{6}Z)?$/u;
+
+/**
+ * The version a catalog built at this time takes, unique per second so a second build on the same day replaces the
+ * first (issue #664).
+ * @param builtAt The build time as an ISO string.
+ * @returns The version.
+ */
+export function catalogVersionAt(builtAt: string) {
+  const iso = new Date(builtAt).toISOString();
+
+  return `${iso.slice(0, 10)}T${iso.slice(11, 19).replaceAll(":", "")}Z`;
+}
+
+/**
  * The catalog snapshot an ETL run publishes, and the only manifest shape the runtime hot-swap accepts
  * (issue #576 `WS-8`).
  */
 export const catalogManifestSchema = z.object({
-  version: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+  version: z.string().regex(CATALOG_VERSION_PATTERN),
   sha256: z.string().regex(/^[0-9a-f]{64}$/u),
   builtAt: z.iso.datetime({ offset: true }),
   rowCount: z.number().int().nonnegative(),

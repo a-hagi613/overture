@@ -289,6 +289,30 @@ describe("the read-only catalog hot-swap", () => {
     }
   });
 
+  test("a second build on the same day replaces the day's first build", async () => {
+    const { catalogPath, directory } = scratch();
+    const objects = createDiskObjectStore(join(directory, "objects"));
+    const first = buildCatalog(join(directory, "v1.sqlite"), "Alpha");
+
+    await publish(objects, manifestFor("2026-11-25", first), first);
+
+    const hotSwap = createCatalogHotSwap({ catalogPath, objects });
+
+    try {
+      await hotSwap.coldBoot();
+
+      const second = buildCatalog(join(directory, "v2.sqlite"), "Beta");
+      const later = manifestFor("2026-11-25T085314Z", second);
+
+      await publish(objects, later, second);
+
+      expect(await hotSwap.applyManifest(later)).toMatchObject({ applied: true });
+      expect(companyNames(hotSwap.db)).toEqual(["Beta"]);
+    } finally {
+      hotSwap.close();
+    }
+  });
+
   test("re-applying the active version and an older version never swap", async () => {
     const { catalogPath, directory } = scratch();
     const objects = createDiskObjectStore(join(directory, "objects"));

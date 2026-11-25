@@ -12,7 +12,7 @@ import type { Context } from "hono";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 import { CatalogRefreshError } from "../catalog/hot-swap.ts";
 import type { CatalogHotSwap, CatalogRefreshErrorReason } from "../catalog/hot-swap.ts";
-import { catalogManifestSchema } from "../catalog/stapply-daily.ts";
+import { CATALOG_VERSION_PATTERN, catalogManifestSchema } from "../catalog/stapply-daily.ts";
 import type { CatalogRefreshRejection, CatalogRefreshVerdict } from "../catalog/stapply-refresh.ts";
 import {
   CATALOG_LATEST_KEY,
@@ -218,7 +218,7 @@ export function createInternalCatalogRoutes(deps: {
   routes.put(CATALOG_SNAPSHOT_PATH, async (context) => {
     const version = context.req.header("x-overture-catalog-version");
 
-    if (version === undefined || !/^\d{4}-\d{2}-\d{2}$/u.test(version)) {
+    if (version === undefined || !CATALOG_VERSION_PATTERN.test(version)) {
       return context.json({ error: API_ERRORS.invalidRequest }, 400);
     }
 

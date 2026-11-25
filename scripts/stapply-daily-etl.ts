@@ -24,6 +24,7 @@ import {
   assertCatalogSizeWithinBudget,
   buildCatalogManifest,
   buildStapplyIngestQuery,
+  catalogVersionAt,
   isRowDrop,
   seedFreshnessCutoffMs,
   stapplyBoardSources,
@@ -117,7 +118,7 @@ if (Number.isNaN(now)) {
 }
 
 const builtAt = new Date(now).toISOString();
-const version = builtAt.slice(0, 10);
+const version = catalogVersionAt(builtAt);
 const freshnessDays = Number(args.values["freshness-days"] ?? String(DEFAULT_SEED_FRESHNESS_DAYS));
 const includeUndated = args.values["include-undated"] === true;
 
