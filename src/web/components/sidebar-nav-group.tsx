@@ -92,7 +92,7 @@ export function SidebarNavGroup({
         <TooltipHint label={label}>
           <DropdownTrigger asChild>
             <button
-              aria-label={label}
+              aria-label={badgeCount > 0 ? `${label}, ${String(badgeCount)}` : label}
               className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-md border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
                 activeGroup ? RAIL_ACTIVE : RAIL_IDLE
               }`}

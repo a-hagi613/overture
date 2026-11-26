@@ -167,10 +167,11 @@ export function BoardPage({
   );
 
   const writeParam = useCallback(
-    (key: "card" | "filter", value: string | null, replace: boolean) => {
+    (key: "application" | "filter", value: string | null, replace: boolean) => {
       const next = new URLSearchParams(searchParams);
 
       next.delete("application");
+      next.delete("card");
 
       if (value === null || value === "") {
         next.delete(key);
@@ -183,9 +184,23 @@ export function BoardPage({
     [searchParams, setSearchParams],
   );
 
+  useEffect(() => {
+    const legacy = searchParams.get("card");
+
+    if (legacy === null || searchParams.has("application")) {
+      return;
+    }
+
+    const next = new URLSearchParams(searchParams);
+
+    next.delete("card");
+    next.set("application", legacy);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const openCard = useCallback(
     (id: string) => {
-      writeParam("card", id, false);
+      writeParam("application", id, false);
     },
     [writeParam],
   );
@@ -193,7 +208,7 @@ export function BoardPage({
   const closeSheet = useCallback(() => {
     const closing = selectedId;
 
-    writeParam("card", null, true);
+    writeParam("application", null, true);
 
     if (closing !== null) {
       globalThis.requestAnimationFrame(() => {
@@ -443,7 +458,7 @@ export function BoardPage({
 
     if (canWithdrawApplication(card.status)) {
       setLaneOverrides((current) => ({ ...current, [card.id]: "closed" }));
-      writeParam("card", null, true);
+      writeParam("application", null, true);
 
       withdraw.mutate(card.id, {
         onError: () => {
@@ -462,11 +477,11 @@ export function BoardPage({
     const fromLane = laneOverrides[card.id] ?? laneForStage(card.stage) ?? "applied";
 
     moveCardToLane(card, fromLane, "closed", "closed", copy.board.lanes.closed);
-    writeParam("card", null, true);
+    writeParam("application", null, true);
   };
 
   const activeMobileLane =
-    TRACKER_LANES.find((lane) => lane.key === mobileLane) ?? TRACKER_LANES[2];
+    TRACKER_LANES.find((lane) => lane.key === mobileLane) ?? TRACKER_LANES[1];
 
   const selectedPosition =
     selectedIndex === -1
@@ -524,8 +539,7 @@ export function BoardPage({
           <div className="animate-pulse space-y-3">
             <span className="sr-only">{copy.shell.loadingPage}</span>
             <div className="h-5 w-1/4 rounded bg-muted" />
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-              <div className="h-64 rounded bg-muted" />
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               <div className="h-64 rounded bg-muted" />
               <div className="h-64 rounded bg-muted" />
               <div className="h-64 rounded bg-muted" />
@@ -601,7 +615,7 @@ export function BoardPage({
           {isDesktopBoard ? (
             <div
               className={`mt-3 grid min-h-0 flex-1 gap-3 ${
-                showClosed ? "grid-cols-5" : "grid-cols-4"
+                showClosed ? "grid-cols-4" : "grid-cols-3"
               }`}
             >
               {visibleLanes.map((lane) => (
@@ -615,7 +629,6 @@ export function BoardPage({
                   key={lane.key}
                   label={lane.label}
                   lane={lane.key}
-                  linkTo={lane.linkTo}
                   onCardKeyDown={handleCardKeyDown}
                   onOpen={openCard}
                   selectedId={selectedId}
@@ -662,7 +675,6 @@ export function BoardPage({
                     keyboardDragTargetLane={keyboardDrag?.targetLane ?? null}
                     label={activeMobileLane.label}
                     lane={activeMobileLane.key}
-                    linkTo={activeMobileLane.linkTo}
                     onCardKeyDown={handleCardKeyDown}
                     onOpen={openCard}
                     selectedId={selectedId}
@@ -699,12 +711,7 @@ export function BoardPage({
             const card = navigableCards.find((entry) => entry.id === selectedId);
             const targetLane = laneForStage(stage);
 
-            if (
-              card !== undefined &&
-              targetLane !== null &&
-              targetLane !== "review" &&
-              targetLane !== "ready"
-            ) {
+            if (card !== undefined && targetLane !== null && targetLane !== "queue") {
               const fromLane = laneOverrides[card.id] ?? laneForStage(card.stage) ?? "applied";
 
               moveCardToLane(card, fromLane, targetLane, stage, copy.board.columns[stage]);
@@ -714,14 +721,14 @@ export function BoardPage({
             const nextCard = navigableCards[selectedIndex + 1];
 
             if (nextCard !== undefined) {
-              writeParam("card", nextCard.id, true);
+              writeParam("application", nextCard.id, true);
             }
           }}
           onPrevious={() => {
             const previousCard = navigableCards[selectedIndex - 1];
 
             if (previousCard !== undefined) {
-              writeParam("card", previousCard.id, true);
+              writeParam("application", previousCard.id, true);
             }
           }}
           onRetry={() => {

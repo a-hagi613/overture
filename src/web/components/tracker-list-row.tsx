@@ -22,7 +22,7 @@ export function TrackerListRow(props: {
   selected: boolean;
 }) {
   const { card, onOpen, selected } = props;
-  const lane = laneForStage(card.stage) ?? "applied";
+  const lane = laneForStage(card.stage) ?? "closed";
   const badge = cardBadgeFor(card, lane);
   const companyLine = card.location === null ? card.company : `${card.company} · ${card.location}`;
   const updatedText = UPDATED_FORMAT.format(new Date(card.updatedAt));

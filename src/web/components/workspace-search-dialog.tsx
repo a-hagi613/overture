@@ -178,7 +178,7 @@ export function WorkspaceSearchDialog({
               className={ITEM_CLASS}
               key={app.id}
               onSelect={() => {
-                go(`/tracker?card=${encodeURIComponent(app.id)}`);
+                go(`/tracker?application=${encodeURIComponent(app.id)}`);
               }}
               value={`app-${app.id}`}
             >

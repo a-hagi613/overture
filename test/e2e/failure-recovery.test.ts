@@ -314,7 +314,9 @@ for (const [width, theme] of [
     await expectAxeClean(page, `Home ${String(width)} ${theme}`);
     await shoot(page, `home-failure-${String(width)}-${theme}`);
 
-    await page.goto(`${recoveryServer.url}/applications?card=${encodeURIComponent(applicationId)}`);
+    await page.goto(
+      `${recoveryServer.url}/applications?application=${encodeURIComponent(applicationId)}`,
+    );
 
     const timeline = page.getByRole("tab", { name: "Timeline" });
 

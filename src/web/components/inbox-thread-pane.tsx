@@ -136,7 +136,7 @@ export function InboxThreadPane({
 
           {thread.applicationId === null ? null : (
             <Button asChild size="sm" variant="outline">
-              <Link to={`/tracker?card=${thread.applicationId}`}>
+              <Link to={`/tracker?application=${thread.applicationId}`}>
                 <span>{copy.inbox.viewOnTracker}</span>
                 <ArrowUpRight aria-hidden="true" size={14} />
               </Link>

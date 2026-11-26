@@ -1,37 +1,34 @@
 import { copy } from "../../shared/copy.ts";
 import type { BoardCard, BoardResponse, StageKey } from "./board-api.ts";
 
-export type TrackerLaneKey = "review" | "ready" | "applied" | "waiting" | "closed";
+export type TrackerLaneKey = "queue" | "applied" | "interviews" | "closed";
 
 export const MOBILE_TAB_PREFIX = "tab:";
 
 export interface CardBadge {
   label: string;
-  variant: "ok" | "outline" | "secondary" | "signal";
+  variant: "ok" | "outline" | "secondary" | "signal" | "need";
 }
 
+/**
+ * The Tracker's three visible columns plus the filtered Closed group.
+ *
+ * Queue groups the Queued and Ready stages (Preparing through Confirming), Applied is the sent
+ * stage, and Interviews groups Screening · Interviewing · Offer. Closed, Cancelled and Not sent
+ * share the last lane and stay behind the "Show closed" toggle.
+ */
 export const TRACKER_LANES: readonly {
   dotClass: string;
   droppable: boolean;
   key: TrackerLaneKey;
   label: string;
-  linkTo: string | null;
   targetStage: StageKey;
 }[] = [
   {
-    dotClass: "bg-muted-foreground/60",
+    dotClass: "bg-foreground",
     droppable: false,
-    key: "review",
-    label: copy.board.lanes.review,
-    linkTo: "/review",
-    targetStage: "queued",
-  },
-  {
-    dotClass: "bg-ok",
-    droppable: false,
-    key: "ready",
-    label: copy.board.lanes.ready,
-    linkTo: "/ready",
+    key: "queue",
+    label: copy.board.lanes.queue,
     targetStage: "ready",
   },
   {
@@ -39,15 +36,13 @@ export const TRACKER_LANES: readonly {
     droppable: true,
     key: "applied",
     label: copy.board.lanes.applied,
-    linkTo: null,
     targetStage: "applied",
   },
   {
-    dotClass: "bg-foreground",
+    dotClass: "bg-ok",
     droppable: true,
-    key: "waiting",
-    label: copy.board.lanes.waiting,
-    linkTo: null,
+    key: "interviews",
+    label: copy.board.lanes.interviews,
     targetStage: "screening",
   },
   {
@@ -55,32 +50,23 @@ export const TRACKER_LANES: readonly {
     droppable: true,
     key: "closed",
     label: copy.board.lanes.closed,
-    linkTo: null,
     targetStage: "closed",
   },
 ];
 
 export function isTrackerLaneKey(value: string): value is TrackerLaneKey {
-  return (
-    value === "review" ||
-    value === "ready" ||
-    value === "applied" ||
-    value === "waiting" ||
-    value === "closed"
-  );
+  return value === "queue" || value === "applied" || value === "interviews" || value === "closed";
 }
 
 export function laneForStage(stage: StageKey | null) {
   let lane: TrackerLaneKey | null = null;
 
-  if (stage === "queued") {
-    lane = "review";
-  } else if (stage === "ready") {
-    lane = "ready";
+  if (stage === "queued" || stage === "ready") {
+    lane = "queue";
   } else if (stage === "applied") {
     lane = "applied";
   } else if (stage === "screening" || stage === "interviewing" || stage === "offer") {
-    lane = "waiting";
+    lane = "interviews";
   } else if (stage === "closed") {
     lane = "closed";
   }
@@ -95,31 +81,38 @@ export function groupCardsByLane(
   const grouped: Record<TrackerLaneKey, BoardCard[]> = {
     applied: [],
     closed: [],
-    ready: [],
-    review: [],
-    waiting: [],
+    interviews: [],
+    queue: [],
   };
 
   if (board === undefined) {
     return grouped;
   }
 
+  const add = (card: BoardCard, baseLane: TrackerLaneKey) => {
+    const effectiveLane = overrides[card.id] ?? baseLane;
+    const laneInfo = TRACKER_LANES.find((entry) => entry.key === effectiveLane);
+
+    const updatedCard =
+      effectiveLane === baseLane || laneInfo === undefined
+        ? card
+        : { ...card, stage: laneInfo.targetStage };
+
+    grouped[effectiveLane].push(updatedCard);
+  };
+
   for (const column of board.columns) {
     const baseLane = laneForStage(column.stage);
 
     if (baseLane !== null) {
       for (const card of column.cards) {
-        const effectiveLane = overrides[card.id] ?? baseLane;
-        const laneInfo = TRACKER_LANES.find((entry) => entry.key === effectiveLane);
-
-        const updatedCard =
-          effectiveLane === baseLane || laneInfo === undefined
-            ? card
-            : { ...card, stage: laneInfo.targetStage };
-
-        grouped[effectiveLane].push(updatedCard);
+        add(card, baseLane);
       }
     }
+  }
+
+  for (const card of board.hidden) {
+    add(card, "closed");
   }
 
   return grouped;
@@ -151,16 +144,66 @@ export function formatCardSalary(card: BoardCard) {
   return copy.board.salary(minimum, maximum, currency, suffix);
 }
 
+function queueBadge(card: BoardCard) {
+  let result: CardBadge | null = null;
+
+  switch (card.status) {
+    case "preparing": {
+      result = { label: copy.board.queueBadges.preparing, variant: "secondary" };
+      break;
+    }
+
+    case "needs_review": {
+      result = { label: copy.board.queueBadges.needsAnswer, variant: "need" };
+      break;
+    }
+
+    case "ready": {
+      result = { label: copy.board.queueBadges.ready, variant: "ok" };
+      break;
+    }
+
+    case "approved": {
+      result = {
+        label:
+          card.sendsAt === null
+            ? copy.board.queueBadges.queuedNext
+            : copy.board.queueBadges.queuedAt(card.sendsAt),
+        variant: "outline",
+      };
+      break;
+    }
+
+    case "sending": {
+      result = { label: copy.board.queueBadges.sending, variant: "signal" };
+      break;
+    }
+
+    case "confirming": {
+      result = { label: copy.board.queueBadges.confirming, variant: "signal" };
+      break;
+    }
+
+    default: {
+      break;
+    }
+  }
+
+  if (result !== null) {
+    return result;
+  }
+
+  return card.needsYou
+    ? ({ label: copy.board.queueBadges.needsAnswer, variant: "need" } satisfies CardBadge)
+    : null;
+}
+
 export function cardBadgeFor(card: BoardCard, lane: TrackerLaneKey) {
   let result: CardBadge = { label: copy.board.appliedBadge, variant: "secondary" };
 
-  if (lane === "review") {
-    result = card.needsYou
-      ? { label: copy.board.needsAnswerBadge, variant: "signal" }
-      : { label: copy.board.queuedBadge, variant: "outline" };
-  } else if (lane === "ready") {
-    result = { label: copy.board.readyBadge, variant: "ok" };
-  } else if (lane === "waiting") {
+  if (lane === "queue") {
+    result = queueBadge(card) ?? { label: copy.board.queuedBadge, variant: "outline" };
+  } else if (lane === "interviews") {
     if (card.stage === "offer") {
       result = { label: copy.board.waitingStages.offer, variant: "signal" };
     } else if (card.stage === "interviewing") {
@@ -169,7 +212,13 @@ export function cardBadgeFor(card: BoardCard, lane: TrackerLaneKey) {
       result = { label: copy.board.waitingStages.screening, variant: "secondary" };
     }
   } else if (lane === "closed") {
-    result = { label: card.note?.label ?? copy.board.closedBadge, variant: "outline" };
+    if (card.status === "skipped" || card.status === "failed") {
+      result = { label: copy.board.notSentBadge, variant: "outline" };
+    } else if (card.status === "withdrawn") {
+      result = { label: copy.board.cancelledBadge, variant: "outline" };
+    } else {
+      result = { label: card.note?.label ?? copy.board.closedBadge, variant: "outline" };
+    }
   } else if (card.note !== null) {
     result = { label: card.note.label, variant: "secondary" };
   }

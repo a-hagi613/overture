@@ -64,6 +64,14 @@ export function BoardRail({
 
   const applicationsItems: SidebarGroupItem[] = [
     {
+      icon: Columns3,
+      isActive: isSidebarNavActive("tracker", pathname, search),
+      key: "tracker",
+      label: copy.nav.tracker,
+      srLabel: navLabel("tracker", 0),
+      to: "/tracker",
+    },
+    {
       badgeClass: navBadgeClass("ready"),
       badgeCount: readyCount,
       icon: ListChecks,
@@ -82,14 +90,6 @@ export function BoardRail({
       label: copy.nav.review,
       srLabel: navLabel("review", reviewCount),
       to: "/review",
-    },
-    {
-      icon: Columns3,
-      isActive: isSidebarNavActive("tracker", pathname, search),
-      key: "tracker",
-      label: copy.nav.tracker,
-      srLabel: navLabel("tracker", 0),
-      to: "/tracker",
     },
   ];
 

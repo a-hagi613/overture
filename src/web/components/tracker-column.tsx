@@ -1,8 +1,7 @@
 import { useDroppable } from "@dnd-kit/core";
-import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useState } from "react";
-import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import type { BoardCard } from "../lib/board-api.ts";
@@ -41,7 +40,6 @@ export function TrackerColumn(props: {
   keyboardDragTargetLane?: TrackerLaneKey | null | undefined;
   label: string;
   lane: TrackerLaneKey;
-  linkTo: string | null;
   onCardKeyDown?:
     | ((card: BoardCard, lane: TrackerLaneKey, event: KeyboardEvent<HTMLButtonElement>) => void)
     | undefined;
@@ -57,7 +55,6 @@ export function TrackerColumn(props: {
     keyboardDragTargetLane = null,
     label,
     lane,
-    linkTo,
     onCardKeyDown,
     onOpen,
     selectedId,
@@ -89,15 +86,6 @@ export function TrackerColumn(props: {
           <h2 className={`${dsEyebrow} truncate text-foreground`}>{label}</h2>
           <span className={dsMono}>{cards.length}</span>
         </div>
-        {linkTo === null ? null : (
-          <Link
-            className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
-            to={linkTo}
-          >
-            <span>{lane === "ready" ? copy.board.openReady : copy.board.openReview}</span>
-            <ArrowUpRight aria-hidden="true" size={13} />
-          </Link>
-        )}
       </div>
 
       <div className="relative min-h-0 flex-1">
