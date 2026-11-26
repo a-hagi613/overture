@@ -17,6 +17,8 @@ import { applicationsLeft } from "../billing/ledger.ts";
 import { postingUserState } from "../platform/db/schema.ts";
 import { postings } from "../platform/db/catalog-schema.ts";
 import { startOnboarding } from "../profile/onboarding-start.ts";
+import { enqueueUserPull } from "../jobs/pull.ts";
+import { preferencesChanged } from "../jobs/preferences.ts";
 import { createConsentService } from "../profile/consent.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createOnboardingProgressService } from "../profile/onboarding-progress.ts";
@@ -410,7 +412,12 @@ export function createOnboardingRoutes(deps: {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
-    await targetsService.save(account.id, context.req.valid("json"));
+    const before = await targetsService.read(account.id);
+    const after = await targetsService.save(account.id, context.req.valid("json"));
+
+    if (preferencesChanged(before.targets, after.targets)) {
+      enqueueUserPull(db, clock, account.id);
+    }
 
     return context.json(await targetsView(account.id, false));
   });

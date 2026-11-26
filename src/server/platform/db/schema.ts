@@ -1397,3 +1397,117 @@ export const supportTickets = sqliteTable(
     index("support_tickets_status_created").on(t.status, t.createdAt),
   ],
 );
+
+/**
+ * One freehire posting, shared by every user and stored in freehire's own shape (issue #700). The public slug is the
+ * primary key, so the same posting pulled for two users is one row. `dedupe_key` folds the per-city copies freehire
+ * keeps apart, and `job_places` carries the geography facets for the matching reads. A row is closed, never deleted,
+ * so an application that points at it keeps resolving.
+ */
+export const jobs = sqliteTable(
+  "jobs",
+  {
+    id: text("id").primaryKey(),
+    source: text("source", { enum: ATS_VALUES }).notNull(),
+    freehireSource: text("freehire_source").notNull(),
+    externalId: text("external_id").notNull(),
+    boardToken: text("board_token").notNull(),
+    atsJobId: text("ats_job_id").notNull(),
+    url: text("url"),
+    applyUrl: text("apply_url").notNull(),
+    applyVia: text("apply_via", { enum: ["direct", "go"] }).notNull(),
+    title: text("title").notNull(),
+    titleNorm: text("title_norm").notNull(),
+    company: text("company").notNull(),
+    companyNorm: text("company_norm").notNull(),
+    companySlug: text("company_slug"),
+    locationRaw: text("location_raw"),
+    countries: text("countries").notNull().default("[]"),
+    regions: text("regions"),
+    metros: text("metros"),
+    cities: text("cities"),
+    workMode: text("work_mode", { enum: ["remote", "hybrid", "onsite"] }),
+    category: text("category"),
+    seniority: text("seniority"),
+    employmentType: text("employment_type"),
+    experienceYearsMin: integer("experience_years_min"),
+    skills: text("skills"),
+    salaryMin: integer("salary_min"),
+    salaryMax: integer("salary_max"),
+    salaryCurrency: text("salary_currency"),
+    salaryPeriod: text("salary_period", { enum: ["year", "month", "day", "hour"] }),
+    description: text("description"),
+    descriptionHash: text("description_hash"),
+    postedAt: integer("posted_at"),
+    sourceCreatedAt: integer("source_created_at"),
+    sourceUpdatedAt: integer("source_updated_at"),
+    firstSeenAt: integer("first_seen_at").notNull(),
+    lastSeenAt: integer("last_seen_at").notNull(),
+    closedAt: integer("closed_at"),
+    status: text("status", { enum: ["open", "closed"] })
+      .notNull()
+      .default("open"),
+    fakeFreshness: integer("fake_freshness", { mode: "boolean" }).notNull().default(false),
+    repostCount: integer("repost_count"),
+    ageDays: integer("age_days"),
+    dedupeKey: text("dedupe_key").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("jobs_source_external_unique").on(t.source, t.externalId),
+    index("jobs_dedupe_key").on(t.dedupeKey),
+    index("jobs_status_posted").on(t.status, t.postedAt),
+    index("jobs_category_status").on(t.category, t.status),
+  ],
+);
+
+/** The geography facets a job was published for, lower case as freehire spells them. */
+export const jobPlaces = sqliteTable(
+  "job_places",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["country", "region", "metro", "city"] }).notNull(),
+    value: text("value").notNull(),
+  },
+  (t) => [
+    uniqueIndex("job_places_job_kind_value_unique").on(t.jobId, t.kind, t.value),
+    index("job_places_kind_value_job").on(t.kind, t.value, t.jobId),
+  ],
+);
+
+/**
+ * When one user's pulls last ran and which search their preferences made, so a periodic tick pulls only who is due.
+ * A changed `last_query_key` means the roles or places changed, and the next pull is a full one.
+ */
+export const jobPullState = sqliteTable("job_pull_state", {
+  userId: cascadeUserId().primaryKey(),
+  lastFullPullAt: integer("last_full_pull_at"),
+  lastFreshPullAt: integer("last_fresh_pull_at"),
+  lastQueryKey: text("last_query_key"),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/** One grouped pull's counters, written beside the event so a failing source is visible without replaying events. */
+export const jobPullRuns = sqliteTable(
+  "job_pull_runs",
+  {
+    id: text("id").primaryKey(),
+    groupKey: text("group_key").notNull(),
+    mode: text("mode", { enum: ["full", "fresh"] }).notNull(),
+    userCount: integer("user_count").notNull(),
+    fetched: integer("fetched").notNull().default(0),
+    kept: integer("kept").notNull().default(0),
+    droppedClosed: integer("dropped_closed").notNull().default(0),
+    droppedDuplicate: integer("dropped_duplicate").notNull().default(0),
+    droppedNoLink: integer("dropped_no_link").notNull().default(0),
+    droppedUnsupported: integer("dropped_unsupported").notNull().default(0),
+    error: text("error"),
+    startedAt: integer("started_at").notNull(),
+    finishedAt: integer("finished_at"),
+  },
+  (t) => [index("job_pull_runs_group_started").on(t.groupKey, t.startedAt)],
+);

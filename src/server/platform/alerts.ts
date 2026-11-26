@@ -35,6 +35,7 @@ export const ALERT_KINDS = [
   "backup.failure",
   "billing.mismatch",
   "catalog.worker",
+  "jobs.pull",
   "health",
   "disk",
   "process.unhandled",

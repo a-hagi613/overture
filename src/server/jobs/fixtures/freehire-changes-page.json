@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "public_slug": "senior-go-engineer-acme",
+      "company_slug": "acme",
+      "seq": 98765,
+      "kind": "closed",
+      "at": "2026-11-21T04:10:00Z",
+      "closed_reason": "unseen"
+    },
+    {
+      "public_slug": "primary-teacher-ottawa",
+      "company_slug": "ottawa-school-board",
+      "seq": 98766,
+      "kind": "opened",
+      "at": "2026-11-21T04:11:00Z"
+    }
+  ],
+  "meta": {
+    "limit": 100,
+    "has_more": false,
+    "next_cursor": "djE6MTIzNDU6OTg3",
+    "available_since": "2026-06-01T00:00:00Z"
+  }
+}
