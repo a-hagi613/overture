@@ -249,6 +249,23 @@ test("the system API reports databases, backups, catalog and live checks without
   );
 
   expect(rerunAudit.audit.some((row) => row.action === "live-checks.run")).toBe(true);
+
+  const manual = await page.request.post(`${adminIsolatedAppUrl}/admin/api/live-checks`, {
+    data: { groups: ["alerts"] },
+  });
+
+  expect(manual.status()).toBe(200);
+  expect(jobSchema.parse(await manual.json()).jobId.length).toBeGreaterThan(0);
+
+  const manualAudit = auditSchema.parse(
+    await (await page.request.get(`${adminIsolatedAppUrl}/admin/api/audit`)).json(),
+  );
+
+  expect(
+    manualAudit.audit.some(
+      (row) => row.action === "live-checks.run" && row.detail["groups"] === "alerts",
+    ),
+  ).toBe(true);
 });
 
 test("the system page shows the runtime, storage and live check sections", async ({

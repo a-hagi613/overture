@@ -185,6 +185,8 @@ interface PlanInput {
   changed: readonly string[];
   isMain: boolean;
   shardCount?: number | undefined;
+  /** Force the full suite even when the changed files would need only a few shards. */
+  full?: boolean | undefined;
   map: z.infer<typeof reachMapSchema>;
   seconds: Record<string, number>;
   allTests: readonly string[];
@@ -1364,8 +1366,29 @@ export function shardNeedsMarker(files: readonly string[], marker: string) {
   return false;
 }
 
+/**
+ * Splits a comma-separated label list from the workflow, trimming and lowercasing each name.
+ * @param value The label names, for example `bug, high-risk`.
+ * @returns The normalized labels, without empty entries.
+ */
+export function parseLabels(value: string) {
+  return value
+    .split(",")
+    .map((label) => label.trim().toLowerCase())
+    .filter((label) => label.length > 0);
+}
+
+/**
+ * Whether a pull request carries the `high-risk` label, which forces the full e2e suite instead of the delta shards.
+ * @param labels The pull request labels.
+ * @returns True when `high-risk` is present.
+ */
+export function hasHighRiskLabel(labels: readonly string[]) {
+  return labels.some((label) => label === "high-risk");
+}
+
 export function computePlan(input: PlanInput) {
-  const { changed, isMain, shardCount, map, seconds, allTests } = input;
+  const { changed, full: requestedFull, isMain, shardCount, map, seconds, allTests } = input;
 
   const changedTests = new Set(
     changed.filter((file) => isE2eTestFile(file) && existsSync(localPath(file))),
@@ -1379,7 +1402,7 @@ export function computePlan(input: PlanInput) {
   const emptyMap = Object.keys(map.tests).length === 0;
   const rule = !testsOnly && (emptyMap || fullByRule(touched));
   const unknown = !testsOnly && fullByUnknown(map, touched);
-  const full = isMain || rule || unknown;
+  const full = requestedFull === true || isMain || rule || unknown;
 
   let selected = allTests.filter((test) => {
     const reach = map.tests[test];
@@ -1416,14 +1439,10 @@ export function computePlan(input: PlanInput) {
     version: 1,
     full,
     container,
-    reason: selectionReason(
-      isMain,
-      rule,
-      unknown,
-      touched.length,
-      selected.length,
-      allTests.length,
-    ),
+    reason:
+      requestedFull === true
+        ? "the high-risk label runs the full suite"
+        : selectionReason(isMain, rule, unknown, touched.length, selected.length, allTests.length),
     selected,
     shards: assignShards(selected, seconds, effectiveShards),
   });
@@ -1432,6 +1451,7 @@ export function computePlan(input: PlanInput) {
 function plan() {
   const base = flagValue("--base");
   const explicitShards = flagValue("--shards");
+  const labels = parseLabels(flagValue("--labels") ?? "");
   const output = flagValue("--out");
   const map = readReachMap();
   const changed = base === null ? [] : changedFiles(base);
@@ -1445,6 +1465,7 @@ function plan() {
 
   const planBody = computePlan({
     changed,
+    full: hasHighRiskLabel(labels),
     isMain: base === null,
     shardCount: explicitShards === null ? undefined : Number(explicitShards),
     map,

@@ -116,3 +116,25 @@ attempted. The testing phase keeps spend minimal.
   it is sent while Overture is being proven.
 - **Later, out of scope:** an opt-in "send without asking" switch per user, off by default and admin-gated. It is
   recorded as a considered option only; nothing is built for it.
+
+## Amendment of 2026-11-26: picks, Send all, and no automatic mode (rebuild)
+
+The 2026-11-26 rebuild (Epic #678, written down by #679) keeps this ADR's core rule and corrects the parts the local
+end-to-end run showed to be wrong.
+
+- **The user picks the jobs.** There is no daily preparation run preparing applications nobody asked for. A
+  preparation starts only when the user picks a job on the Matches page, at most **3 picks on the free trial and 10 on
+  Weekly or Monthly** (10 is also the daily cap; #687, #709). `applications.origin` is `pick` or `manual`.
+- **No automatic send mode, ever.** There is no "send without asking" switch, no timer that approves, and nothing in
+  the product sends an Application the user did not pick and approve. The considered option at the end of the original
+  text is dropped.
+- **Send all is the onboarding path.** The free trial's three picks go **at once, in parallel**; Weekly and Monthly
+  picks are sent **5 minutes apart** per user, with no send window (ADR 0046). Every pick is reviewed first: a card
+  with newly drafted prose is still approved one at a time.
+- **Ready and Review stay as pages.** The earlier plan to retire them into the Tracker is dropped; the sidebar is
+  Home · Tracker · Ready · Review · Matches · Inbox · Profile · Settings (#688).
+- **The account is switched on when onboarding ends.** `profiles.running` becomes 1 at the end of the plan step, so
+  the approval the user just gave is not blocked by a paused account (ADR 0046).
+- **Notifications are batched**, so a Ready card, a Review, a reply or a code is not one email each (#705).
+- The statuses, the frozen plan, its SHA-256, the Undo before `sending`, the preflight against the approved plan and
+  the "anything that changes the plan clears the approval" rule are unchanged.

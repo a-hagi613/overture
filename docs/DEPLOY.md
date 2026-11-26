@@ -20,7 +20,7 @@ to Fly), against names only.
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
-| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ALLOWED_SIGNUP_EMAILS`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `match-probe` (read-only: ranks the live catalog for five sample Targets with the real matcher and prints each count and top five titles; it reads no user's data and writes nothing), `lab-run` (queues one synthetic lab run: real Browser Use fills Overture's own Greenhouse, Lever and Ashby lab forms once each and the step prints each session), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ALLOWED_SIGNUP_EMAILS`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `match-probe` (read-only: ranks the live catalog for five sample Targets with the real matcher and prints each count and top five titles; it reads no user's data and writes nothing), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
 | `.github/workflows/ops-admin-host.yml` | `workflow_dispatch` only, for the admin host: `status` (certificate table, Fly secret names only, app status), `add-cert` (idempotent certificate for `admin.tryoverture.com`, then the same report), `set-access-secrets` (pushes the Cloudflare Access values held as repository secrets to Fly, names only afterwards). Fails with a clear message while `FLY_API_TOKEN` is unset |
 | `.github/workflows/stapply-daily.yml` | Daily at 15:30 UTC (one hour after Stapply's 14:30 snapshot) and on `workflow_dispatch`; skips with a green notice until the R2 repository secrets or `CATALOG_REFRESH_SECRET` are configured. Builds `catalog.sqlite` with DuckDB from the 28 per-board `jobs.parquet` files, delta-syncs it against the previous R2 snapshot, tags it, vacuums and compresses it, then publishes `catalog/latest.sqlite.zst`, `catalog/latest.json` and `catalog/snapshots/<version>.sqlite.zst` to R2 or relays the signed refresh to `overture-web` |
 | `.github/workflows/vacuum-db.yml` | Weekly (Sundays 05:00 UTC, also `workflow_dispatch` with `dry_run` and `force`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise dry-runs `/data/app.sqlite`, and only when its freelist exceeds 50 MB (or `force` is set) restarts the one machine in maintenance mode, vacuums it, restarts the server and polls `/api/health` |
@@ -509,7 +509,6 @@ The same flag exists on the script as `--reconcile-prices`.
 gh workflow run ops-live.yml -f action=check-secrets -R a-hagi613/overture
 gh workflow run ops-live.yml -f action=live-diagnostics -R a-hagi613/overture
 gh workflow run ops-live.yml -f action=match-probe -R a-hagi613/overture
-gh workflow run ops-live.yml -f action=lab-run -R a-hagi613/overture
 ```
 
 `check-secrets` prints the sorted Fly secret names (never values), `flyctl status`, and the production health route.
@@ -523,11 +522,6 @@ candidate ranking the Matches step uses for five sample Targets (a Registered Nu
 London, a Data Scientist in New York, an Account Executive in Toronto, a remote US Product Manager), then prints each
 match count and the top five titles, companies and places. Use it after a catalog rebuild or a matching change to see
 real matches without signing in.
-`lab-run` runs `scripts/lab-run.ts form:greenhouse,form:lever,form:ashby 1 browser_use` on the machine: it queues one `lab.run` job, the same job the
-admin Lab page starts, so the production Browser Use provider fills and submits Overture's own synthetic Greenhouse, Lever
-and Ashby job forms once each on `APP_ORIGIN`. It waits up to 15 minutes and prints each session's outcome, duration, cost and Browser Use
-session id; the job fails unless all three complete. It touches no employer and no user, and the sessions appear on
-the admin Provider report.
 
 ### 4. Roll back
 
@@ -1150,13 +1144,26 @@ this repository. The probe needs no other configuration.
 ## Daily live checks
 
 `live.check` runs daily on `overture-web`; its first run is about five minutes after the first production boot, and
-after that at the next UTC midnight. Run it on demand from the owner's terminal with the admin API, using the
-Cloudflare Access cookie and the owner's session:
-`curl -X POST https://admin.tryoverture.com/admin/api/live-checks`, then
+after that at the next UTC midnight. The nightly run covers the checks that spend nothing: `mail`, `r2` and `alerts`.
+The `forms` check (a real Browser Use session per ATS) and the `llm` check (four Haiku calls) spend real money, so
+they are manual-only (#680) and never run on the schedule.
+
+Run the nightly set on demand from the owner's terminal with the admin API, using the Cloudflare Access cookie and the
+owner's session:
+`curl -X POST https://admin.tryoverture.com/admin/api/live-checks/run`, then
 `curl https://admin.tryoverture.com/admin/api/live-checks` for the recorded pass/fail and timing per check. The same
 rows are in the `live_check_results` table.
 
-The forms check captures one open posting per ATS from the catalog and never fills or submits. The mail group first
+Run the spending groups by hand only when you want them, naming every group you want:
+
+```sh
+curl -X POST https://admin.tryoverture.com/admin/api/live-checks \
+  -H 'content-type: application/json' \
+  --data '{"groups": ["forms", "llm"]}'
+```
+
+Omitting `groups` runs the nightly set, so the button on the admin System page and the bare `curl` can never open a
+Browser Use session. The forms check captures one open posting per ATS from the catalog and never fills or submits. The mail group first
 runs the `mail.sending` guard: gated with `status: "gated"` until `REQUIRE_EMAIL_SENDING` is on, then it verifies
 `tryoverture.com` and its bounce MX, SPF, DKIM and DMARC records and fails with the owner's alert path when one is
 missing. When it passes, the mail check sends to the reserved `live-check@tryoverture.com` (which maps to no user; it
@@ -1238,15 +1245,13 @@ clone does not turn `main` red every day:
   sides with `fly secrets set CATALOG_REFRESH_SECRET=… -a overture-web` and
   `gh secret set CATALOG_REFRESH_SECRET -R a-hagi613/overture`.
 
-`ANTHROPIC_API_KEY` is optional: with it, up to 500 newly inserted apply-supported postings whose role the rules could
-not classify go to Haiku 5.5 in batches of 25 (`CATALOG_LLM_MODEL` overrides the model, `--max-llm-rows` the ceiling);
-without it the pass is skipped and the run still publishes. The classifier's own Haiku tier (titles the ESCO rules
-and the local embeddings leave unsure) additionally needs the repository variable `CATALOG_LLM_MAX_ITEMS` set to a
-positive cap on how many titles one run may send; it defaults to `0`, so no daily AI spend happens until the owner
-sets both (#660, ADR 0043). Role labels for known title templates come from the committed seed
-`src/server/catalog/tag-data/role-labels.json` and cost nothing per run. `STAPPLY_ALERT_NTFY_URL` is optional and only pushes a
-failed run to the owner's phone. The run uploads `stapply-daily.json` (counters, per-board rows, tag sources, the
-manifest) as an artifact and writes it to the step summary.
+The workflow never passes an AI key: its catalog build runs with `--skip-llm`, so a scheduled run spends no real money
+(#680). Role tagging in the ETL comes from the rules and the local ONNX embeddings only. The Haiku fallback stays
+available to a developer who runs `scripts/stapply-daily-etl.ts` by hand with `ANTHROPIC_API_KEY` and
+`--max-llm-rows` set; that is a manual act, not a scheduled one. Role labels for known title templates come from the
+committed seed `src/server/catalog/tag-data/role-labels.json` and cost nothing per run. `STAPPLY_ALERT_NTFY_URL` is
+optional and only pushes a failed run to the owner's phone. The run uploads `stapply-daily.json` (counters, per-board
+rows, tag sources, the manifest) as an artifact and writes it to the step summary.
 
 **What it does.** `scripts/stapply-daily-etl.ts` reads the 28 `<source_key>/jobs.parquet` files over HTTP with DuckDB,
 one board at a time (column projection; `raw` is never selected, `description` is read capped at 4,000 characters and
@@ -1293,7 +1298,7 @@ with `WS-8`); a real HTTP error or a rejected checksum fails the job and alerts.
 `POST /internal/catalog/refresh`; the app pulls from R2 itself.
 
 **First run and rollback.** Run it once with
-`gh workflow run stapply-daily.yml -f allow_row_drop=false -f skip_llm=false -R a-hagi613/overture` and check the step
+`gh workflow run stapply-daily.yml -f allow_row_drop=false -R a-hagi613/overture` and check the step
 summary: `seed: true`, `integrity: "ok"`, and `publish` set to `r2`, `r2+refresh`, or `relay`, not
 `relay_endpoint_missing`. The seed run keeps the last 30 days of postings (measured: 851,637 rows across the 28
 boards, 286,694 of them apply-supported, 277 MB compressed); from the second run on the catalog holds every posting
@@ -1303,7 +1308,7 @@ of merging this workflow is the daily R2 object. To roll back, disable the workf
 replaced by a snapshot that fails its checksum. There is no database migration to undo.
 
 Run it by hand with
-`gh workflow run stapply-daily.yml -f allow_row_drop=false -f skip_llm=false -R a-hagi613/overture`, or locally against
+`gh workflow run stapply-daily.yml -f allow_row_drop=false -R a-hagi613/overture`, or locally against
 a staged fixture directory with
 `bun run scripts/stapply-daily-etl.ts --source-base-url <dir> --out-dir <dir> --as-of <iso> --skip-llm` (it writes a
 local object store and never touches R2). The DuckDB binding is the MIT `@duckdb/node-api` dev dependency; it is not in

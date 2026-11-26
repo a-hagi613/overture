@@ -60,3 +60,23 @@ its limits and how it is rolled out without a second migration.
 - The migration is additive only: `mailboxes.apply_address` is nullable, `profiles.use_personal_email` has a
   default, and no column is renamed or dropped. Old code ignores both, so a rollback is a redeploy with the
   columns left in place, and no batch backfill runs on the hot path.
+
+## Amendment of 2026-11-26: the alias is the only inbound path, and copies go only to the user
+
+The 2026-11-26 rebuild (#679, #693) makes the alias the product's only mail address and fixes the privacy bug the
+local run exposed: the inbound Worker copied every message to one owner address.
+
+- **Provisioned at user creation.** The alias and its `mailboxes` row are written in the transaction that creates the
+  account, not lazily on first read and not in an onboarding step. Existing accounts keep the alias they have.
+- **One catch-all, alias-only.** The apex catch-all resolves the envelope recipient to one **active** alias; a
+  reserved or retired local part, and any address that is not an active alias, never delivers.
+- **Every accepted message is copied to that user's current verified login email**, from the Overture sending domain:
+  an ATS receipt, a recruiter, a code, an attachment, a thread. There is **no shared mailbox and no owner fallback**.
+  A release test with two verified accounts proves user A's mail never reaches user B or the owner.
+- **Delivery is recorded per mailbox and message** in the same transaction as receipt, deduplicated on RFC
+  Message-ID (and a content hash when there is none), with safe retries, a bounce path, loop protection, and oversize
+  attachments linked instead of copied. A changed login email changes the copy destination for later messages.
+- **The `in-{id}-{mac}@MAIL_DOMAIN` forwarding address and its Gmail/Outlook filter guide are retired.** The alias is
+  what an employer sees and the only inbound path; there is no filter for a user to add.
+- Reading stays read-only: the Inbox has no reply composer (§11.2 of the spec), and a user replies from their own
+  mailbox.

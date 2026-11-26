@@ -26,3 +26,7 @@ The owner's rulings on the M1 architecture review (2026-11-19):
 - First real send at the end of M1: leaves the largest risk untested until everything is built.
 - All four sign-in methods in M1: three of them serve nobody while the owner is the only user.
 - Dropping Kernel: the owner prefers to keep the adapter.
+
+*Amendment of 2026-11-26 (#679): the synthetic lab, the provider report and the daily live checks are removed (ADR
+0013, ADR 0046, SPEC §10.4 and §16.5). Cost per completed application is still measured from the attempt record, and a
+send is proven by its before/after Submit screenshots and its timeline.*

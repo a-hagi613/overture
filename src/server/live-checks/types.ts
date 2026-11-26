@@ -4,6 +4,13 @@ export const LIVE_CHECK_GROUPS = ["forms", "llm", "mail", "r2", "alerts"] as con
 
 export type LiveCheckGroup = (typeof LIVE_CHECK_GROUPS)[number];
 
+/**
+ * The groups the scheduled `live.check` job runs. `forms` fills real Browser Use sessions and `llm` spends Anthropic
+ * tokens, so both are manual-only (#680): a nightly job may not spend real money. An admin runs them by hand by
+ * posting an explicit `groups` list to the admin live-checks route.
+ */
+export const AUTOMATIC_LIVE_CHECK_GROUPS = ["mail", "r2", "alerts"] as const;
+
 export interface LiveCheckResult {
   check: string;
   ok: boolean;

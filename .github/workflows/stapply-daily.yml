@@ -9,10 +9,6 @@ on:
         description: "Publish a snapshot whose row count dropped more than 20%"
         type: boolean
         default: false
-      skip_llm:
-        description: "Skip the Haiku pass over newly inserted unresolved postings"
-        type: boolean
-        default: false
       skip_embeddings:
         description: "Skip the local ONNX embedding pass (Tier 2)"
         type: boolean
@@ -101,11 +97,12 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           flyctl status -a overture-web
+      # The Haiku pass is skipped here on purpose: a scheduled workflow may not spend real money (#680), so the
+      # catalog publishes with the rule tiers and the local embeddings only.
       - name: Build the catalog from the 28 Stapply boards and publish it
         if: steps.guard.outputs.skip != 'true'
         env:
           ALLOW_ROW_DROP: ${{ inputs.allow_row_drop == true && '1' || '' }}
-          SKIP_LLM: ${{ inputs.skip_llm == true && '1' || '' }}
           SKIP_EMBEDDINGS: ${{ inputs.skip_embeddings == true && '1' || '' }}
           FRESHNESS_DAYS: ${{ inputs.freshness_days || '7' }}
           INCLUDE_UNDATED: ${{ inputs.include_undated == true && '1' || '' }}
@@ -117,17 +114,11 @@ jobs:
           CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
           CATALOG_REFRESH_ORIGIN: https://overture-web.fly.dev
           CATALOG_EMBEDDING_MODEL: ${{ vars.CATALOG_EMBEDDING_MODEL || '' }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CATALOG_LLM_MODEL: ${{ vars.CATALOG_LLM_MODEL || '' }}
-          CATALOG_LLM_MAX_ITEMS: ${{ vars.CATALOG_LLM_MAX_ITEMS || '0' }}
         run: |
           set -o pipefail
-          flags=()
+          flags=(--skip-llm)
           if [ "$ALLOW_ROW_DROP" = "1" ]; then
             flags+=(--allow-row-drop)
-          fi
-          if [ "$SKIP_LLM" = "1" ]; then
-            flags+=(--skip-llm)
           fi
           if [ "$SKIP_EMBEDDINGS" = "1" ]; then
             flags+=(--skip-embeddings)
