@@ -326,6 +326,8 @@ test("a fresh user walks the Inbox through the real UI, from empty to the Board 
   await page.reload();
   await expect(page.getByRole("button", { name: "All (2)" })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Unread \(\d+\)$/u })).toBeVisible();
+  await expect(page.getByTestId("inbox-addresses")).toContainText("Your application email:");
+  await expect(page.getByTestId("inbox-addresses")).toContainText("Copies sent to:");
 
   const search = page.getByRole("searchbox", { name: "Search messages…" });
 

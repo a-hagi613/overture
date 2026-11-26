@@ -597,6 +597,40 @@ export const messageAttachments = sqliteTable(
   (t) => [index("message_attachments_message_id").on(t.messageId)],
 );
 
+/**
+ * The one forwarded copy of an inbound Message, written in the same transaction that stores the
+ * Message (issue #693). Its `status` is the delivery record the Inbox surfaces: `sent` after the
+ * provider accepts it, `failed` when a send attempt was refused, `bounced` when the provider reports
+ * a permanent bounce, and `skipped` when the copy would loop or the account has no verified address.
+ * `detail` is a short reason code, never message content.
+ */
+export const mailDeliveries = sqliteTable(
+  "mail_deliveries",
+  {
+    id: text("id").primaryKey(),
+    mailboxId: text("mailbox_id")
+      .notNull()
+      .references(() => mailboxes.id, { onDelete: "cascade" }),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["pending", "sent", "failed", "bounced", "skipped"],
+    })
+      .notNull()
+      .default("pending"),
+    detail: text("detail"),
+    providerMessageId: text("provider_message_id"),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("mail_deliveries_message_unique").on(t.messageId),
+    index("mail_deliveries_mailbox_status").on(t.mailboxId, t.status),
+  ],
+);
+
 export const codeWaits = sqliteTable(
   "code_waits",
   {

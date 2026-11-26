@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -15,7 +15,14 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { openOrNull } from "../profile/personal-crypto.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
-import { mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
+import {
+  mailDeliveries,
+  mailboxes,
+  mailThreads,
+  messageAttachments,
+  messages,
+  users,
+} from "../platform/db/schema.ts";
 import {
   attachmentsByMessageOf,
   messagesByThreadOf,
@@ -65,6 +72,7 @@ export function createInboxRoutes(deps: {
   async function messageView(
     message: typeof messages.$inferSelect,
     attachments: readonly (typeof messageAttachments.$inferSelect)[],
+    copyStatus: string | null,
   ) {
     const [subject, from, text] = await Promise.all([
       openOrNull({
@@ -110,6 +118,7 @@ export function createInboxRoutes(deps: {
       attachments: opened,
       auth: message.auth,
       classification: message.classification,
+      copyStatus,
       createdAt: message.createdAt.getTime(),
       direction: message.direction,
       from: from ?? "",
@@ -125,6 +134,21 @@ export function createInboxRoutes(deps: {
     context.header("Cache-Control", "no-store");
   });
 
+  function inboxHeaderOf(userId: string) {
+    const person = db.select({ email: users.email }).from(users).where(eq(users.id, userId)).get();
+
+    const mailbox = db
+      .select({ applyAddress: mailboxes.applyAddress })
+      .from(mailboxes)
+      .where(eq(mailboxes.userId, userId))
+      .get();
+
+    return {
+      alias: mailbox?.applyAddress ?? null,
+      loginEmail: person?.email ?? "",
+    };
+  }
+
   routes.get("/threads", validQuery(threadsQuerySchema), async (context) => {
     const user = await readSessionUser(auth, context.req.raw.headers);
 
@@ -134,16 +158,17 @@ export function createInboxRoutes(deps: {
 
     const query = context.req.valid("query");
 
-    return context.json(
-      await threadPageOf({
+    return context.json({
+      ...(await threadPageOf({
         before: query.before ?? null,
         beforeId: query.beforeId ?? null,
         db,
         limit: query.limit,
         personal,
         userId: user.id,
-      }),
-    );
+      })),
+      ...inboxHeaderOf(user.id),
+    });
   });
 
   routes.get("/threads/:id", async (context) => {
@@ -172,9 +197,24 @@ export function createInboxRoutes(deps: {
 
     const views = await threadViewsOf({ db, personal, threads: [thread], userId: user.id });
 
+    const deliveries = db
+      .select({ messageId: mailDeliveries.messageId, status: mailDeliveries.status })
+      .from(mailDeliveries)
+      .where(
+        inArray(
+          mailDeliveries.messageId,
+          messagesFor.map((row) => row.id),
+        ),
+      )
+      .all();
+
+    const copyStatuses = new Map(deliveries.map((row) => [row.messageId, row.status]));
+
     return context.json({
       messages: await Promise.all(
-        messagesFor.map(async (row) => messageView(row, attachmentsFor.get(row.id) ?? [])),
+        messagesFor.map(async (row) =>
+          messageView(row, attachmentsFor.get(row.id) ?? [], copyStatuses.get(row.id) ?? null),
+        ),
       ),
       thread: views[0] ?? null,
     });

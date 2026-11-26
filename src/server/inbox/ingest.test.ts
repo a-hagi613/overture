@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { eq } from "drizzle-orm";
 
+import { createInboundCopies } from "./copies.ts";
 import { createMailDnsResolver } from "./dns.ts";
 import { createMailboxService } from "./mailboxes.ts";
 import { createMailIngest } from "./ingest.ts";
@@ -14,6 +15,7 @@ import { migrateDatabase } from "../platform/db/migrate.ts";
 import { mailThreads, users } from "../platform/db/schema.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { createDiskObjectStore } from "../platform/ports/object-store.ts";
+import { createSinkMailSender } from "../platform/mail/sink.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { masterKeyringFor } from "../platform/crypto.ts";
 
@@ -84,8 +86,17 @@ describe("the inbound mail transaction", () => {
       "create trigger reject_message before insert on messages begin select raise(abort, 'forced message failure'); end",
     );
 
+    const copies = createInboundCopies({
+      clock,
+      db,
+      domains: ["example.test"],
+      mail: createSinkMailSender(clock),
+      origin: "https://overture.test",
+    });
+
     const ingest = createMailIngest({
       clock,
+      copies,
       db,
       mailboxes,
       objects,

@@ -1,8 +1,3 @@
-import PostalMime from "postal-mime";
-
-import type { Email } from "postal-mime";
-
-import { isAtsMailDomain } from "../../../src/shared/ats-mail-domains.ts";
 import { INBOUND_MAX_BYTES, isLiveCheckAddress } from "../../../src/shared/inbound-mail.ts";
 import {
   INBOUND_QUEUE_MAX_BYTES,
@@ -16,16 +11,6 @@ import type { ForwardableEmailMessage, InboundMailEnv } from "./env.ts";
 
 import { aliasEmailDomain, isAliasRecipient, isManagedRecipient } from "./addresses.ts";
 import { millisecondsNow } from "./clock.ts";
-import { forwardInboundMail, shouldForwardAliasMail } from "./forward.ts";
-
-const CONFIRMATION_SENDERS = new Set(["forwarding-noreply@google.com", "no-reply@microsoft.com"]);
-
-function domainOf(address: string) {
-  return address
-    .slice(address.lastIndexOf("@") + 1)
-    .trim()
-    .toLowerCase();
-}
 
 async function enqueue(
   env: InboundMailEnv,
@@ -66,27 +51,24 @@ async function enqueue(
   }
 }
 
-async function forwardOrThrow(env: InboundMailEnv, parsed: Email, rcptTo: string) {
-  try {
-    await forwardInboundMail(env, parsed, rcptTo);
-  } catch (error) {
-    throw new Error("The inbound forward failed.", { cause: error });
-  }
-}
-
+/**
+ * The `tryoverture.com` catch-all. It only moves mail; routing, storage and the copy to the
+ * account's own verified address live in `overture-web`, which can resolve the envelope recipient to
+ * one active mailbox. A reserved local part, a forged forwarding address and an alias on another
+ * domain are dropped here without an enqueue.
+ * @param message The inbound Email Routing message.
+ * @param env The Worker bindings.
+ */
 export async function email(message: ForwardableEmailMessage, env: InboundMailEnv) {
   const domain = aliasEmailDomain(env);
   const liveCheck = isLiveCheckAddress(message.to, domain);
-  let managed = false;
 
   if (!liveCheck) {
-    managed = await isManagedRecipient(env.INBOUND_HMAC_SECRET, message.to, domain);
-  }
+    const managed = await isManagedRecipient(env.INBOUND_HMAC_SECRET, message.to, domain);
 
-  const alias = !liveCheck && !managed && isAliasRecipient(message.to, domain);
-
-  if (!liveCheck && !managed && !alias) {
-    return;
+    if (!managed && !isAliasRecipient(message.to, domain)) {
+      return;
+    }
   }
 
   if (message.rawSize > INBOUND_MAX_BYTES) {
@@ -99,30 +81,5 @@ export async function email(message: ForwardableEmailMessage, env: InboundMailEn
     return;
   }
 
-  if (liveCheck) {
-    await enqueue(env, message, raw);
-
-    return;
-  }
-
-  const parsed = await new PostalMime({ attachmentEncoding: "arraybuffer" }).parse(raw);
-  const sender = (parsed.from?.address ?? "").trim().toLowerCase();
-
-  if (CONFIRMATION_SENDERS.has(sender)) {
-    await forwardOrThrow(env, parsed, message.to);
-
-    return;
-  }
-
-  const ats = isAtsMailDomain(domainOf(sender));
-
-  if (managed && !ats) {
-    return;
-  }
-
   await enqueue(env, message, raw);
-
-  if (alias && shouldForwardAliasMail(parsed, ats)) {
-    await forwardOrThrow(env, parsed, message.to);
-  }
 }

@@ -34,7 +34,9 @@ export const threadRowSchema = z.object({
 export type InboxThreadRow = z.infer<typeof threadRowSchema>;
 
 const threadsResponseSchema = z.object({
+  alias: z.string().nullable(),
   counts: z.object({ all: z.number(), needsChecking: z.number(), unread: z.number() }),
+  loginEmail: z.string(),
   threads: z.array(threadRowSchema),
 });
 
@@ -44,6 +46,7 @@ const messageSchema = z.object({
   attachments: z.array(attachmentSchema),
   auth: z.enum(["pass", "fail", "none"]),
   classification: z.enum(CLASSIFICATIONS).nullable(),
+  copyStatus: z.enum(["pending", "sent", "failed", "bounced", "skipped"]).nullable(),
   createdAt: z.number(),
   direction: z.enum(["in", "out"]),
   from: z.string(),

@@ -4,6 +4,7 @@ import {
   aliasHandleBase,
   aliasHandleCandidate,
   applyAliasAddress,
+  isReservedAliasHandle,
 } from "../../shared/apply-alias.ts";
 import { forwardingIdFrom, forwardingLocalPart } from "../../shared/inbound-mail.ts";
 import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
@@ -258,6 +259,12 @@ export function createMailboxService(
 
   async function byForwardingAddress(address: string) {
     const normalized = address.trim().toLowerCase();
+    const [aliasLocalPart = ""] = normalized.split("@");
+
+    // A reserved system local part never resolves to a person, even if a bad row ever carried one.
+    if (aliasLocalPart !== "" && isReservedAliasHandle(aliasLocalPart)) {
+      return null;
+    }
 
     const byAlias = db.select().from(mailboxes).where(eq(mailboxes.applyAddress, normalized)).get();
 

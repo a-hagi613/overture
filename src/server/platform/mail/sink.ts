@@ -8,9 +8,18 @@ import type { MailSender, SentMail } from "./port.ts";
 
 const captured: SentMail[] = [];
 let failuresRemaining = 0;
+let bouncesRemaining = 0;
 
 export function failNextSinkMail(count = 1) {
   failuresRemaining = Math.max(0, count);
+}
+
+/**
+ * Make the next sends report a permanent bounce, so the Inbox's bounce surfacing can be tested.
+ * @param count How many copies report a bounce.
+ */
+export function bounceNextSinkMail(count = 1) {
+  bouncesRemaining = Math.max(0, count);
 }
 
 function failIfAsked() {
@@ -19,6 +28,16 @@ function failIfAsked() {
 
     throw new Error("sink mail failure requested by the test route");
   }
+}
+
+function nextBounce() {
+  if (bouncesRemaining > 0) {
+    bouncesRemaining -= 1;
+
+    return true;
+  }
+
+  return false;
 }
 
 export function createSinkMailSender(clock: Clock) {
@@ -192,6 +211,37 @@ export function createSinkMailSender(clock: Clock) {
       captured.push(sent);
 
       await Promise.resolve();
+    },
+    sendInboundCopy: async (mail) => {
+      failIfAsked();
+
+      const id = randomUUID();
+      const bounced = nextBounce();
+
+      const sent: SentMail = {
+        attachments: (mail.attachments ?? []).map((attachment) => ({
+          bytes: attachment.content.byteLength,
+          filename: attachment.filename,
+          type: attachment.type,
+        })),
+        body: mail.text,
+        from: env.MAIL_FROM,
+        id,
+        replyTo: mail.replyTo ?? null,
+        sentAt: clock.now(),
+        subject: mail.subject,
+        to: mail.to,
+      };
+
+      if (mail.headers !== undefined) {
+        sent.headers = mail.headers;
+      }
+
+      captured.push(sent);
+
+      await Promise.resolve();
+
+      return { bounced, messageId: id };
     },
   };
 

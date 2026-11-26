@@ -35,6 +35,7 @@ import {
   mailUsage,
   matches,
   mailboxes,
+  mailDeliveries,
   mailThreads,
   messageAttachments,
   messages,
@@ -84,7 +85,12 @@ import {
 import { createConsentService } from "../profile/consent.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { searchQuerySchema, searchResponse } from "./api.ts";
-import { clearSinkMail, failNextSinkMail, listSinkMail } from "../platform/mail/sink.ts";
+import {
+  bounceNextSinkMail,
+  clearSinkMail,
+  failNextSinkMail,
+  listSinkMail,
+} from "../platform/mail/sink.ts";
 import {
   clearCloudflareEmailRequests,
   listCloudflareEmailRequests,
@@ -2487,6 +2493,8 @@ export function createTestRoutes(
       body: sent.body,
       replyTo: sent.replyTo,
       sentAt: sent.sentAt,
+      headers: sent.headers ?? {},
+      attachments: sent.attachments ?? [],
     }));
 
     return context.json({ messages: captured });
@@ -2520,6 +2528,16 @@ export function createTestRoutes(
 
     return context.json({ ok: true });
   });
+
+  routes.post(
+    "/mail/bounce-next",
+    validJson(z.object({ count: z.number().int().min(1).max(100).default(1) })),
+    (context) => {
+      bounceNextSinkMail(context.req.valid("json").count);
+
+      return context.json({ ok: true });
+    },
+  );
 
   routes.post(
     "/mail/fail-next",
@@ -3765,9 +3783,21 @@ export function createTestRoutes(
             .where(eq(messageAttachments.messageId, row.id))
             .all();
 
+          const delivery = db
+            .select({
+              attempts: mailDeliveries.attempts,
+              detail: mailDeliveries.detail,
+              providerMessageId: mailDeliveries.providerMessageId,
+              status: mailDeliveries.status,
+            })
+            .from(mailDeliveries)
+            .where(eq(mailDeliveries.messageId, row.id))
+            .get();
+
           return {
             id: row.id,
             threadId: row.threadId,
+            delivery: delivery ?? null,
             direction: row.direction,
             rfcMessageId: row.rfcMessageId,
             inReplyTo: row.inReplyTo,
@@ -3836,6 +3866,7 @@ export function createTestRoutes(
 
     return context.json({
       mailboxes: rows.map((row) => ({
+        applyAddress: row.applyAddress,
         id: row.id,
         localPart: row.localPart,
         status: row.status,
@@ -3844,6 +3875,31 @@ export function createTestRoutes(
       })),
     });
   });
+
+  routes.post(
+    "/mailboxes/:id/retire",
+    validJson(z.object({ userId: z.string().min(1) })),
+    (context) => {
+      const retired = testMailboxes?.retireFor(context.req.valid("json").userId) ?? false;
+
+      return context.json({ retired });
+    },
+  );
+
+  routes.post(
+    "/users/email",
+    validJson(z.object({ email: z.email(), userId: z.string().min(1) })),
+    (context) => {
+      const { email, userId } = context.req.valid("json");
+
+      db.update(users)
+        .set({ email: lowercased(email), emailVerified: true, updatedAt: new Date(clock.now()) })
+        .where(eq(users.id, userId))
+        .run();
+
+      return context.json({ ok: true });
+    },
+  );
 
   routes.post(
     "/mailboxes/first-forwarded",

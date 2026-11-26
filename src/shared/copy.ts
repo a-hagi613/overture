@@ -1589,6 +1589,12 @@ export const copy = {
       reason === null ? "Closed" : `Closed · ${reason.replaceAll("_", " ")}`,
   },
   inbox: {
+    addressHeader: (alias: string, loginEmail: string) =>
+      `Your application email: ${alias}  ·  Copies sent to: ${loginEmail}`,
+    copyBounced:
+      "The copy of this message could not be delivered to your email. It is safe here in your Overture Inbox.",
+    copyFailed:
+      "Overture could not deliver the copy of this message to your email yet. The message is safe here.",
     accountNote: "Other mail stays in your personal inbox and never reaches Overture.",
     addressBody:
       "Overture gives you a private forwarding address. Add a filter in your own mailbox to forward only employer hiring messages there so Overture can track replies and confirmations.",
