@@ -276,8 +276,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        # --keep-vars is mandatory: the owner sets OWNER_FORWARD_TO in the dashboard and INBOUND_HMAC_SECRET as a
-        # Worker secret, and a deploy without it would wipe the forwarding address and stop inbound verification.
+        # --keep-vars is mandatory: the owner sets INBOUND_HMAC_SECRET as a Worker secret, and a deploy without it
+        # would stop inbound verification.
         run: bunx wrangler deploy --keep-vars
       - name: Deploy the marketing Worker
         if: steps.guard.outputs.skip != 'true'

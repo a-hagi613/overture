@@ -39,10 +39,12 @@ fallback anywhere. The `in-{id}-{mac}` forwarding address and its filter guide a
 ## Inbound mail goes through Cloudflare Email Routing and an Email Worker
 
 - Email Routing on the apex `tryoverture.com` sends the catch-all to one Email Worker. Literal rules such as `hello@`
-  keep forwarding to the owner. Catch-all works on the apex, which is where the forwarding addresses live.
-- The Worker checks the address MAC, forwards Gmail and Outlook forwarding-confirmation messages to the owner's
-  verified destination, drops mail whose original sender is not an ATS domain, and hands the **raw MIME** with the
-  envelope to the app. No LLM runs in the Worker.
+  keep forwarding to the owner. Catch-all works on the apex, which is where the apply aliases live.
+- The Worker checks the alias shape and hands the **raw MIME** with the envelope to the app. It never sends mail
+  itself: the app resolves the recipient to one active mailbox, stores the Message in that person's Inbox and
+  copies it only to that person's current verified login email (ADR 0040, issue #693). Gmail and Outlook
+  forwarding confirmations are ordinary accepted mail on that path; there is no owner destination. No LLM runs in
+  the Worker.
 - **The hand-off is a Cloudflare Queue, not a direct POST (#286).** The Worker enqueues the raw MIME (envelope as
   metadata) on `overture-inbound-mail`; a consumer in the same Worker signs it with HMAC-SHA256 (timestamped, 5-minute
   replay window) and POSTs it to `POST /internal/mail/inbound`. A 2xx acks the message; a network error or a `5xx`,

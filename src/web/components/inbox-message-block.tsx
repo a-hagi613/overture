@@ -98,6 +98,17 @@ export function InboxMessageBlock(props: {
         </Card>
       )}
 
+      {message.copyStatus === "bounced" || message.copyStatus === "failed" ? (
+        <Card className="mt-3.5 border-need bg-need-soft p-3.5 shadow-none">
+          <div className="flex items-start gap-2.5" role="note">
+            <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0 text-need" size={16} />
+            <p className="text-xs leading-relaxed text-foreground">
+              {message.copyStatus === "bounced" ? copy.inbox.copyBounced : copy.inbox.copyFailed}
+            </p>
+          </div>
+        </Card>
+      ) : null}
+
       <div className="mt-4 flex flex-col gap-3 text-sm leading-relaxed text-foreground">
         {paragraphsOf(message.text).map((paragraph, index) => (
           <p

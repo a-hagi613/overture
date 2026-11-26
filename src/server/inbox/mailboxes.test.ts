@@ -183,7 +183,7 @@ describe("a readable apply alias", () => {
     sqlite.close();
   });
 
-  test("resolves inbound mail addressed to the alias, and still resolves the forwarding address", async () => {
+  test("resolves inbound mail addressed to the alias and retires the forwarding address", async () => {
     const { db, sqlite } = migrated();
     const service = createMailboxService(db, { now: () => NOW }, SECRET, DOMAIN);
     const mailbox = await service.ensureFor("user-1");
@@ -191,7 +191,7 @@ describe("a readable apply alias", () => {
 
     expect((await service.byForwardingAddress(applyAddress))?.id).toBe(mailbox.id);
     expect((await service.byForwardingAddress(applyAddress.toUpperCase()))?.id).toBe(mailbox.id);
-    expect((await service.byForwardingAddress(mailbox.address))?.id).toBe(mailbox.id);
+    expect(await service.byForwardingAddress(mailbox.address)).toBeNull();
     expect(await service.byForwardingAddress(`nobody@${DOMAIN}`)).toBeNull();
 
     sqlite.close();

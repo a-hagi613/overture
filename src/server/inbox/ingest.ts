@@ -13,14 +13,32 @@ import { simpleParser } from "mailparser";
 import { z } from "zod";
 
 import { atsForMailDomain, isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
-import { mailboxes, mailThreads, messageAttachments, messages } from "../platform/db/schema.ts";
+import {
+  mailboxes,
+  mailDeliveries,
+  mailThreads,
+  messageAttachments,
+  messages,
+} from "../platform/db/schema.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { inboundAuth } from "./auth.ts";
 import { classifyMail, codeFromText } from "./codes.ts";
+import type { createInboundCopies } from "./copies.ts";
 import { resolveOpenWaitForMessage } from "./waits.ts";
 
 export const MAIL_INGEST_JOB_KIND = "mail.ingest";
 export const SNIPPET_LENGTH = 200;
+
+async function messageIdOf(parsed: { messageId?: string }, raw: Uint8Array<ArrayBuffer>) {
+  if (parsed.messageId !== undefined && parsed.messageId.trim() !== "") {
+    return parsed.messageId;
+  }
+
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", raw));
+  const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+
+  return `<${hex}@inbound.overture>`;
+}
 
 const ingestPayloadSchema = z.object({
   objectKey: z.string().min(1),
@@ -65,6 +83,7 @@ function replyChain(inReplyTo: string | undefined, references: string | string[]
 }
 
 export function createMailIngest(deps: {
+  copies: ReturnType<typeof createInboundCopies>;
   db: AppDatabase;
   clock: Clock;
   objects: ObjectStore;
@@ -74,7 +93,8 @@ export function createMailIngest(deps: {
   onAuthenticatedMessage?: (input: { userId: string; messageId: string }) => Promise<void>;
   onStoredMessage?: (input: { userId: string; messageId: string }) => Promise<void>;
 }) {
-  const { db, clock, objects, personal, resolver, onAuthenticatedMessage, onStoredMessage } = deps;
+  const { copies, db, clock, objects, personal, resolver } = deps;
+  const { onAuthenticatedMessage, onStoredMessage } = deps;
   const { mailboxes: mailboxService } = deps;
 
   async function sealObject(userId: string, key: string, bytes: Uint8Array<ArrayBuffer>) {
@@ -130,7 +150,7 @@ export function createMailIngest(deps: {
     const text = parsed.text ?? "";
     const fromText = addressText(parsed.from);
     const toText = addressText(parsed.to);
-    const messageId = parsed.messageId ?? `<${crypto.randomUUID()}@inbound.overture>`;
+    const messageId = await messageIdOf(parsed, raw);
 
     const duplicate = db
       .select({ id: messages.id })
@@ -139,6 +159,14 @@ export function createMailIngest(deps: {
       .get();
 
     if (duplicate !== undefined) {
+      await copies.deliver({
+        mailboxId: mailbox.id,
+        messageId: duplicate.id,
+        parsed,
+        rcptTo: job.rcptTo,
+        userId: mailbox.userId,
+      });
+
       await objects.delete(job.objectKey);
 
       return;
@@ -287,15 +315,21 @@ export function createMailIngest(deps: {
         if (attachmentRows.length > 0) {
           tx.insert(messageAttachments).values(attachmentRows).run();
         }
+
+        tx.insert(mailDeliveries)
+          .values({
+            attempts: 0,
+            createdAt,
+            id: crypto.randomUUID(),
+            mailboxId: mailbox.id,
+            messageId: id,
+            status: "pending",
+            updatedAt: createdAt,
+          })
+          .run();
       },
       { behavior: "immediate" },
     );
-
-    await objects.delete(job.objectKey);
-
-    if (isAtsMailDomain(senderDomain)) {
-      mailboxService.markFirstForwarded(mailbox.id, clock.now());
-    }
 
     publishEvent(
       db,
@@ -334,6 +368,20 @@ export function createMailIngest(deps: {
         messageId: id,
         receivedAt: job.receivedAt,
       });
+    }
+
+    const delivered = await copies.deliver({
+      mailboxId: mailbox.id,
+      messageId: id,
+      parsed,
+      rcptTo: job.rcptTo,
+      userId: mailbox.userId,
+    });
+
+    await objects.delete(job.objectKey);
+
+    if (delivered === "sent" || delivered === "bounced") {
+      mailboxService.markFirstForwarded(mailbox.id, clock.now());
     }
   }
 

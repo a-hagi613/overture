@@ -7,9 +7,6 @@
     "deploy": "wrangler deploy",
     "dry-run": "wrangler deploy --dry-run"
   },
-  "dependencies": {
-    "postal-mime": "4.2.1"
-  },
   "devDependencies": {
     "wrangler": "4.164.0"
   }

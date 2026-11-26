@@ -7,14 +7,12 @@ import type {
   InboundMailEnv,
   InboundQueueMessageHandle,
   InboundSpillBucket,
-  OutboundEmail,
 } from "../../workers/inbound-mail/src/env.ts";
 
 export {
   INBOUND_DEAD_LETTER_PATH,
   INBOUND_HEADERS,
   INBOUND_PATH,
-  forwardingIdFrom,
   forwardingLocalPart,
   signInbound,
   verifyInbound,
@@ -32,7 +30,6 @@ export {
 } from "../../src/shared/inbound-queue.ts";
 
 export const inboundTestSecret = "e2e-inbound-queue-secret-0123456789";
-export const inboundTestOwner = "owner@example.com";
 
 export function fakeInboundQueue() {
   const sent: InboundQueueMessage[] = [];
@@ -43,22 +40,6 @@ export function fakeInboundQueue() {
       send: async (message: InboundQueueMessage) => {
         await Promise.resolve();
         sent.push(message);
-      },
-    },
-  };
-}
-
-export function fakeInboundEmail() {
-  const sent: OutboundEmail[] = [];
-
-  return {
-    sent,
-    email: {
-      send: async (message: OutboundEmail) => {
-        await Promise.resolve();
-        sent.push(message);
-
-        return { messageId: crypto.randomUUID() };
       },
     },
   };
@@ -102,17 +83,13 @@ export function inboundTestEnvironment(
   origin: string,
   queue: ReturnType<typeof fakeInboundQueue>,
   spill: ReturnType<typeof fakeInboundSpill>,
-  email: ReturnType<typeof fakeInboundEmail> = fakeInboundEmail(),
 ) {
   return {
     INBOUND_HMAC_SECRET: inboundTestSecret,
     OVERTURE_ORIGIN: origin,
-    OWNER_FORWARD_TO: inboundTestOwner,
     ALIAS_EMAIL_DOMAIN: "tryoverture.com",
-    FORWARD_FROM: "notify@notify.tryoverture.com",
     INBOUND_QUEUE: queue.queue,
     INBOUND_SPILL: spill.bucket,
-    INBOUND_EMAIL: email.email,
   } satisfies InboundMailEnv;
 }
 

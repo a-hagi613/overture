@@ -1,5 +1,3 @@
-import { forwardingIdFrom } from "../../../src/shared/inbound-mail.ts";
-
 import type { InboundMailEnv } from "./env.ts";
 
 export const DEFAULT_ALIAS_EMAIL_DOMAIN = "tryoverture.com";
@@ -60,14 +58,4 @@ export function isAliasRecipient(address: string, domain: string) {
   }
 
   return ALIAS_LOCAL_PART.test(parts.local);
-}
-
-export async function isManagedRecipient(secret: string, address: string, domain: string) {
-  const parts = addressParts(address);
-
-  if (parts === null || parts.domain !== domain) {
-    return false;
-  }
-
-  return (await forwardingIdFrom(secret, address)) !== null;
 }

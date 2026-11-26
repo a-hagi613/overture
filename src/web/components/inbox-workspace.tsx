@@ -65,6 +65,12 @@ export function InboxWorkspace({ routeThreadId }: { routeThreadId: string | null
         titleNode={copy.inbox.titlePlain}
       />
 
+      {data?.alias === null || data?.alias === undefined ? null : (
+        <p className="mt-2 break-words text-xs text-muted-foreground" data-testid="inbox-addresses">
+          {copy.inbox.addressHeader(data.alias, data.loginEmail)}
+        </p>
+      )}
+
       {isPending ? (
         <Card className="mt-4 p-6">
           <div className="space-y-3">

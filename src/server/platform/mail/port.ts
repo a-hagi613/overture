@@ -17,6 +17,8 @@ export interface SentMail {
   body: string;
   replyTo: string | null;
   sentAt: number;
+  headers?: Record<string, string>;
+  attachments?: { bytes: number; filename: string; type: string }[];
 }
 
 export interface OutboundCheckMail {
@@ -69,6 +71,34 @@ export interface OutboundSupportReplyMail {
   body: string;
 }
 
+export interface OutboundCopyAttachment {
+  content: Uint8Array;
+  filename: string;
+  type: string;
+  disposition: "attachment" | "inline";
+}
+
+/**
+ * A copy of an inbound Message, sent to the account's current verified login email (issue #693).
+ * The copy is always addressed from the Overture sending domain; `replyTo` is the original sender so
+ * answering it goes back to the employer or recruiter.
+ */
+export interface OutboundInboundCopyMail {
+  to: string;
+  subject: string;
+  text: string;
+  replyTo?: string;
+  headers?: Record<string, string>;
+  attachments?: OutboundCopyAttachment[];
+}
+
+export interface InboundCopyDelivery {
+  /** The sending provider's id for the copy, when it gave one. */
+  messageId: string;
+  /** True when the provider reported the recipient as a permanent bounce. */
+  bounced: boolean;
+}
+
 export interface MailSender {
   sendMagicLink: (mail: OutboundMagicLinkMail) => Promise<void>;
   sendWaitlistInvite: (mail: OutboundWaitlistInviteMail) => Promise<void>;
@@ -80,4 +110,5 @@ export interface MailSender {
   sendBillingNotice: (mail: OutboundBillingNoticeMail) => Promise<void>;
   sendSupport: (mail: OutboundSupportMail) => Promise<void>;
   sendSupportReply: (mail: OutboundSupportReplyMail) => Promise<void>;
+  sendInboundCopy: (mail: OutboundInboundCopyMail) => Promise<InboundCopyDelivery>;
 }

@@ -19,7 +19,7 @@ import { isProtectedCategory, reserveMailSend } from "./budget.ts";
  * @returns A sender with the same surface that never exceeds the month's cap.
  */
 export function createMeteredMailSender(db: AppDatabase, clock: Clock, adapter: MailSender) {
-  async function metered(category: MailCategory, send: () => Promise<void>) {
+  async function metered<T>(category: MailCategory, send: () => Promise<T>) {
     const decision = reserveMailSend(db, clock, category);
 
     const detail = {
@@ -55,8 +55,11 @@ export function createMeteredMailSender(db: AppDatabase, clock: Clock, adapter: 
     }
 
     try {
-      await send();
+      const result = await send();
+
       defaultMetrics().recordMailEvent({ direction: "outbound", status: "sent" });
+
+      return result;
     } catch (error) {
       defaultMetrics().recordMailEvent({ direction: "outbound", status: "failed" });
 
@@ -95,6 +98,7 @@ export function createMeteredMailSender(db: AppDatabase, clock: Clock, adapter: 
     sendSupportReply: async (mail) => {
       await metered("system", async () => adapter.sendSupportReply(mail));
     },
+    sendInboundCopy: async (mail) => metered("system", async () => adapter.sendInboundCopy(mail)),
   };
 
   return sender;

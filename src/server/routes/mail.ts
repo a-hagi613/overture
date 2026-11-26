@@ -56,7 +56,7 @@ export function createMailRoutes(deps: {
     }
 
     return context.json({
-      address: mailbox.address,
+      address: mailbox.applyAddress ?? mailbox.address,
       firstForwardedAt: mailbox.firstForwardedAt,
       forwardingWorks: mailbox.firstForwardedAt !== null,
     });

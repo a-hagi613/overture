@@ -46,9 +46,11 @@ its limits and how it is rolled out without a second migration.
 
 ## Limits and rollout
 
-- Alias *delivery* is the apex catch-all in the inbound Email Worker (issue #561, merged): any address on
-  `ALIAS_EMAIL_DOMAIN` is accepted, an employer reply is forwarded from `notify@notify.tryoverture.com`, and the app
-  resolves the full stored alias to its mailbox. The forwarding address and its filter guide stay as a second path.
+- Alias *delivery* is the apex catch-all in the inbound Email Worker: any address on `ALIAS_EMAIL_DOMAIN` is
+  accepted and handed to the app, and the app resolves the full stored alias to exactly one active mailbox
+  (issue #693). The app stores every accepted Message in that person's Inbox and sends **one copy to that person's
+  current verified login email** from the Overture sending domain; there is no shared or owner destination anywhere
+  in the Worker, the app or the configuration, and a retired, reserved or unknown alias never delivers.
 - The manual-code path's 0-second ask and the email fallback for expiring codes are WS-6a (issue #565); this ADR
   only records the preference they read.
 - Existing accounts are backfilled lazily rather than in the migration: `GET /api/profile/apply-email`,

@@ -6,36 +6,28 @@ import { z } from "zod";
 
 import {
   INBOUND_DEAD_LETTER_PATH,
+  INBOUND_DEAD_LETTER_QUEUE_NAME,
+  INBOUND_HEADERS,
+  INBOUND_PATH,
   INBOUND_QUEUE_MAX_BYTES,
   INBOUND_QUEUE_MAX_RETRIES,
   INBOUND_QUEUE_NAME,
   INBOUND_QUEUE_RETRY_DELAY_SECONDS,
-  INBOUND_DEAD_LETTER_QUEUE_NAME,
-  INBOUND_HEADERS,
-  INBOUND_PATH,
   INBOUND_SPILL_PREFIX,
   base64ToBytes,
-  fakeInboundEmail,
   fakeInboundQueue,
   fakeInboundSpill,
   forwardableMessage,
-  forwardingLocalPart,
   inboundQueueHandle,
   inboundTestEnvironment,
-  inboundTestOwner,
   inboundTestSecret,
   inlineQueueMessage,
-  mimeWithAttachment,
   paddedMime,
   parseInboundDeadLetter,
   spilledQueueMessage,
   verifyInbound,
 } from "./inbound-mail.fixture.ts";
 import { millisecondsNow, secondsNow } from "../../workers/inbound-mail/src/clock.ts";
-import {
-  DEFAULT_FORWARD_FROM,
-  INBOUND_ATTACHMENT_SPILL_PREFIX,
-} from "../../workers/inbound-mail/src/forward.ts";
 import worker from "../../workers/inbound-mail/src/index.ts";
 
 const id = "4f8c2a1b";
@@ -100,17 +92,9 @@ function startEdge(statuses: { inbound?: number; deadLetter?: number } = {}) {
 }
 
 async function forwardingAddress() {
-  return `${await forwardingLocalPart(inboundTestSecret, id)}@tryoverture.com`;
-}
+  await Promise.resolve();
 
-function firstSentEmail(email: ReturnType<typeof fakeInboundEmail>) {
-  const [sent] = email.sent;
-
-  if (sent === undefined) {
-    throw new Error("The Worker sent no forwarded mail.");
-  }
-
-  return sent;
+  return "ada.chen.4k@tryoverture.com";
 }
 
 function sourceFiles(directory: string) {
@@ -132,15 +116,11 @@ function sourceFiles(directory: string) {
 test("an ATS message is enqueued with its envelope and body", async () => {
   const queue = fakeInboundQueue();
   const spill = fakeInboundSpill();
-  const email = fakeInboundEmail();
   const raw = fixture("greenhouse-application.eml");
   const to = await forwardingAddress();
   const { message, forwarded, rejected } = forwardableMessage(raw, to);
 
-  await worker.email(
-    message,
-    inboundTestEnvironment("https://overture.invalid", queue, spill, email),
-  );
+  await worker.email(message, inboundTestEnvironment("https://overture.invalid", queue, spill));
 
   expect(queue.sent).toHaveLength(1);
 
@@ -151,12 +131,11 @@ test("an ATS message is enqueued with its envelope and body", async () => {
   expect(queued.receivedAt).toBeGreaterThan(0);
   expect(base64ToBytes(queued.bodyBase64)).toEqual(raw);
   expect(spill.objects.size).toBe(0);
-  expect(email.sent).toHaveLength(0);
   expect(forwarded).toHaveLength(0);
   expect(rejected).toHaveLength(0);
 });
 
-test("a non-ATS message is dropped without an enqueue", async () => {
+test("a non-ATS message to an alias is enqueued too", async () => {
   const queue = fakeInboundQueue();
   const spill = fakeInboundSpill();
 
@@ -167,13 +146,13 @@ test("a non-ATS message is dropped without an enqueue", async () => {
 
   await worker.email(message, inboundTestEnvironment("https://overture.invalid", queue, spill));
 
-  expect(queue.sent).toHaveLength(0);
+  expect(queue.sent).toHaveLength(1);
   expect(spill.objects.size).toBe(0);
   expect(forwarded).toHaveLength(0);
   expect(rejected).toHaveLength(0);
 });
 
-test("a forged forwarding address is dropped without an enqueue", async () => {
+test("a retired forwarding address is dropped without an enqueue", async () => {
   const queue = fakeInboundQueue();
   const spill = fakeInboundSpill();
 
@@ -203,106 +182,29 @@ test("a live check message is enqueued even though its sender is not an ATS", as
   expect(base64ToBytes(queued.bodyBase64)).toEqual(raw);
 });
 
-test("a Gmail forwarding confirmation is forwarded to the owner through send_email", async () => {
+test("an alias message is enqueued and the Worker never sends a copy itself", async () => {
   const queue = fakeInboundQueue();
   const spill = fakeInboundSpill();
-  const email = fakeInboundEmail();
-
-  const { message, forwarded, rejected } = forwardableMessage(
-    fixture("gmail-forwarding-confirmation.eml"),
-    await forwardingAddress(),
-  );
-
-  await worker.email(
-    message,
-    inboundTestEnvironment("https://overture.invalid", queue, spill, email),
-  );
-
-  expect(queue.sent).toHaveLength(0);
-  expect(email.sent).toHaveLength(1);
-
-  const sent = firstSentEmail(email);
-
-  expect(sent.from).toBe(DEFAULT_FORWARD_FROM);
-  expect(sent.to).toBe(inboundTestOwner);
-  expect(sent.replyTo).toBe("forwarding-noreply@google.com");
-  expect(sent.subject).toBe(
-    "(Forwarding Confirmation) Yes, forward to in-4f8c2a1b-9d0e7c3a5f@tryoverture.com",
-  );
-  expect(sent.text).toContain("https://mail.google.com/mail/u/0/#settings/fwdandpop");
-  expect(sent.headers).toBeUndefined();
-  expect(sent.attachments).toBeUndefined();
-  expect(forwarded).toHaveLength(0);
-  expect(rejected).toHaveLength(0);
-});
-
-test("an apex alias reply is enqueued and forwarded with the allow-listed headers", async () => {
-  const queue = fakeInboundQueue();
-  const spill = fakeInboundSpill();
-  const email = fakeInboundEmail();
   const raw = fixture("recruiter-reply.eml");
   const { message, forwarded } = forwardableMessage(raw, "ada.chen.4k@tryoverture.com");
 
-  await worker.email(
-    message,
-    inboundTestEnvironment("https://overture.invalid", queue, spill, email),
-  );
+  await worker.email(message, inboundTestEnvironment("https://overture.invalid", queue, spill));
 
   expect(queue.sent).toHaveLength(1);
-  expect(email.sent).toHaveLength(1);
 
   const queued = inlineQueueMessage(queue.sent[0] ?? "");
 
   expect(queued.rcptTo).toBe("ada.chen.4k@tryoverture.com");
   expect(base64ToBytes(queued.bodyBase64)).toEqual(raw);
-
-  const sent = firstSentEmail(email);
-
-  expect(sent.from).toBe(DEFAULT_FORWARD_FROM);
-  expect(sent.to).toBe(inboundTestOwner);
-  expect(sent.replyTo).toBe("priya.raghavan@northstarlabs.com");
-  expect(sent.subject).toBe("Re: Senior Product Engineer at Northstar Labs");
-  expect(sent.text).toContain("Thursday at 10:00");
-  expect(sent.headers).toEqual({
-    "In-Reply-To": "<CAMd2b0e5db1a44c9b8f0d7c3a5f@us.greenhouse-mail.io>",
-    References: "<CAMd2b0e5db1a44c9b8f0d7c3a5f@us.greenhouse-mail.io>",
-    "X-Campaign": "northstar-senior-product-engineer",
-    "X-Tracking-Id": "9911",
-  });
-  expect(sent.headers).not.toHaveProperty("Date");
-  expect(sent.headers).not.toHaveProperty("Message-ID");
-  expect(sent.headers).not.toHaveProperty("MIME-Version");
-  expect(sent.attachments).toBeUndefined();
-  expect(spill.objects.size).toBe(0);
   expect(forwarded).toHaveLength(0);
-});
-
-test("an unthreaded non-ATS alias message is stored but not forwarded", async () => {
-  const queue = fakeInboundQueue();
-  const spill = fakeInboundSpill();
-  const email = fakeInboundEmail();
-
-  const { message } = forwardableMessage(
-    fixture("non-ats-newsletter.eml"),
-    "ada.chen.4k@tryoverture.com",
-  );
-
-  await worker.email(
-    message,
-    inboundTestEnvironment("https://overture.invalid", queue, spill, email),
-  );
-
-  expect(queue.sent).toHaveLength(1);
-  expect(email.sent).toHaveLength(0);
 });
 
 test("an alias domain other than the apex is ignored", async () => {
   const queue = fakeInboundQueue();
   const spill = fakeInboundSpill();
-  const email = fakeInboundEmail();
 
   const environment = {
-    ...inboundTestEnvironment("https://overture.invalid", queue, spill, email),
+    ...inboundTestEnvironment("https://overture.invalid", queue, spill),
     ALIAS_EMAIL_DOMAIN: "mail.example.com",
   };
 
@@ -314,7 +216,6 @@ test("an alias domain other than the apex is ignored", async () => {
   await worker.email(message, environment);
 
   expect(queue.sent).toHaveLength(0);
-  expect(email.sent).toHaveLength(0);
 
   const accepted = forwardableMessage(
     fixture("recruiter-reply.eml"),
@@ -324,97 +225,21 @@ test("an alias domain other than the apex is ignored", async () => {
   await worker.email(accepted.message, environment);
 
   expect(queue.sent).toHaveLength(1);
-  expect(email.sent).toHaveLength(1);
 });
 
-test("a reserved system address is dropped without an enqueue or a forward", async () => {
+test("a reserved system address is dropped without an enqueue", async () => {
   const queue = fakeInboundQueue();
   const spill = fakeInboundSpill();
-  const email = fakeInboundEmail();
 
-  const { message } = forwardableMessage(
-    fixture("greenhouse-application.eml"),
-    "hello@tryoverture.com",
-  );
+  await Promise.all(
+    ["hello@tryoverture.com", "postmaster@tryoverture.com"].map(async (to) => {
+      const { message } = forwardableMessage(fixture("greenhouse-application.eml"), to);
 
-  await worker.email(
-    message,
-    inboundTestEnvironment("https://overture.invalid", queue, spill, email),
+      await worker.email(message, inboundTestEnvironment("https://overture.invalid", queue, spill));
+    }),
   );
 
   expect(queue.sent).toHaveLength(0);
-  expect(email.sent).toHaveLength(0);
-});
-
-test("an alias message over 4 MiB keeps its attachments in R2 and links to the Inbox", async () => {
-  const queue = fakeInboundQueue();
-  const spill = fakeInboundSpill();
-  const email = fakeInboundEmail();
-  const raw = mimeWithAttachment(4 * 1024 * 1024 + 256 * 1024);
-  const { message } = forwardableMessage(raw, "ada.chen.4k@tryoverture.com");
-
-  await worker.email(
-    message,
-    inboundTestEnvironment("https://overture.invalid", queue, spill, email),
-  );
-
-  expect(queue.sent).toHaveLength(1);
-  expect(queue.sent[0]?.kind).toBe("spill");
-  expect(email.sent).toHaveLength(1);
-
-  const sent = firstSentEmail(email);
-
-  expect(sent.attachments).toBeUndefined();
-  expect(sent.text).toContain("Attachments kept in Overture Inbox:");
-  expect(sent.text).toContain("offer-letter.pdf");
-  expect(sent.text).toContain("https://overture.invalid/inbox");
-
-  const keys = [...spill.objects.keys()];
-  const attachmentKeys = keys.filter((key) => key.startsWith(INBOUND_ATTACHMENT_SPILL_PREFIX));
-
-  expect(attachmentKeys).toHaveLength(1);
-  expect(spill.objects.get(attachmentKeys[0] ?? "")?.byteLength).toBe(4 * 1024 * 1024 + 256 * 1024);
-});
-
-test("an HTML-only message links to the Inbox instead of rendering the HTML", async () => {
-  const queue = fakeInboundQueue();
-  const spill = fakeInboundSpill();
-  const email = fakeInboundEmail();
-
-  const { message } = forwardableMessage(
-    fixture("html-only-invite.eml"),
-    "ada.chen.4k@tryoverture.com",
-  );
-
-  await worker.email(
-    message,
-    inboundTestEnvironment("https://overture.invalid", queue, spill, email),
-  );
-
-  const sent = firstSentEmail(email);
-
-  expect(sent.text).toContain("This message has no plain-text part.");
-  expect(sent.text).toContain("[This message is HTML. Open it in Overture:");
-  expect(sent.text).toContain("https://overture.invalid/inbox");
-  expect(sent.text).not.toContain("secret");
-});
-
-test("a long body is truncated in the copy with a link to the Inbox", async () => {
-  const queue = fakeInboundQueue();
-  const spill = fakeInboundSpill();
-  const email = fakeInboundEmail();
-  const raw = paddedMime(fixture("greenhouse-application.eml"), 300_000);
-  const { message } = forwardableMessage(raw, "ada.chen.4k@tryoverture.com");
-
-  await worker.email(
-    message,
-    inboundTestEnvironment("https://overture.invalid", queue, spill, email),
-  );
-
-  const sent = firstSentEmail(email);
-
-  expect(sent.text).toContain("[Message truncated. Open Overture for the full message:");
-  expect(sent.text).toContain("https://overture.invalid/inbox");
 });
 
 test("a message bigger than the queue message limit spills to R2", async () => {
@@ -735,7 +560,7 @@ test("the dead-letter consumer retries while the app cannot take the alert", asy
   }
 });
 
-test("the Wrangler configuration wires the queue, the dead-letter queue, the spill bucket and sending", () => {
+test("the Wrangler configuration has no owner destination and no send_email binding", () => {
   const configuration = readFileSync(
     join(process.cwd(), "workers/inbound-mail/wrangler.jsonc"),
     "utf8",
@@ -746,11 +571,8 @@ test("the Wrangler configuration wires the queue, the dead-letter queue, the spi
       vars: z.object({
         OVERTURE_ORIGIN: z.string(),
         ALIAS_EMAIL_DOMAIN: z.string(),
-        FORWARD_FROM: z.string(),
       }),
-      send_email: z.array(
-        z.object({ name: z.string(), allowed_sender_addresses: z.array(z.string()) }),
-      ),
+      send_email: z.array(z.unknown()).optional(),
       queues: z.object({
         producers: z.array(z.object({ binding: z.string(), queue: z.string() })),
         consumers: z.array(
@@ -769,14 +591,9 @@ test("the Wrangler configuration wires the queue, the dead-letter queue, the spi
   expect(parsed.vars).toEqual({
     OVERTURE_ORIGIN: "https://tryoverture.com",
     ALIAS_EMAIL_DOMAIN: "tryoverture.com",
-    FORWARD_FROM: DEFAULT_FORWARD_FROM,
   });
-  expect(parsed.send_email).toEqual([
-    {
-      name: "INBOUND_EMAIL",
-      allowed_sender_addresses: ["notify@notify.tryoverture.com"],
-    },
-  ]);
+  expect(parsed.send_email).toBeUndefined();
+  expect(configuration).not.toContain("OWNER_FORWARD_TO");
   expect(parsed.queues.producers).toEqual([
     { binding: "INBOUND_QUEUE", queue: INBOUND_QUEUE_NAME },
   ]);
@@ -795,10 +612,16 @@ test("the Wrangler configuration wires the queue, the dead-letter queue, the spi
   ]);
 });
 
-test("the Worker sources never call message.forward", () => {
+test("the Worker sources never send mail, name an owner destination or call message.forward", () => {
   const sources = sourceFiles(join(process.cwd(), "workers/inbound-mail/src"));
-  const offenders = sources.filter((file) => /\.forward\s*\(/u.test(readFileSync(file, "utf8")));
+
+  const noForward = sources.filter((file) => /\.forward\s*\(/u.test(readFileSync(file, "utf8")));
+
+  const noOwner = sources.filter((file) =>
+    /OWNER_FORWARD_TO|INBOUND_EMAIL|send_email/u.test(readFileSync(file, "utf8")),
+  );
 
   expect(sources.length).toBeGreaterThan(0);
-  expect(offenders).toEqual([]);
+  expect(noForward).toEqual([]);
+  expect(noOwner).toEqual([]);
 });

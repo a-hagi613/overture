@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c6884753-10c7-4c78-aa95-97e24937ee2b",
+  "id": "cd90535f-70bd-4f72-a130-83a2112b907e",
   "prevId": "57929851-0bcf-433a-b3ee-96d6dc982886",
   "tables": {
     "account_erasures": {
@@ -3298,6 +3298,111 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "mail_deliveries": {
+      "name": "mail_deliveries",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mailbox_id": {
+          "name": "mailbox_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "message_id": {
+          "name": "message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "detail": {
+          "name": "detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "provider_message_id": {
+          "name": "provider_message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "mail_deliveries_message_unique": {
+          "name": "mail_deliveries_message_unique",
+          "columns": ["message_id"],
+          "isUnique": true
+        },
+        "mail_deliveries_mailbox_status": {
+          "name": "mail_deliveries_mailbox_status",
+          "columns": ["mailbox_id", "status"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "mail_deliveries_mailbox_id_mailboxes_id_fk": {
+          "name": "mail_deliveries_mailbox_id_mailboxes_id_fk",
+          "tableFrom": "mail_deliveries",
+          "tableTo": "mailboxes",
+          "columnsFrom": ["mailbox_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mail_deliveries_message_id_messages_id_fk": {
+          "name": "mail_deliveries_message_id_messages_id_fk",
+          "tableFrom": "mail_deliveries",
+          "tableTo": "messages",
+          "columnsFrom": ["message_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

@@ -187,6 +187,7 @@ import {
   ensureCheckinSweepQueued,
   runCheckinSweep,
 } from "./pipeline/checkins.ts";
+import { createInboundCopies } from "./inbox/copies.ts";
 import { createMailIngest, MAIL_INGEST_JOB_KIND } from "./inbox/ingest.ts";
 import { createInterviewCalendar } from "./inbox/interviews.ts";
 import { createMailMoves, MAIL_CLASSIFY_JOB_KIND } from "./inbox/moves.ts";
@@ -812,7 +813,16 @@ const interviewCalendar = createInterviewCalendar({
   personal,
 });
 
+const inboundCopies = createInboundCopies({
+  clock,
+  db,
+  domains: [aliasEmailDomain, env.MAIL_DOMAIN, env.NOTIFY_MAIL_DOMAIN],
+  mail: mailSender,
+  origin: env.APP_ORIGIN ?? "http://localhost:3000",
+});
+
 const mailIngest = createMailIngest({
+  copies: inboundCopies,
   db,
   clock,
   objects,

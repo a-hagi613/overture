@@ -70,22 +70,6 @@ export function isLiveCheckAddress(address: string, domain?: string) {
   );
 }
 
-export async function forwardingIdFrom(secret: string, address: string) {
-  const local = address.trim().toLowerCase().split("@")[0] ?? "";
-
-  if (!local.startsWith(ADDRESS_PREFIX)) {
-    return null;
-  }
-
-  const [id, mac, ...rest] = local.slice(ADDRESS_PREFIX.length).split("-");
-
-  if (id === undefined || mac === undefined || rest.length > 0 || !ID_PATTERN.test(id)) {
-    return null;
-  }
-
-  return (await sameSecretValue(secret, mac, await addressMac(secret, id))) ? id : null;
-}
-
 async function signedText(timestamp: string, rcptTo: string, body: Uint8Array<ArrayBuffer>) {
   const digest = hex(new Uint8Array(await crypto.subtle.digest("SHA-256", body)));
 

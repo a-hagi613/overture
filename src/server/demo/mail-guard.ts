@@ -61,6 +61,13 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
     sendSupportReply: async (mail) => {
       await sender.sendSupportReply(mail);
     },
+    sendInboundCopy: async (mail) => {
+      if (!allowed(mail.to)) {
+        return { bounced: false, messageId: "demo-skipped" };
+      }
+
+      return sender.sendInboundCopy(mail);
+    },
   };
 
   return guarded;
