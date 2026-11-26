@@ -103,7 +103,6 @@ export function NotificationItem({
 }) {
   const label = ACTIONS.get(row.kind) ?? null;
   const unread = row.readAt === null;
-  const destination = row.kind === "stage_move" ? "/tracker" : row.url;
 
   return (
     <li className="flex items-start gap-3.5 border-t border-border py-4 first:border-t-0">
@@ -134,7 +133,7 @@ export function NotificationItem({
                 onClick={() => {
                   onRead(row.id);
                 }}
-                to={destination}
+                to={row.url}
               >
                 {label}
               </Link>

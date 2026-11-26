@@ -117,7 +117,7 @@ export function notifyCardMoved(
     }),
     kind: copy.notifications.stageMove.kind,
     title: copy.notifications.stageMove.title(label),
-    url: `${copy.notifications.stageMove.url}?undo=${input.applicationId}`,
+    url: `${copy.notifications.stageMove.url}?application=${encodeURIComponent(input.applicationId)}`,
     userId: input.userId,
   });
 }

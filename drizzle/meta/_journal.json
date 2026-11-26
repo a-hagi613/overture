@@ -456,6 +456,13 @@
       "when": 1795529578038,
       "tag": "0064_lame_bloodscream",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "6",
+      "when": 1795726804229,
+      "tag": "0066_batched_notifications",
+      "breakpoints": true
     }
   ]
 }
