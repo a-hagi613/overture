@@ -5,10 +5,11 @@ import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import type { BillingUpgradeOption } from "../components/billing-upgrade-card.tsx";
-import type { BillingPlan } from "../lib/billing-api.ts";
+import type { BillingPlan, BillingState } from "../lib/billing-api.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { PLANS } from "../../shared/plans.ts";
+import { PLANS, planAllowanceText } from "../../shared/plans.ts";
+import { BillingBalanceCard } from "../components/billing-balance-card.tsx";
 import { BillingUpgradeCard } from "../components/billing-upgrade-card.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 import { Badge } from "../components/ui/badge.tsx";
@@ -16,24 +17,22 @@ import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow } from "../components/ui/ds.ts";
 import { openPortal, startCheckout, useBilling } from "../lib/billing-api.ts";
-import { billingSuccessPollDelay } from "../lib/billing-poll.ts";
 import { renewalText } from "../lib/billing-format.ts";
+import { billingSuccessPollDelay } from "../lib/billing-poll.ts";
 import { useHomeData } from "../lib/home-api.ts";
 
-function currentPlanLabel(plan: BillingPlan | null, totalApps: number) {
-  if (plan === "week") {
-    return copy.settingsBilling.weekPlan;
-  }
+function currentPlanLabel(planKind: BillingState["planKind"]) {
+  return copy.home.balance.badge[planKind];
+}
 
-  if (plan === "month") {
-    return copy.settingsBilling.monthPlan;
-  }
+function displayAllowance(
+  planKind: BillingState["planKind"],
+  paidGranted: number,
+  allGranted: number,
+) {
+  const subscribed = planKind === "week" || planKind === "month";
 
-  if (totalApps > 0) {
-    return copy.nav.profilePages.billingTrialPlan;
-  }
-
-  return copy.nav.profilePages.billingNoPlan;
+  return subscribed && paidGranted > 0 ? paidGranted : allGranted;
 }
 
 function upgradePlansFor(activePlan: BillingPlan | null) {
@@ -83,7 +82,12 @@ export function ProfileBillingPage() {
     refetch,
   } = useBilling({
     refetchInterval: (data, polls) =>
-      billingSuccessPollDelay(checkingReturn, data?.plan ?? null, polls),
+      billingSuccessPollDelay(
+        checkingReturn,
+        data?.plan ?? null,
+        data?.planApplications ?? 0,
+        polls,
+      ),
   });
 
   const { data: home } = useHomeData();
@@ -91,15 +95,22 @@ export function ProfileBillingPage() {
   const [openingPortal, setOpeningPortal] = useState(false);
 
   const activePlan = billing?.plan ?? null;
+  const planKind = billing?.planKind ?? home?.planKind ?? "none";
   const applicationsLeft = billing?.applicationsLeft ?? home?.applicationsLeft ?? 0;
-  const planApplications = billing?.planApplications ?? home?.planApplications ?? 0;
+
+  const planApplications = displayAllowance(
+    planKind,
+    billing?.balance.paid.granted ?? 0,
+    billing?.planApplications ?? home?.planApplications ?? 0,
+  );
+
   const upgradeOptions = upgradePlansFor(activePlan);
   const switchInStripe = activePlan !== null && billing?.status !== "canceled";
 
   const billingSignature =
     billing === undefined
       ? null
-      : `${String(billing.plan)}:${String(billing.status)}:${String(billing.applicationsLeft)}:${String(billing.planApplications)}`;
+      : `${billing.planKind}:${String(billing.plan)}:${String(billing.status)}:${String(billing.applicationsLeft)}:${String(billing.planApplications)}:${String(billing.balance.paid.granted)}`;
 
   const previousSignatureRef = useRef<string | null>(null);
 
@@ -228,18 +239,23 @@ export function ProfileBillingPage() {
                 <p className={dsEyebrow}>{bp.billingCurrentPlan}</p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
                   <h2 className={dsCardTitle} id="billing-current-heading">
-                    {currentPlanLabel(activePlan, planApplications)}
+                    {currentPlanLabel(planKind)}
                   </h2>
-                  {activePlan !== null || planApplications > 0 ? (
+                  {planKind !== "none" || planApplications > 0 ? (
                     <Badge variant="ok">{bp.billingActiveBadge}</Badge>
                   ) : null}
                 </div>
                 <p className={`${dsBody} mt-1.5 tabular-nums`}>
-                  {planApplications > 0
-                    ? bp.billingRemaining(applicationsLeft, planApplications)
-                    : copy.settingsBilling.noPlanDetail}
+                  {planKind === "none"
+                    ? copy.settingsBilling.noPlanDetail
+                    : planAllowanceText(planKind)}
                   {renewal === null ? "" : ` · ${copy.settingsBilling.renews} ${renewal}`}
                 </p>
+                {planApplications > 0 ? (
+                  <p className={`${dsBody} mt-0.5 tabular-nums`}>
+                    {bp.billingRemaining(applicationsLeft, planApplications)}
+                  </p>
+                ) : null}
               </div>
               <Button
                 className="shrink-0 self-start sm:self-auto"
@@ -271,6 +287,8 @@ export function ProfileBillingPage() {
               </div>
             ) : null}
           </Card>
+
+          <BillingBalanceCard balance={billing.balance} />
 
           {upgradeOptions.length === 0 ? (
             <Card ariaLabelledBy="billing-top-heading" className="p-6">

@@ -158,10 +158,10 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await expect(page.getByRole("heading", { level: 1, name: "Plan & Billing" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Manage billing" }).first()).toBeVisible();
       await expect(
-        page.getByRole("heading", { exact: true, name: "Upgrade to Week" }),
+        page.getByRole("heading", { exact: true, name: "Upgrade to Weekly" }),
       ).toBeVisible();
       await expect(
-        page.getByRole("heading", { exact: true, name: "Upgrade to Month" }),
+        page.getByRole("heading", { exact: true, name: "Upgrade to Monthly" }),
       ).toBeVisible();
 
       await page.goto(`${appServerUrl}/profile/account`);

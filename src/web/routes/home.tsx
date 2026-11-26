@@ -252,6 +252,8 @@ export function HomePage() {
           <HomeBillingNotice
             applicationsLeft={home.applicationsLeft}
             planApplications={home.planApplications}
+            planKind={home.planKind}
+            trialUsed={home.trialUsed}
           />
 
           {showFailures ? (

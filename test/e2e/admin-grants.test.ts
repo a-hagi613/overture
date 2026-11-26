@@ -51,6 +51,8 @@ test("an admin grant reaches Home as Applications left", async ({
   await signInByMagicLink(page, appUrl, page.request, authTestIdentity.ownerEmail);
   await page.goto(`${appUrl}/home`);
 
-  await expect(page.getByText("of 5 on your plan")).toBeVisible();
+  await expect(
+    page.getByTestId("sidebar-balance").getByText(/^5 applications left/u),
+  ).toBeVisible();
   await expect(page.locator("aside").getByText("5", { exact: true })).toHaveText("5");
 });

@@ -30,9 +30,10 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("heading", { level: 1, name: /Good (?:morning|afternoon|evening),/u }),
     ).toBeVisible();
-    await expect(page.getByText("of 70 on your plan")).toBeVisible();
-    await expect(page.getByText("7 of 10 sent today").first()).toBeVisible();
-    await expect(page.getByText("Resets at midnight")).toBeVisible();
+    const balanceCard = page.getByTestId("sidebar-balance");
+
+    await expect(balanceCard.getByText("Balance", { exact: true })).toBeVisible();
+    await expect(balanceCard.getByText(/applications left · \d+ of 10 today/u)).toBeVisible();
     await page.evaluate(async () => {
       await document.fonts.ready;
     });

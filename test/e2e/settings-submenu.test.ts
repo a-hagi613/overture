@@ -137,8 +137,18 @@ for (const width of [390, 1024, 1280]) {
 
 const homeQuotaSchema = z.object({
   applicationsLeft: z.number(),
+  dailyCap: z.number(),
   planApplications: z.number(),
+  planKind: z.enum(["month", "none", "trial", "week"]),
+  sentToday: z.number(),
 });
+
+const PLAN_BADGE = {
+  month: "Monthly",
+  none: "Free plan",
+  trial: "Free trial",
+  week: "Weekly",
+} as const;
 
 const workspaceSearchSchema = z.object({
   applications: z.array(z.unknown()),
@@ -169,10 +179,16 @@ test("sidebar search queries the backend, usage card reflects /api/home quota, t
   const homeQuota = homeQuotaSchema.parse(await (await homeResponsePromise).json());
   const aside = page.locator("[data-shell-sidebar]");
 
-  await expect(aside.getByText("Applications left", { exact: true })).toBeVisible();
-  await expect(aside.getByText(String(homeQuota.applicationsLeft), { exact: true })).toBeVisible();
+  const balanceCard = aside.getByTestId("sidebar-balance");
+
+  await expect(balanceCard.getByText("Balance", { exact: true })).toBeVisible();
   await expect(
-    aside.getByText(`of ${String(homeQuota.planApplications)}`, { exact: false }),
+    balanceCard.getByText(PLAN_BADGE[homeQuota.planKind], { exact: true }),
+  ).toBeVisible();
+  await expect(
+    balanceCard.getByText(
+      `${String(homeQuota.applicationsLeft)} applications left · ${String(homeQuota.sentToday)} of ${String(homeQuota.dailyCap)} today`,
+    ),
   ).toBeVisible();
 
   await aside.getByRole("button", { name: /^Search/u }).click();

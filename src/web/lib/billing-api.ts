@@ -1,14 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
+const allowanceSchema = z.object({
+  granted: z.number(),
+  left: z.number(),
+  used: z.number(),
+});
+
 const billingSchema = z.object({
   applicationsLeft: z.number(),
+  balance: z.object({
+    expiring: z.object({ applications: z.number(), expiresAt: z.number() }).nullable(),
+    paid: allowanceSchema,
+    released: z.number(),
+    reserved: z.number(),
+    trial: allowanceSchema,
+    used: z.number(),
+  }),
   cancelAtPeriodEnd: z.boolean(),
   currentPeriodEnd: z.number().nullable(),
   customer: z.boolean(),
   enabled: z.boolean(),
   plan: z.enum(["week", "month"]).nullable(),
   planApplications: z.number(),
+  planKind: z.enum(["month", "none", "trial", "week"]),
   status: z.string().nullable(),
 });
 

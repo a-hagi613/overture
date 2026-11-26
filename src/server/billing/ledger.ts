@@ -152,7 +152,7 @@ function grantHasBeenSpent(db: BillingDb, userId: string) {
   );
 }
 
-function activeGrantsOf(db: BillingDb, userId: string, at: number) {
+export function activeGrantsOf(db: BillingDb, userId: string, at: number) {
   return db
     .select()
     .from(grants)
