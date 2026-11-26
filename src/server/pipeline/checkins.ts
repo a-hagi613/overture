@@ -272,7 +272,7 @@ function closeAsNoResponse(
     body: copy.notifications.noResponse.body({ company: input.company, title: input.title }),
     kind: copy.notifications.noResponse.kind,
     title: copy.notifications.noResponse.title,
-    url: copy.notifications.noResponse.url,
+    url: `${copy.notifications.noResponse.url}?application=${encodeURIComponent(row.id)}`,
     userId: input.userId,
   });
 }

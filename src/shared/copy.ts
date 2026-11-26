@@ -2901,27 +2901,44 @@ export const copy = {
     stageMove: {
       title: (stage: string) => `Moved to ${stage}`,
       body: (input: { company: string; title: string; stage: string }) =>
-        `${input.title} at ${input.company} is now in ${input.stage}. Open Applications to undo it.`,
+        `${input.title} at ${input.company} is now in ${input.stage}. Open it in Tracker to undo the move.`,
       url: "/tracker",
       kind: "stage_move",
+      batch: {
+        title: (count: number) => `${String(count)} applications moved`,
+        body: "Open Tracker to see what changed and undo a move if it is wrong.",
+        url: "/tracker",
+      },
     },
     review: {
       title: "A question for you",
       body: "Open Review to answer it so these applications can go ahead.",
       url: "/review",
       kind: "review",
+      batch: {
+        title: (count: number) => `${String(count)} questions need an answer`,
+        body: "Answer them in Review so these applications can go ahead.",
+      },
     },
     reply: {
       title: (company: string) => `${company} replied`,
       body: (title: string) => `About ${title}. Read it in Inbox.`,
       url: "/inbox",
       kind: "reply",
+      batch: {
+        title: (count: number) => `${String(count)} employers replied`,
+        body: "Open Inbox to read them.",
+      },
     },
     interview: {
       title: (company: string) => `Interview request: ${company}`,
       body: (title: string) => `${title}. Open the thread in Inbox to see the details.`,
       url: "/inbox",
       kind: "interview",
+      batch: {
+        title: (count: number) => `${String(count)} interview requests`,
+        body: "Open Inbox to see the details.",
+      },
     },
     offer: {
       title: (company: string) => `Offer from ${company}`,
@@ -2929,6 +2946,10 @@ export const copy = {
         `${title}. Open the thread in Inbox to see the details and what comes next.`,
       url: "/inbox",
       kind: "offer",
+      batch: {
+        title: (count: number) => `${String(count)} offers`,
+        body: "Open Inbox to see the details and what comes next.",
+      },
     },
     paused: {
       url: "/",
@@ -2946,7 +2967,7 @@ export const copy = {
     noResponse: {
       title: "Closed as No response",
       body: (input: { company: string; title: string }) =>
-        `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open Applications to undo it.`,
+        `${input.title} at ${input.company} had no reply after 45 days, so it moved to Closed. Open it in Tracker to undo the move.`,
       url: "/tracker",
       kind: "stage_move",
     },

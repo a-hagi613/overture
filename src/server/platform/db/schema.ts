@@ -692,6 +692,8 @@ export const notifications = sqliteTable(
     readAt: timestamp("read_at"),
     pushedAt: timestamp("pushed_at"),
     emailedAt: timestamp("emailed_at"),
+    /** How many events this row covers; 1 for a single event, >1 for a batched row (#705). */
+    batchCount: integer("batch_count").notNull().default(1),
   },
   (t) => [index("notifications_user_created").on(t.userId, t.createdAt)],
 );

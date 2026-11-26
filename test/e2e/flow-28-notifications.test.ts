@@ -26,6 +26,7 @@ import type { SubscriptionKeys } from "./push.fixture.ts";
 const vapid = vapidKeyPair();
 const SECRET = "e2e-flow-28-secret-0123456789abc";
 const SELECTOR = "overture";
+const PUSH_WINDOW_MS = 2 * 60_000;
 const SIGNING_DOMAINS = ["us.greenhouse-mail.io", "acme.example"] as const;
 
 type SigningDomain = (typeof SIGNING_DOMAINS)[number];
@@ -168,6 +169,16 @@ async function pushedTitles(owner: APIRequestContext, keys: SubscriptionKeys) {
 }
 
 async function waitForPushTitle(owner: APIRequestContext, keys: SubscriptionKeys, title: string) {
+  const { offsetMs } = clockSchema.parse(await (await owner.get("/__test__/clock")).json());
+
+  await owner.post("/__test__/clock/offset", {
+    data: { offsetMs: offsetMs + PUSH_WINDOW_MS + 1 },
+  });
+
+  const ran = await owner.post("/__test__/jobs/run-due", { data: {} });
+
+  expect(ran.ok()).toBe(true);
+
   await expect.poll(async () => pushedTitles(owner, keys), { timeout: 20_000 }).toContain(title);
 }
 
@@ -411,7 +422,7 @@ test("each event writes one list row and one push, and no push approves anything
     (notification) => notification.title === "Moved to Closed",
   );
 
-  expect(moved?.url).toContain(`undo=${larkspur}`);
+  expect(moved?.url).toContain(`application=${larkspur}`);
 
   await owner.post("/api/running", { data: { running: false } });
   await waitForNotification(owner, userId, "paused", "Paused by you.");
