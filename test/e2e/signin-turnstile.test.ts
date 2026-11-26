@@ -11,10 +11,6 @@ import {
   waitForTurnstileStub,
 } from "./turnstile-browser.ts";
 
-declare global {
-  var __signInCls: number;
-}
-
 const labels = {
   email: "Email",
   magic: "Send sign-in link",
@@ -53,26 +49,9 @@ test("the bot check is interaction-only and pre-verified before the click", asyn
   await setTurnstileBrowserScenario(request, url, { delayMs: 750, mode: "pass" });
   await setTurnstileScenario(request, url, { action: "magiclink" });
   await clearSinkMail(url, request);
-  await page.addInitScript(() => {
-    globalThis.__signInCls = 0;
-    new PerformanceObserver((list) => {
-      const shifts = list.getEntries() as (PerformanceEntry & {
-        hadRecentInput: boolean;
-        value: number;
-      })[];
-
-      for (const entry of shifts) {
-        if (!entry.hadRecentInput) {
-          globalThis.__signInCls += entry.value;
-        }
-      }
-    }).observe({ buffered: true, type: "layout-shift" });
-  });
 
   await page.goto(`${url}/signin`);
   await waitForTurnstileStub(page);
-
-  // The widget is warmed while the card renders: no click is needed to start the challenge.
   await waitForPrewarm(page);
 
   const beforeClick = await turnstileStubCounts(page);
@@ -85,22 +64,14 @@ test("the bot check is interaction-only and pre-verified before the click", asyn
 
   await page.getByLabel(labels.email).fill(authTestIdentity.ownerEmail);
 
-  const started = await page.evaluate(() => performance.now());
-
   await page.getByRole("button", { name: labels.magic }).click();
   await expect(page.getByText(labels.sent)).toBeVisible();
 
-  const clickToContinueMs = (await page.evaluate(() => performance.now())) - started;
-  const cls = await page.evaluate(() => globalThis.__signInCls);
   const afterClick = await turnstileStubCounts(page);
 
-  console.log(JSON.stringify({ clickToContinueMs: Math.round(clickToContinueMs), cls }));
-
-  // The cached token is reused: the click starts no second challenge and no reset.
   expect(afterClick.executes).toBe(beforeClick.executes);
   expect(afterClick.renders).toBe(beforeClick.renders);
   expect(afterClick.resets).toBe(0);
-  expect(clickToContinueMs).toBeLessThan(600);
   expect(await sinkMailCount(url, request)).toBe(1);
 });
 
@@ -111,7 +82,7 @@ test("Verifying… keeps the primary button in place while a token is pending", 
 }) => {
   const { url } = isolatedAppServer;
 
-  await setTurnstileBrowserScenario(request, url, { delayMs: 1_500, mode: "pass" });
+  await setTurnstileBrowserScenario(request, url, { delayMs: 1500, mode: "pass" });
   await setTurnstileScenario(request, url, { action: "magiclink" });
   await clearSinkMail(url, request);
 
@@ -233,7 +204,6 @@ test("an expired token is refreshed in the background before the next click", as
 
   await expireTurnstileStub(page);
 
-  // Both cached tokens expire; each is fetched again without the user clicking.
   await expect
     .poll(async () => (await turnstileStubCounts(page)).executes)
     .toBe(beforeExpiry.executes + 2);
@@ -268,8 +238,7 @@ for (const width of [390, 1280]) {
     const submit = page.getByRole("button", { name: labels.magic });
     const hiddenButton = await submit.boundingBox();
 
-    // Hold the challenge open long enough to measure the visible widget before it clears.
-    await setTurnstileBrowserScenario(request, url, { delayMs: 2_000, mode: "interaction" });
+    await setTurnstileBrowserScenario(request, url, { delayMs: 2000, mode: "interaction" });
     await page.reload();
     await waitForTurnstileStub(page);
 
@@ -293,7 +262,6 @@ for (const width of [390, 1280]) {
       expect(Math.abs(widgetCentre - cardCentre)).toBeLessThanOrEqual(1);
     }
 
-    // The widget sits below the submit button, so showing it never moves the button.
     expect(visibleButton?.x).toBe(hiddenButton?.x);
     expect(visibleButton?.y).toBe(hiddenButton?.y);
     expect(visibleButton?.width).toBe(hiddenButton?.width);

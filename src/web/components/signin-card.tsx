@@ -181,29 +181,20 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
     };
   }, []);
 
-  // The email token is warmed as soon as the card can render, so a click mostly reuses a ready token.
-  // Social sign-in has no typing time to hide the challenge, so it warms once the email challenge has
-  // settled. One at a time keeps at most one invisible widget active in the shared slot.
   useEffect(() => {
     if (siteKey === undefined || siteKey === null) {
       return;
     }
 
-    let alive = true;
-
     const warm = async () => {
       await prewarmMagic();
 
-      if (alive && socialProviders.length > 0) {
+      if (socialProviders.length > 0) {
         await prewarmSocial();
       }
     };
 
     void warm();
-
-    return () => {
-      alive = false;
-    };
   }, [prewarmMagic, prewarmSocial, siteKey, socialProviders.length]);
 
   useEffect(() => {
@@ -227,25 +218,21 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
     hasToken: () => boolean,
     obtainToken: () => Promise<TurnstileTokenResult>,
   ) => {
-    // A ready token keeps the click instant; otherwise the primary button says "Verifying…" in place
-    // while the challenge finishes.
     if (!hasToken()) {
       setVerifying(true);
     }
 
-    try {
-      const result = await obtainToken();
+    const result = await obtainToken();
 
-      if (result.token === null) {
-        setActionError(turnstileFailureMessage(result.failure));
+    setVerifying(false);
 
-        return null;
-      }
+    if (result.token === null) {
+      setActionError(turnstileFailureMessage(result.failure));
 
-      return result.token;
-    } finally {
-      setVerifying(false);
+      return null;
     }
+
+    return result.token;
   };
 
   const runPending = async (kind: Pending, task: () => Promise<void>) => {
@@ -520,9 +507,6 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
             {copy.signIn.changeEmail}
           </Button>
         </div>
-        {/* A reserved 65px row (Turnstile's widget height) keeps the centred card and the primary
-            button still when an interaction-only challenge has to appear. Both action widgets share
-            the row; they warm one at a time, so at most one is ever visible. */}
         <div className="mt-3 grid min-h-[65px] w-full place-items-center">
           <div
             className="col-start-1 row-start-1 flex w-full justify-center"
@@ -608,9 +592,6 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
             </p>
           )}
         </div>
-        {/* A reserved 65px row (Turnstile's widget height) keeps the centred card and the primary
-            button still when an interaction-only challenge has to appear. Both action widgets share
-            the row; they warm one at a time, so at most one is ever visible. */}
         <div className="mt-3 grid min-h-[65px] w-full place-items-center">
           <div
             className="col-start-1 row-start-1 flex w-full justify-center"
