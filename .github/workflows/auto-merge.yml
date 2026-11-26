@@ -16,8 +16,9 @@ permissions:
 
 jobs:
   arm:
-    # Only a non-draft pull request on main may arm auto-merge, and never one labelled do-not-auto-merge.
+    # Only an open, non-draft pull request on main may arm auto-merge, and never one labelled do-not-auto-merge.
     if: |
+      github.event.pull_request.state == 'open' &&
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.draft == false &&
       !contains(github.event.pull_request.labels.*.name, 'do-not-auto-merge')
@@ -38,6 +39,7 @@ jobs:
   disarm:
     # A PR labelled do-not-auto-merge never merges on its own, even when it was armed before the label arrived.
     if: |
+      github.event.pull_request.state == 'open' &&
       github.event.pull_request.base.ref == 'main' &&
       contains(github.event.pull_request.labels.*.name, 'do-not-auto-merge')
     runs-on: ubuntu-latest
