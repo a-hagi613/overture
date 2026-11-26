@@ -67,7 +67,7 @@ experiment that has been **removed**. There is one design, and this is it.
 Product vocabulary, screens and behaviour come from `docs/SPEC.md`. The working list of boards still to draw or
 redraw is `docs/research/boards-status.md`; boards that still say `Hold`, show the old nav (Job Board, Holds,
 Answer Bank) or a Live Tab are read as `Queued`/`Review` and the destinations in `docs/SPEC.md` §15 (six in the
-sidebar since ADR 0037: Home, Board, Ready, Review, Inbox, Calendar; Profile and Support open from the profile
+sidebar since ADR 0037: Home, Tracker, Ready, Review, Inbox, Calendar; Profile and Support open from the profile
 menu); their *visual treatment* is what is fixed here.
 
 ---

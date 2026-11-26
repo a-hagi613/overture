@@ -32,7 +32,7 @@ This supersedes ADR 0034's rejection of `react-day-picker` (it is now used witho
 `/pricing`, `/search` and `/inbox/address` pages are removed. The marketing Worker serves only `/`
 (`src/shared/marketing-paths.ts`).
 
-**Navigation.** Six sidebar destinations, in order: Home, Board, Ready, Review, Inbox, Calendar. Profile opens a menu
+**Navigation.** Six sidebar destinations, in order: Home, Tracker, Ready, Review, Inbox, Calendar. Profile opens a menu
 of five pages (Resume, Details, Preferences, Account, Billing, under `/profile/*`); Support (`/support`) and
 Notifications sit below it. Settings is not a destination: account controls are Profile → Account and billing is
 Profile → Billing (`/profile/billing`, which Stripe Checkout and the portal return to). A ⌘K workspace search
