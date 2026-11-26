@@ -1,10 +1,13 @@
+export type LlmOutputSchemaType = "string" | "number" | "boolean" | "object" | "array" | "null";
+
 export interface LlmOutputSchemaProperty {
-  type?: "string" | "number" | "boolean" | "object" | "array" | "null";
+  type?: LlmOutputSchemaType | readonly LlmOutputSchemaType[];
   description?: string;
   enum?: string[];
   items?: LlmOutputSchemaProperty;
   properties?: Record<string, LlmOutputSchemaProperty>;
   required?: string[];
+  additionalProperties?: false;
 }
 
 export interface LlmOutputSchema {
@@ -50,9 +53,30 @@ export interface LlmSingleCall {
   costMicros: number;
 }
 
+export interface LlmStructuredRequest {
+  /** The `llm_usage` purpose the call is billed to. */
+  purpose: string;
+  system: string;
+  user: string;
+  schema: LlmOutputSchema;
+}
+
+export interface LlmStructuredCall {
+  model: string;
+  /** The reply's text block, or null when the reply carried none. */
+  text: string | null;
+  inputTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+  outputTokens: number;
+  costMicros: number;
+}
+
 export interface LlmPort {
   estimateBatchCostMicros: (requests: readonly LlmRequest[]) => number;
   runBatch: (requests: readonly LlmRequest[]) => Promise<LlmBatchCall[]>;
   estimateSingleCostMicros: (request: LlmSingleRequest) => number;
   runSingle: (request: LlmSingleRequest) => Promise<LlmSingleCall>;
+  estimateStructuredCostMicros: (request: LlmStructuredRequest) => number;
+  runStructured: (request: LlmStructuredRequest) => Promise<LlmStructuredCall>;
 }

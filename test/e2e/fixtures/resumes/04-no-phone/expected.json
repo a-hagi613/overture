@@ -1,0 +1,50 @@
+{
+  "identity": {
+    "name": "Priya Raghavan",
+    "email": "priya.raghavan@example.com"
+  },
+  "notes": "No phone number anywhere; GitHub and a personal site in the header.",
+  "extraction": {
+    "firstName": "Priya",
+    "lastName": "Raghavan",
+    "email": "priya.raghavan@example.com",
+    "phone": null,
+    "city": "Bengaluru",
+    "region": null,
+    "country": "India",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Swiggy",
+    "currentTitle": "Senior Data Engineer",
+    "yearsOfExperience": 6,
+    "highestDegree": "BE Information Science",
+    "languages": [
+      {
+        "language": "English",
+        "level": "professional"
+      },
+      {
+        "language": "Kannada",
+        "level": "native"
+      },
+      {
+        "language": "Tamil",
+        "level": "conversational"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": ["https://github.com/priyaraghavan", "https://priya.dev"]
+  },
+  "facts": {
+    "legal_name": "Priya Raghavan",
+    "email": "priya.raghavan@example.com",
+    "current_city": "Bengaluru",
+    "current_country": "India",
+    "current_employer": "Swiggy",
+    "current_job_title": "Senior Data Engineer",
+    "years_total": "6",
+    "degree_highest": "BE Information Science",
+    "languages": "English (professional), Kannada (native), Tamil (conversational)",
+    "github_url": "https://github.com/priyaraghavan",
+    "website_url": "https://priya.dev"
+  }
+}

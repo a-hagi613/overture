@@ -1,0 +1,19 @@
+MAYA OKAFOR
+Toronto, Canada | +1 416 555 0199 | maya.okafor@example.com | linkedin.com/in/maya-okafor
+
+SUMMARY
+Backend engineer with 8 years of experience building payment and billing systems.
+
+EXPERIENCE
+Brightwave Analytics - Senior Backend Engineer
+2021 - Present, Toronto
+Led the billing platform team and shipped usage-based invoicing.
+
+Northwind Labs - Backend Engineer
+2017 - 2021, Toronto
+
+EDUCATION
+BSc Computer Science, University of Toronto, 2014
+
+LANGUAGES
+English (native), French (conversational)

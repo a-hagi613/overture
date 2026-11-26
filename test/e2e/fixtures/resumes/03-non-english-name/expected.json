@@ -1,0 +1,49 @@
+{
+  "identity": {
+    "name": "José Álvarez Fernández",
+    "email": "jose.alvarez@example.com"
+  },
+  "notes": "Accented Spanish name, Spanish headings, Spanish city and country.",
+  "extraction": {
+    "firstName": "José",
+    "lastName": "Álvarez Fernández",
+    "email": "jose.alvarez@example.com",
+    "phone": "+34 612 345 678",
+    "city": "Barcelona",
+    "region": null,
+    "country": "Spain",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Glovo",
+    "currentTitle": "Ingeniero de Software Senior",
+    "yearsOfExperience": 9,
+    "highestDegree": "Máster en Ingeniería Informática",
+    "languages": [
+      {
+        "language": "Español",
+        "level": "nativo"
+      },
+      {
+        "language": "Inglés",
+        "level": "fluido"
+      },
+      {
+        "language": "Catalán",
+        "level": "básico"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "José Álvarez Fernández",
+    "email": "jose.alvarez@example.com",
+    "phone": "+34 612 345 678",
+    "current_city": "Barcelona",
+    "current_country": "Spain",
+    "current_employer": "Glovo",
+    "current_job_title": "Ingeniero de Software Senior",
+    "years_total": "9",
+    "degree_highest": "Máster en Ingeniería Informática",
+    "languages": "Español (nativo), Inglés (fluido), Catalán (básico)"
+  }
+}

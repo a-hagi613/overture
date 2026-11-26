@@ -1,0 +1,45 @@
+{
+  "identity": {
+    "name": "Siobhán O'Connor",
+    "email": "siobhan.oconnor@example.com"
+  },
+  "notes": "Hyphenated surname, apostrophe city, Irish English.",
+  "extraction": {
+    "firstName": "Siobhán",
+    "lastName": "O'Connor-Kelly",
+    "email": "siobhan.oconnor@example.com",
+    "phone": "+1 709 555 0177",
+    "city": "St. John's",
+    "region": null,
+    "country": "Canada",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Newfoundland Infrastructure Group",
+    "currentTitle": "Principal Engineer",
+    "yearsOfExperience": 13,
+    "highestDegree": "MEng Civil Engineering",
+    "languages": [
+      {
+        "language": "English",
+        "level": "native"
+      },
+      {
+        "language": "Irish",
+        "level": "basic"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Siobhán O'Connor-Kelly",
+    "email": "siobhan.oconnor@example.com",
+    "phone": "+1 709 555 0177",
+    "current_city": "St. John's",
+    "current_country": "Canada",
+    "current_employer": "Newfoundland Infrastructure Group",
+    "current_job_title": "Principal Engineer",
+    "years_total": "13",
+    "degree_highest": "MEng Civil Engineering",
+    "languages": "English (native), Irish (basic)"
+  }
+}

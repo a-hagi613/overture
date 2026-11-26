@@ -320,6 +320,12 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   await expect(page.getByText("PDF verified", { exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("jordan-taylor-resume.pdf").first()).toBeVisible();
 
+  const skipped = await api.put("/api/profile/skip-companies", {
+    data: { companies: [{ name: "Northstar Logistics", domain: null }] },
+  });
+
+  expect(skipped.ok()).toBe(true);
+
   await continueBtn.click();
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
 

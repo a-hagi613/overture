@@ -1,0 +1,34 @@
+{
+  "identity": {
+    "name": "Daniel Osei",
+    "email": "daniel.osei@example.com"
+  },
+  "notes": "Two-column sidebar layout with no degree on the resume.",
+  "extraction": {
+    "firstName": "Daniel",
+    "lastName": "Osei",
+    "email": "daniel.osei@example.com",
+    "phone": "+233 24 555 0123",
+    "city": "Accra",
+    "region": null,
+    "country": "Ghana",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Kudi",
+    "currentTitle": "Site Reliability Engineer",
+    "yearsOfExperience": 7,
+    "highestDegree": null,
+    "languages": null,
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Daniel Osei",
+    "email": "daniel.osei@example.com",
+    "phone": "+233 24 555 0123",
+    "current_city": "Accra",
+    "current_country": "Ghana",
+    "current_employer": "Kudi",
+    "current_job_title": "Site Reliability Engineer",
+    "years_total": "7"
+  }
+}

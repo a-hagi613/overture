@@ -1,0 +1,50 @@
+{
+  "identity": {
+    "name": "Mateo Silva",
+    "email": "mateo.silva@example.com"
+  },
+  "notes": "States a work permit instead of citizenship.",
+  "extraction": {
+    "firstName": "Mateo",
+    "lastName": "Silva",
+    "email": "mateo.silva@example.com",
+    "phone": "+351 912 345 678",
+    "city": "Lisbon",
+    "region": null,
+    "country": "Portugal",
+    "citizenshipOrWorkPermit": "EU work permit (Portugal residence card)",
+    "currentEmployer": "Farfetch",
+    "currentTitle": "Backend Engineer",
+    "yearsOfExperience": 2,
+    "highestDegree": "Licenciatura em Engenharia Informática",
+    "languages": [
+      {
+        "language": "Portuguese",
+        "level": "native"
+      },
+      {
+        "language": "English",
+        "level": "fluent"
+      },
+      {
+        "language": "Spanish",
+        "level": "basic"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Mateo Silva",
+    "email": "mateo.silva@example.com",
+    "phone": "+351 912 345 678",
+    "current_city": "Lisbon",
+    "current_country": "Portugal",
+    "work_auth": "EU work permit (Portugal residence card)",
+    "current_employer": "Farfetch",
+    "current_job_title": "Backend Engineer",
+    "years_total": "2",
+    "degree_highest": "Licenciatura em Engenharia Informática",
+    "languages": "Portuguese (native), English (fluent), Spanish (basic)"
+  }
+}

@@ -34,6 +34,22 @@ const singleMessageRequestSchema = z.object({
     .min(1),
 });
 
+const structuredMessageRequestSchema = z.object({
+  model: z.string().min(1),
+  max_tokens: z.number().int().positive(),
+  system: z.array(
+    z.object({
+      type: z.string(),
+      text: z.string(),
+      cache_control: z.object({ type: z.string() }).nullish(),
+    }),
+  ),
+  messages: z.array(z.object({ role: z.literal("user"), content: z.string() })).min(1),
+  output_config: z.object({
+    format: z.object({ type: z.string(), schema: z.record(z.string(), z.unknown()) }),
+  }),
+});
+
 const recordedMessageSchema = z.object({
   id: z.string().min(1),
   model: z.string().min(1),
@@ -98,6 +114,7 @@ export interface RecordedSingleMessage {
   hasDocument: boolean;
   pdfBytes: number;
   userText: string;
+  outputFormatType: string | null;
 }
 
 export interface AnthropicFixtureServer {
@@ -129,6 +146,12 @@ type Recording = z.infer<typeof recordingSchema>;
 
 export function loadResumePdfFallbackRecordingSync() {
   const path = join(process.cwd(), "test/e2e/recordings/anthropic/resume-pdf-fallback.json");
+
+  return recordedMessageSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+}
+
+export function loadResumeFactsRecordingSync() {
+  const path = join(process.cwd(), "test/e2e/recordings/anthropic/resume-facts.json");
 
   return recordedMessageSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 }
@@ -226,6 +249,31 @@ export function loadCoverLetterRecordingsSync() {
   return loadTextRecordingsSync("test/e2e/fixtures/anthropic/cover-letter-recording.jsonl");
 }
 
+function respondWithMessage(
+  response: ServerResponse,
+  message: z.infer<typeof recordedMessageSchema>,
+) {
+  finishJson(
+    response,
+    200,
+    JSON.stringify({
+      id: message.id,
+      type: "message",
+      role: "assistant",
+      model: message.model,
+      content: message.content,
+      stop_reason: "end_turn",
+      stop_sequence: null,
+      usage: {
+        input_tokens: message.usage.input_tokens,
+        cache_creation_input_tokens: message.usage.cache_creation_input_tokens,
+        cache_read_input_tokens: message.usage.cache_read_input_tokens,
+        output_tokens: message.usage.output_tokens,
+      },
+    }),
+  );
+}
+
 function finishJson(response: ServerResponse, status: number, body: string) {
   response.writeHead(status, { "content-type": "application/json" });
   response.end(body);
@@ -283,6 +331,7 @@ export async function startAnthropicFixtureServer(options: AnthropicFixtureServe
   const coverLetterRecordings = loadCoverLetterRecordingsSync();
   const emailClassifyRecordings = loadEmailClassifyRecordingsSync();
   const resumeFallback = loadResumePdfFallbackRecordingSync();
+  const resumeFacts = loadResumeFactsRecordingSync();
   const batches = new Map<string, TrackedBatch>();
   const seenRequests: RecordedBatchRequest[] = [];
   const seenSingleMessages: RecordedSingleMessage[] = [];
@@ -319,7 +368,24 @@ export async function startAnthropicFixtureServer(options: AnthropicFixtureServe
   }
 
   async function createSingleMessage(request: IncomingMessage, response: ServerResponse) {
-    const parsed = singleMessageRequestSchema.parse(JSON.parse(await readBody(request)));
+    const body: unknown = JSON.parse(await readBody(request));
+    const structured = structuredMessageRequestSchema.safeParse(body);
+
+    if (structured.success) {
+      seenSingleMessages.push({
+        model: structured.data.model,
+        hasDocument: false,
+        pdfBytes: 0,
+        userText: structured.data.messages[0]?.content ?? "",
+        outputFormatType: structured.data.output_config.format.type,
+      });
+
+      respondWithMessage(response, resumeFacts);
+
+      return;
+    }
+
+    const parsed = singleMessageRequestSchema.parse(body);
     const message = parsed.messages.at(0);
 
     if (message === undefined) {
@@ -333,27 +399,10 @@ export async function startAnthropicFixtureServer(options: AnthropicFixtureServe
       hasDocument: true,
       pdfBytes: Buffer.from(document.source.data, "base64").byteLength,
       userText: text.text,
+      outputFormatType: null,
     });
 
-    finishJson(
-      response,
-      200,
-      JSON.stringify({
-        id: resumeFallback.id,
-        type: "message",
-        role: "assistant",
-        model: resumeFallback.model,
-        content: resumeFallback.content,
-        stop_reason: "end_turn",
-        stop_sequence: null,
-        usage: {
-          input_tokens: resumeFallback.usage.input_tokens,
-          cache_creation_input_tokens: resumeFallback.usage.cache_creation_input_tokens,
-          cache_read_input_tokens: resumeFallback.usage.cache_read_input_tokens,
-          output_tokens: resumeFallback.usage.output_tokens,
-        },
-      }),
-    );
+    respondWithMessage(response, resumeFallback);
   }
 
   async function createBatch(request: IncomingMessage, response: ServerResponse) {

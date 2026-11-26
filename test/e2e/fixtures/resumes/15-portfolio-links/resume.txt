@@ -1,0 +1,15 @@
+Owen Blackwood
+Manchester, United Kingdom
+owen.blackwood@example.com | 07700 900456
+
+PORTFOLIO
+github.com/owenblackwood | owenblackwood.design | linkedin.com/in/owen-blackwood
+
+EXPERIENCE
+BBC - Frontend Engineer
+2022 - Present, Manchester
+
+EDUCATION
+BSc Computer Science, University of Manchester, 2019
+
+3 years of experience.

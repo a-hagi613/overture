@@ -1,0 +1,49 @@
+{
+  "identity": {
+    "name": "Fatima Al-Sayed",
+    "email": "fatima.alsayed@example.com"
+  },
+  "notes": "Contract history with the current engagement written as a range.",
+  "extraction": {
+    "firstName": "Fatima",
+    "lastName": "Al-Sayed",
+    "email": "fatima.alsayed@example.com",
+    "phone": "+971 50 123 4567",
+    "city": "Dubai",
+    "region": null,
+    "country": "United Arab Emirates",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Emirates NBD",
+    "currentTitle": "Programme Manager",
+    "yearsOfExperience": 18,
+    "highestDegree": "MBA",
+    "languages": [
+      {
+        "language": "Arabic",
+        "level": "native"
+      },
+      {
+        "language": "English",
+        "level": "fluent"
+      },
+      {
+        "language": "French",
+        "level": "basic"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Fatima Al-Sayed",
+    "email": "fatima.alsayed@example.com",
+    "phone": "+971 50 123 4567",
+    "current_city": "Dubai",
+    "current_country": "United Arab Emirates",
+    "current_employer": "Emirates NBD",
+    "current_job_title": "Programme Manager",
+    "years_total": "18",
+    "degree_highest": "MBA",
+    "languages": "Arabic (native), English (fluent), French (basic)"
+  }
+}

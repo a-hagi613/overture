@@ -1,0 +1,49 @@
+{
+  "identity": {
+    "name": "Amara Nwosu",
+    "email": "amara.nwosu@example.com"
+  },
+  "notes": "Career changer with two years in the new field and an older degree.",
+  "extraction": {
+    "firstName": "Amara",
+    "lastName": "Nwosu",
+    "email": "amara.nwosu@example.com",
+    "phone": "+234 802 555 0134",
+    "city": "Lagos",
+    "region": null,
+    "country": "Nigeria",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Paystack",
+    "currentTitle": "Frontend Developer",
+    "yearsOfExperience": 2,
+    "highestDegree": "BSc Mathematics",
+    "languages": [
+      {
+        "language": "English",
+        "level": "native"
+      },
+      {
+        "language": "Yoruba",
+        "level": "native"
+      },
+      {
+        "language": "French",
+        "level": "basic"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Amara Nwosu",
+    "email": "amara.nwosu@example.com",
+    "phone": "+234 802 555 0134",
+    "current_city": "Lagos",
+    "current_country": "Nigeria",
+    "current_employer": "Paystack",
+    "current_job_title": "Frontend Developer",
+    "years_total": "2",
+    "degree_highest": "BSc Mathematics",
+    "languages": "English (native), Yoruba (native), French (basic)"
+  }
+}

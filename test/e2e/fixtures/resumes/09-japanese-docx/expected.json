@@ -1,0 +1,45 @@
+{
+  "identity": {
+    "name": "Hiroshi Tanaka",
+    "email": "hiroshi.tanaka@example.jp"
+  },
+  "notes": "Family name first, Japanese employer, DOCX.",
+  "extraction": {
+    "firstName": "Hiroshi",
+    "lastName": "Tanaka",
+    "email": "hiroshi.tanaka@example.jp",
+    "phone": "+81 90 1234 5678",
+    "city": "Tokyo",
+    "region": null,
+    "country": "Japan",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Sony",
+    "currentTitle": "シニアエンジニア",
+    "yearsOfExperience": 10,
+    "highestDegree": "Master of Engineering",
+    "languages": [
+      {
+        "language": "Japanese",
+        "level": "native"
+      },
+      {
+        "language": "English",
+        "level": "business"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Hiroshi Tanaka",
+    "email": "hiroshi.tanaka@example.jp",
+    "phone": "+81 90 1234 5678",
+    "current_city": "Tokyo",
+    "current_country": "Japan",
+    "current_employer": "Sony",
+    "current_job_title": "シニアエンジニア",
+    "years_total": "10",
+    "degree_highest": "Master of Engineering",
+    "languages": "Japanese (native), English (business)"
+  }
+}

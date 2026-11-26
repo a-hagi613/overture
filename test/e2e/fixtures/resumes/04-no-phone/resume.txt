@@ -1,0 +1,15 @@
+Priya Raghavan
+priya.raghavan@example.com | Bengaluru, India | github.com/priyaraghavan | priya.dev
+
+SUMMARY
+Data engineer with 6 years of experience in streaming pipelines.
+
+EXPERIENCE
+Swiggy - Senior Data Engineer
+2022 - Present, Bengaluru
+
+EDUCATION
+BE Information Science, BMS College of Engineering, 2016
+
+LANGUAGES
+English (professional), Kannada (native), Tamil (conversational)

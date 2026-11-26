@@ -172,59 +172,103 @@ test("a refused resume upload is a 400, not a 500", async ({
 });
 
 test("tier 1 facts are prefilled from the resume and confirmed on Profile", async ({
-  isolatedAppServer: { url: appServerUrl },
+  identityServer,
 }) => {
-  const owner = await ownerContextFor(appServerUrl);
+  const anthropic = await startAnthropicFixtureServer();
 
-  await owner.post("/api/profile/resume", {
-    multipart: {
-      file: {
-        name: "resume.pdf",
-        mimeType: "application/pdf",
-        buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
-      },
-    },
+  const server = await startFreshAppServer(identityServer, {
+    ANTHROPIC_BASE_URL: anthropic.url,
+    ANTHROPIC_API_KEY: "test-anthropic-key",
   });
 
-  const listed = factsSchema.parse(await (await owner.get("/api/profile/facts")).json());
+  try {
+    const owner = await ownerContextFor(server.url);
 
-  const resumeFacts = listed.facts.filter((fact) => fact.source === "resume");
+    const upload = await owner.post("/api/profile/resume", {
+      multipart: {
+        file: {
+          name: "resume.pdf",
+          mimeType: "application/pdf",
+          buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+        },
+      },
+    });
 
-  expect(resumeFacts.map((fact) => fact.key)).toEqual([
-    "current_city",
-    "current_country",
-    "current_employer",
-    "degree_highest",
-    "email",
-    "languages",
-    "legal_name",
-    "notice_period",
-    "phone",
-    "salary_expectation",
-    "willing_relocate",
-    "work_auth",
-  ]);
+    const created = uploadSchema.parse(await upload.json());
 
-  const email = listed.facts.find((fact) => fact.key === "email");
+    expect(created.parsedWith).toBe("unpdf");
+    expect(created.prefilledFacts).toEqual([
+      "legal_name",
+      "email",
+      "phone",
+      "current_city",
+      "current_country",
+      "work_auth",
+      "current_employer",
+      "degree_highest",
+      "languages",
+    ]);
 
-  expect(email?.value).toBe("maya.okafor@example.com");
-  expect(email?.confirmed).toBe(false);
-  expect(email?.revision).toBe(1);
+    const listed = factsSchema.parse(await (await owner.get("/api/profile/facts")).json());
 
-  const confirmed = factsSchema.parse(
-    await (
-      await owner.put("/api/profile/facts", {
-        data: { facts: [{ key: "email", value: "maya.okafor+work@example.com" }] },
-      })
-    ).json(),
-  );
+    const resumeFacts = listed.facts.filter((fact) => fact.source === "resume");
 
-  const confirmedEmail = confirmed.facts.find((fact) => fact.key === "email");
+    expect(resumeFacts.map((fact) => [fact.key, fact.value])).toEqual([
+      ["current_city", "Toronto"],
+      ["current_country", "Canada"],
+      ["current_employer", "Brightwave Analytics"],
+      ["degree_highest", "BSc Computer Science"],
+      ["email", "maya.okafor@example.com"],
+      ["languages", "English, French"],
+      ["legal_name", "Maya Okafor"],
+      ["phone", "+1 416 555 0199"],
+      ["work_auth", "Canadian citizen"],
+    ]);
+    expect(resumeFacts.every((fact) => !fact.confirmed)).toBe(true);
+    expect(resumeFacts.every((fact) => fact.revision === 1)).toBe(true);
 
-  expect(confirmedEmail?.value).toBe("maya.okafor+work@example.com");
-  expect(confirmedEmail?.confirmed).toBe(true);
-  expect(confirmedEmail?.revision).toBe(2);
-  expect(confirmedEmail?.source).toBe("user");
+    const email = listed.facts.find((fact) => fact.key === "email");
+
+    expect(email?.confirmed).toBe(false);
+
+    const confirmed = factsSchema.parse(
+      await (
+        await owner.put("/api/profile/facts", {
+          data: { facts: [{ key: "email", value: "maya.okafor+work@example.com" }] },
+        })
+      ).json(),
+    );
+
+    const confirmedEmail = confirmed.facts.find((fact) => fact.key === "email");
+
+    expect(confirmedEmail?.value).toBe("maya.okafor+work@example.com");
+    expect(confirmedEmail?.confirmed).toBe(true);
+    expect(confirmedEmail?.revision).toBe(2);
+    expect(confirmedEmail?.source).toBe("user");
+
+    const singles = anthropic.singleMessages();
+
+    expect(singles).toHaveLength(1);
+    expect(singles[0]?.model).toBe("claude-haiku-5-5");
+    expect(singles[0]?.hasDocument).toBe(false);
+    expect(singles[0]?.outputFormatType).toBe("json_schema");
+    expect(singles[0]?.userText).toContain("Name: Maya Okafor");
+
+    const sqlite = new DatabaseSync(server.databasePath, { readOnly: true });
+    sqlite.exec("PRAGMA busy_timeout = 5000;");
+
+    const usageRows = sqlite.prepare("select purpose, model, cost_micros from llm_usage").all();
+
+    expect(usageRows).toEqual([
+      { cost_micros: expect.any(Number), model: "claude-haiku-5-5", purpose: "resume_facts" },
+    ]);
+    expect(usageRows.at(0)?.cost_micros).toBeGreaterThan(0);
+
+    sqlite.close();
+  } finally {
+    await server.stop();
+    anthropic.stop();
+  }
 });
 
 test("a scanned resume falls back to the LLM port and a usage row is recorded", async ({
@@ -261,7 +305,6 @@ test("a scanned resume falls back to the LLM port and a usage row is recorded", 
       "phone",
       "current_city",
       "current_country",
-      "notice_period",
       "work_auth",
       "languages",
     ]);
@@ -270,29 +313,40 @@ test("a scanned resume falls back to the LLM port and a usage row is recorded", 
 
     const allScanned = listed.facts.filter((fact) => fact.source === "resume");
 
-    expect(allScanned).toHaveLength(8);
+    expect(allScanned).toHaveLength(7);
     expect(allScanned.every((fact) => fact.confirmed)).toBe(false);
     expect(allScanned.every((fact) => fact.revision)).toBe(true);
 
     const singles = anthropic.singleMessages();
 
-    expect(singles).toHaveLength(1);
+    expect(singles).toHaveLength(2);
     expect(singles[0]?.model).toBe("claude-haiku-5-5");
     expect(singles[0]?.hasDocument).toBe(true);
     expect(singles[0]?.pdfBytes).toBeGreaterThan(0);
+    expect(singles[1]?.hasDocument).toBe(false);
+    expect(singles[1]?.outputFormatType).toBe("json_schema");
 
     const sqlite = new DatabaseSync(server.databasePath, { readOnly: true });
     sqlite.exec("PRAGMA busy_timeout = 5000;");
 
     const usageRows = sqlite
-      .prepare("select purpose, model, input_tokens, output_tokens, cost_micros from llm_usage")
+      .prepare(
+        "select purpose, model, input_tokens, output_tokens, cost_micros from llm_usage order by purpose",
+      )
       .all();
 
-    expect(usageRows).toHaveLength(1);
-    expect(usageRows[0]?.purpose).toBe("resume_pdf");
-    expect(usageRows[0]?.input_tokens).toBe(2006);
-    expect(usageRows[0]?.output_tokens).toBe(92);
-    expect(usageRows[0]?.cost_micros).toBeGreaterThan(0);
+    expect(usageRows).toHaveLength(2);
+    expect(usageRows.map((row) => row.purpose)).toEqual(["resume_facts", "resume_pdf"]);
+
+    const pdfRow = usageRows.find((row) => row.purpose === "resume_pdf");
+
+    expect(pdfRow?.input_tokens).toBe(2006);
+    expect(pdfRow?.output_tokens).toBe(92);
+    expect(pdfRow?.cost_micros).toBeGreaterThan(0);
+
+    const factsRow = usageRows.find((row) => row.purpose === "resume_facts");
+
+    expect(factsRow?.cost_micros).toBeGreaterThan(0);
 
     sqlite.close();
   } finally {
@@ -338,7 +392,7 @@ test("over the cap the scanned upload still succeeds but the text stays empty", 
     expect(created.bytes).toBe(pdfBytes.byteLength);
     expect(created.parsedWith).toBe("unpdf");
     expect(created.unreadable).toBe(true);
-    expect(created.prefilledFacts).toEqual([]);
+    expect(created.prefilledFacts).toEqual(["email"]);
 
     const download = await owner.get(`/api/profile/resume/${created.id}/file`);
     const returned = new Uint8Array(await download.body());
@@ -349,14 +403,14 @@ test("over the cap the scanned upload still succeeds but the text stays empty", 
 
     const listed = factsSchema.parse(await (await owner.get("/api/profile/facts")).json());
 
-    expect(listed.facts.filter((fact) => fact.source === "resume")).toHaveLength(0);
+    expect(listed.facts.filter((fact) => fact.source === "resume")).toEqual([
+      expect.objectContaining({ key: "email", value: "maya.okafor@example.com", confirmed: false }),
+    ]);
 
     const sqlite = new DatabaseSync(server.databasePath, { readOnly: true });
     sqlite.exec("PRAGMA busy_timeout = 5000;");
 
-    const usageRows = sqlite
-      .prepare("select purpose from llm_usage where purpose = 'resume_pdf'")
-      .all();
+    const usageRows = sqlite.prepare("select purpose from llm_usage").all();
 
     expect(usageRows).toHaveLength(0);
 

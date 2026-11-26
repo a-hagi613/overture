@@ -1,0 +1,55 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 698 >>
+stream
+BT
+/F1 10 Tf
+48 760 Td
+12 TL
+(MAYA OKAFOR) Tj T*
+(Toronto, Canada | +1 416 555 0199 | maya.okafor@example.com | linkedin.com/in/maya-okafor) Tj T*
+() Tj T*
+(SUMMARY) Tj T*
+(Backend engineer with 8 years of experience building payment and billing systems.) Tj T*
+() Tj T*
+(EXPERIENCE) Tj T*
+(Brightwave Analytics - Senior Backend Engineer) Tj T*
+(2021 - Present, Toronto) Tj T*
+(Led the billing platform team and shipped usage-based invoicing.) Tj T*
+() Tj T*
+(Northwind Labs - Backend Engineer) Tj T*
+(2017 - 2021, Toronto) Tj T*
+() Tj T*
+(EDUCATION) Tj T*
+(BSc Computer Science, University of Toronto, 2014) Tj T*
+() Tj T*
+(LANGUAGES) Tj T*
+(English \(native\), French \(conversational\)) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000990 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1060
+%%EOF

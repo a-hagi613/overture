@@ -1,0 +1,45 @@
+{
+  "identity": {
+    "name": "Wei Zhang",
+    "email": "wei.zhang@example.com"
+  },
+  "notes": "Academic CV with a doctorate and publications.",
+  "extraction": {
+    "firstName": "Wei",
+    "lastName": "Zhang",
+    "email": "wei.zhang@example.com",
+    "phone": "+1 617 555 0142",
+    "city": "Boston",
+    "region": null,
+    "country": "United States",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Broad Institute",
+    "currentTitle": "Research Scientist",
+    "yearsOfExperience": 7,
+    "highestDegree": "PhD Computational Biology",
+    "languages": [
+      {
+        "language": "Mandarin",
+        "level": "native"
+      },
+      {
+        "language": "English",
+        "level": "fluent"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Wei Zhang",
+    "email": "wei.zhang@example.com",
+    "phone": "+1 617 555 0142",
+    "current_city": "Boston",
+    "current_country": "United States",
+    "current_employer": "Broad Institute",
+    "current_job_title": "Research Scientist",
+    "years_total": "7",
+    "degree_highest": "PhD Computational Biology",
+    "languages": "Mandarin (native), English (fluent)"
+  }
+}

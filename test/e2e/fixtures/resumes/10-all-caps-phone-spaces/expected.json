@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "name": "Robert Fitzgerald",
+    "email": "rob.fitzgerald@example.com"
+  },
+  "notes": "All-caps header, phone written with spaces and parentheses.",
+  "extraction": {
+    "firstName": "Robert",
+    "lastName": "Fitzgerald",
+    "email": "rob.fitzgerald@example.com",
+    "phone": "(01) 555 0199",
+    "city": "Dublin",
+    "region": null,
+    "country": "Ireland",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Stripe",
+    "currentTitle": "Engineering Manager",
+    "yearsOfExperience": 15,
+    "highestDegree": "BEng Software Engineering",
+    "languages": null,
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Robert Fitzgerald",
+    "email": "rob.fitzgerald@example.com",
+    "phone": "(01) 555 0199",
+    "current_city": "Dublin",
+    "current_country": "Ireland",
+    "current_employer": "Stripe",
+    "current_job_title": "Engineering Manager",
+    "years_total": "15",
+    "degree_highest": "BEng Software Engineering"
+  }
+}

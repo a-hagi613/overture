@@ -1,0 +1,49 @@
+{
+  "identity": {
+    "name": "Camila Ferreira",
+    "email": "camila.ferreira@example.com"
+  },
+  "notes": "Brazilian resume in Portuguese with an accented city, DOCX.",
+  "extraction": {
+    "firstName": "Camila",
+    "lastName": "Ferreira",
+    "email": "camila.ferreira@example.com",
+    "phone": "+55 11 91234 5678",
+    "city": "São Paulo",
+    "region": null,
+    "country": "Brazil",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Nubank",
+    "currentTitle": "Product Designer Sênior",
+    "yearsOfExperience": 6,
+    "highestDegree": "Bacharelado em Design",
+    "languages": [
+      {
+        "language": "Português",
+        "level": "nativo"
+      },
+      {
+        "language": "Inglês",
+        "level": "avançado"
+      },
+      {
+        "language": "Espanhol",
+        "level": "intermediário"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Camila Ferreira",
+    "email": "camila.ferreira@example.com",
+    "phone": "+55 11 91234 5678",
+    "current_city": "São Paulo",
+    "current_country": "Brazil",
+    "current_employer": "Nubank",
+    "current_job_title": "Product Designer Sênior",
+    "years_total": "6",
+    "degree_highest": "Bacharelado em Design",
+    "languages": "Português (nativo), Inglês (avançado), Espanhol (intermediário)"
+  }
+}

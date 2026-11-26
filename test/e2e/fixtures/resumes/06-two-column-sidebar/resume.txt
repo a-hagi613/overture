@@ -1,0 +1,12 @@
+DANIEL OSEI                                      CONTACT
+Accra, Ghana                                     daniel.osei@example.com
+                                                 +233 24 555 0123
+PROFILE
+Site reliability engineer with 7 years of experience.
+                                                 CORE SKILLS
+EXPERIENCE                                       Terraform, Kubernetes, Go
+Kudi - Site Reliability Engineer
+2021 - Present, Accra
+
+EDUCATION
+Certificate in Cloud Operations, Ghana Institute of Technology

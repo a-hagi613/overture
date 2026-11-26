@@ -3,9 +3,30 @@ import { readFileSync } from "node:fs";
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
+import type { AppServer } from "./app-server.ts";
+
 import { authTestIdentity } from "./auth.fixture.ts";
-import { expect, test } from "./app.fixture.ts";
+import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import { latestMailLink, requestMagicLink, verifyAuthState } from "./sign-in.ts";
+
+const test = appTest.extend<{ resumeServer: AppServer }>({
+  resumeServer: [
+    async ({ identityServer }, provide) => {
+      const anthropic = await startAnthropicFixtureServer();
+
+      const server = await startFreshAppServer(identityServer, {
+        ANTHROPIC_API_KEY: "test-anthropic-key",
+        ANTHROPIC_BASE_URL: anthropic.url,
+      });
+
+      await provide(server);
+      await server.stop();
+      anthropic.stop();
+    },
+    { scope: "test" },
+  ],
+});
 
 const targetsSchema = z.object({
   roles: z.array(z.string()),
@@ -299,7 +320,7 @@ test("the live count changes as targets change, and a draft count stores nothing
 });
 
 test("a resume upload puts the current employer on the skip list, and companies add and remove", async ({
-  isolatedAppServer: { url: appServerUrl },
+  resumeServer: { url: appServerUrl },
 }) => {
   const owner = await ownerContextFor(appServerUrl);
 

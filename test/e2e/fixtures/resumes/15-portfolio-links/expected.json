@@ -1,0 +1,38 @@
+{
+  "identity": {
+    "name": "Owen Blackwood",
+    "email": "owen.blackwood@example.com"
+  },
+  "notes": "Three profile links in a footer; phone written without a country code.",
+  "extraction": {
+    "firstName": "Owen",
+    "lastName": "Blackwood",
+    "email": "owen.blackwood@example.com",
+    "phone": "07700 900456",
+    "city": "Manchester",
+    "region": null,
+    "country": "United Kingdom",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "BBC",
+    "currentTitle": "Frontend Engineer",
+    "yearsOfExperience": 3,
+    "highestDegree": "BSc Computer Science",
+    "languages": null,
+    "linkedInUrl": "https://linkedin.com/in/owen-blackwood",
+    "githubOrPortfolioUrls": ["https://github.com/owenblackwood", "https://owenblackwood.design"]
+  },
+  "facts": {
+    "legal_name": "Owen Blackwood",
+    "email": "owen.blackwood@example.com",
+    "phone": "07700 900456",
+    "current_city": "Manchester",
+    "current_country": "United Kingdom",
+    "current_employer": "BBC",
+    "current_job_title": "Frontend Engineer",
+    "years_total": "3",
+    "degree_highest": "BSc Computer Science",
+    "linkedin_url": "https://linkedin.com/in/owen-blackwood",
+    "github_url": "https://github.com/owenblackwood",
+    "website_url": "https://owenblackwood.design"
+  }
+}

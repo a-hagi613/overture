@@ -182,6 +182,12 @@ function fakeLlm(onBatch?: () => void) {
 
         return call;
       },
+      estimateStructuredCostMicros: () => 0,
+      runStructured: async () => {
+        await Promise.resolve();
+
+        throw new Error("this suite makes no structured single call");
+      },
     } satisfies LlmPort,
   };
 }
