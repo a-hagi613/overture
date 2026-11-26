@@ -24,7 +24,12 @@ import { runEmailSendingGuard } from "./sending-domain.ts";
 import { runStorageCheck } from "./r2.ts";
 import { latestLiveCheckAt, recordLiveCheckResult } from "./store.ts";
 import { logInfo } from "../platform/log.ts";
-import { LIVE_CHECK_GROUPS, failedResult, skippedResult } from "./types.ts";
+import {
+  AUTOMATIC_LIVE_CHECK_GROUPS,
+  LIVE_CHECK_GROUPS,
+  failedResult,
+  skippedResult,
+} from "./types.ts";
 
 export const LIVE_CHECK_JOB_KIND = "live.check";
 
@@ -74,7 +79,7 @@ function backupLag(status: ReturnType<BackupMonitor["status"]>) {
 
 export async function runLiveChecks(deps: LiveCheckDeps, payload: string) {
   const parsed = payloadSchema.parse(JSON.parse(payload));
-  const groups = parsed.groups ?? [...LIVE_CHECK_GROUPS];
+  const groups = parsed.groups ?? [...AUTOMATIC_LIVE_CHECK_GROUPS];
   const runId = crypto.randomUUID();
   const results: LiveCheckResult[] = [];
   const mailDeps = { db: deps.db, clock: deps.clock, mail: deps.mail, address: deps.mailAddress };
@@ -212,6 +217,12 @@ export async function runLiveCheckMailJob(deps: LiveCheckDeps, payload: string) 
   return result;
 }
 
+/**
+ * Queues the nightly live check. It runs `AUTOMATIC_LIVE_CHECK_GROUPS` only, so a night with no user sends spends
+ * nothing at Browser Use or Anthropic (#680).
+ * @param db The application database.
+ * @param clock The clock the next UTC midnight is read from.
+ */
 export function scheduleDailyLiveCheck(db: AppDatabase, clock: Clock) {
   return enqueueJob(db, clock, LIVE_CHECK_JOB_KIND, "{}", {
     dedupeKey: DAILY_DEDUPE_KEY,
@@ -243,6 +254,20 @@ export function ensureLiveCheckQueued(db: AppDatabase, clock: Clock) {
   return job.inserted;
 }
 
-export function enqueueLiveCheckNow(db: AppDatabase, clock: Clock) {
-  return enqueueJob(db, clock, LIVE_CHECK_JOB_KIND, "{}", { maxAttempts: 1 });
+/**
+ * Queues one live check from the admin, with the groups the admin explicitly asked for. Omitted groups run the
+ * daytime-safe set, so the button on the admin page never fills a Browser Use session or calls Haiku.
+ * @param db The application database.
+ * @param clock The clock the job is queued against.
+ * @param groups The groups to run, or undefined for `AUTOMATIC_LIVE_CHECK_GROUPS`.
+ * @returns The queued job.
+ */
+export function enqueueLiveCheckNow(
+  db: AppDatabase,
+  clock: Clock,
+  groups?: readonly LiveCheckGroup[],
+) {
+  const payload = groups === undefined ? "{}" : JSON.stringify({ groups });
+
+  return enqueueJob(db, clock, LIVE_CHECK_JOB_KIND, payload, { maxAttempts: 1 });
 }

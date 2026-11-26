@@ -13,6 +13,7 @@ import {
   findAdminHostWorkflowProblems,
   findBunVersionDrift,
   findRecoveryWorkflowProblems,
+  findScheduledSpendProblems,
   findVacuumWorkflowProblems,
   findWorkersDeployProblems,
   flyctlRemoteCommands,
@@ -121,6 +122,207 @@ test("the catalog seed runs its five commands in order", () => {
     "load-discovered-boards",
     "enqueue-backfill",
   ]);
+});
+
+function workflowSources() {
+  return [...new Bun.Glob("*.{yml,yaml}").scanSync(".github/workflows")].toSorted().map((file) => ({
+    path: file,
+    source: readFileSync(join(".github/workflows", file), "utf8"),
+  }));
+}
+
+function scheduledWorkflow(envLines: readonly string[]) {
+  return [
+    "name: Example",
+    "",
+    "on:",
+    "  schedule:",
+    '    - cron: "0 6 * * *"',
+    "  workflow_dispatch:",
+    "",
+    "jobs:",
+    "  spend:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - name: Run",
+    "        env:",
+    ...envLines,
+    "        run: bun run scripts/example.ts",
+  ].join("\n");
+}
+
+test("no automatic workflow passes a secret that spends real money", () => {
+  expect(findScheduledSpendProblems({ workflows: workflowSources() })).toStrictEqual([]);
+});
+
+test("a scheduled workflow that passes a Browser Use key is reported", () => {
+  const problems = findScheduledSpendProblems({
+    workflows: [
+      {
+        path: "nightly.yml",
+        source: scheduledWorkflow([
+          "          BROWSER_USE_API_KEY: ${{ secrets.BROWSER_USE_API_KEY }}",
+        ]),
+      },
+    ],
+  });
+
+  expect(problems).toHaveLength(1);
+  expect(problems[0]).toContain(".github/workflows/nightly.yml");
+  expect(problems[0]).toContain("schedule");
+  expect(problems[0]).toContain("BROWSER_USE_API_KEY");
+  expect(problems[0]).toContain("job spend");
+  expect(problems[0]).toContain("allow-list");
+});
+
+test("a workflow that spends on every push is reported, not only a cron one", () => {
+  const problems = findScheduledSpendProblems({
+    workflows: [
+      {
+        path: "ci-spend.yml",
+        source: [
+          "name: CI spend",
+          "",
+          "on:",
+          "  pull_request:",
+          "",
+          "jobs:",
+          "  gate:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - run: bun run scripts/spend.ts",
+          "        env:",
+          "          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}",
+        ].join("\n"),
+      },
+    ],
+  });
+
+  expect(problems).toHaveLength(1);
+  expect(problems[0]).toContain("pull_request");
+  expect(problems[0]).toContain("ANTHROPIC_API_KEY");
+});
+
+test("an inline or scalar on: trigger is read as automatic", () => {
+  const inline = findScheduledSpendProblems({
+    workflows: [
+      {
+        path: "inline.yml",
+        source: [
+          "on: [push, workflow_dispatch]",
+          "jobs:",
+          "  gate:",
+          "    steps:",
+          "      - env:",
+          "          FREEHIRE_API_KEY: ${{ secrets.FREEHIRE_API_KEY }}",
+        ].join("\n"),
+      },
+    ],
+  });
+
+  expect(inline).toHaveLength(1);
+  expect(inline[0]).toContain("push");
+
+  const scalar = findScheduledSpendProblems({
+    workflows: [
+      {
+        path: "scalar.yml",
+        source: [
+          "on: schedule",
+          "jobs:",
+          "  gate:",
+          "    steps:",
+          "      - env:",
+          "          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}",
+        ].join("\n"),
+      },
+    ],
+  });
+
+  expect(scalar).toHaveLength(1);
+  expect(scalar[0]).toContain("schedule");
+});
+
+test("a workflow_dispatch-only tool may read a spend secret", () => {
+  const problems = findScheduledSpendProblems({
+    workflows: [
+      {
+        path: "ops.yml",
+        source: [
+          "name: Ops",
+          "",
+          "on:",
+          "  workflow_dispatch:",
+          "",
+          "jobs:",
+          "  run:",
+          "    runs-on: ubuntu-latest",
+          "    steps:",
+          "      - run: bun run scripts/live.ts",
+          "        env:",
+          "          FREEHIRE_API_KEY: ${{ secrets.FREEHIRE_API_KEY }}",
+        ].join("\n"),
+      },
+    ],
+  });
+
+  expect(problems).toStrictEqual([]);
+});
+
+test("an allow-list entry permits exactly the secret it names", () => {
+  const source = scheduledWorkflow([
+    "          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}",
+    "          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}",
+  ]);
+
+  const allow = [
+    {
+      workflow: "nightly.yml",
+      secrets: ["ANTHROPIC_API_KEY"],
+      reason: "the owner approved one nightly scoring pass",
+    },
+  ];
+
+  const problems = findScheduledSpendProblems({
+    workflows: [{ path: "nightly.yml", source }],
+    allow,
+  });
+
+  expect(problems).toHaveLength(1);
+  expect(problems[0]).toContain("GEMINI_API_KEY");
+});
+
+test("an allow-list entry that outlived its secret is reported as stale", () => {
+  const problems = findScheduledSpendProblems({
+    workflows: [{ path: "nightly.yml", source: scheduledWorkflow([]) }],
+    allow: [
+      {
+        workflow: "nightly.yml",
+        secrets: ["BROWSER_USE_API_KEY"],
+        reason: "the workflow used to fill forms nightly",
+      },
+    ],
+  });
+
+  expect(problems).toHaveLength(1);
+  expect(problems[0]).toContain("stale");
+  expect(problems[0]).toContain("BROWSER_USE_API_KEY");
+});
+
+test("an allow-list entry for a workflow that no longer exists is reported", () => {
+  const problems = findScheduledSpendProblems({
+    workflows: [{ path: "nightly.yml", source: scheduledWorkflow([]) }],
+    allow: [
+      {
+        workflow: "deleted.yml",
+        secrets: ["ANTHROPIC_API_KEY"],
+        reason: "the workflow was removed",
+      },
+    ],
+  });
+
+  expect(problems).toHaveLength(1);
+  expect(problems[0]).toContain("deleted.yml");
 });
 
 test("every workflow pins the Bun version package.json requires", () => {

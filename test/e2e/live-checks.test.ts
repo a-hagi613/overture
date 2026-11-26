@@ -343,7 +343,7 @@ test.afterAll(async () => {
   await dns?.stop();
 });
 
-test("the daily job captures one sample per ATS without submitting, calls Haiku and round-trips storage", async () => {
+test("an explicit forms and llm run captures one sample per ATS without submitting, calls Haiku and round-trips storage", async () => {
   await api.post("/__test__/catalog/postings/close-all", { data: {} });
   await seedCatalog();
   await api.put("/__test__/kill-switches/ats/personio", {
@@ -368,6 +368,25 @@ test("the daily job captures one sample per ATS without submitting, calls Haiku 
   expect(byCheck.get("alert.disk")?.ok).toBe(true);
   expect(byCheck.get("alert.backup.lag")?.ok).toBe(true);
   expect(submissions).toBe(0);
+});
+
+test("the scheduled run spends nothing: no Browser Use session and no Haiku call", async () => {
+  const before = await liveCheckResults();
+  const formsBefore = before.filter((row) => row.check.startsWith("forms.")).length;
+  const llmBefore = before.filter((row) => row.check === "llm").length;
+  const sessionsBefore = browserUse?.sessions.length ?? 0;
+  const batchesBefore = anthropic?.batchesCreated() ?? 0;
+
+  await runJob("live.check", "{}");
+
+  const results = await liveCheckResults();
+
+  expect(results.filter((row) => row.check.startsWith("forms."))).toHaveLength(formsBefore);
+  expect(results.filter((row) => row.check === "llm")).toHaveLength(llmBefore);
+  expect(browserUse?.sessions.length).toBe(sessionsBefore);
+  expect(anthropic?.batchesCreated()).toBe(batchesBefore);
+  expect(results.some((row) => row.check === "r2")).toBe(true);
+  expect(results.some((row) => row.check === "alert.health")).toBe(true);
 });
 
 test("forms.personio is skipped while its kill switch is engaged", async () => {

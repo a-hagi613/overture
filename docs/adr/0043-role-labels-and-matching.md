@@ -70,6 +70,8 @@ different stack), not label errors. Labelling the week cost $6.59 with the Batch
   freshness cannot be shown and most of their titles have no label yet.
 - **Spend.** The classifier's Haiku tier runs only when the repository variable `CATALOG_LLM_MAX_ITEMS` is a positive
   cap and `ANTHROPIC_API_KEY` is set; both are unset by default, so no daily AI spend happens until the owner opts in.
+  Amended by #680: the scheduled `stapply-daily.yml` build now always passes `--skip-llm` and receives no AI key, so a
+  cron run spends nothing; the Haiku pass is a manual script run only.
 
 ## Consequences
 
