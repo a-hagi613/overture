@@ -112,7 +112,11 @@ export function BoardSheetActions(props: {
       </div>
 
       <Button onClick={props.onArchive} size="sm" variant="outline">
-        <Archive aria-hidden="true" size={14} />
+        {withdrawable ? (
+          <X aria-hidden="true" size={14} />
+        ) : (
+          <Archive aria-hidden="true" size={14} />
+        )}
         <span>{withdrawable ? copy.board.cancel : copy.board.archive}</span>
       </Button>
     </div>

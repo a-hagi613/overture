@@ -310,6 +310,7 @@ test("the drawer shows an empty proof state when no screenshots, receipt or mail
 
 test("Submit screenshots stay behind the signed-in owner", async ({ drawerServer }) => {
   const anonymous = await apiRequest.newContext({ baseURL: drawerServer.url });
+
   const response = await anonymous.get(
     "/api/applications/a-missing-application/screenshots/before_submit",
   );
