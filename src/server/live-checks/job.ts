@@ -222,6 +222,7 @@ export async function runLiveCheckMailJob(deps: LiveCheckDeps, payload: string) 
  * nothing at Browser Use or Anthropic (#680).
  * @param db The application database.
  * @param clock The clock the next UTC midnight is read from.
+ * @returns The queued job.
  */
 export function scheduleDailyLiveCheck(db: AppDatabase, clock: Clock) {
   return enqueueJob(db, clock, LIVE_CHECK_JOB_KIND, "{}", {

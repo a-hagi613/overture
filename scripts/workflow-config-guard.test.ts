@@ -131,6 +131,10 @@ function workflowSources() {
   }));
 }
 
+function envLine(name: string) {
+  return `          ${name}: \${{ secrets.${name} }}`;
+}
+
 function scheduledWorkflow(envLines: readonly string[]) {
   return [
     "name: Example",
@@ -160,9 +164,7 @@ test("a scheduled workflow that passes a Browser Use key is reported", () => {
     workflows: [
       {
         path: "nightly.yml",
-        source: scheduledWorkflow([
-          "          BROWSER_USE_API_KEY: ${{ secrets.BROWSER_USE_API_KEY }}",
-        ]),
+        source: scheduledWorkflow([envLine("BROWSER_USE_API_KEY")]),
       },
     ],
   });
@@ -192,7 +194,7 @@ test("a workflow that spends on every push is reported, not only a cron one", ()
           "    steps:",
           "      - run: bun run scripts/spend.ts",
           "        env:",
-          "          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}",
+          envLine("ANTHROPIC_API_KEY"),
         ].join("\n"),
       },
     ],
@@ -214,7 +216,7 @@ test("an inline or scalar on: trigger is read as automatic", () => {
           "  gate:",
           "    steps:",
           "      - env:",
-          "          FREEHIRE_API_KEY: ${{ secrets.FREEHIRE_API_KEY }}",
+          envLine("FREEHIRE_API_KEY"),
         ].join("\n"),
       },
     ],
@@ -233,7 +235,7 @@ test("an inline or scalar on: trigger is read as automatic", () => {
           "  gate:",
           "    steps:",
           "      - env:",
-          "          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}",
+          envLine("GEMINI_API_KEY"),
         ].join("\n"),
       },
     ],
@@ -260,7 +262,7 @@ test("a workflow_dispatch-only tool may read a spend secret", () => {
           "    steps:",
           "      - run: bun run scripts/live.ts",
           "        env:",
-          "          FREEHIRE_API_KEY: ${{ secrets.FREEHIRE_API_KEY }}",
+          envLine("FREEHIRE_API_KEY"),
         ].join("\n"),
       },
     ],
@@ -270,10 +272,7 @@ test("a workflow_dispatch-only tool may read a spend secret", () => {
 });
 
 test("an allow-list entry permits exactly the secret it names", () => {
-  const source = scheduledWorkflow([
-    "          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}",
-    "          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}",
-  ]);
+  const source = scheduledWorkflow([envLine("ANTHROPIC_API_KEY"), envLine("GEMINI_API_KEY")]);
 
   const allow = [
     {

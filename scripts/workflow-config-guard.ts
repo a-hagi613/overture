@@ -60,7 +60,6 @@ export const SPEND_SECRET_NAMES = [
   "GEMINI_API_KEY",
 ] as const;
 
-/** The triggers that run without a person asking, so one of them may never reach a spend secret. */
 const AUTOMATIC_TRIGGERS = [
   "pull_request",
   "pull_request_target",
@@ -86,7 +85,6 @@ export interface ScheduledSpendInput {
   readonly allow?: readonly SpendAllowlistEntry[];
 }
 
-/** The workflow's top-level `on:` lines: the block's entries, or its inline list or scalar form. */
 function triggerBlock(source: string) {
   const lines = source.split("\n");
   const start = lines.findIndex((line) => /^on:\s*$/u.test(line));
@@ -159,9 +157,10 @@ function spendSecretUses(source: string) {
 
   for (const [index, line] of source.split("\n").entries()) {
     const jobMatch = /^ {2}(?<job>[A-Za-z0-9_-]+):\s*$/u.exec(line);
+    const matchedJob = jobMatch?.groups?.["job"];
 
-    if (jobMatch?.groups?.["job"] !== undefined) {
-      job = jobMatch.groups["job"];
+    if (matchedJob !== undefined) {
+      job = matchedJob;
     }
 
     for (const secret of SPEND_SECRET_NAMES) {
