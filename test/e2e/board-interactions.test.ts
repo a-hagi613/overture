@@ -228,12 +228,12 @@ test("tapping the phone stage tabs changes the visible lane", async ({ boardServ
   );
   await expect(page.locator('section[aria-label="Closed"]')).toBeVisible();
 
-  await stages.getByRole("button", { name: "Queued" }).click();
-  await expect(stages.getByRole("button", { name: "Queued" })).toHaveAttribute(
+  await stages.getByRole("button", { name: "Queue" }).click();
+  await expect(stages.getByRole("button", { name: "Queue" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect(page.locator('section[aria-label="Queued"]')).toBeVisible();
+  await expect(page.locator('section[aria-label="Queue"]')).toBeVisible();
 
   await context.close();
   await request.dispose();
@@ -241,7 +241,7 @@ test("tapping the phone stage tabs changes the visible lane", async ({ boardServ
 
 test("archiving a queued card removes it from the Board", async ({ boardServer, browser }) => {
   const { context, page, request } = await openSeeded(browser, boardServer.url, 1280);
-  const card = page.locator('section[aria-label="Queued"] button[data-card]').first();
+  const card = page.locator('section[aria-label="Queue"] button[data-card]').first();
   const id = await card.getAttribute("data-card");
 
   if (id === null) {
@@ -411,8 +411,8 @@ async function openCard(
       ["closed", "Closed"],
       ["interviewing", "Interviews"],
       ["offer", "Interviews"],
-      ["queued", "Queued"],
-      ["ready", "Ready"],
+      ["queued", "Queue"],
+      ["ready", "Queue"],
       ["screening", "Interviews"],
     ]);
 

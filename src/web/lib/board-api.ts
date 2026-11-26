@@ -31,6 +31,7 @@ export const boardCardSchema = z.object({
   position: z.number().nullable(),
   salary: salarySchema.nullable(),
   score: z.number().nullable(),
+  sendsAt: z.string().nullable(),
   sentAt: z.number().nullable(),
   stage: z.enum(STAGE_KEYS).nullable(),
   stageLocked: z.boolean(),
@@ -49,6 +50,7 @@ const boardResponseSchema = z.object({
       stage: z.enum(STAGE_KEYS),
     }),
   ),
+  hidden: z.array(boardCardSchema).default([]),
   total: z.number(),
   updatedAt: z.number(),
 });

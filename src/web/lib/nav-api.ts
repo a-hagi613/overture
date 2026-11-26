@@ -26,9 +26,9 @@ export type NavKey =
  */
 export const NAV_DESTINATIONS = [
   { glyph: "home", to: "/home" },
+  { glyph: "tracker", to: "/tracker" },
   { glyph: "ready", to: "/ready" },
   { glyph: "review", to: "/review" },
-  { glyph: "tracker", to: "/tracker" },
   { glyph: "inbox", to: "/inbox" },
 ] as const satisfies readonly { glyph: NavKey; to: string }[];
 
@@ -77,9 +77,9 @@ export function isSidebarNavActive(key: SidebarNavKey, pathname: string, search:
 }
 
 export const APPLICATIONS_SUBMENU = [
+  { key: "tracker", label: copy.nav.tracker, to: "/tracker" },
   { key: "ready", label: copy.nav.ready, to: "/ready" },
   { key: "review", label: copy.nav.review, to: "/review" },
-  { key: "tracker", label: copy.nav.tracker, to: "/tracker" },
 ] as const;
 
 export const JOB_PROFILE_SUBMENU = [

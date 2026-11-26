@@ -67,7 +67,7 @@ experiment that has been **removed**. There is one design, and this is it.
 Product vocabulary, screens and behaviour come from `docs/SPEC.md`. The working list of boards still to draw or
 redraw is `docs/research/boards-status.md`; boards that still say `Hold`, show the old nav (Job Board, Holds,
 Answer Bank) or a Live Tab are read as `Queued`/`Review` and the destinations in `docs/SPEC.md` §15 (six in the
-sidebar since ADR 0037: Home, Board, Ready, Review, Inbox, Calendar; Profile and Support open from the profile
+sidebar since ADR 0037: Home, Tracker, Ready, Review, Inbox, Calendar; Profile and Support open from the profile
 menu); their *visual treatment* is what is fixed here.
 
 ---
@@ -131,10 +131,11 @@ meter, a drop target, today in the Calendar — use the same orange while they a
 hover colour, never a link colour and never a focus ring. Small orange text uses `--acct`, never `--acc`,
 because `--acc` is 3.6:1 on paper.
 
-The Board's first lane is **Queued**, with the ink rule (decided 2026-11-23, audit M6). The five lanes and
-their rules are Queued `ink`, Ready `ok`, Applied `acc`, Waiting (Screening · Interviewing · Offer) `ok`,
-Closed `mut`. Queued is ink because most of it needs nothing from the user; a Queued card waiting on a
-Review carries the red "Needs you" pill instead. App chrome — selected cards, active tabs, meters, KPI
+The Tracker's first column is **Queue** (the Queued and Ready stages), with the ink rule (decided 2026-11-23,
+audit M6; three-column update 2026-11-26, #688). The three visible columns and their rules are Queue `ink`,
+Applied `acc` and Interviews (Screening · Interviewing · Offer) `ok`; Closed, Cancelled and Not sent sit behind
+"Show closed" and use `mut`. Queue is ink because most of it needs nothing from the user; a Queue card waiting
+on a Review carries the red "Needs you" pill instead. App chrome — selected cards, active tabs, meters, KPI
 numerals — uses ink, never orange.
 
 Statuses differ in lightness as well as hue. "Needs you" (a Review) is the only red. Applied and Submitted
@@ -230,7 +231,7 @@ A 4px base. Every gap, padding and margin is a multiple of 4 (a few 2 and 6px op
 | App main padding | 16 sides / 20 top / 28 bottom at 390 · 28 / 28 from 768 · 56 from 1700 |
 | App content max | 1440 |
 | Sidebar / rail | 268 · 296 from 1700 · rail 76 |
-| Board lane | five lanes, min 264 each, share the width (`repeat(5, minmax(264px, 1fr))`) |
+| Board lane | three columns, min 264 each, share the width (`repeat(3, minmax(264px, 1fr))`); Closed adds a fourth when shown |
 | Sheet | 468 · 520 from 1700; the Board detail sheet is 500 · 540 |
 | Phone sheet | 82dvh, bottom sheet with a 44×5 grab handle |
 | Home grid | one column · two from 1024 (`lg`) |

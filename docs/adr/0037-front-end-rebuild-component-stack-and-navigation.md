@@ -32,16 +32,25 @@ This supersedes ADR 0034's rejection of `react-day-picker` (it is now used witho
 `/pricing`, `/search` and `/inbox/address` pages are removed. The marketing Worker serves only `/`
 (`src/shared/marketing-paths.ts`).
 
-**Navigation.** Six sidebar destinations, in order: Home, Board, Ready, Review, Inbox, Calendar. Profile opens a menu
+**Navigation.** Six sidebar destinations, in order: Home, Tracker, Ready, Review, Inbox, Calendar. Profile opens a menu
 of five pages (Resume, Details, Preferences, Account, Billing, under `/profile/*`); Support (`/support`) and
 Notifications sit below it. Settings is not a destination: account controls are Profile → Account and billing is
 Profile → Billing (`/profile/billing`, which Stripe Checkout and the portal return to). A ⌘K workspace search
 (`GET /api/workspace/search`) and the theme toggle sit in the sidebar. The sidebar collapses to a 76px rail on demand
 and under 1280px; under 768px a tab bar shows Home, Board, Search, Profile and More.
 
-**Board lanes.** The Board shows five lanes that group the seven Stages: Queued, Ready, Applied, Waiting (Screening,
-Interviewing, Offer) and Closed. The Stage model, the API and `canMoveApplicationToStage` are unchanged; a drop on
-Waiting writes `screening`, and Interviewing and Offer stay settable from the card's Move menu.
+**Board lanes.** The Board shows three columns that group the seven Stages: Queue (Queued and Ready), Applied and
+Interviews (Screening, Interviewing, Offer); Closed, Cancelled and Not sent sit behind "Show closed". The Stage
+model, the API and `canMoveApplicationToStage` are unchanged; a drop on Interviews writes `screening`, and
+Interviewing and Offer stay settable from the card's Move menu. The card's URL parameter is `?application=<id>`
+(the `#688` amendment, 2026-11-26, below).
+
+**2026-11-26 amendment (#688).** The Tracker board is now three visible columns (Queue · Applied · Interviews)
+with Closed / Cancelled / Not sent behind an explicit "Show closed" filter, so the page never scrolls sideways.
+Each card opens the job drawer at `?application=<id>`: opening pushes a history entry so Back closes it, closing
+replaces, and a shared deep link opens the drawer directly. ⌘K searches jobs and applications and navigates to
+the selected application's page with the drawer open. The sidebar puts Tracker above Ready and Review; Ready and
+Review remain pages.
 
 **Page titles.** Each page title's final emphasis word is italic serif in `text-signal` (DESIGN §3).
 
@@ -66,7 +75,7 @@ The rebuild did not record its reasons; these are the shapes it replaced.
 - **Words and colour.** The first lane is labelled "On hold" (banned, ADR 0020) and, with the nav count badges and the
   active nav marker, uses orange where DESIGN §2 reserves orange for the moment Overture acts. Either DESIGN §2 widens
   or the build changes.
-- **The canvas is behind the build.** The boards in DESIGN §13 must be redrawn for the new shell, the five lanes, the
+- **The canvas is behind the build.** The boards in DESIGN §13 must be redrawn for the new shell, the three Tracker columns, the
   Profile pages and Support.
 
 ## Consequences

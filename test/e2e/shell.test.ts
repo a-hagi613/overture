@@ -10,9 +10,9 @@ type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 
 const desktopDestinations = [
   "Home",
+  "Tracker",
   "Ready",
   "Review",
-  "Tracker",
   "Resume & Cover Letter",
   "Job Preferences",
   "Application Answers",
@@ -22,7 +22,7 @@ const desktopDestinations = [
   "Support",
 ];
 
-const phoneDestinations = ["Home", "Ready", "Review", "Tracker", "Inbox"];
+const phoneDestinations = ["Home", "Tracker", "Ready", "Review", "Inbox"];
 
 async function expectDestinations(
   locator: ReturnType<Page["getByRole"]>,
@@ -203,7 +203,7 @@ test("the phone header and tab bar reach search, notifications, the profile hub 
   await expect(shellPage).toHaveURL(/\/tracker\?from=legacy$/u);
 
   await shellPage.goto(`${appServerUrl}/board?card=abc`);
-  await expect(shellPage).toHaveURL(/\/tracker\?card=abc$/u);
+  await expect(shellPage).toHaveURL(/\/tracker\?application=abc$/u);
 
   await shellPage.goto(`${appServerUrl}/calendar?month=2026-11`);
   await expect(shellPage).toHaveURL(/\/calendar\?month=2026-11$/u);

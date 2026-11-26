@@ -120,6 +120,14 @@ function clockLabel(at: number, timeZone: string) {
   return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
 }
 
+function clockLabel12(at: number, timeZone: string) {
+  const parts = localPartsAt(at, timeZone);
+  const suffix = parts.hour < 12 ? "AM" : "PM";
+  const hour = parts.hour % 12 === 0 ? 12 : parts.hour % 12;
+
+  return `${String(hour)}:${String(parts.minute).padStart(2, "0")} ${suffix}`;
+}
+
 function noteFor(
   row: CardRow,
   options: { needsYou: boolean; emailNote: string | null; dayStart: number; timeZone: string },
@@ -282,6 +290,7 @@ export function createApplicationRoutes(
               period: row.salaryPeriod,
             },
       score: row.score,
+      sendsAt: row.scheduledFor === null ? null : clockLabel12(row.scheduledFor, timeZone),
       sentAt: row.sentAt,
       stage: row.stage,
       stageLocked: row.stageLocked,
@@ -291,12 +300,21 @@ export function createApplicationRoutes(
       updatedAt: row.updatedAt,
     }));
 
+    const visibleCards = cards.filter((card) => card.stage !== null);
+
+    const hidden = cards.filter(
+      (card) =>
+        card.stage === null &&
+        (card.status === "skipped" || card.status === "withdrawn" || card.status === "failed"),
+    );
+
     return {
       columns: BOARD_STAGES.map((stage) => ({
-        cards: cards.filter((card) => card.stage === stage),
+        cards: visibleCards.filter((card) => card.stage === stage),
         stage,
       })),
-      total: cards.filter((card) => card.stage !== null).length,
+      hidden,
+      total: visibleCards.length,
       updatedAt: now,
     };
   }

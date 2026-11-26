@@ -365,7 +365,7 @@ test("a fresh user walks the Inbox through the real UI, from empty to the Board 
   expect(readFileSync(saved).subarray(0, 5).toString()).toBe("%PDF-");
 
   await page.getByRole("link", { name: /View in Applications/u }).click();
-  await expect(page).toHaveURL(new RegExp(`/tracker\\?card=${applicationId}`, "u"));
+  await expect(page).toHaveURL(new RegExp(`/tracker\\?application=${applicationId}`, "u"));
   await expect(page.getByRole("dialog", { name: "Application detail" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Application detail" })).toContainText(
     "Senior Backend Engineer",

@@ -137,7 +137,7 @@ test("the month grid shows each day's events and the day panel lists them", asyn
   await expect(panel).toContainText("09:12");
 
   await panel.getByRole("link", { name: "View in Applications" }).first().click();
-  await expect(page).toHaveURL(/\/tracker\?card=/u);
+  await expect(page).toHaveURL(/\/tracker\?application=/u);
 
   await page.goBack();
   await expectNoHorizontalOverflow(page);
@@ -255,9 +255,9 @@ test("Calendar is in the desktop sidebar under Follow-ups and opens /calendar", 
 
   await expect(nav.getByRole("link")).toHaveText([
     /^Home/u,
+    /^Tracker/u,
     /^Ready/u,
     /^Review/u,
-    /^Tracker/u,
     /^Resume & Cover Letter/u,
     /^Job Preferences/u,
     /^Application Answers/u,

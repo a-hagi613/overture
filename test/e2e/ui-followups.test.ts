@@ -40,7 +40,8 @@ const applicationStageSchema = z.object({
 
 const clockSchema = z.object({ now: z.number() });
 
-const WAITING_LABEL = TRACKER_LANES.find((lane) => lane.key === "waiting")?.label ?? "Waiting";
+const WAITING_LABEL =
+  TRACKER_LANES.find((lane) => lane.key === "interviews")?.label ?? "Interviews";
 
 function laneLabel(key: string) {
   return TRACKER_LANES.find((lane) => lane.key === key)?.label ?? key;
@@ -203,7 +204,7 @@ test("the Board card and phone lane live in the URL through refresh and Back", a
   await expect(page.locator('section[aria-label="Applied"]')).toBeVisible();
 
   await page.getByRole("button", { name: WAITING_LABEL }).click();
-  await expect(page).toHaveURL(/[?&]filter=waiting/u);
+  await expect(page).toHaveURL(/[?&]filter=interviews/u);
   await expect(page.getByRole("button", { name: WAITING_LABEL })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -224,7 +225,7 @@ test("the Board card and phone lane live in the URL through refresh and Back", a
 
   await card.click();
   await expect(page.locator(SHEET)).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`[?&]card=${id ?? ""}`, "u"));
+  await expect(page).toHaveURL(new RegExp(`[?&]application=${id ?? ""}`, "u"));
 
   await page.reload();
   await expect(page.locator(SHEET)).toBeVisible();
@@ -319,16 +320,16 @@ test("the phone stage tabs move lanes with Arrow, Home and End when each tab is 
   await lane("applied").focus();
 
   await page.keyboard.press("ArrowRight");
-  await expect(lane("waiting")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(`section[aria-label="${laneLabel("waiting")}"]`)).toBeVisible();
+  await expect(lane("interviews")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(`section[aria-label="${laneLabel("interviews")}"]`)).toBeVisible();
 
   await page.keyboard.press("End");
   await expect(lane("closed")).toBeFocused();
   await expect(lane("closed")).toHaveAttribute("aria-pressed", "true");
 
   await page.keyboard.press("Home");
-  await expect(lane("review")).toBeFocused();
-  await expect(lane("review")).toHaveAttribute("aria-pressed", "true");
+  await expect(lane("queue")).toBeFocused();
+  await expect(lane("queue")).toHaveAttribute("aria-pressed", "true");
 
   await page.keyboard.press("ArrowLeft");
   await expect(lane("closed")).toHaveAttribute("aria-pressed", "true");
