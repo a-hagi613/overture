@@ -437,7 +437,7 @@ appTest.describe("reading Lever and Ashby forms in preparation", () => {
         expect(cachedPlan?.hits).toBe(1);
         expect(cachedPlan?.failures).toBe(0);
         expect(anthropic.batchesCreated()).toBe(0);
-        expect(anthropic.singleMessages()).toHaveLength(0);
+        expect(anthropic.singleMessages().filter((message) => message.hasDocument)).toHaveLength(0);
       } finally {
         await server?.stop();
         anthropic.stop();
@@ -499,7 +499,7 @@ appTest.describe("reading Lever and Ashby forms in preparation", () => {
         expect(plan?.questions).toBe(4);
         expect(plan?.hits).toBe(0);
         expect(anthropic.batchesCreated()).toBe(0);
-        expect(anthropic.singleMessages()).toHaveLength(0);
+        expect(anthropic.singleMessages().filter((message) => message.hasDocument)).toHaveLength(0);
       } finally {
         await server?.stop();
         anthropic.stop();
@@ -569,7 +569,7 @@ appTest.describe("the login-wall pre-flight in preparation", () => {
 
         expect((await planCache(owner)).filter((plan) => plan.ats === "lever")).toHaveLength(0);
         expect(anthropic.batchesCreated()).toBe(0);
-        expect(anthropic.singleMessages()).toHaveLength(0);
+        expect(anthropic.singleMessages().filter((message) => message.hasDocument)).toHaveLength(0);
       } finally {
         await server?.stop();
         anthropic.stop();
@@ -640,7 +640,7 @@ appTest.describe("the login-wall pre-flight in preparation", () => {
         expect(billing.applicationsLeft).toBe(3);
         expect(billing.ledger.map((entry) => entry.kind)).toEqual(["grant"]);
         expect(anthropic.batchesCreated()).toBe(0);
-        expect(anthropic.singleMessages()).toHaveLength(0);
+        expect(anthropic.singleMessages().filter((message) => message.hasDocument)).toHaveLength(0);
       } finally {
         await server?.stop();
         anthropic.stop();

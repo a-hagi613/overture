@@ -10,7 +10,10 @@ import type { IdentityServer } from "./identity-server-test.fixture.ts";
 import type { BrowserUseFixture, BrowserUseFixtureOptions } from "./browser-use-server.fixture.ts";
 import type { GreenhouseFixture } from "./greenhouse.fixture.ts";
 
+import type { AnthropicFixtureServer } from "./anthropic-fixture-server.ts";
+
 import { expect, startFreshAppServer, test } from "./app.fixture.ts";
+import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import { startBrowserUseFixture } from "./browser-use-server.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import {
@@ -145,6 +148,7 @@ const reviewSchema = z.object({
 const reviewsSchema = z.object({ reviews: z.array(reviewSchema) });
 
 interface SendHarness {
+  anthropic: AnthropicFixtureServer;
   fixture: BrowserUseFixture;
   greenhouse: GreenhouseFixture;
   server: AppServer;
@@ -161,10 +165,13 @@ async function startHarness(
   options: SendHarnessOptions = {},
 ) {
   const directory = mkdtempSync(join(tmpdir(), "overture-browser-use-send-"));
+  const anthropic = await startAnthropicFixtureServer();
   const fixture = startBrowserUseFixture(options.fixture);
   const greenhouse = startGreenhouseFixture();
 
   const environment = {
+    ANTHROPIC_API_KEY: "test-anthropic-key",
+    ANTHROPIC_BASE_URL: anthropic.url,
     BROWSER_PROVIDER: "browser_use",
     BROWSER_PROXY_COUNTRY: "ca",
     BROWSER_USE_API_BASE_URL: fixture.url,
@@ -177,11 +184,12 @@ async function startHarness(
 
   const server = await startFreshAppServer(identityServer, environment);
 
-  return { fixture, greenhouse, server };
+  return { anthropic, fixture, greenhouse, server };
 }
 
 async function closeHarness(harness: SendHarness) {
   await harness.server.stop();
+  harness.anthropic.stop();
   harness.fixture.close();
   harness.greenhouse.close();
 }

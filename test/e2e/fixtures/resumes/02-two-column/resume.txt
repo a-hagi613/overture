@@ -1,0 +1,12 @@
+ARJUN MEHTA                                  SKILLS
+arjun.mehta@example.com                      Go, PostgreSQL, Kubernetes
++44 7700 900123                              English (fluent), Hindi (native)
+London, United Kingdom
+
+EXPERIENCE                                   LANGUAGES
+Monzo - Staff Engineer                       English (fluent)
+2020 - Present                               Hindi (native)
+11+ years of experience building payment APIs.
+
+EDUCATION
+MSc Computer Science, University of Edinburgh, 2013

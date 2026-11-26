@@ -1,0 +1,49 @@
+{
+  "identity": {
+    "name": "Nadia Haddad",
+    "email": "nadia.haddad@example.com"
+  },
+  "notes": "No email on the resume, so the signup email fills it.",
+  "extraction": {
+    "firstName": "Nadia",
+    "lastName": "Haddad",
+    "email": null,
+    "phone": "+212 6 12 34 56 78",
+    "city": "Rabat",
+    "region": null,
+    "country": "Morocco",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Bank Al-Maghrib Lab",
+    "currentTitle": "Senior UX Researcher",
+    "yearsOfExperience": 5,
+    "highestDegree": "MA Interaction Design",
+    "languages": [
+      {
+        "language": "Arabic",
+        "level": "native"
+      },
+      {
+        "language": "French",
+        "level": "fluent"
+      },
+      {
+        "language": "English",
+        "level": "professional"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Nadia Haddad",
+    "email": "nadia.haddad@example.com",
+    "phone": "+212 6 12 34 56 78",
+    "current_city": "Rabat",
+    "current_country": "Morocco",
+    "current_employer": "Bank Al-Maghrib Lab",
+    "current_job_title": "Senior UX Researcher",
+    "years_total": "5",
+    "degree_highest": "MA Interaction Design",
+    "languages": "Arabic (native), French (fluent), English (professional)"
+  }
+}

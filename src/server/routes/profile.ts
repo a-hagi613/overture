@@ -18,6 +18,7 @@ import { createFactService } from "../profile/facts.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService, MAX_RESUME_BYTES } from "../profile/resume.ts";
+import { createResumeFactsReader } from "../profile/resume-facts.ts";
 import { hasPdfMagicBytes } from "../profile/pdf.ts";
 import { clearBlockerIfRecovered } from "../profile/running-state.ts";
 import { createLanguagesService } from "../profile/languages.ts";
@@ -87,6 +88,13 @@ export function createProfileRoutes(deps: {
 
   const factsService = createFactService({ db, clock, personal });
 
+  const resumeFactsReader = createResumeFactsReader({
+    db,
+    clock,
+    llm,
+    spendGate: deps.spendGate,
+  });
+
   const strengthenService = createStrengthenService({
     db,
     clock,
@@ -139,7 +147,13 @@ export function createProfileRoutes(deps: {
       bytes,
     });
 
-    const prefilled = await factsService.prefillFromResume(account.id, upload.text);
+    const read = await resumeFactsReader.read(
+      account.id,
+      { email: account.email, name: account.name },
+      upload.text,
+    );
+
+    const prefilled = await factsService.saveFromResume(account.id, read.facts);
     clearBlockerIfRecovered(db, clock, account.id, "no_resume");
 
     const employer = prefilled.find((fact) => fact.key === "current_employer");

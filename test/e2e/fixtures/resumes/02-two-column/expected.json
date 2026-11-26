@@ -1,0 +1,45 @@
+{
+  "identity": {
+    "name": "Arjun Mehta",
+    "email": "arjun.mehta@example.com"
+  },
+  "notes": "Two columns: contact and experience left, skills and languages right.",
+  "extraction": {
+    "firstName": "Arjun",
+    "lastName": "Mehta",
+    "email": "arjun.mehta@example.com",
+    "phone": "+44 7700 900123",
+    "city": "London",
+    "region": null,
+    "country": "United Kingdom",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Monzo",
+    "currentTitle": "Staff Engineer",
+    "yearsOfExperience": 11,
+    "highestDegree": "MSc Computer Science",
+    "languages": [
+      {
+        "language": "English",
+        "level": "fluent"
+      },
+      {
+        "language": "Hindi",
+        "level": "native"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Arjun Mehta",
+    "email": "arjun.mehta@example.com",
+    "phone": "+44 7700 900123",
+    "current_city": "London",
+    "current_country": "United Kingdom",
+    "current_employer": "Monzo",
+    "current_job_title": "Staff Engineer",
+    "years_total": "11",
+    "degree_highest": "MSc Computer Science",
+    "languages": "English (fluent), Hindi (native)"
+  }
+}

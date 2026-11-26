@@ -1,0 +1,50 @@
+{
+  "identity": {
+    "name": "Lena Hoffmann",
+    "email": "lena.hoffmann@example.de"
+  },
+  "notes": "German resume in a DOCX with a citizenship statement.",
+  "extraction": {
+    "firstName": "Lena",
+    "lastName": "Hoffmann",
+    "email": "lena.hoffmann@example.de",
+    "phone": "+49 30 1234567",
+    "city": "Berlin",
+    "region": null,
+    "country": "Deutschland",
+    "citizenshipOrWorkPermit": "Deutsche Staatsbürgerin",
+    "currentEmployer": "Zalando",
+    "currentTitle": "Senior Product Managerin",
+    "yearsOfExperience": 12,
+    "highestDegree": "MSc Wirtschaftsinformatik",
+    "languages": [
+      {
+        "language": "Deutsch",
+        "level": "Muttersprache"
+      },
+      {
+        "language": "Englisch",
+        "level": "verhandlungssicher"
+      },
+      {
+        "language": "Französisch",
+        "level": "Grundkenntnisse"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Lena Hoffmann",
+    "email": "lena.hoffmann@example.de",
+    "phone": "+49 30 1234567",
+    "current_city": "Berlin",
+    "current_country": "Deutschland",
+    "work_auth": "Deutsche Staatsbürgerin",
+    "current_employer": "Zalando",
+    "current_job_title": "Senior Product Managerin",
+    "years_total": "12",
+    "degree_highest": "MSc Wirtschaftsinformatik",
+    "languages": "Deutsch (Muttersprache), Englisch (verhandlungssicher), Französisch (Grundkenntnisse)"
+  }
+}

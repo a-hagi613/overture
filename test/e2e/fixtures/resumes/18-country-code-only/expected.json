@@ -1,0 +1,45 @@
+{
+  "identity": {
+    "name": "Ingrid Larsen",
+    "email": "ingrid.larsen@example.com"
+  },
+  "notes": "Home written as a city with an ISO country code instead of a name.",
+  "extraction": {
+    "firstName": "Ingrid",
+    "lastName": "Larsen",
+    "email": "ingrid.larsen@example.com",
+    "phone": "+45 20 12 34 56",
+    "city": "Copenhagen",
+    "region": null,
+    "country": "DK",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Maersk",
+    "currentTitle": "Logistics Analyst",
+    "yearsOfExperience": 6,
+    "highestDegree": "MSc Supply Chain Management",
+    "languages": [
+      {
+        "language": "Danish",
+        "level": "native"
+      },
+      {
+        "language": "English",
+        "level": "fluent"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Ingrid Larsen",
+    "email": "ingrid.larsen@example.com",
+    "phone": "+45 20 12 34 56",
+    "current_city": "Copenhagen",
+    "current_country": "Denmark",
+    "current_employer": "Maersk",
+    "current_job_title": "Logistics Analyst",
+    "years_total": "6",
+    "degree_highest": "MSc Supply Chain Management",
+    "languages": "Danish (native), English (fluent)"
+  }
+}

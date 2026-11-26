@@ -1,0 +1,45 @@
+{
+  "identity": {
+    "name": "Nguyễn Thị Mai",
+    "email": "mai.nguyen@example.com"
+  },
+  "notes": "Vietnamese diacritics in name and employer, DOCX.",
+  "extraction": {
+    "firstName": "Nguyễn Thị",
+    "lastName": "Mai",
+    "email": "mai.nguyen@example.com",
+    "phone": "+84 912 345 678",
+    "city": "Hanoi",
+    "region": null,
+    "country": "Vietnam",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "FPT Software",
+    "currentTitle": "Kỹ sư phần mềm cao cấp",
+    "yearsOfExperience": 8,
+    "highestDegree": "Bằng Kỹ sư Công nghệ thông tin",
+    "languages": [
+      {
+        "language": "Tiếng Việt",
+        "level": "bản ngữ"
+      },
+      {
+        "language": "Tiếng Anh",
+        "level": "thành thạo"
+      }
+    ],
+    "linkedInUrl": null,
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Nguyễn Thị Mai",
+    "email": "mai.nguyen@example.com",
+    "phone": "+84 912 345 678",
+    "current_city": "Hanoi",
+    "current_country": "Vietnam",
+    "current_employer": "FPT Software",
+    "current_job_title": "Kỹ sư phần mềm cao cấp",
+    "years_total": "8",
+    "degree_highest": "Bằng Kỹ sư Công nghệ thông tin",
+    "languages": "Tiếng Việt (bản ngữ), Tiếng Anh (thành thạo)"
+  }
+}

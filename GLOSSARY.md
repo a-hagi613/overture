@@ -128,9 +128,9 @@ waits for Approval and is labelled Ready, not Needs you.
 _Avoid_: action required, blocked
 
 **Paid work**:
-Any step that calls the LLM or a cloud browser: scoring, preparation, form reads, resume text extraction, email
-classification and sending. It never runs for an account with no Applications left while the spend gate is on, so
-nobody can cost the host money before a verified trial card, a paid plan, or an admin grant.
+Any step that calls the LLM or a cloud browser: scoring, preparation, form reads, resume text extraction, resume
+fact reading, email classification and sending. It never runs for an account with no Applications left while the spend
+gate is on, so nobody can cost the host money before a verified trial card, a paid plan, or an admin grant.
 _Avoid_: AI work, compute, usage
 
 ## The user's facts

@@ -64,6 +64,22 @@ function countedLlm() {
         text: null,
       };
     },
+    estimateStructuredCostMicros: () => 0,
+    runStructured: async () => {
+      calls += 1;
+
+      await Promise.resolve();
+
+      return {
+        cachedTokens: 0,
+        cacheWriteTokens: 0,
+        costMicros: 0,
+        inputTokens: 0,
+        model: "fake",
+        outputTokens: 0,
+        text: null,
+      };
+    },
   };
 
   return { calls: () => calls, llm };

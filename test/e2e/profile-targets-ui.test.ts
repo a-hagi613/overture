@@ -4,9 +4,30 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
+import type { AppServer } from "./app-server.ts";
+
 import { authTestIdentity } from "./auth.fixture.ts";
-import { expect, test } from "./app.fixture.ts";
+import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
+
+const test = appTest.extend<{ resumeServer: AppServer }>({
+  resumeServer: [
+    async ({ identityServer }, provide) => {
+      const anthropic = await startAnthropicFixtureServer();
+
+      const server = await startFreshAppServer(identityServer, {
+        ANTHROPIC_API_KEY: "test-anthropic-key",
+        ANTHROPIC_BASE_URL: anthropic.url,
+      });
+
+      await provide(server);
+      await server.stop();
+      anthropic.stop();
+    },
+    { scope: "test" },
+  ],
+});
 
 const createdSchema = z.object({ id: z.string() });
 const countSchema = z.object({ matchedCount: z.number() });
@@ -252,7 +273,7 @@ test("a granular Level-2 role can be searched and added from Profile targets, an
 });
 
 test("the skip list is prefilled from the resume, and companies add and remove", async ({
-  isolatedAppServer: { url: appServerUrl },
+  resumeServer: { url: appServerUrl },
   browser,
 }) => {
   const { request, storageState } = await ownerStorage(appServerUrl);

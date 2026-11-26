@@ -11,6 +11,7 @@ import type { AppServer } from "./app-server.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import { downloadArchive } from "./export-archive.ts";
 import {
   ownerContextFor,
@@ -23,10 +24,17 @@ import {
 const test = appTest.extend<{ exportServer: AppServer }>({
   exportServer: [
     async ({ identityServer }, provide) => {
-      const server = await startFreshAppServer(identityServer, { JOBS_AUTORUN: "false" });
+      const anthropic = await startAnthropicFixtureServer();
+
+      const server = await startFreshAppServer(identityServer, {
+        ANTHROPIC_API_KEY: "test-anthropic-key",
+        ANTHROPIC_BASE_URL: anthropic.url,
+        JOBS_AUTORUN: "false",
+      });
 
       await provide(server);
       await server.stop();
+      anthropic.stop();
     },
     { scope: "test" },
   ],

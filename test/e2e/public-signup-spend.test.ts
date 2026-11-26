@@ -256,8 +256,12 @@ publicTest.describe("public sign-up with spend protection", () => {
 
       expect(allowed.parsedWith).toBe("llm");
       expect(allowed.unreadable).toBe(false);
-      expect(anthropic.singleMessages()).toHaveLength(1);
-      expect(llmUsageRows(publicServer)).toHaveLength(1);
+      expect(anthropic.singleMessages()).toHaveLength(2);
+      expect(
+        llmUsageRows(publicServer)
+          .map((row) => row.purpose)
+          .toSorted(),
+      ).toEqual(["resume_facts", "resume_pdf"]);
 
       await context.dispose();
     },

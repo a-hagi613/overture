@@ -27,6 +27,13 @@ export interface FactRecord {
   revision: number;
 }
 
+/** One value the resume reader grounded against the resume text, ready to store as a Fact. */
+export interface ResumeFactDraft {
+  key: string;
+  scope: string;
+  value: string;
+}
+
 export interface FactService {
   list: (userId: string) => Promise<FactRecord[]>;
   save: (userId: string, key: string, value: string, scope?: string) => Promise<FactRecord>;
@@ -36,8 +43,8 @@ export interface FactService {
     value: string,
     scope?: string,
   ) => Promise<FactRecord>;
+  saveFromResume: (userId: string, drafts: readonly ResumeFactDraft[]) => Promise<FactRecord[]>;
   remove: (userId: string, key: string, scope?: string | null) => Promise<number>;
-  prefillFromResume: (userId: string, text: string) => Promise<FactRecord[]>;
 }
 
 function assertFactKey(key: string) {
@@ -219,6 +226,18 @@ export function createFactService(deps: {
 
       return upsert(userId, key, scope, value, "review", true);
     },
+    saveFromResume: async (userId: string, drafts: readonly ResumeFactDraft[]) => {
+      for (const draft of drafts) {
+        assertFactKey(draft.key);
+        assertScope(draft.key, draft.scope);
+      }
+
+      return Promise.all(
+        drafts.map(async (draft) =>
+          upsert(userId, draft.key, draft.scope, draft.value, "resume", false),
+        ),
+      );
+    },
     remove: async (userId: string, key: string, scope: string | null = null) => {
       assertFactKey(key);
 
@@ -243,45 +262,5 @@ export function createFactService(deps: {
 
       return removed.length;
     },
-    prefillFromResume: async (userId: string, text: string) => {
-      const parsed = parseResumeFacts(text);
-
-      const prefilled = await Promise.all(
-        parsed.map(async (fact) => upsert(userId, fact.key, "", fact.value, "resume", false)),
-      );
-
-      return prefilled;
-    },
   };
-}
-
-const LABELLED_PATTERNS: { key: string; pattern: RegExp }[] = [
-  { key: "legal_name", pattern: /^name:\s*(?<value>.+)$/imu },
-  { key: "email", pattern: /^email:\s*(?<value>\S+@\S+\.\S+)$/imu },
-  { key: "phone", pattern: /^phone:\s*(?<value>.+)$/imu },
-  { key: "current_city", pattern: /^city:\s*(?<value>.+)$/imu },
-  { key: "current_country", pattern: /^country:\s*(?<value>.+)$/imu },
-  { key: "notice_period", pattern: /^notice period:\s*(?<value>.+)$/imu },
-  { key: "earliest_start", pattern: /^earliest start:\s*(?<value>.+)$/imu },
-  { key: "work_auth", pattern: /^work authorisation:\s*(?<value>.+)$/imu },
-  { key: "willing_relocate", pattern: /^willing to relocate:\s*(?<value>.+)$/imu },
-  { key: "salary_expectation", pattern: /^salary expectation:\s*(?<value>.+)$/imu },
-  { key: "degree_highest", pattern: /^degree:\s*(?<value>.+)$/imu },
-  { key: "languages", pattern: /^languages:\s*(?<value>.+)$/imu },
-  { key: "linkedin_url", pattern: /^linkedin:\s*(?<value>\S+)$/imu },
-  { key: "current_employer", pattern: /^current employer:\s*(?<value>.+)$/imu },
-];
-
-function parseResumeFacts(text: string) {
-  const found: { key: string; value: string }[] = [];
-
-  for (const { key, pattern } of LABELLED_PATTERNS) {
-    const match = pattern.exec(text);
-
-    if (match?.groups?.value !== undefined) {
-      found.push({ key, value: match.groups.value.trim() });
-    }
-  }
-
-  return found;
 }

@@ -8,17 +8,23 @@ import type { AppServer } from "./app-server.ts";
 
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
 
 const test = appTest.extend<{ onboardingServer: AppServer }>({
   onboardingServer: [
     async ({ identityServer }, provide) => {
+      const anthropic = await startAnthropicFixtureServer();
+
       const server = await startFreshAppServer(identityServer, {
         ALLOWED_SIGNUP_EMAILS: "gated.onboarding.user@example.com",
+        ANTHROPIC_API_KEY: "test-anthropic-key",
+        ANTHROPIC_BASE_URL: anthropic.url,
       });
 
       await provide(server);
       await server.stop();
+      anthropic.stop();
     },
     { scope: "test" },
   ],

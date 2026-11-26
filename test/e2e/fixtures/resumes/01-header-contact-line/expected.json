@@ -1,0 +1,46 @@
+{
+  "identity": {
+    "name": "Maya Okafor",
+    "email": "maya.okafor@example.com"
+  },
+  "notes": "One-column page with a single contact line under the name.",
+  "extraction": {
+    "firstName": "Maya",
+    "lastName": "Okafor",
+    "email": "maya.okafor@example.com",
+    "phone": "+1 416 555 0199",
+    "city": "Toronto",
+    "region": null,
+    "country": "Canada",
+    "citizenshipOrWorkPermit": null,
+    "currentEmployer": "Brightwave Analytics",
+    "currentTitle": "Senior Backend Engineer",
+    "yearsOfExperience": 8,
+    "highestDegree": "BSc Computer Science",
+    "languages": [
+      {
+        "language": "English",
+        "level": "native"
+      },
+      {
+        "language": "French",
+        "level": "conversational"
+      }
+    ],
+    "linkedInUrl": "https://www.linkedin.com/in/maya-okafor",
+    "githubOrPortfolioUrls": null
+  },
+  "facts": {
+    "legal_name": "Maya Okafor",
+    "email": "maya.okafor@example.com",
+    "phone": "+1 416 555 0199",
+    "current_city": "Toronto",
+    "current_country": "Canada",
+    "current_employer": "Brightwave Analytics",
+    "current_job_title": "Senior Backend Engineer",
+    "years_total": "8",
+    "degree_highest": "BSc Computer Science",
+    "languages": "English (native), French (conversational)",
+    "linkedin_url": "https://www.linkedin.com/in/maya-okafor"
+  }
+}

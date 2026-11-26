@@ -67,6 +67,7 @@ function llmAnswering(value: HealAnswer) {
   const llm: LlmPort = {
     estimateBatchCostMicros: () => 500,
     estimateSingleCostMicros: () => 0,
+    estimateStructuredCostMicros: () => 0,
     runBatch: async (batch) => {
       requests.push(...batch.map((request) => request.user));
 
@@ -87,6 +88,11 @@ function llmAnswering(value: HealAnswer) {
       await Promise.resolve();
 
       throw new Error("self-heal must never use the single PDF call");
+    },
+    runStructured: async () => {
+      await Promise.resolve();
+
+      throw new Error("self-heal must never use the structured single call");
     },
   };
 

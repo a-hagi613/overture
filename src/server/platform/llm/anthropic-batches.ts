@@ -157,6 +157,31 @@ function sameOrigin(root: string, target: string) {
   }
 }
 
+function recordedMessageCall(message: z.infer<typeof messageSchema>, purpose: string) {
+  const result = {
+    model: message.model,
+    text: message.text,
+    inputTokens: message.usage.input_tokens,
+    cachedTokens: message.usage.cache_read_input_tokens,
+    cacheWriteTokens: message.usage.cache_creation_input_tokens,
+    outputTokens: message.usage.output_tokens,
+    costMicros: costMicrosFor(message.model, {
+      input: message.usage.input_tokens,
+      cacheRead: message.usage.cache_read_input_tokens,
+      cacheWrite: message.usage.cache_creation_input_tokens,
+      output: message.usage.output_tokens,
+    }),
+  };
+
+  defaultMetrics().recordLlmCall({
+    ...result,
+    purpose,
+    status: "ok",
+  });
+
+  return result;
+}
+
 export function createAnthropicBatchProvider(config: AnthropicLlmConfig) {
   const { root, headers, call } = createClient(config);
 
@@ -354,30 +379,37 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
 
       const body: unknown = await response.json();
 
-      const message = messageSchema.parse(body);
+      return recordedMessageCall(messageSchema.parse(body), "resume");
+    },
+    estimateStructuredCostMicros: (request) =>
+      costMicrosFor(config.model, {
+        input:
+          Math.ceil(request.system.length / CHARS_PER_TOKEN) +
+          Math.ceil(request.user.length / CHARS_PER_TOKEN),
+        cacheRead: 0,
+        cacheWrite: 0,
+        output: ESTIMATED_OUTPUT_TOKENS,
+      }),
+    runStructured: async (request) => {
+      if (config.apiKey === undefined) {
+        throw new Error("the Anthropic adapter has no api key configured");
+      }
 
-      const result = {
-        model: message.model,
-        text: message.text,
-        inputTokens: message.usage.input_tokens,
-        cachedTokens: message.usage.cache_read_input_tokens,
-        cacheWriteTokens: message.usage.cache_creation_input_tokens,
-        outputTokens: message.usage.output_tokens,
-        costMicros: costMicrosFor(message.model, {
-          input: message.usage.input_tokens,
-          cacheRead: message.usage.cache_read_input_tokens,
-          cacheWrite: message.usage.cache_creation_input_tokens,
-          output: message.usage.output_tokens,
+      const response = await call("/v1/messages", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          model: config.model,
+          max_tokens: SINGLE_MAX_TOKENS,
+          system: [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: request.user }],
+          output_config: { format: { type: "json_schema", schema: request.schema } },
         }),
-      };
-
-      defaultMetrics().recordLlmCall({
-        ...result,
-        purpose: "resume",
-        status: "ok",
       });
 
-      return result;
+      const body: unknown = await response.json();
+
+      return recordedMessageCall(messageSchema.parse(body), request.purpose);
     },
   };
 
