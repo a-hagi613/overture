@@ -20,13 +20,11 @@ export interface ObjectStore {
 async function keysUnder(root: string) {
   const keys: string[] = [];
 
-  // A store whose root was never written has no keys yet; that is an empty
-  // store, not a failure to list.
-  const writable = await stat(root)
+  const present = await stat(root)
     .then((details) => details.isDirectory())
     .catch(() => false);
 
-  if (!writable) {
+  if (!present) {
     return keys;
   }
 
