@@ -40,7 +40,7 @@ function preferencesFor(url: string) {
   const parsed = safeHref(url);
 
   if (parsed === null) {
-    return;
+    return null;
   }
 
   return { label: "Manage email preferences", url: new URL("/profile/account", parsed).toString() };
@@ -79,7 +79,7 @@ function withPreferences(input: {
 
   const preferences = preferencesFor(input.url);
 
-  if (preferences !== undefined) {
+  if (preferences !== null) {
     template.preferences = preferences;
   }
 
