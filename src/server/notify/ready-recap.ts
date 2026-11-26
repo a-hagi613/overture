@@ -16,6 +16,7 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { MailCapExceededError } from "../platform/mail/errors.ts";
+import { recapEmail } from "../platform/mail/emails.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import {
   addLocalDays,
@@ -267,16 +268,21 @@ async function emailRecap(
   const todayStart = localDayStart(now, timeZone);
   const yesterdayStart = localDayStartFor(addLocalDays(localDateAt(now, timeZone), -1), timeZone);
 
-  const body = copy.mail.recapBody({
-    needAnswer: recap.openReviews,
-    ready: recap.ready,
-    replied: repliedYesterday(deps.db, userId, yesterdayStart, todayStart),
-    sent: sentYesterday(deps.db, userId, yesterdayStart, todayStart),
-    url: recap.url,
-  });
+  const sent = sentYesterday(deps.db, userId, yesterdayStart, todayStart);
+  const replied = repliedYesterday(deps.db, userId, yesterdayStart, todayStart);
 
   try {
-    await deps.mail.sendReadyRecap({ body, subject: recap.subject, to: to.email });
+    await deps.mail.sendReadyRecap({
+      to: to.email,
+      ...recapEmail({
+        needAnswer: recap.openReviews,
+        ready: recap.ready,
+        replied,
+        sent,
+        subject: recap.subject,
+        url: recap.url,
+      }),
+    });
   } catch (error) {
     if (!(error instanceof MailCapExceededError)) {
       throw error;

@@ -13,9 +13,6 @@ import { requestMagicLink, sinkMailCount } from "./sign-in.ts";
 
 const MAGIC_LINK_SUBJECT = "Your Overture sign-in link";
 
-const magicLinkBody = (url: string) =>
-  `Open this link to sign in to Overture. It works once and expires in 15 minutes.\n\n${url}\n`;
-
 const cloudflareEnvironment = {
   CLOUDFLARE_EMAIL_API_TOKEN: "e2e-cloudflare-email-api-token",
   CLOUDFLARE_ACCOUNT_ID: "e2e-cloudflare-account-id",
@@ -36,6 +33,7 @@ const cloudflareRequestListSchema = z.object({ requests: z.array(cloudflareReque
 
 const sendEmailSchema = z.object({
   from: z.string(),
+  html: z.string(),
   to: z.array(z.string()),
   subject: z.string(),
   text: z.string(),
@@ -88,7 +86,10 @@ test("a magic-link request sends exactly one Cloudflare Email Sending request wi
     }
 
     expect(link).toContain("/api/auth/magic-link/verify?token=");
-    expect(payload.text).toBe(magicLinkBody(link));
+    expect(payload.text).toContain("Sign in to Overture");
+    expect(payload.text).toContain(link);
+    expect(payload.html).toContain(`href="${link.replaceAll("&", "&amp;")}"`);
+    expect(payload.html).toContain("Sign in to Overture");
     expect(call.headers["authorization"]).toBe(
       `Bearer ${cloudflareEnvironment.CLOUDFLARE_EMAIL_API_TOKEN}`,
     );

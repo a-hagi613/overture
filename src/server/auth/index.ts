@@ -23,6 +23,7 @@ import {
 } from "../platform/db/schema.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { recordPasskeyAssertion } from "../platform/passkey/index.ts";
+import { magicLinkEmail } from "../platform/mail/emails.ts";
 import { isSameMailbox } from "./email.ts";
 import { isDemoAllowedAuthPath } from "./demo-paths.ts";
 import {
@@ -467,7 +468,7 @@ export function createAuth(
             });
           }
 
-          await mailSender.sendMagicLink({ to: email, url: data.url });
+          await mailSender.sendMagicLink({ to: email, ...magicLinkEmail(data.url) });
         },
       }),
       ...(env.DEMO_LOGIN_ENABLED && options.ensureDemoUser !== undefined

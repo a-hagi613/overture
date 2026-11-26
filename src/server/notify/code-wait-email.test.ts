@@ -107,6 +107,9 @@ test("no push endpoint emails the paste ask once per wait (#565)", async () => {
   expect(sent).toHaveLength(1);
   expect(sent[0]?.to).toBe("maya@example.test");
   expect(sent[0]?.body).toContain("https://overture.test/home?codeWait=code-email-wait");
+  expect(sent[0]?.html).toContain('href="https://overture.test/home?codeWait=code-email-wait"');
+  expect(sent[0]?.html).toContain("Paste your verification code");
+  expect(sent[0]?.html).toContain("Overture");
   expect(emailedAt(db)?.getTime()).toBe(NOW);
 
   expect(await send(db)).toEqual({ sent: false });

@@ -19,6 +19,7 @@
     "lint:config": "bun run scripts/check-lint-config.ts",
     "format": "bun fmt",
     "format:check": "bun fmt --check",
+    "email:preview": "bun run scripts/preview-email.ts",
     "test:unit": "bun test src scripts",
     "test:e2e": "bun node_modules/playwright/cli.js test",
     "db:generate": "drizzle-kit generate",

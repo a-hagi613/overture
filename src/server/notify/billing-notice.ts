@@ -10,6 +10,7 @@ import { copy } from "../../shared/copy.ts";
 import { isDemoRole } from "../../shared/demo.ts";
 import { notifications, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { billingPauseEmail } from "../platform/mail/emails.ts";
 import { insertNotification } from "./notifications.ts";
 
 export const BILLING_NOTICE_JOB_KIND = "billing.notice";
@@ -126,14 +127,14 @@ export async function runBillingNoticeJob(
   const url = `${deps.appOrigin.replace(/\/+$/u, "")}${path}`;
 
   await deps.mail.sendBillingNotice({
-    body: copy.mail.billingPauseBody({
+    to: to.email,
+    ...billingPauseEmail({
       copy: pause.copy,
       fix: pause.fix,
+      subject: copy.mail.billingPauseSubject(input.reason),
       title: pause.title,
       url,
     }),
-    subject: copy.mail.billingPauseSubject(input.reason),
-    to: to.email,
   });
 
   deps.db

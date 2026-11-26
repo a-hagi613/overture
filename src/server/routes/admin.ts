@@ -32,6 +32,7 @@ import {
 } from "../admin/support.ts";
 import { supportReplySchema, supportTicketUpdateSchema } from "../../shared/support.ts";
 import type { MailSender } from "../platform/mail/port.ts";
+import { waitlistInviteEmail } from "../platform/mail/emails.ts";
 
 import {
   applications,
@@ -1512,7 +1513,7 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
     try {
       await deps.mail.sendWaitlistInvite({
         to: row.email,
-        url: `${env.APP_ORIGIN ?? env.ADMIN_ORIGIN}/signin`,
+        ...waitlistInviteEmail(`${env.APP_ORIGIN ?? env.ADMIN_ORIGIN}/signin`),
       });
     } catch (error) {
       db.update(invites)

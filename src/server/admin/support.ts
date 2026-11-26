@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { MailSender } from "../platform/mail/port.ts";
+import { supportReplyEmail } from "../platform/mail/emails.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type {
   SupportCategory,
@@ -12,7 +13,6 @@ import type {
   SupportTicketUpdate,
 } from "../../shared/support.ts";
 
-import { copy } from "../../shared/copy.ts";
 import { SUPPORT_STATUS_FILTERS } from "../../shared/support.ts";
 import { logError } from "../platform/log.ts";
 import { insertAdminAudit } from "../platform/audit/insert.ts";
@@ -252,9 +252,12 @@ export async function replyToSupportTicket(
 
   try {
     await deps.mail.sendSupportReply({
-      body: copy.mail.supportReplyBody(input.message, row.ticket.referenceId),
-      subject: copy.mail.supportReplySubject(row.ticket.referenceId, row.ticket.subject),
       to: row.authorEmail,
+      ...supportReplyEmail({
+        message: input.message,
+        referenceId: row.ticket.referenceId,
+        subject: row.ticket.subject,
+      }),
     });
   } catch (error) {
     logError("admin.support.reply", error);

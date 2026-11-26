@@ -162,6 +162,11 @@ repeat-application throttles.
   `cf-bounce.tryoverture.com` and leaves the Email Routing records on the apex alone. The sink stays the test and
   development adapter, and a half-set pair of Cloudflare names stops the server at boot. Details and quotes:
   `docs/research/cloudflare-email-sending.md`.
+- **Branded outbound mail (#694).** Every Overture email is rendered by
+  `src/server/platform/mail/template.ts` and sent as both an Ember-branded HTML part and an accurate plain-text
+  part (Cloudflare's `html` and `text` fields). The layout is table-based with inline CSS so Gmail and Outlook keep
+  it, it declares light and dark colours, and the forwarded copy names the alias, sender, subject and time before
+  the original text and its attachments. `bun run email:preview` renders every kind locally.
 
 ## Checked before building (M2 and discovery)
 

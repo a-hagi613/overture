@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { copy } from "../../../shared/copy.ts";
 import { env } from "../../config/env.ts";
 import type { Clock } from "../ports/clock.ts";
 
@@ -41,207 +40,119 @@ function nextBounce() {
 }
 
 export function createSinkMailSender(clock: Clock) {
+  function record(input: {
+    attachments?: { bytes: number; filename: string; type: string }[];
+    body: string;
+    headers?: Record<string, string>;
+    html: string;
+    replyTo?: string;
+    subject: string;
+    to: string;
+  }) {
+    const sent: SentMail = {
+      body: input.body,
+      from: env.MAIL_FROM,
+      html: input.html,
+      id: randomUUID(),
+      replyTo: input.replyTo ?? null,
+      sentAt: clock.now(),
+      subject: input.subject,
+      to: input.to,
+    };
+
+    if (input.attachments !== undefined) {
+      sent.attachments = input.attachments;
+    }
+
+    if (input.headers !== undefined) {
+      sent.headers = input.headers;
+    }
+
+    captured.push(sent);
+
+    return sent;
+  }
+
   const sender: MailSender = {
     sendMagicLink: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: copy.mail.magicLinkSubject,
-        body: copy.mail.magicLinkBody(mail.url),
-        replyTo: null,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendCheck: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: mail.subject,
-        body: mail.body,
-        replyTo: null,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendWaitlistInvite: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: copy.mail.waitlistInviteSubject,
-        body: copy.mail.waitlistInviteBody(mail.url),
-        replyTo: null,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendCodeWait: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: mail.subject,
-        body: mail.body,
-        replyTo: null,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendReadyRecap: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: mail.subject,
-        body: mail.body,
-        replyTo: null,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendAccountDeleted: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: copy.mail.accountDeletedSubject,
-        body: copy.mail.accountDeletedBody(mail.name),
-        replyTo: null,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendExportReady: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: mail.subject,
-        body: mail.body,
-        replyTo: null,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendBillingNotice: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: mail.subject,
-        body: mail.body,
-        replyTo: null,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendSupport: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: mail.subject,
-        body: mail.body,
-        replyTo: mail.replyTo,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendSupportReply: async (mail) => {
       failIfAsked();
-
-      const sent = {
-        id: randomUUID(),
-        to: mail.to,
-        from: env.MAIL_FROM,
-        subject: mail.subject,
-        body: mail.body,
-        replyTo: null,
-        sentAt: clock.now(),
-      };
-
-      captured.push(sent);
-
+      record(mail);
       await Promise.resolve();
     },
     sendInboundCopy: async (mail) => {
       failIfAsked();
 
-      const id = randomUUID();
       const bounced = nextBounce();
-
-      const sent: SentMail = {
+      const input: Parameters<typeof record>[0] = {
         attachments: (mail.attachments ?? []).map((attachment) => ({
           bytes: attachment.content.byteLength,
           filename: attachment.filename,
           type: attachment.type,
         })),
-        body: mail.text,
-        from: env.MAIL_FROM,
-        id,
-        replyTo: mail.replyTo ?? null,
-        sentAt: clock.now(),
+        body: mail.body,
+        html: mail.html,
         subject: mail.subject,
         to: mail.to,
       };
 
       if (mail.headers !== undefined) {
-        sent.headers = mail.headers;
+        input.headers = mail.headers;
       }
 
-      captured.push(sent);
+      if (mail.replyTo !== undefined) {
+        input.replyTo = mail.replyTo;
+      }
+
+      const sent = record(input);
 
       await Promise.resolve();
 
-      return { bounced, messageId: id };
+      return { bounced, messageId: sent.id };
     },
   };
 
