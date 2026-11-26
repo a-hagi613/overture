@@ -78,6 +78,11 @@ interface CachedToken {
   token: string;
 }
 
+interface InflightChallenge {
+  consumed: boolean;
+  promise: Promise<TurnstileTokenResult>;
+}
+
 const scriptLoadTimeoutMs = 10_000;
 const configWaitTimeoutMs = 10_000;
 const challengeTimeoutMs = 30_000;
@@ -160,8 +165,10 @@ export function useTurnstile(
   const tokenRef = useRef<CachedToken | null>(null);
   const serialRef = useRef(0);
   const waiterRef = useRef<((result: TurnstileTokenResult) => void) | null>(null);
-  const pendingRef = useRef<Promise<TurnstileTokenResult> | null>(null);
+  const inflightRef = useRef<InflightChallenge | null>(null);
   const needsResetRef = useRef(false);
+  const autoRefreshRef = useRef(false);
+  const refreshRef = useRef<() => void>(() => {});
   const siteKeyRef = useRef<string | null | undefined>(siteKey);
   const actionRef = useRef<TurnstileAction>(action);
   const scriptUrlRef = useRef(scriptUrl);
@@ -172,6 +179,10 @@ export function useTurnstile(
     const waiter = waiterRef.current;
 
     waiterRef.current = null;
+
+    if (result.token !== null) {
+      autoRefreshRef.current = false;
+    }
 
     if (waiter === null) {
       if (result.token !== null) {
@@ -197,6 +208,7 @@ export function useTurnstile(
     widgetRef.current = null;
     tokenRef.current = null;
     needsResetRef.current = false;
+    autoRefreshRef.current = false;
 
     if (widget !== null && widget.element.isConnected && globalThis.turnstile !== undefined) {
       globalThis.turnstile.remove(widget.id);
@@ -282,7 +294,7 @@ export function useTurnstile(
     const id = turnstile.render(element, {
       sitekey: key,
       action: widgetAction,
-      appearance: "execute",
+      appearance: "interaction-only",
       execution: "execute",
       callback: (token) => {
         if (active()) {
@@ -295,14 +307,31 @@ export function useTurnstile(
         }
       },
       "expired-callback": () => {
-        if (active()) {
-          tokenRef.current = null;
+        if (!active()) {
+          return;
+        }
+
+        tokenRef.current = null;
+        needsResetRef.current = true;
+
+        if (waiterRef.current !== null) {
           fail("expired");
+        }
+
+        // A token that expires while the form is still being filled should not make the user wait on
+        // the next click: fetch a fresh one in the background. Guarded so a repeated expiry cannot
+        // loop, and reset on the next successful token.
+        if (!autoRefreshRef.current) {
+          autoRefreshRef.current = true;
+          globalThis.setTimeout(() => {
+            refreshRef.current();
+          }, 0);
         }
       },
       "timeout-callback": () => {
         if (active()) {
           tokenRef.current = null;
+          needsResetRef.current = true;
           fail("timeout");
         }
       },
@@ -313,7 +342,7 @@ export function useTurnstile(
     return widgetRef.current;
   }, [fail, removeWidget, settle]);
 
-  const requestToken = useCallback(async () => {
+  const challenge = useCallback(async (): Promise<TurnstileTokenResult> => {
     if (siteKeyRef.current === undefined) {
       configReadyRef.current ??= new Promise<void>((resolve) => {
         configWaiterRef.current = resolve;
@@ -330,18 +359,13 @@ export function useTurnstile(
       return failed("missing");
     }
 
-    const cached = tokenRef.current;
+    let widget: RenderedWidget | null;
 
-    if (cached !== null && cached.action === actionRef.current) {
-      tokenRef.current = null;
-      needsResetRef.current = true;
-
-      return succeeded(cached.token);
+    try {
+      widget = await widgetFor();
+    } catch {
+      return failed("error");
     }
-
-    tokenRef.current = null;
-
-    const widget = await widgetFor();
 
     if (widget === null || globalThis.turnstile === undefined) {
       return failed("unavailable");
@@ -351,7 +375,12 @@ export function useTurnstile(
 
     if (needsResetRef.current) {
       needsResetRef.current = false;
-      turnstile.reset(widget.id);
+
+      try {
+        turnstile.reset(widget.id);
+      } catch {
+        return failed("error");
+      }
     }
 
     const result = await new Promise<TurnstileTokenResult>((resolve) => {
@@ -387,29 +416,93 @@ export function useTurnstile(
     return result;
   }, [widgetFor]);
 
-  const obtainToken = useCallback(async () => {
-    const running = pendingRef.current;
-
-    if (running !== null) {
-      return await running;
+  const prewarm = useCallback(async () => {
+    if (tokenRef.current !== null || inflightRef.current !== null) {
+      return;
     }
 
-    const started = requestToken();
+    const key = siteKeyRef.current;
 
-    pendingRef.current = started;
+    if (key === null || key === undefined) {
+      return;
+    }
 
-    let result: TurnstileTokenResult;
+    const widgetAction = actionRef.current;
+    const entry: InflightChallenge = { consumed: false, promise: challenge() };
+
+    inflightRef.current = entry;
 
     try {
-      result = await started;
+      const result = await entry.promise;
+
+      if (
+        !entry.consumed &&
+        result.token !== null &&
+        siteKeyRef.current === key &&
+        actionRef.current === widgetAction
+      ) {
+        tokenRef.current = { action: widgetAction, token: result.token };
+      }
     } catch {
-      result = failed("error");
+      // A failed warm leaves the cache empty; the next click runs the challenge and reports it.
+    } finally {
+      if (inflightRef.current === entry) {
+        inflightRef.current = null;
+      }
+    }
+  }, [challenge]);
+
+  useEffect(() => {
+    refreshRef.current = () => {
+      void prewarm();
+    };
+  }, [prewarm]);
+
+  const hasToken = useCallback(
+    () => tokenRef.current !== null && tokenRef.current.action === actionRef.current,
+    [],
+  );
+
+  const obtainToken = useCallback(async () => {
+    autoRefreshRef.current = false;
+
+    const cached = tokenRef.current;
+
+    if (cached !== null && cached.action === actionRef.current) {
+      tokenRef.current = null;
+      needsResetRef.current = true;
+
+      return succeeded(cached.token);
     }
 
-    pendingRef.current = null;
+    tokenRef.current = null;
 
-    return result;
-  }, [requestToken]);
+    const running = inflightRef.current;
 
-  return { containerRef, obtainToken };
+    if (running !== null) {
+      running.consumed = true;
+
+      try {
+        return await running.promise;
+      } catch {
+        return failed("error");
+      }
+    }
+
+    const entry: InflightChallenge = { consumed: true, promise: challenge() };
+
+    inflightRef.current = entry;
+
+    try {
+      return await entry.promise;
+    } catch {
+      return failed("error");
+    } finally {
+      if (inflightRef.current === entry) {
+        inflightRef.current = null;
+      }
+    }
+  }, [challenge]);
+
+  return { containerRef, hasToken, obtainToken, prewarm };
 }

@@ -417,6 +417,7 @@ export const copy = {
     emailPlaceholder: "you@example.com",
     magicSubmit: "Send sign-in link",
     signUpMagicSubmit: "Send sign-up link",
+    verifying: "Verifying…",
     switchToSignUpPrompt: "New to Overture?",
     switchToSignUpAction: "Create an account",
     switchToSignInPrompt: "Already have an account?",
