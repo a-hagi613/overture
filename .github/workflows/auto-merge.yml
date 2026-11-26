@@ -1,0 +1,55 @@
+name: Auto-merge
+
+# `pull_request_target` runs this workflow from `main`, never from the pull request, so no untrusted code can change
+# it or reach the write token. The job only talks to the GitHub API through `gh pr merge`; it checks nothing out.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  arm:
+    # Only a non-draft pull request on main may arm auto-merge, and never one labelled do-not-auto-merge.
+    if: |
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.draft == false &&
+      !contains(github.event.pull_request.labels.*.name, 'do-not-auto-merge')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Arm squash auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          if [ -n "$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest // empty')" ]; then
+            echo "auto-merge is already armed"
+            exit 0
+          fi
+          gh pr merge "$PR_URL" --auto --squash
+
+  disarm:
+    # A PR labelled do-not-auto-merge never merges on its own, even when it was armed before the label arrived.
+    if: |
+      github.event.pull_request.base.ref == 'main' &&
+      contains(github.event.pull_request.labels.*.name, 'do-not-auto-merge')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disable auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          if [ -n "$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest // empty')" ]; then
+            gh pr merge "$PR_URL" --disable-auto
+            exit 0
+          fi
+          echo "auto-merge is not armed"
