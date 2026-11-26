@@ -1,6 +1,7 @@
--- Send now (issue #681, ADR 0029). Approved Applications go straight away, so
--- the daytime send window and its 20-minute default are gone. Paid sends are
--- spaced five minutes apart; the onboarding trial's three go in parallel.
+-- Send now (issue #681, ADR 0046, amending ADR 0029). Approved Applications go
+-- straight away, so the daytime send window and its 20-minute default are gone.
+-- Paid sends are spaced five minutes apart; the onboarding trial's three go in
+-- parallel.
 --
 -- The admin settings screen lists every default plus any stored override, so a
 -- row left from the old rules would keep showing (and enforcing) them. Clear
