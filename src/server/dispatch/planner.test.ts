@@ -221,7 +221,7 @@ test("a new approval follows the last scheduled send, even when that send is in 
 });
 
 test("a daily cap that is used up moves the next Application to local midnight, not a daytime window", () => {
-  const { db, sqlite } = freshDatabase();
+  const { sqlite } = freshDatabase();
 
   try {
     expect(

@@ -45,10 +45,12 @@ export function checkLlmCaps(db: AppDatabase, clock: Clock, input: LlmCapInput) 
 
   const userCap =
     input.userId === null || input.onboardingMatching === true ? null : llmUserDayBudgetMicros(db);
+
   const onboardingCap =
     input.userId !== null && input.onboardingMatching === true
       ? llmOnboardingMatchingBudgetMicros(db)
       : null;
+
   const taggingCap = isTagging(input.purpose) ? capMicros(db, "llm.cap_tagging_day_usd") : null;
   const globalCap = llmDayBudgetMicros(db, now);
 

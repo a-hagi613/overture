@@ -98,7 +98,7 @@ export interface TagFallbackReport {
   tagged: number;
   recorded: number;
   blocked: boolean;
-  blockedCap: "user" | "global" | "tagging" | null;
+  blockedCap: "user" | "onboarding" | "global" | "tagging" | null;
 }
 
 interface LeftoverPosting {

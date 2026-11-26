@@ -46,7 +46,7 @@ export function planSendSlots(input: PlanSendSlotsInput) {
   const todayStart = localDayStart(now, timeZone);
   const byDay = new Map<number, DayUse>();
 
-  function useOf(day: number) {
+  function dayUse(day: number) {
     const existing = byDay.get(day);
 
     if (existing !== undefined) {
@@ -60,12 +60,12 @@ export function planSendSlots(input: PlanSendSlotsInput) {
   }
 
   if (input.usedToday > 0) {
-    useOf(todayStart).count += input.usedToday;
+    dayUse(todayStart).count += input.usedToday;
   }
 
   for (const at of input.scheduled) {
     const day = localDayStart(at, timeZone);
-    const use = useOf(day);
+    const use = dayUse(day);
 
     use.count += 1;
     use.latest = Math.max(use.latest, at);
@@ -79,7 +79,7 @@ export function planSendSlots(input: PlanSendSlotsInput) {
     guard += 1;
 
     const day = localDayStart(cursor, timeZone);
-    const use = useOf(day);
+    const use = dayUse(day);
 
     if (use.count >= cap) {
       cursor = Math.max(nextLocalDayStart(day, timeZone), use.latest + spacingMs);

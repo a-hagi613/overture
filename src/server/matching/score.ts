@@ -284,11 +284,12 @@ export function createMatchingService(deps: MatchDeps) {
       .get();
 
     const onboardingMatching =
-      account !== undefined &&
-      account.onboardedAt === null &&
-      account.role !== "owner" &&
-      account.role !== "demo" &&
-      !account.running;
+      account === undefined
+        ? false
+        : account.onboardedAt === null &&
+          account.role !== "owner" &&
+          account.role !== "demo" &&
+          !account.running;
 
     const caps = checkLlmCaps(db, clock, {
       userId,

@@ -595,8 +595,6 @@ export function createDispatcherTick(deps: DispatchDeps) {
         continue;
       }
 
-      // The trial's three Applications run in parallel; a paid user's sends
-      // leave one at a time, spaced by the planner's five-minute slots.
       const candidates = byUser.get(userId) ?? [];
       const limit = trial ? candidates.length : 1;
       let taken = 0;

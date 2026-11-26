@@ -110,8 +110,6 @@ export function createPlanner(deps: PlannerDeps) {
     const dailyCap = settingNumber(db, "limits.daily_cap", DEFAULT_DAILY_CAP);
     const trial = isOnboardingTrial(db, userId, now);
 
-    // The onboarding trial's three Applications go at once; paid sends are spaced
-    // per user. One person's spacing is read from their own rows and never shared.
     const spacingMs = trial
       ? 0
       : settingNumber(db, "limits.send_spacing_minutes", DEFAULT_SPACING_MINUTES) * MINUTE_MS;
@@ -162,11 +160,13 @@ export function createPlanner(deps: PlannerDeps) {
     ensureMidnightQueued(userId);
 
     const planned = Math.min(slots.length, unplaced.length);
+
     const alreadyScheduledToday = approved.filter(
       (application) =>
         application.scheduledFor !== null &&
         localDayStart(application.scheduledFor, timeZone) === todayStart,
     ).length;
+
     const placedToday = slots.filter((slot) => localDayStart(slot, timeZone) === todayStart).length;
 
     if (planned > 0) {
