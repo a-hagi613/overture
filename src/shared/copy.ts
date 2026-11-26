@@ -1,3 +1,5 @@
+import { SEND_RULES } from "./plans.ts";
+
 const COUNT_WORDS = [
   "zero",
   "one",
@@ -1685,8 +1687,8 @@ export const copy = {
     limitsIntro: "Shared pacing limits keep applications spaced naturally.",
     limitDaily: "Up to 10 per day",
     limitDailyDetail: "Daily count resets at midnight in your local time zone.",
-    limitWindow: "8:00 AM to 8:00 PM",
-    limitWindowDetail: "Applications send during daytime hours, spaced at least 20 minutes apart.",
+    limitWindow: "Sends right after approval",
+    limitWindowDetail: `Paid sends are spaced ${String(SEND_RULES.paidGapMinutes)} minutes apart; the trial's ${String(SEND_RULES.trialParallel)} go together.`,
     limitCompany: "1 company per 30 days",
     limitCompanyDetail: "Overture waits 30 days before applying to the same company again.",
     limitRepost: "60-day repost cooldown",
