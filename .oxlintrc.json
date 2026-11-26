@@ -328,6 +328,7 @@
           "src/server/platform/ports/replica-listing.test.ts",
           "src/server/platform/rate-limit.test.ts",
           "src/server/platform/search/search.test.ts",
+          "src/server/platform/settings/index.test.ts",
           "src/server/platform/sse/hub.test.ts",
           "src/server/platform/sse/stream.test.ts",
           "src/server/platform/telemetry/dashboard.test.ts",
