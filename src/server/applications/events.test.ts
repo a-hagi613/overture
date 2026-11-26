@@ -7,8 +7,10 @@ import { applicationEvents, applications, users } from "../platform/db/schema.ts
 import { openCountingDatabase } from "../testing/query-counter.ts";
 import {
   applicationEventDetail,
+  applicationEventText,
   parseApplicationEventDetail,
   readApplicationTimeline,
+  readApplicationTimelineRows,
   recordApplicationEvent,
 } from "./events.ts";
 
@@ -129,5 +131,53 @@ describe("the application event writer", () => {
   test("keeps an old free-text detail readable rather than losing it", () => {
     expect(parseApplicationEventDetail("not json")).toEqual({ text: "not json" });
     expect(applicationEventDetail({ reason: "", detail: {} })).toBe('{"reason":""}');
+  });
+
+  test("reads a plain sentence out of a structured detail", () => {
+    expect(
+      applicationEventText({
+        message: "This posting closed before sending.",
+        reason: "posting_closed",
+      }),
+    ).toBe("This posting closed before sending.");
+    expect(applicationEventText({ text: "not json" })).toBe("not json");
+    expect(applicationEventText({ reason: "user_stage_move" })).toBeNull();
+    expect(applicationEventText(null)).toBeNull();
+  });
+
+  test("the API timeline keeps the reason and attempt id beside the sentence", () => {
+    const db = fresh();
+
+    db.insert(applicationEvents)
+      .values({
+        applicationId: APPLICATION_ID,
+        at: NOW,
+        detail: JSON.stringify({
+          attemptId: "attempt-9",
+          message: "This posting closed before sending.",
+          reason: "posting_closed",
+        }),
+        fromValue: "ready",
+        id: "event-closed",
+        kind: "status",
+        source: "system",
+        toValue: "skipped",
+        userId: USER_ID,
+      })
+      .run();
+
+    const [row] = readApplicationTimelineRows(db, APPLICATION_ID);
+
+    expect(row).toMatchObject({
+      applicationId: APPLICATION_ID,
+      attemptId: "attempt-9",
+      detail: "This posting closed before sending.",
+      fromValue: "ready",
+      kind: "status",
+      reason: "posting_closed",
+      toValue: "skipped",
+      userId: USER_ID,
+    });
+    expect(row?.detail).not.toContain("{");
   });
 });

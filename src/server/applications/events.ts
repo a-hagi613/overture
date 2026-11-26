@@ -32,6 +32,8 @@ export interface ApplicationEventInput {
 
 export interface ApplicationTimelineEntry {
   id: string;
+  applicationId: string;
+  userId: string;
   at: number;
   kind: ApplicationEventKind;
   fromValue: string | null;
@@ -87,6 +89,25 @@ function attemptIdOf(detail: ApplicationEventDetail | null) {
 }
 
 /**
+ * The human sentence to show for an event's detail. Structured details keep their
+ * message; an old free-text detail is returned as it was written; a detail that
+ * only carries a machine reason has no sentence of its own.
+ * @param detail The parsed detail of one event, or null.
+ * @returns The text to render, or null when the event has nothing to say.
+ */
+export function applicationEventText(detail: ApplicationEventDetail | null) {
+  for (const field of ["message", "text"] as const) {
+    const parsed = textSchema.safeParse(detail?.[field]);
+
+    if (parsed.success) {
+      return parsed.data;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Writes one structured Application event. Every stage change and every wait or
  * deferral goes through this one writer, so the timeline always carries the
  * reason and (when a send was running) the attempt id in `detail`.
@@ -125,6 +146,7 @@ export function readApplicationTimeline(db: AppDatabase, applicationId: string) 
       const detail = parseApplicationEventDetail(row.detail);
 
       return {
+        applicationId: row.applicationId,
         at: row.at,
         attemptId: attemptIdOf(detail),
         detail,
@@ -134,6 +156,49 @@ export function readApplicationTimeline(db: AppDatabase, applicationId: string) 
         reason: reasonOf(detail),
         source: row.source,
         toValue: row.toValue,
+        userId: row.userId,
       } satisfies ApplicationTimelineEntry;
     });
+}
+
+/** One timeline entry as the Application API returns it: a sentence, never raw JSON. */
+export interface ApplicationTimelineRow {
+  applicationId: string;
+  at: number;
+  attemptId: string | null;
+  detail: string | null;
+  fromValue: string | null;
+  id: string;
+  kind: ApplicationEventKind;
+  reason: string | null;
+  source: ApplicationEventSource;
+  toValue: string | null;
+  userId: string;
+}
+
+/**
+ * The Application timeline in the shape the API and the Board render: the
+ * machine reason and attempt id come out beside a plain sentence, so a
+ * structured event never reaches a screen as a JSON blob.
+ * @param db The application database.
+ * @param applicationId The Application whose timeline is read.
+ * @returns The timeline in time order, oldest first.
+ */
+export function readApplicationTimelineRows(db: AppDatabase, applicationId: string) {
+  return readApplicationTimeline(db, applicationId).map(
+    (entry) =>
+      ({
+        applicationId,
+        at: entry.at,
+        attemptId: entry.attemptId,
+        detail: applicationEventText(entry.detail),
+        fromValue: entry.fromValue,
+        id: entry.id,
+        kind: entry.kind,
+        reason: entry.reason,
+        source: entry.source,
+        toValue: entry.toValue,
+        userId: entry.userId,
+      }) satisfies ApplicationTimelineRow,
+  );
 }

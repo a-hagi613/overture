@@ -21,6 +21,7 @@ import {
 } from "../platform/db/schema.ts";
 import { localDayStart, localPartsAt } from "../platform/local-time.ts";
 import { restartCheckinAfterUndo } from "../pipeline/checkins.ts";
+import { readApplicationTimelineRows } from "../applications/events.ts";
 import { latestEmailNotesOf } from "../pipeline/email-notes.ts";
 import { linkedMailOf } from "../inbox/linked-mail.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
@@ -676,12 +677,7 @@ export function createApplicationRoutes(
       },
     );
 
-    const timeline = db
-      .select()
-      .from(applicationEvents)
-      .where(eq(applicationEvents.applicationId, id))
-      .orderBy(asc(applicationEvents.at))
-      .all();
+    const timeline = readApplicationTimelineRows(db, id);
 
     const resumeLines =
       snapshotView === null
