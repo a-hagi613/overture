@@ -113,10 +113,10 @@ function upsertBatchedNotification(
 }
 
 /**
- * Write a notification row whatever the user's preferences say. Only the one
- * Recap row uses this: it is also the per-day marker the email send reads, so
- * turning the push off must not make a retried run email twice. The caller says
- * whether a push should go out for it.
+ * Write a notification row whatever the user's preferences say. The one Recap
+ * row and a billing pause use this: the Recap row is also the per-day marker
+ * the email send reads, so turning the push off must not make a retried run
+ * email twice. The caller says whether a push should go out for it.
  * @param db The application database.
  * @param clock The clock the row is stamped from.
  * @param input The user, kind and copy.
