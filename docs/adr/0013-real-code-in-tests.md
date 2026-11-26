@@ -29,7 +29,8 @@ arriving) is caught by **live checks** on `overture-web`: real forms filled and 
 of real Haiku calls, a real mail loop through Cloudflare Email Sending to an Overture-owned check address, and a real R2
 round trip. Each check alerts on failure and refreshes the saved forms and recordings the tests replay. None submits
 an application or touches a user. Amended by #680: the forms and Haiku checks spend real money, so only the mail, R2
-and alert checks stay on the nightly schedule; an admin runs the other two by hand through the admin live-checks route.
+and alert checks stay on the nightly schedule until #695 removes the live checks entirely; an admin runs the other two
+by hand through the admin live-checks route.
 
 End-to-end Playwright tests are the standard, driving only what a user, an admin or a webhook touches. Unit tests
 exist only for the eighty-one files SPEC §16.2 lists: the sent Dossier (`src/shared/dossier.ts`: the file is sent
