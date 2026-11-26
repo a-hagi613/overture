@@ -17,7 +17,6 @@ import { fetchBoard } from "../lib/board-api.ts";
 import { useAcceptConsent, useConsent } from "../lib/consent-api.ts";
 import {
   fetchOnboardingMatches,
-  useFinishOnboardingStep,
   useOnboardingMatches,
   useOnboardingState,
   usePrepareOnboarding,
@@ -79,7 +78,6 @@ export function OnboardingMatchesPage() {
   const state = useOnboardingState();
   const matches = useOnboardingMatches();
   const save = useSaveOnboardingMatches();
-  const finish = useFinishOnboardingStep();
   const consent = useConsent();
   const acceptConsent = useAcceptConsent();
   const prepare = usePrepareOnboarding();
@@ -228,7 +226,7 @@ export function OnboardingMatchesPage() {
 
   if (matches.data === undefined || waitingForPreviewBoard) {
     return (
-      <OnboardingShell step={3}>
+      <OnboardingShell step={4}>
         <OnboardingLoadState
           onRetry={() => {
             void matches.refetch();
@@ -292,10 +290,6 @@ export function OnboardingMatchesPage() {
     try {
       if (!preview && picks.length > 0) {
         await save.mutateAsync(picks);
-
-        if ((state.data?.step ?? 0) < 4) {
-          await finish.mutateAsync(3);
-        }
       }
 
       setModalDismissed(false);
@@ -354,7 +348,7 @@ export function OnboardingMatchesPage() {
   );
 
   return (
-    <OnboardingShell step={3}>
+    <OnboardingShell step={4}>
       <OnboardingMatchesCard
         allowEmptyContinue={preview && effectiveMatches.matches.length === 0}
         backTo={`/onboarding/targets${suffix}`}

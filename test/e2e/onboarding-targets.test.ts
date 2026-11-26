@@ -9,6 +9,7 @@ import type { AppServer } from "./app-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { seedOnboardingTargetsFlow, seedOnsitePosting } from "./onboarding-targets-harness.ts";
+import { completeOnboardingGaps } from "./onboarding-walk.ts";
 
 const test = appTest.extend<{ onboardingServer: AppServer }>({
   onboardingServer: [
@@ -214,7 +215,7 @@ test("choices persist across reload, optional salary saves, and browser zone is 
 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
-  expect(state.step).toBe(3);
+  expect(state.step).toBe(5);
 
   await context.close();
   await request.dispose();
@@ -242,6 +243,7 @@ test("a fresh user is offered on-site work and sees matches only once every grou
   await page.locator('input[type="file"]').setInputFiles("test/e2e/fixtures/resume-text.pdf");
   await expect(page.getByText("resume-text.pdf")).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
+  await completeOnboardingGaps(page);
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
   await expect(page.getByRole("button", { exact: true, name: "On-site" })).toBeVisible();
   await expect(seeMatches).toBeDisabled();

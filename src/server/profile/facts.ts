@@ -44,6 +44,7 @@ export interface FactService {
     scope?: string,
   ) => Promise<FactRecord>;
   saveFromResume: (userId: string, drafts: readonly ResumeFactDraft[]) => Promise<FactRecord[]>;
+  confirm: (userId: string, key: string, value: string, scope?: string) => Promise<FactRecord>;
   remove: (userId: string, key: string, scope?: string | null) => Promise<number>;
 }
 
@@ -113,6 +114,7 @@ export function createFactService(deps: {
     value: string,
     source: FactRecord["source"],
     confirmed: boolean,
+    keepSourceWhenUnchanged = false,
   ) {
     const rows = await db
       .select()
@@ -131,6 +133,8 @@ export function createFactService(deps: {
         userId,
       })) === value;
 
+    const resolvedSource = keepSourceWhenUnchanged && unchanged ? row.source : source;
+
     const revision = row === undefined || !unchanged ? (row?.revision ?? 0) + 1 : row.revision;
     const rowId = row?.id ?? crypto.randomUUID();
 
@@ -145,7 +149,7 @@ export function createFactService(deps: {
       key,
       scope,
       valueEnc,
-      source,
+      source: resolvedSource,
       confirmed,
       revision,
       updatedAt: new Date(clock.now()),
@@ -162,7 +166,7 @@ export function createFactService(deps: {
 
     return {
       changed: row === undefined || !unchanged,
-      record: { key, scope, value, source, confirmed, revision },
+      record: { key, scope, value, source: resolvedSource, confirmed, revision },
     };
   }
 
@@ -173,9 +177,18 @@ export function createFactService(deps: {
     value: string,
     source: FactRecord["source"],
     confirmed: boolean,
+    keepSourceWhenUnchanged = false,
   ) {
     return inWriteOrder(`${userId}\u0000${key}\u0000${scope}`, async () => {
-      const written = await write(userId, key, scope, value, source, confirmed);
+      const written = await write(
+        userId,
+        key,
+        scope,
+        value,
+        source,
+        confirmed,
+        keepSourceWhenUnchanged,
+      );
 
       if (written.changed) {
         publishEvent(db, clock, "profile.updated", JSON.stringify({ factKey: key, scope }), userId);
@@ -237,6 +250,12 @@ export function createFactService(deps: {
           upsert(userId, draft.key, draft.scope, draft.value, "resume", false),
         ),
       );
+    },
+    confirm: async (userId: string, key: string, value: string, scope = "") => {
+      assertFactKey(key);
+      assertScope(key, scope);
+
+      return upsert(userId, key, scope, value, "user", true, true);
     },
     remove: async (userId: string, key: string, scope: string | null = null) => {
       assertFactKey(key);

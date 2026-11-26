@@ -6,6 +6,7 @@ import type { OnboardingTargetsView } from "../../shared/onboarding.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 
 import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
+import { KEY_DETAIL_FACT_KEYS } from "../../shared/key-details.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
 import { saveSkipCompanies } from "./profile-api.ts";
 
@@ -78,6 +79,18 @@ const onboardingMatchesSchema = z.object({
   pickLimit: z.number(),
   poolCount: z.number(),
   selected: z.array(z.string()),
+});
+
+const keyDetailFieldSchema = z.object({
+  confirmed: z.boolean(),
+  key: z.enum(KEY_DETAIL_FACT_KEYS),
+  label: z.string(),
+  source: z.enum(["resume", "user", "review", "import"]).nullable(),
+  value: z.string(),
+});
+
+const onboardingGapsSchema = z.object({
+  fields: z.array(keyDetailFieldSchema),
 });
 
 const prepareResultSchema = z.object({
@@ -153,6 +166,28 @@ export type OnboardingMatches = z.infer<typeof onboardingMatchesSchema>;
 
 export type OnboardingMatchView = z.infer<typeof onboardingMatchSchema>;
 
+export type OnboardingGaps = z.infer<typeof onboardingGapsSchema>;
+
+export type KeyDetailField = z.infer<typeof keyDetailFieldSchema>;
+
+export const gapsKey = ["onboarding-gaps"] as const;
+
+export async function fetchOnboardingGaps() {
+  return onboardingGapsSchema.parse(await jsonFrom(await fetch("/api/onboarding/gaps")));
+}
+
+export async function saveOnboardingGaps(fields: { key: string; value: string }[]) {
+  return onboardingGapsSchema.parse(
+    await jsonFrom(
+      await fetch("/api/onboarding/gaps", {
+        body: JSON.stringify({ fields }),
+        headers: { "content-type": "application/json" },
+        method: "PUT",
+      }),
+    ),
+  );
+}
+
 export const matchesKey = ["onboarding-matches"] as const;
 
 export async function fetchOnboardingMatches() {
@@ -220,7 +255,24 @@ export function useUploadOnboardingResume() {
       await Promise.all([
         client.invalidateQueries({ queryKey: stateKey }),
         client.invalidateQueries({ queryKey: targetsKey }),
+        client.invalidateQueries({ queryKey: gapsKey }),
       ]);
+    },
+  });
+}
+
+export function useOnboardingGaps(enabled = true) {
+  return useQuery({ enabled, queryFn: fetchOnboardingGaps, queryKey: gapsKey, retry: 1 });
+}
+
+export function useSaveOnboardingGaps() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveOnboardingGaps,
+    onSuccess: (view) => {
+      client.setQueryData(gapsKey, view);
+      client.removeQueries({ queryKey: matchesKey });
     },
   });
 }

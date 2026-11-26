@@ -6,6 +6,7 @@ import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
+import { completeOnboardingGaps } from "./onboarding-walk.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
 
 const USER_EMAIL = "jordan.taylor@example.com";
@@ -327,6 +328,8 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   expect(skipped.ok()).toBe(true);
 
   await continueBtn.click();
+  await expect(page).toHaveURL(/\/onboarding\/gaps$/u);
+  await completeOnboardingGaps(page);
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
 
   await page.getByLabel("Category").click();
@@ -406,10 +409,16 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
 
   await page.getByRole("link", { name: "Back" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/gaps$/u);
+
+  await page.getByRole("link", { name: /Back to resume/u }).click();
   await expect(page).toHaveURL(/\/onboarding\/resume$/u);
   await expect(page.getByText("PDF verified", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/gaps$/u);
+
+  await page.getByRole("button", { name: "Save and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
   await expect(status).toHaveText("4 open roles match");
 
@@ -494,7 +503,7 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   const finalState = onboardingSchema.parse(await (await api.get("/api/onboarding")).json());
 
   expect(finalState.onboardedAt).not.toBeNull();
-  expect(finalState.step).toBe(4);
+  expect(finalState.step).toBe(5);
 
   await context.close();
   await api.dispose();

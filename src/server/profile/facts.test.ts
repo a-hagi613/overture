@@ -469,6 +469,38 @@ describe("a Fact's scope", () => {
   });
 });
 
+describe("confirming a value the resume reader found", () => {
+  test("keeps the resume source and its revision when the value is unchanged", async () => {
+    const { facts, userId } = freshFacts();
+
+    await facts.saveFromResume(userId, [{ key: "legal_name", scope: "", value: "Maya Okafor" }]);
+
+    const [before] = await facts.list(userId);
+    const confirmed = await facts.confirm(userId, "legal_name", "Maya Okafor");
+
+    expect(confirmed).toMatchObject({
+      confirmed: true,
+      revision: before?.revision,
+      source: "resume",
+      value: "Maya Okafor",
+    });
+  });
+
+  test("records an edited value as the person's own", async () => {
+    const { facts, userId } = freshFacts();
+
+    await facts.saveFromResume(userId, [{ key: "legal_name", scope: "", value: "Maya Okafor" }]);
+
+    const confirmed = await facts.confirm(userId, "legal_name", "Maya Chen");
+
+    expect(confirmed).toMatchObject({
+      confirmed: true,
+      source: "user",
+      value: "Maya Chen",
+    });
+  });
+});
+
 describe("a Fact write the other tab must see", () => {
   test("publishes a profile topic when a Fact changes", async () => {
     const { db, facts, userId } = freshFacts();

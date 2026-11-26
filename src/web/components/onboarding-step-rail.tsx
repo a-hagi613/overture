@@ -15,7 +15,7 @@ export function OnboardingStepRail({
     <div className="my-5">
       <ol
         aria-label={copy.onboarding.stepsLabel}
-        className="hidden items-center gap-3 md:grid md:grid-cols-3"
+        className="hidden items-center gap-2 md:grid md:grid-cols-4"
       >
         {labels.map((name, index) => {
           const position = index + 1;

@@ -6,6 +6,11 @@ import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
 import { factLabelFor, isTier2FactKey, TIER_1_FACT_KEYS } from "../../shared/facts.ts";
+import {
+  KEY_DETAIL_FACT_KEYS,
+  KEY_DETAIL_FACT_LABELS,
+  isKeyDetailFactKey,
+} from "../../shared/key-details.ts";
 import { fetchProfileFacts, fetchStrengthen, saveProfileFacts } from "../lib/profile-api.ts";
 import { FactRow } from "./fact-row.tsx";
 import { SourceChip } from "./source-chip.tsx";
@@ -21,6 +26,15 @@ type Tier = "tier1" | "tier2" | "tier3";
 
 const TIER_1_ORDER: readonly string[] = [...TIER_1_FACT_KEYS];
 const INITIAL_VISIBLE_FACTS = 6;
+
+function keyDetailFactFor<T extends { key: string; scope: string }>(
+  facts: readonly T[],
+  key: string,
+) {
+  const candidates = facts.filter((fact) => fact.key === key);
+
+  return candidates.find((fact) => fact.scope === "") ?? candidates[0];
+}
 
 function isTier(value: string): value is Tier {
   return value === "tier1" || value === "tier2" || value === "tier3";
@@ -106,9 +120,11 @@ export function FactsSection() {
     )
     .toSorted((left, right) => tier1SortOrder(left.key) - tier1SortOrder(right.key));
 
+  const otherTier1Facts = tier1Facts.filter((entry) => !isKeyDetailFactKey(entry.key));
+
   const visibleTier1 = expandedTiers.tier1
-    ? tier1Facts
-    : tier1Facts.slice(0, INITIAL_VISIBLE_FACTS);
+    ? otherTier1Facts
+    : otherTier1Facts.slice(0, INITIAL_VISIBLE_FACTS);
 
   const visibleTier3 = expandedTiers.tier3
     ? learnedFacts
@@ -196,53 +212,93 @@ export function FactsSection() {
       {tier === "tier1" ? (
         <div className="mt-4">
           <p className="max-w-2xl text-xs text-muted-foreground">{facts.tier1.note}</p>
-          {tier1Facts.length === 0 ? (
-            <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/30 px-5 py-8 text-center">
-              <p className="text-sm text-muted-foreground">{pw.tier1Empty}</p>
-            </div>
-          ) : (
-            <div className="mt-3">
-              {visibleTier1.map((fact) => {
-                const label = factLabelFor(fact.key) || readableFactKey(fact.key);
-                const resolvedValue = localEdits[fact.key] ?? fact.value;
-                const readOnly = fact.key === "apply_email";
+          <div className="mt-3">
+            <h3 className={dsCardTitle} id="profile-key-details-heading">
+              {facts.keyDetails}
+            </h3>
+            <p className="max-w-2xl text-xs text-muted-foreground">{facts.keyDetailsNote}</p>
+            <div className="mt-3" id="profile-key-details-list">
+              {KEY_DETAIL_FACT_KEYS.map((key) => {
+                const label = KEY_DETAIL_FACT_LABELS[key];
+                const fact = keyDetailFactFor(allServerFacts, key);
+                const resolvedValue = localEdits[key] ?? fact?.value ?? "";
 
                 const note =
-                  fact.scope === "" || fact.scope === "default"
+                  fact === undefined || fact.scope === "" || fact.scope === "default"
                     ? ""
                     : `${pw.factScopeAccount} · ${fact.scope}`;
 
                 return (
                   <FactRow
-                    action={readOnly ? "read-only" : "edit"}
-                    chip={chipForFactSource(fact.source, fact.key)}
-                    key={`${fact.key}:${fact.scope}`}
-                    kind={fact.key === "apply_email" || fact.key === "email" ? "mono" : "serif"}
+                    action="edit"
+                    chip={
+                      fact === undefined ? (
+                        <SourceChip variant="dashed">{facts.notSet}</SourceChip>
+                      ) : (
+                        chipForFactSource(fact.source, key)
+                      )
+                    }
+                    key={key}
+                    kind={key === "email" ? "mono" : "serif"}
                     label={label}
                     note={note}
                     onSave={(nextValue) => {
-                      persistFact(fact.key, label, nextValue, fact.scope);
+                      persistFact(key, label, nextValue, fact?.scope ?? "");
                     }}
                     saving={save.isPending}
                     value={resolvedValue}
                   />
                 );
               })}
-              {tier1Facts.length > INITIAL_VISIBLE_FACTS ? (
-                <div className="border-t border-border pt-3">
-                  <Button
-                    onClick={() => {
-                      setExpandedTiers((current) => ({ ...current, tier1: !current.tier1 }));
-                    }}
-                    size="sm"
-                    variant="outline"
-                  >
-                    {expandedTiers.tier1
-                      ? facts.showLess
-                      : facts.showMore(tier1Facts.length - INITIAL_VISIBLE_FACTS)}
-                  </Button>
-                </div>
-              ) : null}
+            </div>
+          </div>
+
+          {otherTier1Facts.length === 0 ? null : (
+            <div className="mt-6">
+              <h3 className={dsCardTitle}>{facts.otherSaved}</h3>
+              <div className="mt-3">
+                {visibleTier1.map((fact) => {
+                  const label = factLabelFor(fact.key) || readableFactKey(fact.key);
+                  const resolvedValue = localEdits[fact.key] ?? fact.value;
+                  const readOnly = fact.key === "apply_email";
+
+                  const note =
+                    fact.scope === "" || fact.scope === "default"
+                      ? ""
+                      : `${pw.factScopeAccount} · ${fact.scope}`;
+
+                  return (
+                    <FactRow
+                      action={readOnly ? "read-only" : "edit"}
+                      chip={chipForFactSource(fact.source, fact.key)}
+                      key={`${fact.key}:${fact.scope}`}
+                      kind={fact.key === "apply_email" || fact.key === "email" ? "mono" : "serif"}
+                      label={label}
+                      note={note}
+                      onSave={(nextValue) => {
+                        persistFact(fact.key, label, nextValue, fact.scope);
+                      }}
+                      saving={save.isPending}
+                      value={resolvedValue}
+                    />
+                  );
+                })}
+                {otherTier1Facts.length > INITIAL_VISIBLE_FACTS ? (
+                  <div className="border-t border-border pt-3">
+                    <Button
+                      onClick={() => {
+                        setExpandedTiers((current) => ({ ...current, tier1: !current.tier1 }));
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {expandedTiers.tier1
+                        ? facts.showLess
+                        : facts.showMore(otherTier1Facts.length - INITIAL_VISIBLE_FACTS)}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           )}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
