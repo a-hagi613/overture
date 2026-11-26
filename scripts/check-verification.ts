@@ -4,6 +4,7 @@ const headingPattern = /^(?:#{1,6}\s+verification|\*\*verification\*\*)\s*$/iu;
 const anyHeadingPattern = /^(?:#{1,6}\s|\*\*[^*]+\*\*\s*$)/iu;
 const entryPattern = /^\s*[-*]\s+(?<key>[^:]+?)\s*:\s*(?<value>.*)$/u;
 const placeholderPattern = /^(?:<[^>]*>|todo|tbd)$/iu;
+
 const notRunPattern =
   /^(?:(?:it|this|the\s+\S+)\s+)?(?:(?:was|is|were|has|had|have)\s+)?(?:not[\s-]*run|never\s+run|skipped)\b/iu;
 
