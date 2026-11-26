@@ -273,13 +273,20 @@ export function createReviewService(deps: {
   const catalog = createQuestionCatalog({ db, catalogDb, clock });
   const factsService = createFactService({ db, clock, personal });
 
-  async function answer(
+  interface ResolvedAnswer {
+    reviewId: string;
+    factKey: string | null;
+    scope: string;
+    applicationIds: string[];
+    saveForFuture: boolean;
+  }
+
+  async function resolveAnswer(
     userId: string,
     reviewId: string,
     value: string,
     options: {
       fact?: { key: string; scope: string };
-      prepare?: "await" | "enqueue";
       saveForFuture?: boolean;
     } = {},
   ) {
@@ -333,9 +340,28 @@ export function createReviewService(deps: {
       userId,
     });
 
+    publishEvent(db, clock, "review.resolved", JSON.stringify({ reviewId }), userId);
+    publishEvent(db, clock, "home.updated", JSON.stringify({ reviewId }), userId);
+
+    return {
+      reviewId,
+      factKey: saveForFuture ? factKey : null,
+      scope: saveForFuture ? scope : "",
+      applicationIds,
+      saveForFuture,
+    };
+  }
+
+  async function settleAnswers(
+    userId: string,
+    resolved: readonly ResolvedAnswer[],
+    prepare: "await" | "enqueue",
+  ) {
     await returnStaleApprovals({ clock, db, personal, userId });
 
-    if (options.prepare === "enqueue") {
+    const applicationIds = [...new Set(resolved.flatMap((entry) => entry.applicationIds))];
+
+    if (prepare === "enqueue") {
       for (const applicationId of applicationIds) {
         enqueueApplicationPrepare(db, clock, applicationId);
       }
@@ -349,7 +375,7 @@ export function createReviewService(deps: {
       const statuses = db
         .select({ status: applications.status })
         .from(applications)
-        .where(inArray(applications.id, [...applicationIds]))
+        .where(inArray(applications.id, applicationIds))
         .all();
 
       for (const row of statuses) {
@@ -359,17 +385,73 @@ export function createReviewService(deps: {
       }
     }
 
-    publishEvent(db, clock, "review.resolved", JSON.stringify({ reviewId }), userId);
-    publishEvent(db, clock, "home.updated", JSON.stringify({ reviewId }), userId);
+    return { applicationIds, readyCount };
+  }
+
+  async function answer(
+    userId: string,
+    reviewId: string,
+    value: string,
+    options: {
+      fact?: { key: string; scope: string };
+      prepare?: "await" | "enqueue";
+      saveForFuture?: boolean;
+    } = {},
+  ) {
+    const resolved = await resolveAnswer(userId, reviewId, value, options);
+
+    if (resolved === null) {
+      return null;
+    }
+
+    const { applicationIds, readyCount } = await settleAnswers(
+      userId,
+      [resolved],
+      options.prepare ?? "await",
+    );
 
     return {
       reviewId,
-      factKey: saveForFuture ? factKey : null,
-      scope: saveForFuture ? scope : "",
+      factKey: resolved.factKey,
+      scope: resolved.scope,
       applicationIds,
       readyCount,
-      saveForFuture,
+      saveForFuture: resolved.saveForFuture,
     };
+  }
+
+  async function answerMany(
+    userId: string,
+    answers: readonly { reviewId: string; value: string; saveForFuture?: boolean | undefined }[],
+  ) {
+    const ids = answers.map((entry) => entry.reviewId);
+
+    const open = db
+      .select({ id: reviews.id })
+      .from(reviews)
+      .where(and(eq(reviews.userId, userId), eq(reviews.status, "open"), inArray(reviews.id, ids)))
+      .all();
+
+    if (open.length !== new Set(ids).size) {
+      return null;
+    }
+
+    const settled = await Promise.all(
+      answers.map(async (entry) =>
+        resolveAnswer(userId, entry.reviewId, entry.value, {
+          saveForFuture: entry.saveForFuture ?? true,
+        }),
+      ),
+    );
+
+    if (settled.some((one) => one === null)) {
+      return null;
+    }
+
+    const resolved = settled.filter((one): one is ResolvedAnswer => one !== null);
+    const { applicationIds, readyCount } = await settleAnswers(userId, resolved, "await");
+
+    return { answers: resolved, applicationIds, readyCount };
   }
 
   function dismiss(userId: string, reviewId: string) {
@@ -417,6 +499,7 @@ export function createReviewService(deps: {
 
   return {
     answer,
+    answerMany,
     dismiss,
     list: (userId: string) => listReviews({ catalogDb, clock, db, userId }),
   };

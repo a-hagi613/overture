@@ -93,6 +93,7 @@ export function StrengthenFacts() {
                 <div className="mt-3 max-w-md">
                   <ReviewAnswer
                     field={fact}
+                    label={fact.label}
                     labelledBy={labelId}
                     onChange={(next) => {
                       setDrafts((current) => ({ ...current, [fact.key]: next }));

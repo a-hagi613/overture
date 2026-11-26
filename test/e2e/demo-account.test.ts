@@ -243,7 +243,10 @@ test("test@email.com signs in with one click and every main screen is populated"
   await page.goto(`${demoServer.url}/review`);
   await expect(page.getByRole("heading", { name: "Review Queue" })).toBeVisible();
   await expect(
-    page.getByText("What are your salary expectations for this role?").first(),
+    page
+      .getByRole("list", { name: "Applications waiting on answers" })
+      .getByRole("listitem")
+      .first(),
   ).toBeVisible();
 
   await page.goto(`${demoServer.url}/inbox`);

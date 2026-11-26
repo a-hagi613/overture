@@ -271,26 +271,30 @@ test("the Review question and filter live in the URL and Back returns to the pho
   );
 
   await page.goto(`${uiServer.url}/review`);
-  await expect(page.getByRole("button", { name: new RegExp(second.company, "u") })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: new RegExp(`^${second.company} ·`, "u") }),
+  ).toBeVisible();
 
-  await page.getByRole("button", { name: new RegExp(second.company, "u") }).click();
+  await page.getByRole("button", { name: new RegExp(`^${second.company} ·`, "u") }).click();
 
   const dialog = page.getByRole("dialog");
 
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("heading", { name: second.prompt })).toBeVisible();
-  await expect(page).toHaveURL(/[?&]question=/u);
+  await expect(dialog.getByText(second.prompt)).toBeVisible();
+  await expect(page).toHaveURL(/[?&]application=/u);
 
   await page.reload();
-  await expect(dialog.getByRole("heading", { name: second.prompt })).toBeVisible();
+  await expect(dialog.getByText(second.prompt)).toBeVisible();
 
   await page.goBack();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: new RegExp(second.company, "u") })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: new RegExp(`^${second.company} ·`, "u") }),
+  ).toBeVisible();
 
   await page.goForward();
-  await expect(dialog.getByRole("heading", { name: second.prompt })).toBeVisible();
-  await expect(page).toHaveURL(/[?&]question=/u);
+  await expect(dialog.getByText(second.prompt)).toBeVisible();
+  await expect(page).toHaveURL(/[?&]application=/u);
 
   await context.close();
   await request.dispose();
