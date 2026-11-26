@@ -203,3 +203,12 @@ while a local run never retries and keeps the trace of a failure.
 - Hand-written fakes for every port: fast, but they test our idea of the service rather than the service, and drift silently. Banned by Landmines `no-test-doubles`.
 - Real third-party services in every test run: slow, costly, flaky, and would touch employers.
 - A unit-heavy suite (v1: about 118 files): tested implementation rather than behaviour.
+
+## Amendment of 2026-11-26: the daily live checks are removed
+
+The daily `live.check` job, its form/AI/mail/storage checks, `live_check_results` and the reserved `live-check@`
+address are removed (#695, #679). A scheduled job that opens a real employer form, makes real model calls or runs a
+real mail loop spends money outside real user activity, which the owner ruled out (#680), and it proved less than the
+record of a real send. What remains is the fail-closed test interceptor and the fixture suite below, plus the evidence
+of a real send: the before/after Submit screenshots, the per-application timeline and the support lookup (ADR 0046,
+SPEC §16.5). `scripts/pull-forms.ts` still refreshes fixtures through a pull request when a form genuinely changes.

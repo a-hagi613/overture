@@ -88,3 +88,21 @@ different stack), not label errors. Labelling the week cost $6.59 with the Batch
   Health Practitioner`) is never offered; it is reached by choosing its category. Targets saved before the move keep
   their retired names, which still resolve to taxonomy ids, coarser than a direct choice (`Software Engineering`
   reaches all of Software & IT).
+
+## Amendment of 2026-11-26: the role taxonomy and its labels are retired
+
+The 2026-11-26 rebuild (#678, #679) replaces this ADR's label and taxonomy design. Everything below is history.
+
+- **Roles are freehire's job categories (about 55) plus optional title words.** A job matches when its category is
+  picked **or** its title contains a picked word. The 29-category / 272-role taxonomy, its ESCO input, the committed
+  `role-labels.json` seed, the one-time Haiku labelling pass, `taxonomy-tags.ts`, the retired-tag bridge and the
+  hiring.cafe tag import are deleted with the old job source (#700, #706).
+- **Locations are freehire's own place lists**, stored as place ids on both sides, plus `Remote · <country>`,
+  `Remote · <continent>` and `Remote · Worldwide`. A job's place ids and a user's place ids come from the same source,
+  so a location match is exact (#683).
+- **Work mode is never a filter.** freehire leaves it blank on most jobs, and a blank is stored as null, never guessed
+  ("Work mode not stated" in the drawer). Seniority, salary, employment type and job type are not filters either
+  (#684).
+- **Matching is the code pool filter, then one Haiku 5.5 score per job, stored once, then a band-first code sort.**
+  The score, its schema and the sort are in the new ADR 0045 ("Matching score and sort"); role and location play no
+  part in the score's arithmetic, only in the pool.

@@ -74,3 +74,7 @@ alert catches a missed run.
 - **Parse off-box and tag in the app.** Moves 833 MB a day to the app and keeps the CPU cost there.
 - **Fetch the feed from the app with a guard.** Contradicts ADR 0016 and the measured cost.
 - **No Workable ingest.** Drops the ATS the owner selected in ADR 0028.
+
+*Amendment of 2026-11-26 (#679, #700): the Workable bulk feed ingest is retired with the old job source. freehire is
+the only job source, so the app no longer fetches, stages or ingests a Workable snapshot; the Workable apply adapter
+(its form read over plain HTTP) stays. See SPEC §6.*
