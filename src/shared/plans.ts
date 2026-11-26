@@ -22,6 +22,32 @@ export const PLANS = {
   },
 } as const;
 
+/** The plan a person is on, before their grants run out: the trial or a paid subscription. */
+export type PlanKind = "month" | "none" | "trial" | "week";
+
+/**
+ * The one-line price and allowance for a plan, used beside its name in the
+ * sidebar, Home and Settings → Billing. Every number comes from the plan
+ * configuration above, so a price change never leaves a screen behind.
+ * @param kind The plan the person is on.
+ * @returns The price and allowance, or what is left to choose when there is no plan.
+ */
+export function planAllowanceText(kind: PlanKind) {
+  if (kind === "trial") {
+    return `${String(TRIAL.applications)} applications`;
+  }
+
+  if (kind === "week") {
+    return `${formatUsd(PLANS.week.priceUsd)}/wk · ${String(PLANS.week.applications)}/wk`;
+  }
+
+  if (kind === "month") {
+    return `${formatUsd(PLANS.month.priceUsd)}/mo · ${String(PLANS.month.applications)}/mo`;
+  }
+
+  return "No plan yet";
+}
+
 export const SEND_WINDOW = {
   endHour: 20,
   minGapMinutes: 20,

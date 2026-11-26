@@ -188,7 +188,9 @@ test("the phone header and tab bar reach search, notifications, the profile hub 
 
   await expect(hub.getByRole("switch", { name: "Switch to dark mode" })).toBeVisible();
   await expect(hub.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await expect(shellPage.getByText("Applications left", { exact: true })).toBeVisible();
+  await expect(
+    shellPage.getByTestId("sidebar-balance").getByText("Balance", { exact: true }),
+  ).toBeVisible();
   await shellPage.getByRole("link", { name: "Job Preferences" }).click();
   await expect(shellPage).toHaveURL(/\/profile\/preferences$/u);
 

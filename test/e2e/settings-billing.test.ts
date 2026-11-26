@@ -256,9 +256,11 @@ test.describe("plan and billing in Profile, and the paused states", () => {
         await expect(
           page.getByRole("heading", { name: /Plan & Billing/u, level: 1 }),
         ).toBeVisible();
-        await expect(page.getByRole("heading", { exact: true, name: "Month plan" })).toBeVisible();
+        await expect(page.getByRole("heading", { exact: true, name: "Monthly" })).toBeVisible();
         await expect(page.getByText(/250 of 250 applications left/u)).toBeVisible();
-        await expect(page.getByRole("heading", { name: "You're on the Month plan" })).toBeVisible();
+        await expect(
+          page.getByRole("heading", { name: "You're on the Monthly plan" }),
+        ).toBeVisible();
 
         await page.getByRole("button", { name: "Manage billing" }).first().click();
 
@@ -285,8 +287,10 @@ test.describe("plan and billing in Profile, and the paused states", () => {
       try {
         await freeView.page.goto(`${app.server.url}/profile/billing`);
 
-        await expect(freeView.page.getByRole("heading", { name: "Upgrade to Week" })).toBeVisible();
-        await freeView.page.getByRole("button", { name: "Upgrade to Week in Stripe" }).click();
+        await expect(
+          freeView.page.getByRole("heading", { name: "Upgrade to Weekly" }),
+        ).toBeVisible();
+        await freeView.page.getByRole("button", { name: "Upgrade to Weekly in Stripe" }).click();
 
         await expect
           .poll(() => app.stripe.requests.some((r) => r.path === "/v1/checkout/sessions"))
@@ -302,12 +306,12 @@ test.describe("plan and billing in Profile, and the paused states", () => {
       try {
         await weekView.page.goto(`${app.server.url}/profile/billing`);
 
-        await expect(weekView.page.getByRole("heading", { name: "Week plan" })).toBeVisible();
+        await expect(weekView.page.getByRole("heading", { name: "Weekly" })).toBeVisible();
         await expect(
-          weekView.page.getByRole("heading", { name: "Upgrade to Month" }),
+          weekView.page.getByRole("heading", { name: "Upgrade to Monthly" }),
         ).toBeVisible();
         await expect(
-          weekView.page.getByRole("button", { name: "Upgrade to Month in Stripe" }),
+          weekView.page.getByRole("button", { name: "Upgrade to Monthly in Stripe" }),
         ).toBeVisible();
       } finally {
         await weekView.close();

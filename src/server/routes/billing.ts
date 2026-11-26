@@ -13,7 +13,7 @@ import {
   claimTrialCard,
   TRIAL_APPLICATIONS,
 } from "../billing/card-fingerprint.ts";
-import { applicationsLeft, planApplications } from "../billing/ledger.ts";
+import { billingAccountOf } from "../billing/plan-account.ts";
 import { planForPriceId, stripePriceId } from "../billing/index.ts";
 import { createCheckoutCoordinator } from "../billing/checkout.ts";
 import { linkStripeCustomer, stripeCustomerIdFor } from "../billing/customers.ts";
@@ -115,16 +115,18 @@ export function createBillingRoutes(deps: {
     context.header("Cache-Control", "no-store");
 
     const subscription = currentSubscriptionOf(db, access.account.id);
-    const now = clock.now();
+    const account = billingAccountOf(db, access.account.id, clock.now());
 
     return context.json({
-      applicationsLeft: applicationsLeft(db, access.account.id, now),
+      applicationsLeft: account.applicationsLeft,
+      balance: account.balance,
       cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd ?? false,
       currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
       customer: stripeCustomerIdFor(db, access.account.id) !== null,
       enabled: payments !== null,
       plan: subscription?.plan ?? null,
-      planApplications: planApplications(db, access.account.id, now),
+      planApplications: account.planApplications,
+      planKind: account.planKind,
       status: subscription?.status ?? null,
     });
   });

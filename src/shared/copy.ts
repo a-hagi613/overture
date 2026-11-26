@@ -254,17 +254,15 @@ export const copy = {
       billingActiveBadge: "Active",
       billingPopularBadge: "Recommended",
       billingUpgradeEyebrow: "Next tier",
-      billingUpgradeWeekTitle: "Upgrade to Week",
-      billingUpgradeMonthTitle: "Upgrade to Month",
+      billingUpgradeWeekTitle: "Upgrade to Weekly",
+      billingUpgradeMonthTitle: "Upgrade to Monthly",
       billingUpgradeAction: (planName: string) => `Upgrade to ${planName} in Stripe`,
-      billingTopPlanTitle: "You're on the Month plan",
+      billingTopPlanTitle: "You're on the Monthly plan",
       billingTopPlanBody:
         "You have our highest allowance of 250 applications every 30 days. Manage renewals, payment methods, or invoices anytime in Stripe.",
       billingStripeNote: "Billing portal is available once Stripe is connected.",
       billingCheckoutNote: "Stripe checkout is unavailable in this environment.",
       billingManageStripe: "Manage billing",
-      billingTrialPlan: "Free trial",
-      billingNoPlan: "Free plan",
       billingRemaining: (left: number, total: number) =>
         `${String(left)} of ${String(total)} applications left`,
       notFoundTitlePlain: "Page ",
@@ -711,35 +709,28 @@ export const copy = {
     greetingMorning: "Good morning,",
     greetingAfternoon: "Good afternoon,",
     greetingEvening: "Good evening,",
-    applicationsLeft: "Applications left",
     sentToday: "Sent today",
     usageCount: String,
-    usagePlan: (plan: number, planKind?: "week" | "month" | "trial" | "free" | null) => {
-      if (planKind === "week") {
-        return `of ${String(plan)} on your week plan`;
-      }
-
-      if (planKind === "month") {
-        return `of ${String(plan)} on your month plan`;
-      }
-
-      if (planKind === "trial") {
-        return `of ${String(plan)} on your free trial`;
-      }
-
-      if (planKind === "free") {
-        return `of ${String(plan)} on your free plan`;
-      }
-
-      return `of ${String(plan)} on your plan`;
-    },
-    usageSentToday: (sent: number, cap: number) =>
-      `${String(sent)} of ${String(cap)} sent today · resets at midnight`,
-    usageSentTodayShort: (sent: number, cap: number) =>
-      `${String(sent)} of ${String(cap)} sent today`,
-    usageResetsMidnight: "Resets at midnight",
-    usageLowQuota: "Running low. Choose a plan",
     usageAria: (count: number) => `${String(count)} applications left`,
+    balance: {
+      badge: {
+        month: "Monthly",
+        none: "Free plan",
+        trial: "Free trial",
+        week: "Weekly",
+      },
+      applicationsLeft: "applications left",
+      eyebrow: "Balance",
+      manage: "Manage plan",
+      todayTail: (sent: number, cap: number) => `· ${String(sent)} of ${String(cap)} today`,
+      upgrade: "Upgrade to Weekly / Monthly",
+    },
+    trialUsed: {
+      body: "Upgrade to keep applying.",
+      cta: "Upgrade to Weekly / Monthly",
+      eyebrow: "Free trial",
+      title: "Your 3 free applications are sent.",
+    },
     daySoFar: "The day so far",
     outcomes: {
       interviews: "Interviews",
@@ -1874,8 +1865,6 @@ export const copy = {
     titleItalic: "and billing",
     lead: "What you have left, when it renews, and how to change it",
     planHeading: "Your plan",
-    weekPlan: "Week plan",
-    monthPlan: "Month plan",
     weekDetail: "50 tailored applications every 7 days ($9.99/week).",
     monthDetail: "250 tailored applications every 30 days ($29.99/month).",
     leftHeading: "Applications left",
@@ -1903,6 +1892,21 @@ export const copy = {
     portalError: "Stripe did not open. Try again in a moment.",
     billingOff: "Plan changes are not set up on this server yet.",
     usageSummary: (left: number, total: number) => `${String(left)} of ${String(total)} remaining`,
+    balanceHeading: "Balance",
+    balanceTitle: "Where your applications are",
+    balanceHint:
+      "Granted applications are added by your plan or an invite. Held ones are set aside for a send in progress and returned if it fails.",
+    balanceTrial: "Free trial applications",
+    balancePaid: "Paid applications",
+    balanceHeld: "Held for sends",
+    balanceUsed: "Used",
+    balanceReturned: "Returned",
+    balanceExpiring: "Expiring",
+    balanceNoneExpiring: "None",
+    balanceAllowance: (granted: number, used: number, left: number) =>
+      `${String(granted)} granted · ${String(used)} used · ${String(left)} left`,
+    balanceExpiringValue: (applications: number, date: string) =>
+      `${String(applications)} by ${date}`,
   },
   profileWorkspace: {
     resumeUploadedToast: "Resume uploaded and saved.",
@@ -1930,8 +1934,8 @@ export const copy = {
     titlePlain: "Choose",
     titleItalic: "a plan",
     lead: "Week or Month, for Applications you approve",
-    weekName: "Week",
-    monthName: "Month",
+    weekName: "Weekly",
+    monthName: "Monthly",
     weekPrice: "$9.99",
     monthPrice: "$29.99",
     weekUnit: "/ week",
@@ -1944,13 +1948,13 @@ export const copy = {
     ],
     monthBullets: [
       "250 tailored applications every 30 days",
-      "40% lower cost per application than the Week plan",
+      "40% lower cost per application than the Weekly plan",
       "Renews automatically each month, cancel anytime",
       "Unused applications expire at renewal",
       "Failed submissions never count against your limit",
     ],
-    chooseWeek: "Choose Week",
-    chooseMonth: "Choose Month",
+    chooseWeek: "Choose Weekly",
+    chooseMonth: "Choose Monthly",
     startError: "Checkout did not open. Try again in a moment.",
     startedTitle: "Plan started",
     startedLine: (plan: string) => `${plan} plan on`,
@@ -3812,7 +3816,7 @@ export const copy = {
     billingStatPaused: "Paused for payment",
     billingStatEnding: "Ending in 7 days",
     billingStatTrialHint: "Applications on the trial",
-    billingStatPayingHint: "Week or Month plan",
+    billingStatPayingHint: "Weekly or Monthly plan",
     billingStatPausedHint: "Applications stopped",
     billingStatEndingHint: "Renewal or plan end",
     billingReconcileHeading: "Last reconciliation",

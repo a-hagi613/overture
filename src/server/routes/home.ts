@@ -11,7 +11,8 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { openOrNull } from "../profile/personal-crypto.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 
-import { billingSummary, committedSince } from "../billing/ledger.ts";
+import { committedSince } from "../billing/ledger.ts";
+import { billingAccountOf } from "../billing/plan-account.ts";
 import {
   applicationEvents,
   applications,
@@ -516,7 +517,7 @@ export function createHomeRoutes(deps: {
     const dayStart = localDayStartFor(today, zone);
     const sentToday = committedSince(db, userId, dayStart);
     const dailyCap = dailyCapOf(db);
-    const billing = billingSummary(db, userId, now);
+    const billing = billingAccountOf(db, userId, now);
     const left = billing.applicationsLeft;
     const profile = profileOf(userId);
 
@@ -653,6 +654,7 @@ export function createHomeRoutes(deps: {
       now,
       pauseReason: profile.pauseReason,
       planApplications: billing.planApplications,
+      planKind: billing.planKind,
       queue: sendQueueOf(scheduledFor, now),
       queued: approvedRows.length,
       ready: {
@@ -684,6 +686,7 @@ export function createHomeRoutes(deps: {
       sentToday,
       strengthen: strengthenOf(userId),
       timeZone: zone,
+      trialUsed: billing.trialUsed,
     });
   });
 

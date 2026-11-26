@@ -78,6 +78,7 @@ const homeResponseSchema = z.object({
   now: z.number(),
   pauseReason: z.enum(PAUSE_REASONS).nullable(),
   planApplications: z.number(),
+  planKind: z.enum(["month", "none", "trial", "week"]),
   queue: z.object({ position: z.number().nullable(), sendAt: z.number().nullable() }),
   queued: z.number(),
   ready: z.object({
@@ -97,6 +98,7 @@ const homeResponseSchema = z.object({
   sentToday: z.number(),
   strengthen: z.object({ missing: z.number() }).nullable(),
   timeZone: z.string(),
+  trialUsed: z.boolean(),
 });
 
 export type HomeResponse = z.infer<typeof homeResponseSchema>;
