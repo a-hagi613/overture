@@ -29,7 +29,7 @@ const appPaths = [
 const bypassPaths = [
   "/api/health",
   "/api/auth/sign-in",
-  "/api/auth/oauth2/callback/google",
+  "/api/auth/callback/google",
   "/webhooks/stripe",
   "/internal/mail/inbound",
   "/assets/main-abc123.js",

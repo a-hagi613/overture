@@ -58,7 +58,9 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    production).
    The OAuth clients are optional until they exist, one pair at a time: `GOOGLE_CLIENT_ID` with
    `GOOGLE_CLIENT_SECRET`, and `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET` (redirect URIs
-   `https://tryoverture.com/api/auth/oauth2/callback/google` and `…/oauth2/callback/linkedin`).
+   `https://tryoverture.com/api/auth/callback/google` and `…/api/auth/callback/linkedin`, plus
+   `http://localhost:3000/api/auth/callback/{google,linkedin}` for local development; the generic OAuth
+   plugin registers the core `/callback/:id` route, so there is no `oauth2` segment).
    A provider whose pair is not both set is not registered and its button does not render; the
    emailed sign-in link works on its own. Setting only one name of a pair stops the server at boot.
    Resume and Facts (M1-13) add `MASTER_KEY_V1`, generated with `openssl rand -base64 32`
