@@ -123,6 +123,16 @@ describe("Submit screenshots", () => {
     expect(files.size).toBe(0);
   });
 
+  test("an unavailable object store leaves the support lookup with no screenshots", async () => {
+    const { store } = memoryStore();
+
+    store.listWithSizes = async function* listWithSizes() {
+      throw new Error("the object store root is missing");
+    };
+
+    expect(await listApplicationScreenshots(store, USER_ID, APPLICATION_ID)).toEqual([]);
+  });
+
   test("cleanup deletes only expired shots and never a foreign key", async () => {
     const { files, store } = memoryStore();
     const oldAt = NOW - SCREENSHOT_RETENTION_MS - 1;

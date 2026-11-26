@@ -22,7 +22,9 @@ function Section({ children, heading }: { children: ReactNode; heading: string }
   return (
     <section className={`mt-5 ${CARD}`}>
       <h2 className="font-serif text-card-title leading-[1.1]">{heading}</h2>
-      <div className="mt-3 overflow-x-auto">{children}</div>
+      <div aria-label={heading} className="mt-3 overflow-x-auto" role="region" tabIndex={0}>
+        {children}
+      </div>
     </section>
   );
 }

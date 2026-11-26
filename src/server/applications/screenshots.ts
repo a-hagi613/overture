@@ -138,14 +138,20 @@ export async function listApplicationScreenshots(
 ) {
   const found: StoredScreenshot[] = [];
 
-  for await (const entry of objects.listWithSizes(
-    applicationScreenshotPrefix(userId, applicationId),
-  )) {
-    const parsed = parseApplicationScreenshotKey(entry.key, entry.bytes);
+  try {
+    for await (const entry of objects.listWithSizes(
+      applicationScreenshotPrefix(userId, applicationId),
+    )) {
+      const parsed = parseApplicationScreenshotKey(entry.key, entry.bytes);
 
-    if (parsed !== null) {
-      found.push(parsed);
+      if (parsed !== null) {
+        found.push(parsed);
+      }
     }
+  } catch (error) {
+    logError("screenshots.list", error);
+
+    return [];
   }
 
   return found.toSorted((left, right) => left.at - right.at);
@@ -164,15 +170,19 @@ export async function cleanupExpiredScreenshots(
   const cutoff = now - retentionMs;
   let deleted = 0;
 
-  for await (const key of objects.list(SCREENSHOT_PREFIX)) {
-    const parsed = parseApplicationScreenshotKey(key);
+  try {
+    for await (const key of objects.list(SCREENSHOT_PREFIX)) {
+      const parsed = parseApplicationScreenshotKey(key);
 
-    if (parsed === null || parsed.at >= cutoff) {
-      continue;
+      if (parsed === null || parsed.at >= cutoff) {
+        continue;
+      }
+
+      await objects.delete(key);
+      deleted += 1;
     }
-
-    await objects.delete(key);
-    deleted += 1;
+  } catch (error) {
+    logError("screenshots.cleanup", error);
   }
 
   return deleted;
