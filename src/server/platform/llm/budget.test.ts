@@ -3,14 +3,13 @@ import { expect, test } from "bun:test";
 import { openDatabase } from "../db/client.ts";
 import { grants, users } from "../db/schema.ts";
 import { migrateDatabase } from "../db/migrate.ts";
-import { scaledBudget } from "../budgets.ts";
 import { setSetting } from "../settings/index.ts";
 
 import {
   DEFAULT_SPEND_ALERT_RATIO,
   llmDayBudget,
+  llmOnboardingMatchingBudgetMicros,
   llmSpendAlertRatio,
-  llmSubscriberUserDayBudgetMicros,
   llmUserDayBudgetMicros,
 } from "./budget.ts";
 
@@ -59,31 +58,32 @@ function addGrant(
     .run();
 }
 
-test("the global daily budget is the base with no paying subscribers", () => {
+test("the global daily budget is the fifty-dollar base with no subscribers", () => {
   const budget = llmDayBudget(memoryDatabase(), AT);
 
   expect(budget).toEqual({
-    baseMicros: 10_000_000,
-    budgetMicros: 10_000_000,
+    baseMicros: 50_000_000,
+    budgetMicros: 50_000_000,
     perSubscriberMicros: 300_000,
     subscribers: 0,
   });
 });
 
-test("the global daily budget grows by the subscriber share for every paying subscriber", () => {
+test("paying subscribers raise the global budget by the subscriber share", () => {
   const db = memoryDatabase();
 
   addGrant(db, "paying-1", "period");
   addGrant(db, "paying-2", "period");
 
   expect(llmDayBudget(db, AT)).toMatchObject({
-    baseMicros: 10_000_000,
-    budgetMicros: 10_000_000 + 2 * 300_000,
+    baseMicros: 50_000_000,
+    budgetMicros: 50_000_000 + 2 * 300_000,
+    perSubscriberMicros: 300_000,
     subscribers: 2,
   });
 });
 
-test("admin, trial and ended periods never grow a budget", () => {
+test("admin, trial and ended periods are never counted as paying subscribers", () => {
   const db = memoryDatabase();
 
   addGrant(db, "invited", "admin", null);
@@ -93,7 +93,7 @@ test("admin, trial and ended periods never grow a budget", () => {
   expect(llmDayBudget(db, AT).subscribers).toBe(0);
 });
 
-test("a person's overlapping periods count once so a plan switch cannot double the budget", () => {
+test("a person's overlapping periods count once", () => {
   const db = memoryDatabase();
 
   addGrant(db, "paying", "period");
@@ -102,25 +102,31 @@ test("a person's overlapping periods count once so a plan switch cannot double t
   expect(llmDayBudget(db, AT).subscribers).toBe(1);
 });
 
-test("a paying subscriber's own daily budget is raised above the invited-user floor", () => {
+test("every person has the same ten-cent daily budget", () => {
   const db = memoryDatabase();
 
   addGrant(db, "paying", "period");
 
-  expect(llmUserDayBudgetMicros(db, "paying", AT)).toBe(500_000);
-  expect(llmUserDayBudgetMicros(db, "invited", AT)).toBe(250_000);
+  expect(llmUserDayBudgetMicros(db)).toBe(100_000);
 });
 
-test("an admin sets the subscriber shares and the alert ratio", () => {
+test("the onboarding matching pool is a separate fifty-cent budget", () => {
+  expect(llmOnboardingMatchingBudgetMicros(memoryDatabase())).toBe(500_000);
+});
+
+test("an admin sets the caps and the alert ratio", () => {
   const db = memoryDatabase();
 
-  setSetting(db, clock, "llm.cap_per_subscriber_day_usd", "1.5", "test");
-  setSetting(db, clock, "llm.cap_subscriber_user_day_usd", "0.75", "test");
+  setSetting(db, clock, "llm.cap_global_day_usd", "75", "test");
+  setSetting(db, clock, "llm.cap_user_day_usd", "0.40", "test");
+  setSetting(db, clock, "llm.cap_onboarding_usd", "2.00", "test");
+  setSetting(db, clock, "llm.cap_per_subscriber_day_usd", "1.50", "test");
   setSetting(db, clock, "llm.spend_alert_ratio", "0.5", "test");
   addGrant(db, "paying", "period");
 
-  expect(llmDayBudget(db, AT).budgetMicros).toBe(10_000_000 + 1_500_000);
-  expect(llmUserDayBudgetMicros(db, "paying", AT)).toBe(1_000_000);
+  expect(llmDayBudget(db, AT).budgetMicros).toBe(75_000_000 + 1_500_000);
+  expect(llmUserDayBudgetMicros(db)).toBe(400_000);
+  expect(llmOnboardingMatchingBudgetMicros(db)).toBe(2_000_000);
   expect(llmSpendAlertRatio(db)).toBe(0.5);
 });
 
@@ -138,7 +144,7 @@ test("an unusable alert ratio falls back to the documented share", () => {
   expect(llmSpendAlertRatio(db)).toBe(DEFAULT_SPEND_ALERT_RATIO);
 });
 
-test("the micros global override becomes the base the subscriber share is added to", () => {
+test("the micros global override still becomes the base", () => {
   const db = memoryDatabase();
 
   setSetting(db, clock, "llm.daily_spend_cap_micros", "20000000", "test");
@@ -148,14 +154,4 @@ test("the micros global override becomes the base the subscriber share is added 
     baseMicros: 20_000_000,
     budgetMicros: 20_000_000 + 300_000,
   });
-});
-
-test("scaling clamps negative inputs instead of shrinking a budget", () => {
-  expect(scaledBudget(-5, 300_000, 2)).toBe(600_000);
-  expect(scaledBudget(10_000_000, -1, 2)).toBe(10_000_000);
-  expect(scaledBudget(10_000_000, 300_000, -2)).toBe(10_000_000);
-});
-
-test("the paying subscriber's user budget is reported beside the invited-user base", () => {
-  expect(llmSubscriberUserDayBudgetMicros(memoryDatabase())).toBe(500_000);
 });

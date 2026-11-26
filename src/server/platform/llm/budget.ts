@@ -1,12 +1,6 @@
 import type { AppDatabase } from "../db/client.ts";
 
-import {
-  activeSubscriberCount,
-  isPayingSubscriber,
-  scaledBudget,
-  settingMicros,
-  settingRatio,
-} from "../budgets.ts";
+import { activeSubscriberCount, scaledBudget, settingMicros, settingRatio } from "../budgets.ts";
 import { getSetting } from "../settings/index.ts";
 
 const GLOBAL_DAILY_CAP_KEY = "llm.daily_spend_cap_micros";
@@ -16,6 +10,7 @@ export const DEFAULT_SPEND_ALERT_RATIO = 0.8;
 
 export type LlmDollarCapKey =
   | "llm.cap_global_day_usd"
+  | "llm.cap_onboarding_usd"
   | "llm.cap_tagging_day_usd"
   | "llm.cap_user_day_usd";
 
@@ -81,31 +76,24 @@ export function llmDayBudgetMicros(db: AppDatabase, at: number) {
 }
 
 /**
- * One person's daily LLM budget: the invited-user base, plus the subscriber
- * share while a paid period is running, so a paying user's preparation never
- * stops at the invite-only ceiling.
+ * One person's daily LLM budget. Every account gets the same daily ceiling;
+ * the onboarding matching pool is a separate, one-time budget and the global
+ * ceiling grows with paying subscribers.
  * @param db The application database.
- * @param userId The person whose budget it is.
- * @param at The instant to read the paid period at.
  * @returns The budget in micros.
  */
-export function llmUserDayBudgetMicros(db: AppDatabase, userId: string, at: number) {
-  return isPayingSubscriber(db, userId, at)
-    ? llmSubscriberUserDayBudgetMicros(db)
-    : capMicros(db, "llm.cap_user_day_usd");
+export function llmUserDayBudgetMicros(db: AppDatabase) {
+  return capMicros(db, "llm.cap_user_day_usd");
 }
 
 /**
- * The daily budget a paying subscriber's own calls get: the invited-user base
- * plus the subscriber share. It is what the admin LLM page shows beside the
- * base, whether or not a particular person is paying right now.
+ * The one-time matching budget a person gets while onboarding, before their
+ * daily ceiling applies to scored jobs after onboarding.
  * @param db The application database.
  * @returns The budget in micros.
  */
-export function llmSubscriberUserDayBudgetMicros(db: AppDatabase) {
-  return (
-    capMicros(db, "llm.cap_user_day_usd") + settingMicros(db, "llm.cap_subscriber_user_day_usd")
-  );
+export function llmOnboardingMatchingBudgetMicros(db: AppDatabase) {
+  return capMicros(db, "llm.cap_onboarding_usd");
 }
 
 /**

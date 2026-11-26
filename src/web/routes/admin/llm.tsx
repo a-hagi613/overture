@@ -68,7 +68,6 @@ export function LlmUsagePage() {
       <p className="mt-3 font-mono text-xs text-muted-foreground">
         {copy.admin.llmCapsFootnote(
           formatUsdMicros(data.caps.userDailyCapMicros),
-          formatUsdMicros(data.caps.subscriberUserDailyCapMicros),
           formatUsdMicros(data.caps.taggingDailyCapMicros),
         )}
       </p>

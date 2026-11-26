@@ -4,7 +4,7 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Clock } from "../ports/clock.ts";
 import { llmUsage } from "../db/schema.ts";
 import { getSetting } from "../settings/index.ts";
-import { llmDayBudget, llmSubscriberUserDayBudgetMicros } from "./budget.ts";
+import { llmDayBudget } from "./budget.ts";
 
 export const DAY_MS = 86_400_000;
 
@@ -82,6 +82,22 @@ export function llmSpendTodayMicros(
   userId: string | null,
 ) {
   return spendMicros(db, dayStartUtc(atMs), purpose, userId);
+}
+
+/**
+ * Every recorded call for one purpose and person, with no day boundary. The
+ * onboarding matching pool is spent once, so it is read this way.
+ * @param db The application database.
+ * @param purpose The purpose to sum, or null for every purpose.
+ * @param userId The person to sum, or null for everyone.
+ * @returns The spend in micros.
+ */
+export function llmSpendAllTimeMicros(
+  db: AppDatabase,
+  purpose: string | null,
+  userId: string | null,
+) {
+  return spendMicros(db, 0, purpose, userId);
 }
 
 export interface LlmUsageRow {
@@ -276,7 +292,6 @@ export function readAdminLlmUsage(db: AppDatabase, clock: Clock, query: AdminLlm
       subscribers: dailyBudget.subscribers,
       monthlySpendCapMicros,
       userDailyCapMicros: parseUsdSettingMicros(db, "llm.cap_user_day_usd"),
-      subscriberUserDailyCapMicros: llmSubscriberUserDayBudgetMicros(db),
       taggingDailyCapMicros: parseUsdSettingMicros(db, "llm.cap_tagging_day_usd"),
     },
   };

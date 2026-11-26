@@ -1,207 +1,108 @@
-import { z } from "zod";
+import { localDayStart, nextLocalDayStart } from "../platform/local-time.ts";
 
-import {
-  addLocalDays,
-  localDateAt,
-  localDayStartFor,
-  localPartsAt,
-  localTimeOn,
-  localWindowOn,
-} from "../platform/local-time.ts";
-
-export interface SendWindow {
-  startMinutes: number;
-  endMinutes: number;
-}
-
-export const DEFAULT_SEND_WINDOW: SendWindow = { endMinutes: 20 * 60, startMinutes: 8 * 60 };
-
-export interface PlanSlotsInput {
+export interface PlanSendSlotsInput {
   now: number;
   timeZone: string;
-  window: SendWindow;
   count: number;
   spacingMs: number;
-  blocked: readonly number[];
-  random: () => number;
+  dailyCap: number;
+  /** Sends already counted against today's cap (ledger or attempts). */
+  usedToday: number;
+  /** Approved Applications that already hold a send time. */
+  scheduled: readonly number[];
+  earliest?: number;
 }
 
-const TIME_PATTERN = /^(?<hours>\d{2}):(?<minutes>\d{2})$/u;
-
-const windowSchema = z.object({ start: z.string(), end: z.string() });
-
-function minutesOf(value: string) {
-  const match = TIME_PATTERN.exec(value);
-
-  if (match?.groups === undefined) {
-    return null;
-  }
-
-  const hours = Number(match.groups["hours"]);
-  const minutes = Number(match.groups["minutes"]);
-
-  if (hours > 24 || minutes > 59) {
-    return null;
-  }
-
-  return Math.min(hours * 60 + minutes, 24 * 60);
+interface DayUse {
+  count: number;
+  latest: number;
 }
 
-export function parseSendWindow(raw: string | null) {
-  if (raw === null) {
-    return DEFAULT_SEND_WINDOW;
+/**
+ * Places approved Applications in order: the first at `earliest` (or now), each
+ * following one a spacing apart. A spacing of zero places them all at the same
+ * instant, which is how the onboarding trial's three Applications go in parallel.
+ *
+ * The daily cap still applies. When a day's sends run out, the next Application
+ * waits for local midnight, when the cap resets, never a daytime send window.
+ * Times that other approved Applications already hold are respected, so a later
+ * run cannot place a send on top of one.
+ * @param input The instant, the zone, how many to place, the spacing, the daily cap, today's used sends, the times already held and an optional earliest slot.
+ * @returns The send times, in order.
+ */
+export function planSendSlots(input: PlanSendSlotsInput) {
+  const { count, dailyCap, now, spacingMs, timeZone } = input;
+
+  if (count <= 0) {
+    return [];
   }
 
-  let parsed: ReturnType<typeof windowSchema.safeParse>;
+  const cap = Math.max(0, Math.trunc(dailyCap));
 
-  try {
-    parsed = windowSchema.safeParse(JSON.parse(raw));
-  } catch {
-    return DEFAULT_SEND_WINDOW;
+  if (cap <= 0) {
+    return [];
   }
 
-  if (!parsed.success) {
-    return DEFAULT_SEND_WINDOW;
+  const todayStart = localDayStart(now, timeZone);
+  const byDay = new Map<number, DayUse>();
+
+  function useOf(day: number) {
+    const existing = byDay.get(day);
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const created: DayUse = { count: 0, latest: 0 };
+    byDay.set(day, created);
+
+    return created;
   }
 
-  const startMinutes = minutesOf(parsed.data.start);
-  const endMinutes = minutesOf(parsed.data.end);
-
-  if (startMinutes === null || endMinutes === null || startMinutes >= endMinutes) {
-    return DEFAULT_SEND_WINDOW;
+  if (input.usedToday > 0) {
+    useOf(todayStart).count += input.usedToday;
   }
 
-  return { endMinutes, startMinutes };
-}
+  for (const at of input.scheduled) {
+    const day = localDayStart(at, timeZone);
+    const use = useOf(day);
 
-export function planningWindow(now: number, timeZone: string, window: SendWindow) {
-  const today = localDateAt(now, timeZone);
-  const todayStart = localDayStartFor(today, timeZone);
-  const nextDayStart = localDayStartFor(addLocalDays(today, 1), timeZone);
-  const todayWindow = localWindowOn(today, window.startMinutes, window.endMinutes, timeZone);
-
-  if (now < todayWindow.end) {
-    return {
-      dayStart: todayStart,
-      end: todayWindow.end,
-      nextDayStart,
-      start: Math.max(now, todayWindow.start),
-    };
+    use.count += 1;
+    use.latest = Math.max(use.latest, at);
   }
 
-  const tomorrow = addLocalDays(today, 1);
-  const tomorrowWindow = localWindowOn(tomorrow, window.startMinutes, window.endMinutes, timeZone);
+  const slots: number[] = [];
+  let cursor = Math.max(now, input.earliest ?? 0, 0);
+  let guard = 0;
 
-  return {
-    dayStart: nextDayStart,
-    end: tomorrowWindow.end,
-    nextDayStart: localDayStartFor(addLocalDays(tomorrow, 1), timeZone),
-    start: tomorrowWindow.start,
-  };
-}
+  while (slots.length < count && guard < 10_000) {
+    guard += 1;
 
-interface Interval {
-  start: number;
-  end: number;
-}
+    const day = localDayStart(cursor, timeZone);
+    const use = useOf(day);
 
-function freeIntervals(start: number, end: number, blocked: readonly number[], spacingMs: number) {
-  let intervals: Interval[] = [{ end, start }];
+    if (use.count >= cap) {
+      cursor = Math.max(nextLocalDayStart(day, timeZone), use.latest + spacingMs);
 
-  const relevant = blocked
-    .filter((at) => at + spacingMs > start && at - spacingMs < end)
-    .toSorted((left, right) => left - right);
+      continue;
+    }
 
-  for (const at of relevant) {
-    const zoneStart = at - spacingMs;
-    const zoneEnd = at + spacingMs;
-    const next: Interval[] = [];
+    if (use.latest > 0 && use.count > 0) {
+      const spaced = use.latest + Math.max(0, spacingMs);
 
-    for (const interval of intervals) {
-      if (zoneEnd <= interval.start || zoneStart >= interval.end) {
-        next.push(interval);
+      if (spaced > cursor) {
+        cursor = spaced;
 
         continue;
       }
-
-      if (zoneStart > interval.start) {
-        next.push({ end: zoneStart, start: interval.start });
-      }
-
-      if (zoneEnd < interval.end) {
-        next.push({ end: interval.end, start: zoneEnd });
-      }
     }
 
-    intervals = next;
-  }
+    const slot = Math.max(cursor, now);
 
-  return intervals.filter((interval) => interval.end > interval.start);
-}
-
-export function nextSendSlot(earliest: number, timeZone: string, window: SendWindow) {
-  const parts = localPartsAt(earliest, timeZone);
-  const minuteOfDay = parts.hour * 60 + parts.minute;
-
-  if (minuteOfDay >= window.startMinutes && minuteOfDay < window.endMinutes) {
-    return earliest;
-  }
-
-  const date = { day: parts.day, month: parts.month, year: parts.year };
-  const target = minuteOfDay < window.startMinutes ? date : addLocalDays(date, 1);
-
-  return localTimeOn(
-    target,
-    Math.trunc(window.startMinutes / 60),
-    window.startMinutes % 60,
-    timeZone,
-  );
-}
-
-export function planSlots(input: PlanSlotsInput) {
-  if (input.count <= 0 || input.spacingMs <= 0) {
-    return [];
-  }
-
-  const window = planningWindow(input.now, input.timeZone, input.window);
-
-  if (window.end <= window.start) {
-    return [];
-  }
-
-  const intervals = freeIntervals(window.start, window.end, input.blocked, input.spacingMs);
-
-  const raw: number[] = [];
-
-  for (const interval of intervals) {
-    if (raw.length >= input.count) {
-      break;
-    }
-
-    const capacity = Math.floor((interval.end - interval.start) / input.spacingMs) + 1;
-    const take = Math.min(input.count - raw.length, capacity);
-    const usable = interval.end - interval.start - (take - 1) * input.spacingMs;
-    const band = usable / take;
-
-    for (let index = 0; index < take; index += 1) {
-      const offset = interval.start + index * band + input.random() * band;
-
-      raw.push(offset + index * input.spacingMs);
-    }
-  }
-
-  raw.sort((left, right) => left - right);
-
-  const slots: number[] = [];
-
-  for (const candidate of raw) {
-    const at = Math.round(candidate);
-    const previous = slots.at(-1);
-    const adjusted = previous === undefined ? at : Math.max(at, previous + input.spacingMs);
-
-    if (adjusted <= window.end) {
-      slots.push(adjusted);
-    }
+    slots.push(slot);
+    use.count += 1;
+    use.latest = slot;
+    cursor = slot + Math.max(0, spacingMs);
   }
 
   return slots;

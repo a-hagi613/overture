@@ -65,7 +65,7 @@ function spend(
   });
 }
 
-test("spend under the scaled budget is allowed and the check reports the scaled ceiling", () => {
+test("spend under the global budget is allowed and reports that ceiling", () => {
   const { db, sqlite, clock } = freshDatabase();
 
   try {
@@ -80,40 +80,17 @@ test("spend under the scaled budget is allowed and the check reports the scaled 
     });
 
     expect(caps.withinCaps).toBe(true);
-    expect(caps.capMicros).toBe(10_300_000);
+    expect(caps.capMicros).toBe(50_300_000);
   } finally {
     sqlite.close();
   }
 });
 
-test("spend above a static $10 no longer halts preparation once subscribers raise the budget", () => {
+test("a call over the fifty-dollar global budget fails closed", () => {
   const { db, sqlite, clock } = freshDatabase();
 
   try {
-    addUser(db, "paying-1");
-    addUser(db, "paying-2");
-    addPeriod(db, "paying-1");
-    addPeriod(db, "paying-2");
-    spend(db, clock, 10_100_000);
-
-    const caps = checkLlmCaps(db, clock, {
-      estimatedCostMicros: 100_000,
-      purpose: "score",
-      userId: "paying-1",
-    });
-
-    expect(caps.capMicros).toBe(10_600_000);
-    expect(caps.withinCaps).toBe(true);
-  } finally {
-    sqlite.close();
-  }
-});
-
-test("a call over the scaled budget still fails closed", () => {
-  const { db, sqlite, clock } = freshDatabase();
-
-  try {
-    spend(db, clock, 10_000_000);
+    spend(db, clock, 50_000_000);
 
     const caps = checkLlmCaps(db, clock, {
       estimatedCostMicros: 100_000,
@@ -121,36 +98,71 @@ test("a call over the scaled budget still fails closed", () => {
       userId: null,
     });
 
-    expect(caps).toMatchObject({ capMicros: 10_000_000, exceeded: "global", withinCaps: false });
+    expect(caps).toMatchObject({ capMicros: 50_000_000, exceeded: "global", withinCaps: false });
   } finally {
     sqlite.close();
   }
 });
 
-test("a paying subscriber's own budget is higher than an invited user's", () => {
+test("every person has the same ten-cent daily budget", () => {
   const { db, sqlite, clock } = freshDatabase();
 
   try {
     addUser(db, "paying");
     addUser(db, "invited");
     addPeriod(db, "paying");
-    spend(db, clock, 200_000, "paying");
-    spend(db, clock, 200_000, "invited");
+    spend(db, clock, 120_000, "paying");
+    spend(db, clock, 120_000, "invited");
 
     const paid = checkLlmCaps(db, clock, {
-      estimatedCostMicros: 100_000,
+      estimatedCostMicros: 10_000,
       purpose: "score",
       userId: "paying",
     });
 
     const invited = checkLlmCaps(db, clock, {
-      estimatedCostMicros: 100_000,
+      estimatedCostMicros: 10_000,
       purpose: "score",
       userId: "invited",
     });
 
-    expect(paid.withinCaps).toBe(true);
-    expect(invited).toMatchObject({ capMicros: 250_000, exceeded: "user", withinCaps: false });
+    expect(paid).toMatchObject({ capMicros: 100_000, exceeded: "user", withinCaps: false });
+    expect(invited).toMatchObject({ capMicros: 100_000, exceeded: "user", withinCaps: false });
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("the onboarding matching pool is spent once across days", () => {
+  const { db, sqlite, clock } = freshDatabase();
+
+  try {
+    addUser(db, "new");
+
+    const first = checkLlmCaps(db, clock, {
+      estimatedCostMicros: 400_000,
+      onboardingMatching: true,
+      purpose: "score",
+      userId: "new",
+    });
+
+    expect(first.withinCaps).toBe(true);
+
+    spend(db, clock, 450_000, "new");
+
+    const second = checkLlmCaps(db, clock, {
+      estimatedCostMicros: 100_000,
+      onboardingMatching: true,
+      purpose: "score",
+      userId: "new",
+    });
+
+    expect(second).toMatchObject({
+      capMicros: 500_000,
+      exceeded: "onboarding",
+      withinCaps: false,
+      spentMicros: 450_000,
+    });
   } finally {
     sqlite.close();
   }

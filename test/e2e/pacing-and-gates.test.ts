@@ -179,10 +179,6 @@ async function ownerFor(server: AppServer) {
 
   await owner.put("/__test__/settings/jobs.poll_interval_ms", { data: { value: "3600000" } });
 
-  await owner.put("/__test__/settings/limits.send_window", {
-    data: { value: JSON.stringify({ end: "20:00", start: "08:00" }) },
-  });
-
   const start = await owner.post("/api/running", { data: { running: true } });
 
   expect(start.ok()).toBe(true);
@@ -335,10 +331,6 @@ async function sendJobIds(owner: APIRequestContext) {
   return jobs.filter((job) => job.kind === SEND_JOB).map((job) => job.id);
 }
 
-function utcHour(at: number) {
-  return new Date(at).getUTCHours();
-}
-
 async function newSendJobs(owner: APIRequestContext, before: ReadonlySet<string>) {
   return (await sendJobIds(owner)).filter((id) => !before.has(id));
 }
@@ -449,9 +441,6 @@ test("every dispatcher gate blocks a send until it is cleared", async ({ pacing 
   if (planned?.scheduledFor === null || planned?.scheduledFor === undefined) {
     throw new Error("the planner gave no slot");
   }
-
-  expect(utcHour(planned.scheduledFor)).toBeGreaterThanOrEqual(8);
-  expect(utcHour(planned.scheduledFor)).toBeLessThan(20);
 
   await moveClockTo(owner, new Date(planned.scheduledFor).toISOString());
 
@@ -625,7 +614,7 @@ test("a Posting closed since preparation is skipped, not sent", async ({ pacing 
   expect(reason?.detail).toBe("This posting closed before sending.");
 });
 
-test("the clock moves sends only into the window, spaced at least twenty minutes apart", async ({
+test("approved Applications go at once, and paid ones are spaced five minutes apart", async ({
   pacing,
 }) => {
   const { owner, userId } = await ownerFor(pacing.server);
@@ -648,28 +637,27 @@ test("the clock moves sends only into the window, spaced at least twenty minutes
   const firstSlot = planned[0]?.scheduledFor ?? 0;
   const secondSlot = planned[1]?.scheduledFor ?? 0;
 
-  expect(firstSlot).toBeGreaterThan(0);
-  expect(secondSlot - firstSlot).toBeGreaterThanOrEqual(20 * MINUTE_MS);
-  expect(utcHour(firstSlot)).toBeGreaterThanOrEqual(8);
-  expect(utcHour(secondSlot)).toBeLessThan(20);
+  expect(firstSlot).toBeGreaterThanOrEqual(Date.parse("2026-03-10T07:00:00.000Z"));
+  expect(firstSlot).toBeLessThan(Date.parse("2026-03-10T07:00:10.000Z"));
+  expect(secondSlot - firstSlot).toBe(5 * MINUTE_MS);
 
-  await moveClockTo(owner, "2026-03-10T07:59:00.000Z");
-
-  const beforeWindow = new Set(await sendJobIds(owner));
-
-  await runJob(owner, "dispatch.tick", "{}");
-
-  expect(await newSendJobs(owner, beforeWindow)).toEqual([]);
-
-  await moveClockTo(owner, new Date(firstSlot).toISOString());
+  await moveClockTo(owner, "2026-03-10T06:59:00.000Z");
 
   const beforeFirstSlot = new Set(await sendJobIds(owner));
 
   await runJob(owner, "dispatch.tick", "{}");
 
-  await waitForNewSend(owner, pacing.server.url, beforeFirstSlot);
+  expect(await newSendJobs(owner, beforeFirstSlot)).toEqual([]);
 
-  await moveClockTo(owner, new Date(firstSlot + 10 * MINUTE_MS).toISOString());
+  await moveClockTo(owner, new Date(firstSlot).toISOString());
+
+  const beforeClaim = new Set(await sendJobIds(owner));
+
+  await runJob(owner, "dispatch.tick", "{}");
+
+  await waitForNewSend(owner, pacing.server.url, beforeClaim);
+
+  await moveClockTo(owner, new Date(firstSlot + 4 * MINUTE_MS).toISOString());
 
   const beforeBetweenSlots = new Set(await sendJobIds(owner));
 
@@ -691,15 +679,10 @@ test("the clock moves sends only into the window, spaced at least twenty minutes
 
   const sentAt = sent.map((row) => row.sentAt ?? 0).toSorted((left, right) => left - right);
 
-  expect((sentAt[1] ?? 0) - (sentAt[0] ?? 0)).toBeGreaterThanOrEqual(20 * MINUTE_MS);
-
-  for (const at of sentAt) {
-    expect(utcHour(at)).toBeGreaterThanOrEqual(8);
-    expect(utcHour(at)).toBeLessThan(20);
-  }
+  expect((sentAt[1] ?? 0) - (sentAt[0] ?? 0)).toBeGreaterThanOrEqual(5 * MINUTE_MS - 10_000);
 });
 
-test("an approval that cannot fit today's remaining slots rolls to the next window", async ({
+test("an approval beyond today's daily cap waits for local midnight, not a send window", async ({
   pacing,
 }) => {
   const { owner, userId } = await ownerFor(pacing.server);
@@ -714,11 +697,7 @@ test("an approval that cannot fit today's remaining slots rolls to the next wind
 
   expect(cap.ok()).toBe(true);
 
-  const { firstApplication, secondApplication } = await seedTwoApproved(
-    owner,
-    userId,
-    pacing.fixture.url,
-  );
+  await seedTwoApproved(owner, userId, pacing.fixture.url);
 
   await runJob(owner, "planner.day", JSON.stringify({ userId }));
 
@@ -728,24 +707,9 @@ test("an approval that cannot fit today's remaining slots rolls to the next wind
 
   expect(planned.length).toBe(2);
 
-  const firstSlot = planned[0]?.scheduledFor ?? 0;
-  const secondSlot = planned[1]?.scheduledFor ?? 0;
-  const tomorrow = Date.parse("2026-03-11T00:00:00.000Z");
-
-  expect(firstSlot).toBeGreaterThanOrEqual(Date.parse("2026-03-10T08:00:00.000Z"));
-  expect(firstSlot).toBeLessThan(Date.parse("2026-03-10T20:00:00.000Z"));
-  expect(secondSlot).toBeGreaterThanOrEqual(tomorrow + 8 * 60 * MINUTE_MS);
-  expect(secondSlot).toBeLessThan(tomorrow + 20 * 60 * MINUTE_MS);
-
-  await moveClockTo(owner, "2026-03-11T00:05:00.000Z");
-  await runJob(owner, "planner.day", JSON.stringify({ userId }));
-
-  const nextDay = await applicationsFor(owner, userId);
-  const firstNext = nextDay.find((row) => row.id === firstApplication)?.scheduledFor ?? 0;
-  const secondNext = nextDay.find((row) => row.id === secondApplication)?.scheduledFor ?? 0;
-
-  expect(firstNext).toBeGreaterThan(0);
-  expect(secondNext).toBeGreaterThan(firstNext);
+  expect(planned[0]?.scheduledFor).toBeGreaterThanOrEqual(Date.parse("2026-03-10T07:00:00.000Z"));
+  expect(planned[0]?.scheduledFor).toBeLessThan(Date.parse("2026-03-10T07:00:10.000Z"));
+  expect(planned[1]?.scheduledFor).toBe(Date.parse("2026-03-11T00:00:00.000Z"));
 });
 
 async function putSetting(owner: APIRequestContext, key: string, value: string) {

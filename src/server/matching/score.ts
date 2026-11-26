@@ -8,7 +8,14 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { RankedCandidate } from "./candidates.ts";
 import type { Targets } from "../../shared/targets.ts";
 
-import { applications, matches, postingUserState, resumes } from "../platform/db/schema.ts";
+import {
+  applications,
+  matches,
+  postingUserState,
+  profiles,
+  resumes,
+  users,
+} from "../platform/db/schema.ts";
 import { companies, postingTags, postings } from "../platform/db/catalog-schema.ts";
 
 import { applicationsLeft } from "../billing/ledger.ts";
@@ -31,7 +38,6 @@ export const SCORE_PURPOSE = "score";
 const WAITING_STATUSES = ["preparing", "ready", "approved"] as const;
 
 const CHUNK_SIZE = 5;
-const SCORE_ATTEMPT_MULTIPLE = 3;
 const RESUME_DIGEST_CHARS = 1500;
 
 const OUTPUT_SCHEMA: LlmOutputSchema = {
@@ -270,10 +276,25 @@ export function createMatchingService(deps: MatchDeps) {
 
     const estimated = llm.estimateBatchCostMicros(requests);
 
+    const account = db
+      .select({ onboardedAt: profiles.onboardedAt, role: users.role, running: profiles.running })
+      .from(profiles)
+      .innerJoin(users, eq(users.id, profiles.userId))
+      .where(eq(profiles.userId, userId))
+      .get();
+
+    const onboardingMatching =
+      account !== undefined &&
+      account.onboardedAt === null &&
+      account.role !== "owner" &&
+      account.role !== "demo" &&
+      !account.running;
+
     const caps = checkLlmCaps(db, clock, {
       userId,
       purpose: SCORE_PURPOSE,
       estimatedCostMicros: estimated,
+      onboardingMatching,
     });
 
     if (!caps.withinCaps) {
@@ -498,8 +519,6 @@ export function createMatchingService(deps: MatchDeps) {
     const companiesUsed = activeApplicationCompanies(db, userId);
     let scored = 0;
     let applicationsCreated = 0;
-    const scoreAttemptBound = dailyCap * SCORE_ATTEMPT_MULTIPLE;
-    let scoreAttempts = 0;
 
     function offerApplication(candidate: RankedCandidate, score: number) {
       if (need <= 0 || score < context.threshold || companiesUsed.has(candidate.companyId)) {
@@ -551,13 +570,7 @@ export function createMatchingService(deps: MatchDeps) {
         return;
       }
 
-      const budget = scoreAttemptBound - scoreAttempts;
-
-      if (budget <= 0) {
-        return;
-      }
-
-      const chunk = unscored.slice(start, start + Math.min(CHUNK_SIZE, need, budget));
+      const chunk = unscored.slice(start, start + Math.min(CHUNK_SIZE, need));
       const descriptions = descriptionsFor(chunk.map((candidate) => candidate.id));
 
       const requests = chunk.map((candidate, index) =>
@@ -587,8 +600,6 @@ export function createMatchingService(deps: MatchDeps) {
         return;
       }
 
-      scoreAttempts += chunk.length;
-
       let scoredThisChunk = 0;
 
       for (const [index, candidate] of chunk.entries()) {
@@ -612,19 +623,6 @@ export function createMatchingService(deps: MatchDeps) {
     }
 
     await scoreNextChunk(0);
-
-    const boundHit =
-      need > 0 && scoreAttempts >= scoreAttemptBound && scoreAttempts < unscored.length;
-
-    if (boundHit) {
-      raiseAlert(db, clock, "match.score_bound", {
-        attempts: scoreAttempts,
-        bound: scoreAttemptBound,
-        candidates: unscored.length,
-        need,
-        threshold: context.threshold,
-      });
-    }
 
     return {
       applicationsCreated,

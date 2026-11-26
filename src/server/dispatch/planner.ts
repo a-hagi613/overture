@@ -1,24 +1,22 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
-import type { Random } from "../platform/ports/random.ts";
 
 import { applications, profiles, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { getSetting } from "../platform/settings/index.ts";
-import { dailyUsageSince } from "../billing/ledger.ts";
+import { dailyUsageSince, isOnboardingTrial } from "../billing/ledger.ts";
 import { localDayStart, nextLocalDayStart } from "../platform/local-time.ts";
-import { parseSendWindow, planSlots, planningWindow } from "./planning.ts";
+import { planSendSlots } from "./planning.ts";
 
 export const PLANNER_DAY_JOB_KIND = "planner.day";
 
 const DEFAULT_DAILY_CAP = 10;
-const DEFAULT_SPACING_MINUTES = 20;
+const DEFAULT_SPACING_MINUTES = 5;
 const MINUTE_MS = 60_000;
-const MAX_PLANNED_DAYS = 366;
 
 const payloadSchema = z.object({ userId: z.string().min(1) });
 
@@ -30,7 +28,6 @@ export interface PlannerRun {
 export interface PlannerDeps {
   db: AppDatabase;
   clock: Clock;
-  random: Random;
 }
 
 export interface PlannerService {
@@ -54,7 +51,7 @@ export function parsePlannerDayPayload(payload: string) {
 }
 
 export function createPlanner(deps: PlannerDeps) {
-  const { db, clock, random } = deps;
+  const { db, clock } = deps;
 
   function timeZoneOf(userId: string) {
     const row = db
@@ -110,13 +107,15 @@ export function createPlanner(deps: PlannerDeps) {
     }
 
     const timeZone = timeZoneOf(userId) ?? "UTC";
-    const window = parseSendWindow(getSetting(db, "limits.send_window"));
     const dailyCap = settingNumber(db, "limits.daily_cap", DEFAULT_DAILY_CAP);
+    const trial = isOnboardingTrial(db, userId, now);
 
-    const spacingMs =
-      settingNumber(db, "limits.send_spacing_minutes", DEFAULT_SPACING_MINUTES) * MINUTE_MS;
+    // The onboarding trial's three Applications go at once; paid sends are spaced
+    // per user. One person's spacing is read from their own rows and never shared.
+    const spacingMs = trial
+      ? 0
+      : settingNumber(db, "limits.send_spacing_minutes", DEFAULT_SPACING_MINUTES) * MINUTE_MS;
 
-    const target = planningWindow(now, timeZone, window);
     const todayStart = localDayStart(now, timeZone);
 
     const approved = db
@@ -131,83 +130,23 @@ export function createPlanner(deps: PlannerDeps) {
       .orderBy(asc(applications.approvedAt), asc(applications.createdAt))
       .all();
 
-    const firstNeedsSlot = approved.findIndex(
-      (application) =>
-        application.scheduledFor === null || application.scheduledFor < target.dayStart,
-    );
+    const unplaced = approved.filter((application) => application.scheduledFor === null);
 
-    const kept = firstNeedsSlot === -1 ? approved : approved.slice(0, firstNeedsSlot);
+    const usage = dailyUsageSince(db, userId, todayStart);
 
-    const replan = firstNeedsSlot === -1 ? [] : approved.slice(firstNeedsSlot);
-
-    const keptSlots = kept.flatMap((application) =>
-      application.scheduledFor === null ? [] : [application.scheduledFor],
-    );
-
-    const latestKept = keptSlots.length === 0 ? 0 : Math.max(...keptSlots);
-
-    const referenceWindow = planningWindow(Math.max(now, latestKept), timeZone, window);
-
-    const usage =
-      referenceWindow.dayStart === todayStart ? dailyUsageSince(db, userId, todayStart) : 0;
-
-    const keptInReference = kept.filter(
-      (application) =>
-        application.scheduledFor !== null &&
-        application.scheduledFor >= referenceWindow.dayStart &&
-        application.scheduledFor < referenceWindow.nextDayStart,
-    );
-
-    const remaining = Math.max(0, dailyCap - usage - keptInReference.length);
-
-    const staleSlots = replan.filter((application) => application.scheduledFor !== null);
-
-    if (staleSlots.length > 0) {
-      db.update(applications)
-        .set({ scheduledFor: null, updatedAt: now })
-        .where(
-          inArray(
-            applications.id,
-            staleSlots.map((application) => application.id),
-          ),
-        )
-        .run();
-    }
-
-    const slots = planSlots({
-      blocked: keptSlots,
-      count: Math.min(remaining, replan.length),
-      now: Math.max(now, latestKept),
-      random: random.next,
+    const slots = planSendSlots({
+      count: unplaced.length,
+      dailyCap,
+      now,
+      scheduled: approved.flatMap((application) =>
+        application.scheduledFor === null ? [] : [application.scheduledFor],
+      ),
       spacingMs,
       timeZone,
-      window,
+      usedToday: usage,
     });
 
-    let windowEnd = planningWindow(Math.max(now, latestKept), timeZone, window).end;
-
-    for (let day = 0; day < MAX_PLANNED_DAYS && slots.length < replan.length; day += 1) {
-      const next = planningWindow(windowEnd, timeZone, window);
-
-      const later = planSlots({
-        blocked: slots,
-        count: Math.min(dailyCap, replan.length - slots.length),
-        now: next.start,
-        random: random.next,
-        spacingMs,
-        timeZone,
-        window,
-      });
-
-      if (later.length === 0) {
-        break;
-      }
-
-      slots.push(...later);
-      windowEnd = next.end + 1;
-    }
-
-    for (const [index, application] of replan.slice(0, slots.length).entries()) {
+    for (const [index, application] of unplaced.entries()) {
       const scheduledFor = slots[index];
 
       if (scheduledFor === undefined) {
@@ -222,11 +161,22 @@ export function createPlanner(deps: PlannerDeps) {
 
     ensureMidnightQueued(userId);
 
-    if (slots.length > 0) {
-      publishEvent(db, clock, "home.updated", JSON.stringify({ planned: slots.length }), userId);
+    const planned = Math.min(slots.length, unplaced.length);
+    const alreadyScheduledToday = approved.filter(
+      (application) =>
+        application.scheduledFor !== null &&
+        localDayStart(application.scheduledFor, timeZone) === todayStart,
+    ).length;
+    const placedToday = slots.filter((slot) => localDayStart(slot, timeZone) === todayStart).length;
+
+    if (planned > 0) {
+      publishEvent(db, clock, "home.updated", JSON.stringify({ planned }), userId);
     }
 
-    return { planned: slots.length, remaining };
+    return {
+      planned,
+      remaining: Math.max(0, dailyCap - usage - alreadyScheduledToday - placedToday),
+    };
   }
 
   return { ensureMidnightQueued, plan } satisfies PlannerService;

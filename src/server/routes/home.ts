@@ -33,7 +33,6 @@ import {
 import { dueCheckins } from "../pipeline/checkins.ts";
 import { notifyPaused } from "../notify/events.ts";
 import { pauseByUser, resumeByUser } from "../profile/running-state.ts";
-import { parseSendWindow } from "../dispatch/planning.ts";
 import { nextSendAtOf, sendQueueOf } from "../pipeline/send-queue.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy, failedReasonText } from "../../shared/copy.ts";
@@ -627,14 +626,10 @@ export function createHomeRoutes(deps: {
 
     const scheduledFor = approvedRows.map((row) => row.scheduledFor);
 
-    const window = parseSendWindow(getSetting(db, "limits.send_window"));
-
     const nextSendAt = nextSendAtOf({
       approved: approvedRows.length,
       now,
       scheduledFor,
-      window,
-      zone,
     });
 
     const reviewList = reviews.list(userId);

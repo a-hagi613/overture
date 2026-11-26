@@ -783,7 +783,7 @@ export const copy = {
       resumeErrorToast: "Could not update sending status. Try again.",
       runningTitle: "Application sending",
       viewBoard: "View Applications",
-      windowNote: "Sends 8 am – 8 pm local time",
+      windowNote: "Sends right after you approve",
     },
     schedule: {
       emptyBody: "Confirmed interview invites forwarded to your Inbox appear here automatically.",
@@ -1695,7 +1695,7 @@ export const copy = {
     timeLanguageHeading: "Time and language",
     timeZoneLabel: "Time zone",
     timeZoneHint:
-      "Controls your daytime sending window and midnight reset. Updates take effect after 7 days.",
+      "Sets your local midnight reset for the daily limit. Updates take effect after 7 days.",
     timeZoneToronto: "Eastern Time (Toronto)",
     timeZoneVancouver: "Pacific Time (Vancouver)",
     timeZoneBerlin: "Central European Time (Berlin)",
@@ -2338,7 +2338,7 @@ export const copy = {
     },
     scheduledTitle: "Scheduled to send",
     scheduledCount: (count: number) => `${String(count)} scheduled`,
-    scheduledNote: "Queued for the next sending window.",
+    scheduledNote: "Queued to send as soon as the queue reaches it.",
     scheduledUndo: "Undo",
     approvedSectionAria: "Scheduled applications",
   },
@@ -3640,8 +3640,8 @@ export const copy = {
     llmStatCacheHint: (cached: string, input: string) =>
       `${cached} cached of ${input} input tokens`,
     llmStatCacheEmpty: "No input tokens recorded yet",
-    llmCapsFootnote: (userCap: string, subscriberCap: string, taggingCap: string) =>
-      `Per-user daily cap: ${userCap} (${subscriberCap} while a paid period runs) · Tagging daily cap: ${taggingCap}`,
+    llmCapsFootnote: (userCap: string, taggingCap: string) =>
+      `Per-user daily cap: ${userCap} · Tagging daily cap: ${taggingCap}`,
     llmUnexpectedHeading: "Unexpected Anthropic model detected",
     llmUnexpectedBody: (expected: string, models: string) =>
       `Configured model is ${expected}, but recorded calls used ${models}. Verify ANTHROPIC_MODEL and pricing rows before spend grows.`,

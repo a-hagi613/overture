@@ -25,7 +25,6 @@ export const ALERT_KINDS = [
   "code.challenge_rate",
   "queue.age",
   "llm.spend",
-  "match.score_bound",
   "application.confirming_stuck",
   "application.cost",
   "match.unscored",

@@ -48,19 +48,16 @@ export function planAllowanceText(kind: PlanKind) {
   return "No plan yet";
 }
 
-export const SEND_WINDOW = {
-  endHour: 20,
-  minGapMinutes: 20,
-  startHour: 8,
+export const SEND_RULES = {
+  /** The onboarding trial's Applications go together, in parallel. */
+  trialParallel: 3,
+  /** Paid Applications for one person are spaced this far apart. */
+  paidGapMinutes: 5,
   maxPerDay: 10,
 } as const;
 
 /** The hiring systems Overture fills. Workday is out of scope (ADR 0017). */
 export const PUBLIC_ATS = ["Greenhouse", "Lever", "Ashby", "Personio", "Workable"] as const;
-
-export function formatHour(hour: number) {
-  return `${String(hour).padStart(2, "0")}:00`;
-}
 
 /**
  * Formats a price for the marketing and legal pages: a whole dollar amount

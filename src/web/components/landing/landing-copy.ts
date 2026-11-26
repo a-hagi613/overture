@@ -1,13 +1,5 @@
-import {
-  formatHour,
-  formatUsd,
-  PLANS,
-  PUBLIC_ATS,
-  SEND_WINDOW,
-  TRIAL,
-} from "../../../shared/plans.ts";
+import { formatUsd, PLANS, PUBLIC_ATS, SEND_RULES, TRIAL } from "../../../shared/plans.ts";
 
-const sendHours = `${formatHour(SEND_WINDOW.startHour)} to ${formatHour(SEND_WINDOW.endHour)}`;
 const atsSentence = `${PUBLIC_ATS.slice(0, -1).join(", ")} and ${PUBLIC_ATS.at(-1) ?? ""}`;
 
 export const LANDING_COPY = {
@@ -37,9 +29,9 @@ export const LANDING_COPY = {
     appliedLabel: "Applied:",
     appliedStamp: "Applied",
     ariaLabel:
-      "Global job application cards cycling through daytime sending hours and stamping Applied",
+      "Global job application cards cycling through a day of applications and stamping Applied",
     postingAsks: "The posting asks",
-    windowAria: "Daytime sending window from 8 am to 8 pm",
+    windowAria: "Application timeline through the day",
     yourResume: "Your resume",
   },
   supply: {
@@ -190,7 +182,7 @@ export const LANDING_COPY = {
         q: "Does Overture blast my resume out to random jobs?",
       },
       {
-        a: `Yes. Every prepared application sits in Ready with its answers, cover letter, and resume. Nothing goes out until you click Send. Approved applications send between ${sendHours} local time, spaced at least ${String(SEND_WINDOW.minGapMinutes)} minutes apart.`,
+        a: `Yes. Every prepared application sits in Ready with its answers, cover letter, and resume. Nothing goes out until you click Send. Approved applications go out right away: the trial's ${String(SEND_RULES.trialParallel)} together, then paid sends about ${String(SEND_RULES.paidGapMinutes)} minutes apart.`,
         open: false,
         q: "Do I approve applications before they are sent?",
       },
