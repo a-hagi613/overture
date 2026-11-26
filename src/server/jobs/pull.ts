@@ -192,6 +192,10 @@ export function createPullService(deps: PullDeps) {
   const applyTarget =
     deps.applyTarget ?? (async (job: FreehireJobRecord) => await resolveApplyTarget(job));
 
+  function pullEnabled() {
+    return getSetting(db, "jobs.pull_enabled") !== "false";
+  }
+
   function recordRun(input: {
     groupKey: string;
     mode: "full" | "fresh";
@@ -443,6 +447,10 @@ export function createPullService(deps: PullDeps) {
   };
 
   async function runTick(now = clock.now()) {
+    if (!pullEnabled()) {
+      return 0;
+    }
+
     const intervalHours = getSettingNumber(db, "jobs.fresh_pull_interval_hours", {
       fallback: 3,
       minimum: 1,
@@ -484,6 +492,10 @@ export function createPullService(deps: PullDeps) {
   }
 
   async function runUser(userId: string) {
+    if (!pullEnabled()) {
+      return null;
+    }
+
     const row = db
       .select({
         lastFreshPullAt: jobPullState.lastFreshPullAt,
@@ -513,7 +525,7 @@ export function createPullService(deps: PullDeps) {
   }
 
   async function runChanges() {
-    if (source.changes === undefined || deps.hasApiKey !== true) {
+    if (!pullEnabled() || source.changes === undefined || deps.hasApiKey !== true) {
       return 0;
     }
 

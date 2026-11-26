@@ -48,6 +48,7 @@ const SETTING_DEFAULTS = {
   "jobs.pull_max_pages": "5",
   "jobs.changes_pages": "5",
   "jobs.pull_failures": "0",
+  "jobs.pull_enabled": "true",
   "catalog.sweep_max_boards": "20",
   "backups.replica_read_interval_ms": "30000",
   "live_checks.mail_wait_minutes": "5",

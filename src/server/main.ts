@@ -463,6 +463,8 @@ if (env.ENABLE_TEST_ROUTES) {
     JSON.stringify({ end: "24:00", start: "00:00" }),
     "system:test",
   );
+
+  setSetting(db, clock, "jobs.pull_enabled", "false", "system:test");
 }
 
 recoverBootRunningJobs(db, clock);

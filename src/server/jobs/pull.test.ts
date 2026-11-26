@@ -16,6 +16,7 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { createJobStore } from "./store.ts";
+import { setSetting } from "../platform/settings/index.ts";
 import { createPullService } from "./pull.ts";
 import { createFakeJobSource } from "./testing/fake-source.ts";
 import type { ApplyTarget } from "./apply-link.ts";
@@ -317,6 +318,32 @@ describe("pull scheduling", () => {
     await service.runTick(now);
 
     expect(source.searches).toHaveLength(2);
+  });
+});
+
+describe("the test-routes switch", () => {
+  test("turns every pull off so no automated test can reach freehire", async () => {
+    const { db } = migrated();
+
+    seedUser(db, { id: "user-1" });
+    setSetting(db, { now: () => NOW }, "jobs.pull_enabled", "false", "system:test");
+
+    const source = createFakeJobSource({
+      pages: [{ ignoredParams: [], jobs: [record()], total: 1 }],
+    });
+
+    const service = createPullService({
+      applyTarget: async (job) => await Promise.resolve(target(job)),
+      clock: { now: () => NOW },
+      db,
+      source,
+      store: createJobStore({ clock: { now: () => NOW }, db }),
+    });
+
+    expect(await service.runTick(NOW)).toBe(0);
+    expect(await service.runUser("user-1")).toBeNull();
+    expect(await service.runChanges()).toBe(0);
+    expect(source.searches).toHaveLength(0);
   });
 });
 
