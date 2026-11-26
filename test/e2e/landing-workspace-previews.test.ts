@@ -71,6 +71,11 @@ async function expectPlaying(page: Page, playing: boolean) {
     .toBe(!playing);
 }
 
+async function pressPlayFromKeyboard(page: Page) {
+  await page.getByRole("button", { name: "Play walkthrough" }).focus();
+  await page.keyboard.press("Enter");
+}
+
 function expectNoConsoleErrors(consoleErrors: string[], pageErrors: string[]) {
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
@@ -145,7 +150,7 @@ test("the desktop walkthrough uses the frameless HoverPlayCard without sample ch
   await page.mouse.move(10, 10);
   await expectPlaying(page, false);
 
-  await page.getByRole("button", { name: "Play walkthrough" }).click();
+  await pressPlayFromKeyboard(page);
   await expectPlaying(page, true);
 
   await page.mouse.move(10, 10);
@@ -184,8 +189,9 @@ test("the player swaps to the 9:16 phone walkthrough below lg without overflow",
     )
     .toBe(true);
 
-  await page.getByRole("button", { name: "Play walkthrough" }).click();
+  await pressPlayFromKeyboard(page);
   await expectPlaying(page, true);
+  await page.locator(`${CHAPTER} video`).hover({ position: { x: 24, y: 24 } });
   await page.getByRole("button", { name: "Pause walkthrough" }).click();
   await expectPlaying(page, false);
 
@@ -239,8 +245,9 @@ test("reduced motion does not autoplay on load and allows hover and manual play"
   await expectPlaying(page, false);
   await expect(page.getByRole("button", { name: "Play walkthrough" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Play walkthrough" }).click();
+  await pressPlayFromKeyboard(page);
   await expectPlaying(page, true);
+  await expect(page.locator(CHAPTER).getByText("Playing", { exact: true })).toBeVisible();
 
   expectNoConsoleErrors(consoleErrors, pageErrors);
   await context.close();
