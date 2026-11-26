@@ -89,8 +89,11 @@ test("the owner traces an application by id across the whole flow", async ({
   test.setTimeout(180_000);
 
   const { owner, userId } = await ownerContextFor(adminIsolatedAppServer.url);
+
   const companyId = await seedCompany(owner, "Ferro Cloud", "ferro.example");
+
   const boardId = await seedBoard(owner, companyId, "greenhouse", "ws695");
+
   const postingId = await seedPosting(owner, {
     atsJobId: "ws695-1",
     boardId,
@@ -98,12 +101,14 @@ test("the owner traces an application by id across the whole flow", async ({
     title: "Senior Platform Engineer",
     url: "https://ferro.example/jobs/ws695-1",
   });
+
   const applicationId = await seedApplication(owner, {
     postingId,
     status: "confirming",
     userId,
   });
-  const eventAt = Date.now() - 60_000;
+
+  const eventAt = 1_764_000_000_000;
 
   const events = await owner.post("/__test__/applications/events/seed", {
     data: {
@@ -127,7 +132,7 @@ test("the owner traces an application by id across the whole flow", async ({
     data: {
       applicationId,
       browserMs: 45_000,
-      costMicros: 9_500,
+      costMicros: 9500,
       n: 1,
       outcome: "unconfirmed",
       provider: "browser_use",
@@ -138,10 +143,15 @@ test("the owner traces an application by id across the whole flow", async ({
   expect(attempt.status()).toBe(200);
 
   await openAdminAsOwner(page, adminIsolatedAppUrl, accessServer.issueToken);
+
   const state = await page.context().storageState();
 
-  for (const { height, width } of SIZES) {
-    for (const theme of THEMES) {
+  const checks = SIZES.flatMap(({ height, width }) =>
+    THEMES.map((theme) => ({ height, theme, width })),
+  );
+
+  await Promise.all(
+    checks.map(async ({ height, theme, width }) => {
       await expectLookupPage(
         browser,
         adminIsolatedAppUrl,
@@ -151,6 +161,6 @@ test("the owner traces an application by id across the whole flow", async ({
         height,
         theme,
       );
-    }
-  }
+    }),
+  );
 });

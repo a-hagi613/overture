@@ -6,7 +6,10 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { applicationEvents } from "../platform/db/schema.ts";
 
-const detailSchema = z.record(z.string(), z.unknown());
+const detailSchema = z.record(z.string(), z.json());
+const textSchema = z.string();
+
+export type ApplicationEventDetail = z.infer<typeof detailSchema>;
 
 export type ApplicationEventKind = "status" | "stage" | "email" | "checkin" | "note";
 
@@ -24,7 +27,7 @@ export interface ApplicationEventInput {
   /** The send attempt this event belongs to, when one was running. */
   attemptId?: string | null;
   /** Extra structured fields, merged with `reason` and `attemptId`. */
-  detail?: Record<string, unknown> | null;
+  detail?: ApplicationEventDetail | null;
 }
 
 export interface ApplicationTimelineEntry {
@@ -36,15 +39,15 @@ export interface ApplicationTimelineEntry {
   source: ApplicationEventSource;
   reason: string | null;
   attemptId: string | null;
-  detail: Record<string, unknown> | null;
+  detail: ApplicationEventDetail | null;
 }
 
 export function applicationEventDetail(input: {
   reason?: string | null | undefined;
   attemptId?: string | null | undefined;
-  detail?: Record<string, unknown> | null | undefined;
+  detail?: ApplicationEventDetail | null | undefined;
 }) {
-  const fields: Record<string, unknown> = { ...(input.detail ?? {}) };
+  const fields = { ...input.detail };
 
   if (input.reason !== undefined && input.reason !== null) {
     fields.reason = input.reason;
@@ -57,7 +60,7 @@ export function applicationEventDetail(input: {
   return Object.keys(fields).length === 0 ? null : JSON.stringify(fields);
 }
 
-export function parseApplicationEventDetail(raw: string | null): Record<string, unknown> | null {
+export function parseApplicationEventDetail(raw: string | null) {
   if (raw === null) {
     return null;
   }
@@ -71,22 +74,25 @@ export function parseApplicationEventDetail(raw: string | null): Record<string, 
   }
 }
 
-function reasonOf(detail: Record<string, unknown> | null) {
-  const value = detail?.reason;
+function reasonOf(detail: ApplicationEventDetail | null) {
+  const parsed = textSchema.safeParse(detail?.reason);
 
-  return typeof value === "string" ? value : null;
+  return parsed.success ? parsed.data : null;
 }
 
-function attemptIdOf(detail: Record<string, unknown> | null) {
-  const value = detail?.attemptId;
+function attemptIdOf(detail: ApplicationEventDetail | null) {
+  const parsed = textSchema.safeParse(detail?.attemptId);
 
-  return typeof value === "string" ? value : null;
+  return parsed.success ? parsed.data : null;
 }
 
 /**
  * Writes one structured Application event. Every stage change and every wait or
  * deferral goes through this one writer, so the timeline always carries the
  * reason and (when a send was running) the attempt id in `detail`.
+ * @param db The application database or an open transaction.
+ * @param clock The clock that stamps the event.
+ * @param input The event's move, reason, attempt and structured detail.
  */
 export function recordApplicationEvent(
   db: Pick<DatabaseWriter, "insert">,

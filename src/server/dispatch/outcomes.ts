@@ -24,8 +24,6 @@ import { publishEvent } from "../platform/sse/stream.ts";
 import { recordApplicationVariableCosts } from "./application-cost.ts";
 import { recordApplicationEvent } from "../applications/events.ts";
 
-export { recordApplicationEvent };
-
 const HOUR_MS = 60 * 60_000;
 
 type AttemptRow = typeof attempts.$inferSelect;

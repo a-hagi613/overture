@@ -2,11 +2,16 @@ import { expect, test } from "bun:test";
 
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
+import type { AlertMetrics } from "./alerts.ts";
 
 Bun.env.BETTER_AUTH_SECRET ??= "alerts-observability-test-secret-0123456789";
+
 Bun.env.OWNER_EMAIL ??= "owner@example.test";
+
 Bun.env.TURNSTILE_SITE_KEY ??= "alerts-observability-test-site-key";
+
 Bun.env.TURNSTILE_SECRET ??= "alerts-observability-test-secret";
+
 Bun.env.MASTER_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
 const {
@@ -23,7 +28,7 @@ const AT = Date.UTC(2026, 10, 25, 9, 0, 0);
 const clock = { now: () => AT };
 
 function quietMetrics() {
-  return {
+  const metrics: AlertMetrics = {
     ...drillAlertMetrics(),
     atsSuccess: [],
     backupLagSeconds: 0,
@@ -43,6 +48,8 @@ function quietMetrics() {
     unhandledRejections: 0,
     unscoredBacklog: 0,
   };
+
+  return metrics;
 }
 
 function raisedFor(metrics: ReturnType<typeof quietMetrics>) {

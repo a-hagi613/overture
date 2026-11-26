@@ -1,5 +1,3 @@
-import type { Page } from "playwright-core";
-
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
@@ -17,6 +15,10 @@ const CLEANUP_INTERVAL_MS = 24 * 60 * 60_000;
 
 export type ScreenshotPhase = "before_submit" | "after_submit";
 
+export interface ScreenshotPage {
+  screenshot: (options: { fullPage: boolean; type: "png" }) => Promise<Uint8Array>;
+}
+
 export interface StoredScreenshot {
   key: string;
   at: number;
@@ -28,7 +30,13 @@ export interface StoredScreenshot {
 }
 
 const keyPattern =
-  /^screenshots\/([^/]+)\/([^/]+)\/([^/]+)-(before_submit|after_submit)-(\d+)\.png$/u;
+  /^screenshots\/(?<userId>[^/]+)\/(?<applicationId>[^/]+)\/(?<attemptId>[^/]+)-(?<phase>before_submit|after_submit)-(?<at>\d+)\.png$/u;
+
+const PHASES = ["before_submit", "after_submit"] as const;
+
+function isScreenshotPhase(value: string): value is ScreenshotPhase {
+  return PHASES.some((phase) => phase === value);
+}
 
 export function applicationScreenshotPrefix(userId: string, applicationId: string) {
   return `${SCREENSHOT_PREFIX}${userId}/${applicationId}/`;
@@ -44,24 +52,23 @@ export function applicationScreenshotKey(input: {
   return `${applicationScreenshotPrefix(input.userId, input.applicationId)}${input.attemptId}-${input.phase}-${String(input.at)}.png`;
 }
 
-export function parseApplicationScreenshotKey(
-  key: string,
-  bytes: number | null = null,
-): StoredScreenshot | null {
+export function parseApplicationScreenshotKey(key: string, bytes: number | null = null) {
   const matched = keyPattern.exec(key);
+  const groups = matched?.groups;
 
-  if (matched === null) {
+  if (groups === undefined) {
     return null;
   }
 
-  const [, userId, applicationId, attemptId, phase, at] = matched;
+  const { applicationId, at, attemptId, phase, userId } = groups;
 
   if (
     userId === undefined ||
     applicationId === undefined ||
     attemptId === undefined ||
     phase === undefined ||
-    at === undefined
+    at === undefined ||
+    !isScreenshotPhase(phase)
   ) {
     return null;
   }
@@ -72,7 +79,7 @@ export function parseApplicationScreenshotKey(
     attemptId,
     bytes,
     key,
-    phase: phase as ScreenshotPhase,
+    phase,
     userId,
   };
 }
@@ -80,17 +87,20 @@ export function parseApplicationScreenshotKey(
 /**
  * Captures one Submit screenshot into the user's own account prefix. A broken
  * screenshot never fails the send: the error is logged and the send continues.
+ * @param deps The clock that stamps the shot and the object store that keeps it.
+ * @param input The application, attempt, page and Submit phase to capture.
+ * @returns The stored screenshot, or null when the capture or the store failed.
  */
 export async function captureSubmitScreenshot(
   deps: { clock: Clock; objects: ObjectStore },
   input: {
     applicationId: string;
     attemptId: string;
-    page: Page;
+    page: ScreenshotPage;
     phase: ScreenshotPhase;
     userId: string;
   },
-): Promise<StoredScreenshot | null> {
+) {
   let bytes: Uint8Array<ArrayBuffer>;
 
   try {
@@ -104,6 +114,7 @@ export async function captureSubmitScreenshot(
   }
 
   const at = deps.clock.now();
+
   const key = applicationScreenshotKey({
     applicationId: input.applicationId,
     at,
@@ -161,6 +172,10 @@ export async function listApplicationScreenshots(
  * Deletes Submit screenshots older than the retention window. Keys that do not
  * match the screenshot format are left alone, so a foreign object is never
  * removed by the cleanup.
+ * @param objects The object store holding the screenshots.
+ * @param now The instant the retention cutoff is measured from.
+ * @param retentionMs How long a screenshot is kept.
+ * @returns How many screenshots were deleted.
  */
 export async function cleanupExpiredScreenshots(
   objects: ObjectStore,

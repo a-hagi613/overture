@@ -95,7 +95,7 @@ import { createNotification } from "../notify/notifications.ts";
 import { sendCodeWaitEmailFallback } from "../notify/code-wait-email.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy } from "../../shared/copy.ts";
-import { recordApplicationEvent } from "./outcomes.ts";
+import { recordApplicationEvent } from "../applications/events.ts";
 import { acquireBrowserSession } from "./browser/session-slots.ts";
 import { nextSendSlot as nextSlotInWindow, parseSendWindow, planningWindow } from "./planning.ts";
 import { openApprovedPlan } from "../pipeline/approved-plan.ts";

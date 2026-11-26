@@ -118,21 +118,19 @@ export interface ApplicationLookup {
     }[];
   } | null;
   mail: {
-    threads: {
+    id: string;
+    subject: string | null;
+    employerStarted: boolean;
+    lastMessageAt: number;
+    messages: {
       id: string;
+      direction: string;
+      senderDomain: string;
+      auth: string;
+      classification: string | null;
+      outStatus: string | null;
       subject: string | null;
-      employerStarted: boolean;
-      lastMessageAt: number;
-      messages: {
-        id: string;
-        direction: string;
-        senderDomain: string;
-        auth: string;
-        classification: string | null;
-        outStatus: string | null;
-        subject: string | null;
-        createdAt: number;
-      }[];
+      createdAt: number;
     }[];
   }[];
   screenshots: {
@@ -149,11 +147,11 @@ export interface ApplicationLookup {
  * jobs, send attempts, deploy interruption and recovery, confirmation,
  * balance/ledger and linked mail, plus the Submit screenshots. Mail subjects are
  * opened for the admin only and a value that cannot be opened stays null.
+ * @param deps The database, clock, object store and personal crypto to read with.
+ * @param applicationId The Application id the support request names.
+ * @returns The full trace, or null when no Application has that id.
  */
-export async function lookupApplication(
-  deps: ApplicationLookupDeps,
-  applicationId: string,
-): Promise<ApplicationLookup | null> {
+export async function lookupApplication(deps: ApplicationLookupDeps, applicationId: string) {
   const { db, objects, personal } = deps;
   const row = db.select().from(applications).where(eq(applications.id, applicationId)).get();
 
@@ -162,6 +160,7 @@ export async function lookupApplication(
   }
 
   const timeline = readApplicationTimeline(db, applicationId);
+
   const attemptRows = db
     .select()
     .from(attempts)
@@ -182,6 +181,7 @@ export async function lookupApplication(
     .from(applicationSnapshots)
     .where(eq(applicationSnapshots.applicationId, applicationId))
     .get();
+
   const receipt = db
     .select()
     .from(applicationReceipts)

@@ -23,6 +23,7 @@ export function skipClosedPostingApplications(
     message: failedReasonText(POSTING_CLOSED_REASON) ?? null,
     reason: POSTING_CLOSED_REASON,
   });
+
   const skipped: SkippedApplication[] = [];
 
   for (let offset = 0; offset < postingIds.length; offset += POSTING_CHUNK) {

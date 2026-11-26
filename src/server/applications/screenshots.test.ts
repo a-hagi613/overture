@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import type { Page } from "playwright-core";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import type { ObjectEntry, ObjectStore } from "../platform/ports/object-store.ts";
+import { createDiskObjectStore } from "../platform/ports/object-store.ts";
+import type { ObjectStore } from "../platform/ports/object-store.ts";
 
 import {
   SCREENSHOT_RETENTION_MS,
@@ -24,18 +27,31 @@ function memoryStore() {
   const store: ObjectStore = {
     kind: "disk",
     delete: async (key) => {
+      await Promise.resolve();
       files.delete(key);
     },
-    get: async (key) => files.get(key) ?? null,
-    getStream: async () => null,
+    get: async (key) => {
+      await Promise.resolve();
+
+      return files.get(key) ?? null;
+    },
+    getStream: async () => {
+      await Promise.resolve();
+
+      return null;
+    },
     list: async function* list(prefix) {
+      await Promise.resolve();
+
       for (const key of [...files.keys()].toSorted()) {
         if (key.startsWith(prefix)) {
           yield key;
         }
       }
     },
-    listWithSizes: async function* listWithSizes(prefix): AsyncIterable<ObjectEntry> {
+    listWithSizes: async function* listWithSizes(prefix) {
+      await Promise.resolve();
+
       for (const key of [...files.keys()].toSorted()) {
         if (key.startsWith(prefix)) {
           yield { bytes: files.get(key)?.byteLength ?? 0, key };
@@ -43,22 +59,38 @@ function memoryStore() {
       }
     },
     put: async (key, data) => {
+      await Promise.resolve();
       files.set(key, data);
     },
-    putStream: async () => 0,
+    putStream: async () => {
+      await Promise.resolve();
+
+      return 0;
+    },
   };
 
   return { files, store };
 }
 
 function pageOf(screenshot: () => Promise<Uint8Array>) {
-  return { screenshot } as unknown as Page;
+  return {
+    screenshot: async () => {
+      await Promise.resolve();
+
+      return screenshot();
+    },
+  };
 }
 
 describe("Submit screenshots", () => {
   test("stores before and after shots under the user and application prefix", async () => {
     const { files, store } = memoryStore();
-    const page = pageOf(async () => new Uint8Array([1, 2, 3]));
+
+    const page = pageOf(async () => {
+      await Promise.resolve();
+
+      return new Uint8Array([1, 2, 3]);
+    });
 
     const before = await captureSubmitScreenshot(
       { clock: { now: () => NOW }, objects: store },
@@ -70,6 +102,7 @@ describe("Submit screenshots", () => {
         userId: USER_ID,
       },
     );
+
     const after = await captureSubmitScreenshot(
       { clock: { now: () => NOW + 1 }, objects: store },
       {
@@ -104,7 +137,10 @@ describe("Submit screenshots", () => {
 
   test("a failed capture never throws and stores nothing", async () => {
     const { files, store } = memoryStore();
+
     const page = pageOf(async () => {
+      await Promise.resolve();
+
       throw new Error("page gone");
     });
 
@@ -124,13 +160,13 @@ describe("Submit screenshots", () => {
   });
 
   test("an unavailable object store leaves the support lookup with no screenshots", async () => {
-    const { store } = memoryStore();
+    const directory = mkdtempSync(join(tmpdir(), "screenshots-missing-"));
 
-    store.listWithSizes = async function* listWithSizes() {
-      throw new Error("the object store root is missing");
-    };
+    rmSync(directory, { recursive: true });
 
-    expect(await listApplicationScreenshots(store, USER_ID, APPLICATION_ID)).toEqual([]);
+    const missing = createDiskObjectStore(directory);
+
+    expect(await listApplicationScreenshots(missing, USER_ID, APPLICATION_ID)).toEqual([]);
   });
 
   test("cleanup deletes only expired shots and never a foreign key", async () => {

@@ -3170,7 +3170,7 @@ export const copy = {
     lookupAttemptsHeading: "Send attempts",
     lookupAttemptsEmpty: "No send attempts yet.",
     lookupStarted: "Started",
-    lookupSubmit: "Submit",
+    lookupSubmitColumn: "Submit",
     lookupResponse: "Response",
     lookupRunning: "Running",
     lookupConfirmationHeading: "Confirmation",

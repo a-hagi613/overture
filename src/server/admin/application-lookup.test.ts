@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { ObjectEntry, ObjectStore } from "../platform/ports/object-store.ts";
+import type { ObjectStore } from "../platform/ports/object-store.ts";
 
 import { masterKeyringFor } from "../platform/crypto.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
@@ -21,9 +21,13 @@ import { applicationScreenshotKey } from "../applications/screenshots.ts";
 import { lookupApplication } from "./application-lookup.ts";
 
 Bun.env.BETTER_AUTH_SECRET ??= "application-lookup-test-secret-0123456789";
+
 Bun.env.OWNER_EMAIL ??= "owner@example.test";
+
 Bun.env.TURNSTILE_SITE_KEY ??= "application-lookup-test-site-key";
+
 Bun.env.TURNSTILE_SECRET ??= "application-lookup-test-secret";
+
 Bun.env.MASTER_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
 const NOW = Date.UTC(2026, 10, 25, 9, 0, 0);
@@ -39,18 +43,31 @@ function memoryStore() {
   const store: ObjectStore = {
     kind: "disk",
     delete: async (key) => {
+      await Promise.resolve();
       files.delete(key);
     },
-    get: async (key) => files.get(key) ?? null,
-    getStream: async () => null,
+    get: async (key) => {
+      await Promise.resolve();
+
+      return files.get(key) ?? null;
+    },
+    getStream: async () => {
+      await Promise.resolve();
+
+      return null;
+    },
     list: async function* list(prefix) {
+      await Promise.resolve();
+
       for (const key of [...files.keys()].toSorted()) {
         if (key.startsWith(prefix)) {
           yield key;
         }
       }
     },
-    listWithSizes: async function* listWithSizes(prefix): AsyncIterable<ObjectEntry> {
+    listWithSizes: async function* listWithSizes(prefix) {
+      await Promise.resolve();
+
       for (const key of [...files.keys()].toSorted()) {
         if (key.startsWith(prefix)) {
           yield { bytes: files.get(key)?.byteLength ?? 0, key };
@@ -58,9 +75,14 @@ function memoryStore() {
       }
     },
     put: async (key, data) => {
+      await Promise.resolve();
       files.set(key, data);
     },
-    putStream: async () => 0,
+    putStream: async () => {
+      await Promise.resolve();
+
+      return 0;
+    },
   };
 
   return { files, store };
@@ -93,12 +115,12 @@ async function seeded() {
       createdAt: NOW,
       costRecordedAt: NOW,
       id: APPLICATION_ID,
-      llmCostMicros: 3_000,
+      llmCostMicros: 3000,
       origin: "auto",
       postingId: "posting-lookup",
       postingTitle: "Senior Platform Engineer",
       postingUrl: "https://boards.example/jobs/lookup",
-      retryCostMicros: 1_000,
+      retryCostMicros: 1000,
       sentAt: NOW + 1000,
       stage: "applied",
       status: "confirming",
@@ -287,34 +309,38 @@ describe("the application support lookup", () => {
 
     const view = await lookupApplication({ clock, db, objects: store, personal }, APPLICATION_ID);
 
-    expect(view?.application).toMatchObject({
+    if (view === null) {
+      throw new Error("the lookup returned null");
+    }
+
+    expect(view.application).toMatchObject({
       companyName: "Ferro Cloud",
       id: APPLICATION_ID,
       stage: "applied",
       status: "confirming",
       userId: USER_ID,
     });
-    expect(view?.timeline[0]).toMatchObject({
+    expect(view.timeline[0]).toMatchObject({
       attemptId: "attempt-lookup",
       reason: "deploy_interruption",
       toValue: "confirming",
     });
-    expect(view?.queue.jobs.map((job) => job.kind)).toEqual(["application.send"]);
-    expect(view?.attempts[0]).toMatchObject({
+    expect(view.queue.jobs.map((job) => job.kind)).toEqual(["application.send"]);
+    expect(view.attempts[0]).toMatchObject({
       id: "attempt-lookup",
       outcome: "unconfirmed",
       submitClickedAt: NOW + 500,
     });
-    expect(view?.confirmation).toEqual({ receipt: null, snapshot: null });
-    expect(view?.balance?.ledger[0]).toMatchObject({ amount: 1, kind: "commit" });
-    expect(view?.balance?.balances.used).toBe(1);
-    expect(view?.mail[0]?.subject).toBe("Thanks for applying");
-    expect(view?.mail[0]?.messages[0]).toMatchObject({
+    expect(view.confirmation).toEqual({ receipt: null, snapshot: null });
+    expect(view.balance.ledger[0]).toMatchObject({ amount: 1, kind: "commit" });
+    expect(view.balance.balances.used).toBe(1);
+    expect(view.mail[0]?.subject).toBe("Thanks for applying");
+    expect(view.mail[0]?.messages[0]).toMatchObject({
       classification: "ack",
       direction: "in",
       subject: "Application received",
     });
-    expect(view?.screenshots.map((shot) => shot.phase)).toEqual(["before_submit", "after_submit"]);
+    expect(view.screenshots.map((shot) => shot.phase)).toEqual(["before_submit", "after_submit"]);
   });
 
   test("an unreadable mail subject stays null instead of failing the lookup", async () => {
@@ -324,6 +350,10 @@ describe("the application support lookup", () => {
 
     const view = await lookupApplication({ clock, db, objects: store, personal }, APPLICATION_ID);
 
-    expect(view?.mail[0]?.messages[0]?.subject).toBeNull();
+    if (view === null) {
+      throw new Error("the lookup returned null");
+    }
+
+    expect(view.mail[0]?.messages[0]?.subject).toBeNull();
   });
 });
