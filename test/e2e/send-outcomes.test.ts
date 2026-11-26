@@ -16,7 +16,7 @@ import { request as apiRequest } from "@playwright/test";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startTxtDnsServer } from "./dns.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
-import { INBOUND_HEADERS, forwardingIdFrom, signInbound } from "./inbound-mail.fixture.ts";
+import { INBOUND_HEADERS, signInbound } from "./inbound-mail.fixture.ts";
 import {
   approveApplication,
   grantApplications,
@@ -67,15 +67,39 @@ const test = appTest.extend<{ outcomes: OutcomeHarness }>({
       });
 
       const owner = await apiRequestFor(server);
-      const mailboxResponse = await owner.get("/api/profile/mailbox");
-      const { address } = z.object({ address: z.string() }).parse(await mailboxResponse.json());
-      const mailboxId = await forwardingIdFrom(secret, address);
+
+      const me = z
+        .object({ user: z.object({ id: z.string() }).nullable() })
+        .parse(await (await owner.get("/api/me")).json());
+
+      if (me.user === null) {
+        throw new Error("the owner is not signed in");
+      }
+
+      const { mailboxes } = z
+        .object({
+          mailboxes: z.array(z.object({ applyAddress: z.string().nullable(), id: z.string() })),
+        })
+        .parse(
+          await (
+            await owner.get(`/__test__/mailboxes?userId=${encodeURIComponent(me.user.id)}`)
+          ).json(),
+        );
+
+      const [mailbox] = mailboxes;
+
+      if (mailbox === undefined) {
+        throw new Error("the app returned no mailbox");
+      }
+
+      if (mailbox.applyAddress === null) {
+        throw new Error("the app returned no apply alias");
+      }
+
+      const address = mailbox.applyAddress;
+      const mailboxId = mailbox.id;
 
       await owner.dispose();
-
-      if (mailboxId === null) {
-        throw new Error("the app returned an invalid forwarding address");
-      }
 
       await provide({
         address,

@@ -33,6 +33,7 @@ const mailboxSchema = z.object({
 const mailboxesSchema = z.object({
   mailboxes: z.array(
     z.object({
+      applyAddress: z.string().nullable(),
       id: z.string(),
       localPart: z.string(),
       status: z.string(),
@@ -266,11 +267,11 @@ test.beforeAll(async () => {
   const { mailboxes: created } = mailboxesSchema.parse(await owned.json());
   const [mailboxRow] = created;
 
-  if (mailboxRow === undefined || created.length !== 1) {
-    throw new Error("The new account did not get exactly one forwarding address.");
+  if (mailboxRow === undefined || created.length !== 1 || mailboxRow.applyAddress === null) {
+    throw new Error("The new account did not get exactly one apply alias.");
   }
 
-  address = `${mailboxRow.localPart}@tryoverture.com`;
+  address = mailboxRow.applyAddress;
   mailboxId = mailboxRow.id;
 });
 
@@ -301,13 +302,12 @@ test("a new account has one address, and its first forwarded ATS message records
   const owned = await mailboxesFor(me.user.id);
 
   expect(owned).toHaveLength(1);
-  expect(owned[0]?.localPart).toBe(address.split("@")[0]);
+  expect(owned[0]?.applyAddress).toBe(address);
   expect(owned[0]?.status).toBe("active");
   expect(owned[0]?.firstForwardedAt).toBeNull();
 
   const before = await readMailbox();
 
-  expect(before.address).toBe(address);
   expect(before.forwardingWorks).toBe(false);
   expect(before.firstForwardedAt).toBeNull();
 
@@ -341,7 +341,6 @@ test("a new account has one address, and its first forwarded ATS message records
 
   const after = await readMailbox();
 
-  expect(after.address).toBe(address);
   expect(after.forwardingWorks).toBe(true);
   expect(after.firstForwardedAt).not.toBeNull();
 
@@ -506,13 +505,17 @@ test("mail for another user's address is ingested for that user only", async () 
   }
 
   expect(burner.status).toBe("active");
-  expect(burner.localPart).not.toBe(address.split("@")[0]);
+  expect(burner.applyAddress).not.toBe(address);
 
   const raw = await sign(
     fixture("greenhouse-ack.eml").replaceAll("__MESSAGE_ID__", crypto.randomUUID()),
   );
 
-  const posted = await postInbound(raw, `${burner.localPart}@tryoverture.com`);
+  if (burner.applyAddress === null) {
+    throw new Error("The second user got no apply alias.");
+  }
+
+  const posted = await postInbound(raw, burner.applyAddress);
 
   expect(posted.status()).toBe(204);
 

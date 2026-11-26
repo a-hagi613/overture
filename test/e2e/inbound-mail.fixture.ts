@@ -13,7 +13,6 @@ export {
   INBOUND_DEAD_LETTER_PATH,
   INBOUND_HEADERS,
   INBOUND_PATH,
-  forwardingIdFrom,
   forwardingLocalPart,
   signInbound,
   verifyInbound,

@@ -18,7 +18,6 @@ import {
   fakeInboundQueue,
   fakeInboundSpill,
   forwardableMessage,
-  forwardingLocalPart,
   inboundQueueHandle,
   inboundTestEnvironment,
   inboundTestSecret,
@@ -93,7 +92,9 @@ function startEdge(statuses: { inbound?: number; deadLetter?: number } = {}) {
 }
 
 async function forwardingAddress() {
-  return `${await forwardingLocalPart(inboundTestSecret, id)}@tryoverture.com`;
+  await Promise.resolve();
+
+  return "ada.chen.4k@tryoverture.com";
 }
 
 function sourceFiles(directory: string) {
@@ -134,7 +135,7 @@ test("an ATS message is enqueued with its envelope and body", async () => {
   expect(rejected).toHaveLength(0);
 });
 
-test("a non-ATS message to a managed address is enqueued too", async () => {
+test("a non-ATS message to an alias is enqueued too", async () => {
   const queue = fakeInboundQueue();
   const spill = fakeInboundSpill();
 
@@ -151,7 +152,7 @@ test("a non-ATS message to a managed address is enqueued too", async () => {
   expect(rejected).toHaveLength(0);
 });
 
-test("a forged forwarding address is dropped without an enqueue", async () => {
+test("a retired forwarding address is dropped without an enqueue", async () => {
   const queue = fakeInboundQueue();
   const spill = fakeInboundSpill();
 

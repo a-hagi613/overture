@@ -9,7 +9,7 @@ import {
 import type { InboundQueueMessage } from "../../../src/shared/inbound-queue.ts";
 import type { ForwardableEmailMessage, InboundMailEnv } from "./env.ts";
 
-import { aliasEmailDomain, isAliasRecipient, isManagedRecipient } from "./addresses.ts";
+import { aliasEmailDomain, isAliasRecipient } from "./addresses.ts";
 import { millisecondsNow } from "./clock.ts";
 
 async function enqueue(
@@ -53,8 +53,8 @@ async function enqueue(
 
 /**
  * The `tryoverture.com` catch-all. It only moves mail; routing, storage and the copy to the
- * account's own verified address live in `overture-web`, which can resolve the envelope recipient to
- * one active mailbox. A reserved local part, a forged forwarding address and an alias on another
+ * account's own verified address live in `overture-web`, which resolves the envelope recipient to
+ * one active alias. A reserved local part, a retired forwarding address and an alias on another
  * domain are dropped here without an enqueue.
  * @param message The inbound Email Routing message.
  * @param env The Worker bindings.
@@ -63,12 +63,8 @@ export async function email(message: ForwardableEmailMessage, env: InboundMailEn
   const domain = aliasEmailDomain(env);
   const liveCheck = isLiveCheckAddress(message.to, domain);
 
-  if (!liveCheck) {
-    const managed = await isManagedRecipient(env.INBOUND_HMAC_SECRET, message.to, domain);
-
-    if (!managed && !isAliasRecipient(message.to, domain)) {
-      return;
-    }
+  if (!liveCheck && !isAliasRecipient(message.to, domain)) {
+    return;
   }
 
   if (message.rawSize > INBOUND_MAX_BYTES) {

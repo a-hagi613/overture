@@ -6,7 +6,7 @@ import {
   applyAliasAddress,
   isReservedAliasHandle,
 } from "../../shared/apply-alias.ts";
-import { forwardingIdFrom, forwardingLocalPart } from "../../shared/inbound-mail.ts";
+import { forwardingLocalPart } from "../../shared/inbound-mail.ts";
 import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -258,39 +258,22 @@ export function createMailboxService(
   }
 
   async function byForwardingAddress(address: string) {
-    const normalized = address.trim().toLowerCase();
-    const [aliasLocalPart = ""] = normalized.split("@");
+    await Promise.resolve();
 
-    // A reserved system local part never resolves to a person, even if a bad row ever carried one.
-    if (aliasLocalPart !== "" && isReservedAliasHandle(aliasLocalPart)) {
+    const normalized = address.trim().toLowerCase();
+    const [aliasLocalPart = "", addressHost = ""] = normalized.split("@");
+
+    if (addressHost !== aliasHost) {
+      return null;
+    }
+
+    if (aliasLocalPart === "" || isReservedAliasHandle(aliasLocalPart)) {
       return null;
     }
 
     const byAlias = db.select().from(mailboxes).where(eq(mailboxes.applyAddress, normalized)).get();
 
-    if (byAlias !== undefined) {
-      return { ...byAlias, address: addressOf(byAlias.localPart) };
-    }
-
-    const [localPart = "", addressHost = ""] = normalized.split("@");
-
-    if (addressHost !== host) {
-      return null;
-    }
-
-    const id = await forwardingIdFrom(secret, localPart);
-
-    if (id === null) {
-      return null;
-    }
-
-    const mailbox = db.select().from(mailboxes).where(eq(mailboxes.id, id)).get();
-
-    if (mailbox === undefined) {
-      return null;
-    }
-
-    return { ...mailbox, address: addressOf(mailbox.localPart) };
+    return byAlias === undefined ? null : { ...byAlias, address: addressOf(byAlias.localPart) };
   }
 
   function byId(id: string) {

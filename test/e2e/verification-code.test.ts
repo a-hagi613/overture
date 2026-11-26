@@ -16,7 +16,7 @@ import { startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startTxtDnsServer } from "./dns.fixture.ts";
 import { startGreenhouseFixture } from "./greenhouse.fixture.ts";
 import { subscriptionKeys, vapidKeyPair } from "./push.fixture.ts";
-import { INBOUND_HEADERS, forwardingIdFrom, signInbound } from "./inbound-mail.fixture.ts";
+import { INBOUND_HEADERS, signInbound } from "./inbound-mail.fixture.ts";
 import {
   approveApplication,
   grantApplications,
@@ -155,8 +155,6 @@ const sentMailSchema = z.object({
 });
 
 const sentMailListSchema = z.object({ messages: z.array(sentMailSchema) });
-
-const mailboxSchema = z.object({ address: z.string() });
 
 const fixtureStateSchema = z.object({
   submissions: z.number(),
@@ -310,15 +308,35 @@ async function ownerFor(server: AppServer) {
 }
 
 async function mailboxAddress(owner: APIRequestContext) {
-  const response = await owner.get("/api/profile/mailbox");
-  const body = mailboxSchema.parse(await response.json());
-  const id = await forwardingIdFrom(secret, body.address);
+  const me = z
+    .object({ user: z.object({ id: z.string() }).nullable() })
+    .parse(await (await owner.get("/api/me")).json());
 
-  if (id === null) {
-    throw new Error(`The app returned an invalid forwarding address: ${body.address}`);
+  if (me.user === null) {
+    throw new Error("the owner is not signed in");
   }
 
-  return { address: body.address, id };
+  const { mailboxes } = z
+    .object({
+      mailboxes: z.array(z.object({ applyAddress: z.string().nullable(), id: z.string() })),
+    })
+    .parse(
+      await (
+        await owner.get(`/__test__/mailboxes?userId=${encodeURIComponent(me.user.id)}`)
+      ).json(),
+    );
+
+  const [mailbox] = mailboxes;
+
+  if (mailbox === undefined) {
+    throw new Error("The app returned no mailbox.");
+  }
+
+  if (mailbox.applyAddress === null) {
+    throw new Error("The app returned no apply alias.");
+  }
+
+  return { address: mailbox.applyAddress, id: mailbox.id };
 }
 
 async function uploadResume(owner: APIRequestContext) {

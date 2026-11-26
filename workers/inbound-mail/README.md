@@ -3,11 +3,10 @@
 The Cloudflare Email Worker that receives the `tryoverture.com` catch-all and hands accepted mail to
 `overture-web` (`POST /internal/mail/inbound`, SPEC §11.1, ADR 0028), through a Queue.
 
-It accepts a managed forwarding address (`in-{id}-{mac}@tryoverture.com`, checked with
-`forwardingIdFrom` in `src/shared/inbound-mail.ts`) and an apex alias
-(`<handle>@<ALIAS_EMAIL_DOMAIN>`, ADR 0040). A reserved system local part (`hello@`, `support@`, …)
-and a forged `in-` address are dropped silently. The Worker does not resolve the mailbox itself: the
-app resolves the envelope recipient to exactly one active alias and drops a retired or unknown one.
+It accepts an apex alias (`<handle>@<ALIAS_EMAIL_DOMAIN>`, ADR 0040). A reserved system local part
+(`hello@`, `support@`, …) and the retired `in-{id}-{mac}@tryoverture.com` forwarding address are
+dropped silently. The Worker does not resolve the mailbox itself: the app resolves the envelope
+recipient to exactly one active alias and drops a retired or unknown one.
 
 **The Worker never sends mail.** It has no `send_email` binding and no forwarding destination, so
 there is no shared or owner fallback anywhere (issue #693). `message.forward()` is never used either:
@@ -47,8 +46,8 @@ In the Cloudflare dashboard for the `tryoverture.com` zone, open **Email Routing
 
 - The catch-all route sends to this Worker (`overture-inbound-mail`).
 - Keep the literal routes such as `hello@tryoverture.com` forwarding to the owner as they are.
-- The managed forwarding addresses live on the apex, `in-{id}-{mac}@tryoverture.com`. The apex alias domain is
-  `ALIAS_EMAIL_DOMAIN` (default `tryoverture.com`); the app provisions `<handle>@tryoverture.com` at signup.
+- The aliases live on the apex, `<handle>@tryoverture.com`. The apex alias domain is `ALIAS_EMAIL_DOMAIN`
+  (default `tryoverture.com`); the app provisions `<handle>@tryoverture.com` at signup.
 
 ## Configuration
 
@@ -96,8 +95,8 @@ build.
 
 `test/e2e/inbound-mail-worker.test.ts` runs the Worker's `email` and `queue` handlers against the
 recorded `.eml` fixtures in `test/e2e/fixtures/inbound-mail/`, with a fake Queue, a fake R2 bucket and
-a local server that verifies every request with `verifyInbound`. It covers the managed-address check,
-apex aliases, reserved addresses, the 25 MiB limit and a static check that no Worker source sends
+a local server that verifies every request with `verifyInbound`. It covers the retired forwarding address,
+apex aliases, reserved addresses, the queue spill path and a static check that no Worker source sends
 mail or calls `message.forward()`.
 `test/e2e/inbound-mail-queue.test.ts` runs the consumer against the real app: an outage, a retry, a
 recovery and a redelivery store the message exactly once, a message over 128 KB spills and is deleted

@@ -37,6 +37,7 @@ const RECORDED_MESSAGE_ID = "CAMd2b0e5db1a44c9b8f0d7c3a5f@us.greenhouse-mail.io"
 const mailboxesSchema = z.object({
   mailboxes: z.array(
     z.object({
+      applyAddress: z.string().nullable(),
       id: z.string(),
       localPart: z.string(),
       status: z.string(),
@@ -161,10 +162,14 @@ test.beforeAll(async () => {
   const [mailbox] = owned.mailboxes;
 
   if (mailbox === undefined) {
-    throw new Error("The owner has no forwarding address.");
+    throw new Error("The owner has no mailbox.");
   }
 
-  address = `${mailbox.localPart}@tryoverture.com`;
+  if (mailbox.applyAddress === null) {
+    throw new Error("The owner has no apply alias.");
+  }
+
+  address = mailbox.applyAddress;
   mailboxId = mailbox.id;
 });
 
