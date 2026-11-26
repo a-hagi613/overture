@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
     # `edited` re-runs the Verification-block check when a worker fills the body in after opening the pull request.
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    # `labeled`/`unlabeled` re-plan e2e, because `high-risk` must run the full suite even when it is added after opening.
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled, unlabeled]
   push:
     branches: [main]
   # A burst of merges cancels its own push runs, so the e2e timings and reach map can go stale; the nightly run
