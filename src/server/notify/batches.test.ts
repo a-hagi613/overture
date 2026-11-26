@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import { and, eq } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
-import type { Clock } from "../platform/ports/clock.ts";
 
 import { bgJobs, notifications, users } from "../platform/db/schema.ts";
 import { openDatabase } from "../platform/db/client.ts";
@@ -18,9 +17,13 @@ import { setNotificationPreference } from "./preferences.ts";
 import { PUSH_NOTIFY_JOB_KIND } from "./push.ts";
 
 Bun.env.BETTER_AUTH_SECRET ??= "batches-test-secret-0123456789";
+
 Bun.env.OWNER_EMAIL ??= "owner@example.test";
+
 Bun.env.TURNSTILE_SITE_KEY ??= "batches-test-site-key";
+
 Bun.env.TURNSTILE_SECRET ??= "batches-test-secret";
+
 Bun.env.MASTER_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
 const NOW = Date.UTC(2026, 10, 26, 12, 0, 0);
@@ -46,7 +49,7 @@ function seeded() {
   return { db, sqlite };
 }
 
-function clockAt(now: number): Clock {
+function clockAt(now: number) {
   return { now: () => now };
 }
 
@@ -78,8 +81,6 @@ test("a burst of sixteen question events becomes one notification", () => {
   expect(all[0]?.body).toBe("Answer them in Review so these applications can go ahead.");
   expect(all[0]?.url).toBe("/review");
 
-  // The row is written once, so its push is queued once; the push waits out the
-  // window and reads the row, so it carries the grouped copy.
   const pushes = pushJobs(db);
 
   expect(pushes).toHaveLength(1);
@@ -119,7 +120,7 @@ test("three kinds in a burst become three notifications", () => {
   }
 
   const all = rows(db);
-  const kinds = all.map((row) => row.kind).sort();
+  const kinds = all.map((row) => row.kind).toSorted();
 
   expect(all).toHaveLength(3);
   expect(kinds).toEqual(["interview", "reply", "review"]);
@@ -158,6 +159,10 @@ test("a merged row becomes unread again and keeps the single rows' links", () =>
     title: "Senior Backend Engineer",
     userId: USER_ID,
   });
+
+  if (id === null) {
+    throw new Error("the notification was not written");
+  }
 
   const [single] = rows(db);
 

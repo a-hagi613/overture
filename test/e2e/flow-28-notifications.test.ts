@@ -7,7 +7,6 @@ import { request as apiRequest } from "@playwright/test";
 import { dkimSign } from "mailauth";
 import { z } from "zod";
 
-import { NOTIFICATION_BATCH_WINDOW_MS } from "../../src/shared/notifications.ts";
 import type { APIRequestContext } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 
@@ -27,6 +26,7 @@ import type { SubscriptionKeys } from "./push.fixture.ts";
 const vapid = vapidKeyPair();
 const SECRET = "e2e-flow-28-secret-0123456789abc";
 const SELECTOR = "overture";
+const PUSH_WINDOW_MS = 2 * 60_000;
 const SIGNING_DOMAINS = ["us.greenhouse-mail.io", "acme.example"] as const;
 
 type SigningDomain = (typeof SIGNING_DOMAINS)[number];
@@ -172,7 +172,7 @@ async function waitForPushTitle(owner: APIRequestContext, keys: SubscriptionKeys
   const { offsetMs } = clockSchema.parse(await (await owner.get("/__test__/clock")).json());
 
   await owner.post("/__test__/clock/offset", {
-    data: { offsetMs: offsetMs + NOTIFICATION_BATCH_WINDOW_MS + 1 },
+    data: { offsetMs: offsetMs + PUSH_WINDOW_MS + 1 },
   });
 
   const ran = await owner.post("/__test__/jobs/run-due", { data: {} });

@@ -64,6 +64,19 @@ async function emit(
   expect(response.ok()).toBe(true);
 }
 
+async function emitMany(
+  request: APIRequestContext,
+  count: number,
+  kind: string,
+  title: string,
+  body: string,
+  url: string,
+) {
+  await Promise.all(
+    Array.from({ length: count }, async () => emit(request, kind, title, body, url)),
+  );
+}
+
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 
 test("a fresh user's question burst shows one grouped notification", async ({
@@ -74,15 +87,14 @@ test("a fresh user's question burst shows one grouped notification", async ({
 
   await seedOwner(request, notificationsServerUrl);
 
-  for (let index = 0; index < 16; index += 1) {
-    await emit(
-      request,
-      "review",
-      "A question for you",
-      "Open Review to answer it so these applications can go ahead.",
-      "/review",
-    );
-  }
+  await emitMany(
+    request,
+    16,
+    "review",
+    "A question for you",
+    "Open Review to answer it so these applications can go ahead.",
+    "/review",
+  );
 
   const state = await notificationsOf(request);
 
@@ -91,10 +103,12 @@ test("a fresh user's question burst shows one grouped notification", async ({
   expect(state.unread).toBe(1);
 
   const storage = await request.storageState();
+
   const context = await browser.newContext({
     storageState: storage,
     viewport: { width: 1280, height: 900 },
   });
+
   const page = await context.newPage();
 
   await page.goto(`${notificationsServerUrl}/notifications`);
@@ -123,7 +137,7 @@ test("a fresh user sees one notification per kind, never one per event", async (
 
   await seedOwner(request, notificationsServerUrl);
 
-  for (const [kind, title, body, url] of [
+  const kinds = [
     [
       "review",
       "A question for you",
@@ -137,16 +151,16 @@ test("a fresh user sees one notification per kind, never one per event", async (
       "Staff Platform Engineer. Open the thread in Inbox to see the details.",
       "/inbox",
     ],
-  ] as const) {
-    for (let index = 0; index < 4; index += 1) {
-      await emit(request, kind, title, body, url);
-    }
-  }
+  ] as const;
+
+  await Promise.all(
+    kinds.map(async ([kind, title, body, url]) => emitMany(request, 4, kind, title, body, url)),
+  );
 
   const state = await notificationsOf(request);
 
   expect(state.notifications).toHaveLength(3);
-  expect(state.notifications.map((row) => row.kind).sort()).toEqual([
+  expect(state.notifications.map((row) => row.kind).toSorted()).toEqual([
     "interview",
     "reply",
     "review",
@@ -154,10 +168,12 @@ test("a fresh user sees one notification per kind, never one per event", async (
   expect(state.notifications.every((row) => row.readAt === null)).toBe(true);
 
   const storage = await request.storageState();
+
   const context = await browser.newContext({
     storageState: storage,
     viewport: { width: 390, height: 844 },
   });
+
   const page = await context.newPage();
 
   await page.goto(`${notificationsServerUrl}/notifications`);
