@@ -20,6 +20,7 @@ import {
   applications,
   applicationAnswers,
   applicationEvents,
+  applicationReceipts,
   applicationSnapshots,
   attempts,
   bgJobs,
@@ -70,6 +71,7 @@ import { enqueueJob } from "../platform/jobs/queue.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { postingDisplayFor } from "../matching/applications.ts";
+import { applicationScreenshotKey } from "../applications/screenshots.ts";
 import { attachApplication, ensureOpenReview } from "../pipeline/review-store.ts";
 import { ensureApplyFailuresQueued } from "../notify/failure-digest.ts";
 import { createNotification } from "../notify/notifications.ts";
@@ -517,10 +519,26 @@ const seedEventBody = z.object({
         toValue: z.string().nullable().default(null),
         source: z.enum(["system", "user", "email", "checkin", "admin"]),
         detail: z.string().nullable().default(null),
+        reason: z.string().nullable().default(null),
+        attemptId: z.string().nullable().default(null),
       }),
     )
     .min(1)
     .max(60),
+});
+
+const seedScreenshotBody = z.object({
+  applicationId: z.string().min(1),
+  attemptId: z.string().min(1).default("attempt-1"),
+  at: z.number().int().optional(),
+  phase: z.enum(["before_submit", "after_submit"]),
+  pngBase64: z.string().min(1).optional(),
+});
+
+const seedReceiptBody = z.object({
+  applicationId: z.string().min(1),
+  messageId: z.string().min(1),
+  confirmedAt: z.number().int().optional(),
 });
 
 const seedGrantBody = z.object({
@@ -1907,18 +1925,90 @@ export function createTestRoutes(
 
     db.insert(applicationEvents)
       .values(
-        events.map((event) => ({
-          at: event.at,
-          applicationId,
-          detail: event.detail,
-          fromValue: event.fromValue,
-          id: crypto.randomUUID(),
-          kind: event.kind,
-          source: event.source,
-          toValue: event.toValue,
-          userId: application.userId,
-        })),
+        events.map((event) => {
+          const detail: Record<string, string> = {};
+
+          if (event.detail !== null) {
+            detail.message = event.detail;
+          }
+
+          if (event.reason !== null) {
+            detail.reason = event.reason;
+          }
+
+          if (event.attemptId !== null) {
+            detail.attemptId = event.attemptId;
+          }
+
+          return {
+            at: event.at,
+            applicationId,
+            detail: Object.keys(detail).length === 0 ? event.detail : JSON.stringify(detail),
+            fromValue: event.fromValue,
+            id: crypto.randomUUID(),
+            kind: event.kind,
+            source: event.source,
+            toValue: event.toValue,
+            userId: application.userId,
+          };
+        }),
       )
+      .run();
+
+    return context.json({ ok: true });
+  });
+
+  routes.post("/screenshots/seed", validJson(seedScreenshotBody), async (context) => {
+    if (objects === null) {
+      return context.json({ error: "no object store" }, 503);
+    }
+
+    const body = context.req.valid("json");
+
+    const application = db
+      .select({ userId: applications.userId })
+      .from(applications)
+      .where(eq(applications.id, body.applicationId))
+      .get();
+
+    if (application === undefined) {
+      return context.json({ error: API_ERRORS.notFound }, 404);
+    }
+
+    const at = body.at ?? clock.now();
+
+    const key = applicationScreenshotKey({
+      applicationId: body.applicationId,
+      at,
+      attemptId: body.attemptId,
+      phase: body.phase,
+      userId: application.userId,
+    });
+
+    const bytes = Buffer.from(
+      body.pngBase64 ??
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=",
+      "base64",
+    );
+
+    await objects.put(key, new Uint8Array(bytes));
+
+    return context.json({ key });
+  });
+
+  routes.post("/receipts/seed", validJson(seedReceiptBody), (context) => {
+    const body = context.req.valid("json");
+
+    db.insert(applicationReceipts)
+      .values({
+        applicationId: body.applicationId,
+        confirmedAt: body.confirmedAt ?? clock.now(),
+        messageId: body.messageId,
+      })
+      .onConflictDoUpdate({
+        target: applicationReceipts.applicationId,
+        set: { confirmedAt: body.confirmedAt ?? clock.now(), messageId: body.messageId },
+      })
       .run();
 
     return context.json({ ok: true });

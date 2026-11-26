@@ -1,7 +1,8 @@
-import { Archive, Check, ChevronDown, ExternalLink } from "lucide-react";
+import { Archive, Check, ChevronDown, CircleHelp, X } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
 
-import { canMoveApplicationToStage } from "../../shared/board.ts";
+import { canMoveApplicationToStage, canWithdrawApplication } from "../../shared/board.ts";
 import { copy } from "../../shared/copy.ts";
 import { STAGE_KEYS } from "../lib/board-api.ts";
 import type { ApplicationDetail, StageKey } from "../lib/board-api.ts";
@@ -16,14 +17,49 @@ export function BoardSheetActions(props: {
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const { application, posting } = props.detail;
+  const withdrawable = canWithdrawApplication(application.status);
+  const needsAnswer = application.status === "needs_review";
+  const canApprove = application.status === "ready" || application.status === "approved";
+  const canRetry = application.status === "failed" && posting.applyUrl !== null;
+
   return (
     <div className="mt-4 flex flex-wrap items-center gap-2">
-      <Button asChild size="sm" variant="primary">
-        <a href={props.detail.posting.url} rel="noreferrer" target="_blank">
-          <ExternalLink aria-hidden="true" size={14} />
-          <span>{copy.board.openPosting}</span>
-        </a>
-      </Button>
+      {needsAnswer ? (
+        <Button asChild size="sm" variant="primary">
+          <Link to={`/review?application=${encodeURIComponent(application.id)}`}>
+            <CircleHelp aria-hidden="true" size={14} />
+            <span>{copy.board.actions.answer}</span>
+          </Link>
+        </Button>
+      ) : null}
+
+      {canApprove ? (
+        <Button asChild size="sm" variant="primary">
+          <Link
+            to={
+              application.status === "approved"
+                ? "/ready"
+                : `/ready?application=${encodeURIComponent(application.id)}`
+            }
+          >
+            <Check aria-hidden="true" size={14} />
+            <span>
+              {application.status === "approved"
+                ? copy.board.actions.manageSend
+                : copy.board.actions.approve}
+            </span>
+          </Link>
+        </Button>
+      ) : null}
+
+      {canRetry && posting.applyUrl !== null ? (
+        <Button asChild size="sm" variant="secondary">
+          <a href={posting.applyUrl} rel="noopener noreferrer" target="_blank">
+            <span>{copy.board.actions.retry}</span>
+          </a>
+        </Button>
+      ) : null}
 
       <div className="relative">
         <Button
@@ -43,8 +79,8 @@ export function BoardSheetActions(props: {
           <Card className="absolute left-0 top-full z-20 mt-1.5 min-w-48 p-1.5" variant="default">
             <div role="menu">
               {STAGE_KEYS.map((stage) => {
-                const isCurrent = stage === props.detail.application.stage;
-                const allowed = canMoveApplicationToStage(props.detail.application.status, stage);
+                const isCurrent = stage === application.stage;
+                const allowed = canMoveApplicationToStage(application.status, stage);
                 let itemStyle = "text-foreground hover:bg-muted";
 
                 if (isCurrent) {
@@ -77,7 +113,7 @@ export function BoardSheetActions(props: {
 
       <Button onClick={props.onArchive} size="sm" variant="outline">
         <Archive aria-hidden="true" size={14} />
-        <span>{copy.board.archive}</span>
+        <span>{withdrawable ? copy.board.cancel : copy.board.archive}</span>
       </Button>
     </div>
   );

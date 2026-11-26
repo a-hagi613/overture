@@ -1,6 +1,6 @@
 import { copy } from "../../shared/copy.ts";
 import type { ApplicationDetail } from "../lib/board-api.ts";
-import { money, providerName, stageLabel, stamp } from "../lib/board-format.ts";
+import { stageLabel, stamp } from "../lib/board-format.ts";
 import { Badge } from "./ui/badge.tsx";
 
 function stageBadgeVariant(stage: string | null) {
@@ -19,12 +19,33 @@ function stageBadgeVariant(stage: string | null) {
   return "secondary" as const;
 }
 
+function noteBadgeVariant(tone: string) {
+  switch (tone) {
+    case "accent": {
+      return "signal" as const;
+    }
+
+    case "need": {
+      return "need" as const;
+    }
+
+    case "ok": {
+      return "ok" as const;
+    }
+
+    case "ink": {
+      return "default" as const;
+    }
+
+    default: {
+      return "outline" as const;
+    }
+  }
+}
+
 export function BoardSheetPills({ detail }: { detail: ApplicationDetail }) {
-  const salary = money(detail);
   const stage = stageLabel(detail.application.stage);
-  const score = detail.match?.score ?? null;
   const isSent = detail.application.sentAt !== null || detail.dossier !== null;
-  const strongMatch = score !== null && score >= 80;
 
   const sentTitle =
     detail.dossier === null
@@ -37,35 +58,18 @@ export function BoardSheetPills({ detail }: { detail: ApplicationDetail }) {
   const showStageBadge = stage !== null && !(isSent && detail.application.stage === "applied");
 
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
+    <div className="mt-3 flex flex-wrap items-center gap-2">
       {isSent ? (
         <Badge title={sentTitle} variant="ok">
           {copy.board.states.sent}
         </Badge>
       ) : null}
-      {score === null ? null : (
-        <Badge
-          className="tabular-nums"
-          title={detail.match?.reason ?? copy.board.matchFallbackReason}
-          variant={strongMatch ? "signal" : "secondary"}
-        >
-          {copy.board.matchPercent(score)}
-        </Badge>
-      )}
-      {detail.posting.location === null ? null : (
-        <Badge variant="outline">{detail.posting.location}</Badge>
-      )}
-      {salary === null ? null : (
-        <Badge className="tabular-nums" variant="secondary">
-          {salary}
-        </Badge>
-      )}
-      {detail.posting.ats === null ? null : (
-        <Badge variant="outline">{providerName(detail.posting.ats)}</Badge>
-      )}
       {showStageBadge ? (
         <Badge variant={stageBadgeVariant(detail.application.stage)}>{stage}</Badge>
       ) : null}
+      {detail.note === null ? null : (
+        <Badge variant={noteBadgeVariant(detail.note.tone)}>{detail.note.label}</Badge>
+      )}
     </div>
   );
 }

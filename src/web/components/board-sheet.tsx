@@ -5,6 +5,8 @@ import type { ApplicationDetail, StageKey } from "../lib/board-api.ts";
 import { useModalSheet } from "../lib/use-modal-sheet.ts";
 import { BoardAnswers } from "./board-answers.tsx";
 import { BoardCover } from "./board-cover.tsx";
+import { BoardJobFacts } from "./board-job-facts.tsx";
+import { BoardProof } from "./board-proof.tsx";
 import { BoardSentBanner } from "./board-sent-banner.tsx";
 import { BoardSheetActions } from "./board-sheet-actions.tsx";
 import { BoardSheetHeader } from "./board-sheet-header.tsx";
@@ -18,10 +20,10 @@ import { TabsPanel } from "./ui/tabs-content.tsx";
 import { TabsList } from "./ui/tabs-list.tsx";
 import { TabsTrigger } from "./ui/tabs-trigger.tsx";
 
-type BoardTab = "answers" | "cover" | "timeline";
+type BoardTab = "answers" | "cover" | "proof" | "timeline";
 
 function isBoardTab(value: string): value is BoardTab {
-  return value === "timeline" || value === "answers" || value === "cover";
+  return value === "timeline" || value === "answers" || value === "cover" || value === "proof";
 }
 
 export function BoardSheet(props: {
@@ -92,8 +94,11 @@ export function BoardSheet(props: {
           className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-8 pt-2 md:px-7 md:pt-6"
           data-scroll-region
         >
-          <BoardSheetHeader detail={detail} />
-          <BoardSheetPills detail={detail} />
+          <section aria-label={copy.board.job.sectionLabel}>
+            <BoardSheetHeader detail={detail} />
+            <BoardSheetPills detail={detail} />
+            <BoardJobFacts detail={detail} />
+          </section>
           <BoardSentBanner detail={detail} />
           <BoardSheetActions detail={detail} onArchive={props.onArchive} onMove={props.onMove} />
 
@@ -108,17 +113,34 @@ export function BoardSheet(props: {
               }}
               value={tab}
             >
-              <TabsList ariaLabel={copy.board.sectionsLabel} className="flex w-full">
-                <TabsTrigger className="flex-1 whitespace-nowrap px-2.5" value="timeline">
-                  {copy.board.tabs.timeline}
-                </TabsTrigger>
-                <TabsTrigger className="flex-1 whitespace-nowrap px-2.5" value="answers">
-                  {copy.board.tabs.answers}
-                </TabsTrigger>
-                <TabsTrigger className="flex-none whitespace-nowrap px-3" value="cover">
-                  {copy.board.tabs.cover}
-                </TabsTrigger>
-              </TabsList>
+              <div className="scrollbar-none -mx-1 overflow-x-auto px-1" data-scroll-region>
+                <TabsList ariaLabel={copy.board.sectionsLabel} className="flex w-max min-w-full">
+                  <TabsTrigger
+                    className="grow shrink-0 basis-auto whitespace-nowrap px-2.5"
+                    value="timeline"
+                  >
+                    {copy.board.tabs.timeline}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    className="grow shrink-0 basis-auto whitespace-nowrap px-2.5"
+                    value="answers"
+                  >
+                    {copy.board.tabs.answers}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    className="grow shrink-0 basis-auto whitespace-nowrap px-2.5"
+                    value="cover"
+                  >
+                    {copy.board.tabs.cover}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    className="grow shrink-0 basis-auto whitespace-nowrap px-2.5"
+                    value="proof"
+                  >
+                    {copy.board.tabs.proof}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
               <TabsPanel value="timeline">
                 <BoardTimeline detail={detail} />
               </TabsPanel>
@@ -127,6 +149,9 @@ export function BoardSheet(props: {
               </TabsPanel>
               <TabsPanel value="cover">
                 <BoardCover detail={detail} />
+              </TabsPanel>
+              <TabsPanel value="proof">
+                <BoardProof detail={detail} />
               </TabsPanel>
             </Tabs>
           </div>

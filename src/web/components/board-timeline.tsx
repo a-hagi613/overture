@@ -1,6 +1,6 @@
 import { copy, failedReasonText } from "../../shared/copy.ts";
 import type { ApplicationDetail, TimelineEvent } from "../lib/board-api.ts";
-import { stageLabel, stamp } from "../lib/board-format.ts";
+import { stageLabel, stamp, timelineReasonText } from "../lib/board-format.ts";
 import { ApplyRecovery } from "./apply-recovery.tsx";
 import { dsMono } from "./ui/ds.ts";
 
@@ -8,6 +8,10 @@ const FAILED_STATUSES = new Set<string>(["failed", "skipped"]);
 
 function statusTitle(value: string) {
   switch (value) {
+    case "approved": {
+      return copy.board.timeline.approved;
+    }
+
     case "confirming": {
       return copy.board.timeline.confirming;
     }
@@ -54,14 +58,18 @@ const ACCENT_TITLES = new Set<string>([copy.board.timeline.submitted, copy.board
 
 interface TimelineItem {
   at: number;
+  attempt: string | null;
   body: string | null;
   failed: boolean;
   key: string;
+  reason: string | null;
   short: string | null;
   title: string;
 }
 
-function eventItems(event: TimelineEvent) {
+function eventItems(event: TimelineEvent, attempt: string | null) {
+  const reason = timelineReasonText(event.reason);
+
   if (event.kind === "status" && event.toValue !== null) {
     const title = statusTitle(event.toValue);
 
@@ -70,9 +78,11 @@ function eventItems(event: TimelineEvent) {
       : [
           {
             at: event.at,
+            attempt,
             body: event.detail,
             failed: FAILED_STATUSES.has(event.toValue),
             key: event.id,
+            reason,
             short: event.detail,
             title,
           },
@@ -87,9 +97,11 @@ function eventItems(event: TimelineEvent) {
       : [
           {
             at: event.at,
+            attempt,
             body: event.detail,
             failed: false,
             key: event.id,
+            reason,
             short: event.detail,
             title: copy.board.timeline.moved(stage),
           },
@@ -100,9 +112,11 @@ function eventItems(event: TimelineEvent) {
     return [
       {
         at: event.at,
+        attempt,
         body: event.detail,
         failed: false,
         key: event.id,
+        reason,
         short: event.detail,
         title: copy.board.timeline.email,
       },
@@ -113,9 +127,11 @@ function eventItems(event: TimelineEvent) {
     return [
       {
         at: event.at,
+        attempt,
         body: event.detail,
         failed: false,
         key: event.id,
+        reason,
         short: event.detail,
         title: copy.board.timeline.checkin,
       },
@@ -125,9 +141,11 @@ function eventItems(event: TimelineEvent) {
   return [
     {
       at: event.at,
+      attempt,
       body: event.detail,
       failed: false,
       key: event.id,
+      reason,
       short: event.detail,
       title: copy.board.timeline.note,
     },
@@ -138,9 +156,11 @@ function itemsFor(detail: ApplicationDetail) {
   const items: TimelineItem[] = [
     {
       at: detail.application.createdAt,
+      attempt: null,
       body: copy.board.timeline.foundBody(detail.company),
       failed: false,
       key: "found",
+      reason: null,
       short: null,
       title: copy.board.timeline.found,
     },
@@ -151,16 +171,32 @@ function itemsFor(detail: ApplicationDetail) {
   if (score !== null) {
     items.push({
       at: detail.application.createdAt + 60_000,
+      attempt: null,
       body: detail.match?.reason ?? null,
       failed: false,
       key: "scored",
+      reason: null,
       short: (detail.match?.reason ?? "").split(". ").at(0) ?? null,
       title: copy.board.timeline.scored(score),
     });
   }
 
+  const attempts = new Map<string, number>();
+
   for (const event of detail.timeline) {
-    items.push(...eventItems(event));
+    let attempt: string | null = null;
+
+    if (event.attemptId !== null) {
+      const found = attempts.get(event.attemptId);
+
+      if (found === undefined) {
+        attempts.set(event.attemptId, attempts.size + 1);
+      }
+
+      attempt = copy.board.timeline.attempt(attempts.get(event.attemptId) ?? 1);
+    }
+
+    items.push(...eventItems(event, attempt));
   }
 
   return items.toSorted((left, right) => left.at - right.at);
@@ -220,6 +256,13 @@ export function BoardTimeline({ detail }: { detail: ApplicationDetail }) {
                     )}
                   </p>
                 )}
+                {item.reason === null || item.reason === item.body ? null : (
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    <span className="font-semibold">{`${copy.board.timeline.reasonLabel}:`}</span>{" "}
+                    <span>{item.reason}</span>
+                  </p>
+                )}
+                {item.attempt === null ? null : <p className={`${dsMono} mt-1`}>{item.attempt}</p>}
                 {failure === null ? null : (
                   <div className="mt-2 rounded-lg border border-need bg-need-soft px-3.5 py-3">
                     <p className="text-sm leading-relaxed text-foreground">{failure.reason}</p>

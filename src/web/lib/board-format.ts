@@ -1,4 +1,4 @@
-import { copy } from "../../shared/copy.ts";
+import { copy, failedReasonText } from "../../shared/copy.ts";
 import type { ApplicationDetail } from "./board-api.ts";
 
 export function stamp(at: number, timeZone: string) {
@@ -148,4 +148,68 @@ export function providerName(provider: string) {
 
 export function kilobytes(bytes: number) {
   return copy.board.dossier.fileKb(Math.round(bytes / 1024));
+}
+
+const TIMELINE_REASONS = new Map<string, string>([
+  ["approval_invalidated", copy.board.timeline.reasons.approval_invalidated],
+  ["ats_flagged", copy.board.timeline.reasons.ats_flagged],
+  ["confirmation_email", copy.board.timeline.reasons.confirmation_email],
+  ["confirmation_page", copy.board.timeline.reasons.confirmation_page],
+  ["confirm_wait_elapsed", copy.board.timeline.reasons.confirm_wait_elapsed],
+  ["form_changed", copy.board.timeline.reasons.form_changed],
+  ["login_wall", copy.board.timeline.reasons.login_wall],
+  ["mail", copy.board.timeline.reasons.mail],
+  ["posting_closed", copy.board.timeline.reasons.posting_closed],
+  ["posting_identity", copy.board.timeline.reasons.posting_identity],
+  ["prepare_problem", copy.board.timeline.reasons.prepare_problem],
+  ["retry_scheduled", copy.board.timeline.reasons.retry_scheduled],
+  ["review_dismissed", copy.board.timeline.reasons.review_dismissed],
+  ["selected_automatically", copy.board.timeline.reasons.selected_automatically],
+  ["selected_by_user", copy.board.timeline.reasons.selected_by_user],
+  ["user_withdraw", copy.board.timeline.reasons.user_withdraw],
+]);
+
+/**
+ * The plain sentence for a recorded timeline reason. Machine-only reasons never
+ * reach the screen as tokens; an unknown reason stays unshown and the event's
+ * own sentence carries the meaning instead.
+ * @param reason The stored reason, when the event has one.
+ * @returns The sentence to show, or null when there is nothing honest to add.
+ */
+export function timelineReasonText(reason: string | null) {
+  if (reason === null || reason === "") {
+    return null;
+  }
+
+  if (reason.startsWith("checkin:")) {
+    const answer = reason.slice("checkin:".length);
+
+    return answer === "no_response"
+      ? "The employer did not reply."
+      : copy.board.timeline.reasons.checkin(answer);
+  }
+
+  if (reason.startsWith("mail:")) {
+    return copy.board.timeline.reasons.mail;
+  }
+
+  if (reason.startsWith("posting_identity:")) {
+    return copy.board.timeline.reasons.posting_identity;
+  }
+
+  return TIMELINE_REASONS.get(reason) ?? failedReasonText(reason) ?? null;
+}
+
+/**
+ * How a posting's work mode reads in the drawer. Freehire leaves it blank on
+ * most postings, and the drawer says so rather than guessing.
+ * @param workplace The stored workplace, or null when the catalog has none.
+ * @returns The label to show.
+ */
+export function workModeText(workplace: "remote" | "hybrid" | "onsite" | null) {
+  if (workplace === null) {
+    return copy.board.job.workModeNotStated;
+  }
+
+  return copy.board.job.workModes[workplace];
 }
