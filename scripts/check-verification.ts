@@ -4,7 +4,10 @@ const headingPattern = /^(?:#{1,6}\s+verification|\*\*verification\*\*)\s*$/iu;
 const anyHeadingPattern = /^(?:#{1,6}\s|\*\*[^*]+\*\*\s*$)/iu;
 const entryPattern = /^\s*[-*]\s+(?<key>[^:]+?)\s*:\s*(?<value>.*)$/u;
 const placeholderPattern = /^(?:<[^>]*>|todo|tbd)$/iu;
-const notRunPattern = /\bnot[\s-]*run\b/iu;
+// Only a verdict that opens with one of these says the skill was not run; prose that mentions the phrase mid-sentence
+// (a verdict describing this check, for example) is still a verdict.
+const notRunPattern =
+  /^(?:(?:it|this|the\s+\S+)\s+)?(?:(?:was|is|were|has|had|have)\s+)?(?:not[\s-]*run|never\s+run|skipped)\b/iu;
 
 /** The two skills every ticket runs (epic #678), so every Verification block must list them. */
 const requiredSkills = ["code-review-and-quality", "test-driven-development"] as const;

@@ -67,7 +67,14 @@ test("an untouched template with placeholders is reported", () => {
 });
 
 test("a skill line that says not run is reported whatever its case and spacing", () => {
-  for (const verdict of ["not run", "Not Run", "NOT-RUN", "not run locally"]) {
+  for (const verdict of [
+    "not run",
+    "Not Run",
+    "NOT-RUN",
+    "not run locally",
+    "was not run",
+    "skipped",
+  ]) {
     const body = complete.replace(
       "- ci-cd-and-automation: clean",
       `- ci-cd-and-automation: ${verdict}`,
@@ -77,6 +84,15 @@ test("a skill line that says not run is reported whatever its case and spacing",
       "the `ci-cd-and-automation` line says not run",
     ]);
   }
+});
+
+test("a verdict that mentions the phrase mid-sentence is still a verdict", () => {
+  const body = complete.replace(
+    "- ci-cd-and-automation: clean",
+    "- ci-cd-and-automation: clean — the gate now rejects a verdict that says the phrase mid-sentence",
+  );
+
+  expect(findVerificationProblems(body)).toStrictEqual([]);
 });
 
 test("a line without a verdict is reported", () => {
