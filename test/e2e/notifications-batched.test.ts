@@ -23,8 +23,8 @@ const test = appTest.extend<{ notificationsServerUrl: string }>({
 const notificationsSchema = z.object({
   notifications: z.array(
     z.object({
+      at: z.number(),
       body: z.string(),
-      createdAt: z.number(),
       id: z.string(),
       kind: z.string(),
       readAt: z.number().nullable(),
