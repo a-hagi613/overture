@@ -255,9 +255,9 @@ test("Calendar is in the desktop sidebar under Follow-ups and opens /calendar", 
 
   await expect(nav.getByRole("link")).toHaveText([
     /^Home/u,
+    /^Tracker/u,
     /^Ready/u,
     /^Review/u,
-    /^Tracker/u,
     /^Resume & Cover Letter/u,
     /^Job Preferences/u,
     /^Application Answers/u,
