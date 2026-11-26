@@ -585,6 +585,8 @@ test("every spec alert fires from the test-only drill route", async () => {
 
   expect(report.raised.toSorted()).toEqual(
     [
+      "application.confirming_stuck",
+      "application.cost",
       "ats.success",
       "backup.failure",
       "backup.lag",
@@ -592,13 +594,16 @@ test("every spec alert fires from the test-only drill route", async () => {
       "code.challenge_rate",
       "disk",
       "health",
+      "llm.schema_rejection",
       "llm.spend",
       "mail.domain_reply_rate",
+      "mail.forwarding",
       "mail.reply_rate",
+      "match.unscored",
       "process.unhandled",
       "provider.success",
       "queue.age",
     ].toSorted(),
   );
-  expect(report.results).toHaveLength(13);
+  expect(report.results).toHaveLength(18);
 });
