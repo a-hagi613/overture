@@ -37,6 +37,7 @@ const ApplicationsPage = lazyRoute(
 
 const ReadyPage = lazyRoute(async () => import("./routes/ready.tsx"), "ReadyPage");
 const ReviewPage = lazyRoute(async () => import("./routes/review.tsx"), "ReviewPage");
+const MatchesPage = lazyRoute(async () => import("./routes/matches.tsx"), "MatchesPage");
 const CalendarPage = lazyRoute(async () => import("./routes/calendar.tsx"), "CalendarPage");
 
 const InboxPage = lazyRoute(async () => import("./routes/inbox.tsx"), "InboxPage");
@@ -183,6 +184,7 @@ const appShellChildren: RouteObject[] = withRouteError([
   { path: "/ready", element: <ReadyPage /> },
   { path: "/board", element: <PreserveSearchRedirect to="/tracker" /> },
   { path: "/review", element: <ReviewPage /> },
+  { path: "/matches", element: <MatchesPage /> },
   { path: "/calendar", element: <CalendarPage /> },
   { path: "/inbox", element: <InboxPage /> },
   { path: "/inbox/:id", element: <InboxThreadPage /> },

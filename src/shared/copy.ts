@@ -65,28 +65,6 @@ function possessive(name: string) {
   return trimmed.endsWith("s") || trimmed.endsWith("S") ? `${trimmed}’` : `${trimmed}’s`;
 }
 
-function ordinal(count: number) {
-  const remainder = count % 100;
-
-  if (remainder >= 11 && remainder <= 13) {
-    return `${String(count)}th`;
-  }
-
-  if (count % 10 === 1) {
-    return `${String(count)}st`;
-  }
-
-  if (count % 10 === 2) {
-    return `${String(count)}nd`;
-  }
-
-  if (count % 10 === 3) {
-    return `${String(count)}rd`;
-  }
-
-  return `${String(count)}th`;
-}
-
 export const PAUSE_REASONS = [
   "user",
   "onboarding",
@@ -723,14 +701,6 @@ export const copy = {
     caughtUp: {
       nextLabel: "Next preparation run at",
     },
-    ready: {
-      action: "Send applications",
-      countBadge: (count: number) => `${String(count)} ready`,
-      eyebrow: "Ready to send",
-      subtitle: "Prepared applications waiting for approval",
-      title: (ready: number, _approved = 0) =>
-        `${String(ready)} ${ready === 1 ? "application" : "applications"} ready to send`,
-    },
     codeWait: {
       eyebrow: "Needs you",
       expires: (time: string) => `Expires in ${time}`,
@@ -832,14 +802,6 @@ export const copy = {
         title: "Forwarding isn't set up.",
       },
     } satisfies Record<PauseReason, { copy: string; fix: string; title: string }>,
-    queue: {
-      eyebrow: "Queue",
-      inLine: ordinal,
-      inLineTail: "in line",
-      noPosition: "In line",
-      nextAt: (time: string) => `Next send around ${time} once sending resumes.`,
-      waiting: "Next send once sending resumes.",
-    },
     checkIn: {
       answerAria: (answer: string, company: string, title: string) =>
         `${answer}: ${title} at ${company}`,
@@ -899,18 +861,54 @@ export const copy = {
       perWeek90: "Weekly applications sent · Last 90 days",
     },
     needsYou: {
-      title: "Needs review",
-      note: "Questions waiting for your answer",
-      openCount: (count: number) => `${String(count)} open`,
-      askedBy: (companies: string) => `Asked by ${companies}`,
-      blocksApps: (count: number) =>
-        `Blocks ${String(count)} ${plural(count, "application", "applications")}`,
       jobsUnlocked: (count: number) => `${String(count)} ${plural(count, "job", "jobs")}`,
-      footer: (questions: number, applications: number) =>
-        `${capitalize(countWord(questions))} ${plural(questions, "question", "questions")}, ` +
-        `${countWord(applications)} ${plural(applications, "application", "applications")} waiting`,
-      open: "Answer questions",
-      empty: "Nothing needs review right now.",
+    },
+    sections: {
+      openLabel: (viewAll: string, title: string, count: string) =>
+        `${viewAll}: ${title}, ${count}`,
+      loadFailed: "This section could not be loaded.",
+      retry: "Retry",
+      needsAnswer: {
+        title: "Needs your answer",
+        subtitle: "Questions that hold applications until you reply",
+        viewAll: "Open Review",
+        count: (count: number) => `${String(count)} open`,
+        askedBy: (companies: string) => `Asked by ${companies}`,
+      },
+      ready: {
+        title: "Ready to send",
+        subtitle: "Prepared applications waiting for your approval",
+        viewAll: "Open Ready",
+        count: (count: number) => `${String(count)} ready`,
+      },
+      inProgress: {
+        title: "In progress",
+        subtitle: "Preparing, sending and queued to go",
+        viewAll: "Open Tracker",
+        count: (count: number) => `${String(count)} moving`,
+        queuedAt: (time: string) => `Queued · sends at ${time}`,
+        queuedNext: "Queued · next in line",
+        preparing: "Preparing",
+        sending: "Sending",
+        confirming: "Confirming",
+      },
+      replies: {
+        title: "Recruiter replies",
+        subtitle: "Recent mail from employers in your Inbox",
+        viewAll: "Open Inbox",
+        count: (count: number) => `${String(count)} recent`,
+        unread: "Unread",
+      },
+      matches: {
+        title: "New matches",
+        subtitle: "Scored jobs you have not picked yet",
+        empty: "No new matches yet.",
+        emptyBody: "Overture is still scanning career pages for your roles and places.",
+        emptyAction: "Set your roles and places",
+        viewAll: "Open Matches",
+        count: (count: number) => `${String(count)} new`,
+        scoring: "Scoring…",
+      },
     },
     inbox: {
       title: "Recent in your Inbox",
@@ -931,6 +929,18 @@ export const copy = {
       filedUnder: (stage: string) => `Filed under ${stage}`,
       empty: "No employer mail yet.",
     },
+  },
+  matches: {
+    title: "Matches",
+    lead: "Jobs scored for your roles and places, newest first",
+    listTitle: "New matches",
+    subtitle: "Scored jobs you have not picked yet",
+    error: "Matches could not be loaded right now.",
+    retry: "Retry",
+    emptyTitle: "No matches yet",
+    emptyBody: "Overture scores jobs after your roles and places are saved.",
+    emptyAction: "Set your roles and places",
+    count: (count: number) => `${String(count)} new`,
   },
   legal: {
     back: "Back to Overture",

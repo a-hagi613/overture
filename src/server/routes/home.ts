@@ -3,13 +3,16 @@ import { validJson } from "./validators.ts";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { Auth } from "../auth/index.ts";
 import { readSessionUser } from "../auth/session.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { openOrNull } from "../profile/personal-crypto.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
+
+import { newMatchesOf } from "../matching/new-matches.ts";
+import { inProgressOf } from "../pipeline/in-progress.ts";
 
 import { committedSince } from "../billing/ledger.ts";
 import { billingAccountOf } from "../billing/plan-account.ts";
@@ -41,6 +44,8 @@ import { TIER_1_FACT_KEYS, TIER_2_FACT_KEYS } from "../../shared/facts.ts";
 
 const MAX_REVIEW_ROWS = 4;
 const MAX_INBOX_ROWS = 4;
+const MAX_IN_PROGRESS_ROWS = 4;
+const MAX_NEW_MATCH_ROWS = 3;
 const REVIEW_HIDDEN_COMPANIES = 2;
 const ACTIVITY_SENT_LIMIT = 3;
 const ACTIVITY_FAILED_LIMIT = 1;
@@ -101,6 +106,8 @@ interface HomeRangeView {
 
 interface HomeInboxView {
   id: string;
+  threadId: string;
+  unread: boolean;
   company: string;
   text: string;
   detail: string | null;
@@ -265,12 +272,13 @@ function failedReasonFor(reason: string | null) {
 
 export function createHomeRoutes(deps: {
   db: AppDatabase;
+  catalogDb: CatalogDatabase;
   clock: Clock;
   auth: Auth;
   personal: PersonalCrypto;
   reviews: ReviewService;
 }) {
-  const { db, clock, auth, personal, reviews } = deps;
+  const { db, catalogDb, clock, auth, personal, reviews } = deps;
 
   const routes = new Hono();
   const zones = createTimeZoneService({ db, clock });
@@ -404,8 +412,10 @@ export function createHomeRoutes(deps: {
         fromEnc: messages.fromEnc,
         id: messages.id,
         postingTitle: applications.postingTitle,
+        readAt: messages.readAt,
         stage: applications.stage,
         subjectEnc: messages.subjectEnc,
+        threadId: messages.threadId,
       })
       .from(messages)
       .leftJoin(mailThreads, eq(mailThreads.id, messages.threadId))
@@ -496,6 +506,8 @@ export function createHomeRoutes(deps: {
           id: row.id,
           kind: row.classification ?? "other",
           text: inboxPhrase(row.classification, subject, row.postingTitle),
+          threadId: row.threadId,
+          unread: row.readAt === null,
         } satisfies HomeInboxView;
       }),
     );
@@ -644,6 +656,8 @@ export function createHomeRoutes(deps: {
       checkIns,
       dailyCap,
       endingGrant: billing.endingGrant,
+      inProgress: inProgressOf(db, userId, now, MAX_IN_PROGRESS_ROWS),
+      newMatches: newMatchesOf({ catalogDb, db }, userId, MAX_NEW_MATCH_ROWS),
       nextPrepAt: nextPrepRunAt(now, zone, prepRunMinutes),
       nextSendAt,
       now,

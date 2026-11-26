@@ -256,7 +256,7 @@ const waitlistSeedBody = z.object({
 
 const homeSampleBody = z.object({
   email: z.email(),
-  variant: z.enum(["running", "paused", "caught_up"]).default("running"),
+  variant: z.enum(["running", "paused", "caught_up", "attention"]).default("running"),
 });
 
 const profileRunningBody = z.object({
@@ -422,7 +422,17 @@ const seedAnswerBody = z.object({
 
 const SAMPLE_GRANT_QUANTITY = 70;
 
-function defaultStageFor(status: "approved" | "failed" | "needs_review" | "ready" | "sent") {
+function defaultStageFor(
+  status:
+    | "approved"
+    | "confirming"
+    | "failed"
+    | "needs_review"
+    | "preparing"
+    | "ready"
+    | "sent"
+    | "sending",
+) {
   return status === "sent" ? "applied" : stageForStatus(status);
 }
 
@@ -3065,7 +3075,15 @@ export function createTestRoutes(
 
     function addApplication(input: {
       postingId: string;
-      status: "approved" | "ready" | "needs_review" | "sent" | "failed";
+      status:
+        | "approved"
+        | "confirming"
+        | "ready"
+        | "needs_review"
+        | "preparing"
+        | "sent"
+        | "sending"
+        | "failed";
       createdAt?: number;
       scheduledFor?: number;
       sentAt?: number;
@@ -3123,6 +3141,147 @@ export function createTestRoutes(
           userId,
         })
         .run();
+    }
+
+    if (variant === "attention") {
+      const reviewOwner = addCompany("Northwind Labs", "attention-review.example", "att-review");
+      const reviewPosting = addPosting(reviewOwner, "Platform Engineer", "att-review-1");
+      const reviewPostingB = addPosting(reviewOwner, "Senior Platform Engineer", "att-review-2");
+
+      const reviewApplicationIds = [
+        addApplication({ postingId: reviewPosting, stage: "queued", status: "needs_review" }),
+        addApplication({ postingId: reviewPostingB, stage: "queued", status: "needs_review" }),
+      ];
+
+      seedReviewRow({
+        answerKind: "unknown",
+        applicationIds: reviewApplicationIds,
+        fieldType: "select",
+        options: ["Yes", "No"],
+        prompt: "Are you comfortable with a weekly on-call rotation?",
+        reason: "unknown_required",
+        scope: "",
+        userId,
+      });
+
+      const readyOwner = addCompany("Halden Systems", "attention-ready.example", "att-ready");
+      const readyPosting = addPosting(readyOwner, "Site Reliability Engineer", "att-ready-1");
+      const readyPostingB = addPosting(readyOwner, "Backend Engineer", "att-ready-2");
+
+      addApplication({
+        postingId: readyPosting,
+        stage: "ready",
+        status: "ready",
+        updatedAt: now - 2 * hour,
+      });
+      addApplication({
+        postingId: readyPostingB,
+        stage: "ready",
+        status: "ready",
+        updatedAt: now - hour,
+      });
+
+      const progressOwner = addCompany("Larkspur Health", "attention-progress.example", "att-prog");
+
+      addApplication({
+        postingId: addPosting(progressOwner, "Staff Platform Engineer", "att-prog-1"),
+        stage: "ready",
+        status: "sending",
+        updatedAt: now - 3 * minute,
+      });
+
+      addApplication({
+        postingId: addPosting(progressOwner, "Infrastructure Engineer", "att-prog-2"),
+        stage: "queued",
+        status: "preparing",
+        updatedAt: now - 9 * minute,
+      });
+
+      addApplication({
+        postingId: addPosting(progressOwner, "Cloud Engineer", "att-prog-3"),
+        scheduledFor: now + 3 * hour,
+        stage: "ready",
+        status: "approved",
+        updatedAt: now - 12 * minute,
+      });
+
+      addApplication({
+        postingId: addPosting(progressOwner, "Platform Engineer", "att-prog-4"),
+        stage: "ready",
+        status: "approved",
+        updatedAt: now - 16 * minute,
+      });
+
+      await insertMailRow({
+        applicationId: null,
+        attachments: [],
+        at: now - 40 * minute,
+        auth: "pass",
+        classification: "screening",
+        direction: "in",
+        from: "Tideline Software <no-reply@tideline.example>",
+        senderDomain: "tideline.example",
+        subject: "Phone screen invitation",
+        text: "We would like to invite you to a phone screen with our team.",
+        userId,
+      });
+
+      await insertMailRow({
+        applicationId: null,
+        attachments: [],
+        at: now - 3 * hour,
+        auth: "pass",
+        classification: "ack",
+        direction: "in",
+        from: "Brightwave Analytics <no-reply@brightwave.example>",
+        senderDomain: "brightwave.example",
+        subject: "Your application to Brightwave Analytics",
+        text: "Thank you for applying. We received your application.",
+        userId,
+      });
+
+      const matchSeeds = [
+        {
+          codeRank: 97.4,
+          company: "Tideline Software",
+          domain: "attention-match-tideline.example",
+          score: 92,
+          title: "Senior Backend Engineer",
+          token: "att-match-tideline",
+        },
+        {
+          codeRank: 95.1,
+          company: "Brightwave Analytics",
+          domain: "attention-match-brightwave.example",
+          score: null,
+          title: "Data Platform Engineer",
+          token: "att-match-brightwave",
+        },
+        {
+          codeRank: 93.8,
+          company: "Ferro Cloud",
+          domain: "attention-match-ferro.example",
+          score: 81,
+          title: "DevOps Engineer",
+          token: "att-match-ferro",
+        },
+      ];
+
+      for (const seed of matchSeeds) {
+        const owner = addCompany(seed.company, seed.domain, seed.token);
+        const postingId = addPosting(owner, seed.title, `${seed.token}-1`);
+
+        db.insert(matches)
+          .values({
+            codeRank: seed.codeRank,
+            postingId,
+            score: seed.score,
+            userId,
+          })
+          .run();
+      }
+
+      return context.json({ ok: true });
     }
 
     const sample = addCompany("Sample Works", "sample.example", "home-sample");

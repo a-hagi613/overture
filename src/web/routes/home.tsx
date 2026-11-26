@@ -19,10 +19,12 @@ import { HomeCheckIn } from "../components/home-checkin.tsx";
 import { HomeCodeWait } from "../components/home-code-wait.tsx";
 import { HomeControlBand } from "../components/home-control-band.tsx";
 import { HomeFailures } from "../components/home-failures.tsx";
+import { HomeInProgress } from "../components/home-in-progress.tsx";
+import { HomeMatches } from "../components/home-matches.tsx";
 import { HomeNeedsYou } from "../components/home-needs-you.tsx";
 import { HomePauseBanner } from "../components/home-pause-banner.tsx";
-import { HomeQueue } from "../components/home-queue.tsx";
 import { HomeReadyCard } from "../components/home-ready-card.tsx";
+import { HomeReplies } from "../components/home-replies.tsx";
 import { HomeStrengthen } from "../components/home-strengthen.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 import { Button } from "../components/ui/button.tsx";
@@ -100,7 +102,6 @@ export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const range = home?.ranges[rangeKey] ?? null;
-  const paused = home?.pauseReason !== null && home?.pauseReason !== undefined;
   const waits = codeWaits?.waits ?? [];
   const wait = waits[0] ?? null;
   const asked = wait !== null && isAtAskTime(wait, codeWaits?.now ?? 0);
@@ -114,8 +115,6 @@ export function HomePage() {
     (requestedWait === null ? null : { error: null, mode: "waiting", wait: requestedWait });
 
   const codeWaitAsking = wait !== null && asked;
-  const showReady = home !== undefined && home.ready.ready > 0;
-  const showNeedsYou = home !== undefined && home.reviews.total > 0;
   const showFailures = home !== undefined && home.activity.failed.length > 0;
   const showCheckIn = home !== undefined && home.checkIns.length > 0;
   const caughtUp = home !== undefined && isAllCaughtUp(homeActionStateOf(home), codeWaitAsking);
@@ -215,6 +214,19 @@ export function HomePage() {
         <HomePauseBanner reason={home.pauseReason} />
       )}
 
+      {wait === null || !asked ? null : (
+        <HomeCodeWait
+          onNoCode={() => {
+            openSheet(wait, "no_code");
+          }}
+          onPaste={() => {
+            openSheet(wait, "waiting");
+          }}
+          serverNow={codeWaits?.now}
+          wait={wait}
+        />
+      )}
+
       {homePending ? (
         <div aria-busy="true" className="mt-3 space-y-3">
           <span className="sr-only">{copy.shell.loadingPage}</span>
@@ -242,7 +254,7 @@ export function HomePage() {
             size="sm"
             variant="outline"
           >
-            {copy.inbox.retry}
+            {copy.home.sections.retry}
           </Button>
         </Card>
       ) : null}
@@ -256,65 +268,38 @@ export function HomePage() {
             trialUsed={home.trialUsed}
           />
 
-          {showFailures ? (
-            <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-stretch">
-              <HomeFailures failed={home.activity.failed} now={home.now} zone={home.timeZone} />
-              <HomeControlBand home={home} />
-            </div>
-          ) : (
-            <div className="mt-3">
-              <HomeControlBand home={home} />
-            </div>
-          )}
+          <div className="mt-3">
+            <HomeControlBand home={home} />
+          </div>
 
-          {wait === null || !asked ? null : (
-            <HomeCodeWait
-              onNoCode={() => {
-                openSheet(wait, "no_code");
-              }}
-              onPaste={() => {
-                openSheet(wait, "waiting");
-              }}
-              serverNow={codeWaits?.now}
-              wait={wait}
+          <div className="mt-3 flex flex-col gap-3" data-testid="home-attention">
+            <HomeNeedsYou reviews={home.reviews.list} total={home.reviews.total} />
+            <HomeReadyCard readyCount={home.ready.ready} />
+            <HomeInProgress
+              items={home.inProgress.items}
+              total={home.inProgress.total}
+              zone={home.timeZone}
             />
-          )}
+            <HomeReplies items={home.recentInbox} total={home.recentInbox.length} />
+            <HomeMatches items={home.newMatches.items} total={home.newMatches.total} />
+          </div>
 
           {caughtUp ? <HomeCaughtUp nextPrepAt={home.nextPrepAt} zone={home.timeZone} /> : null}
+
+          {showFailures ? (
+            <div className="mt-3">
+              <HomeFailures failed={home.activity.failed} now={home.now} zone={home.timeZone} />
+            </div>
+          ) : null}
 
           {range === null ? null : (
             <HomeChart onRangeChange={setRangeKey} range={range} rangeKey={rangeKey} />
           )}
 
-          {showReady || showNeedsYou ? (
-            <div
-              className={
-                showReady && showNeedsYou ? "mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2" : "mt-3"
-              }
-            >
-              {showReady ? <HomeReadyCard readyCount={home.ready.ready} /> : null}
-              {showNeedsYou ? (
-                <HomeNeedsYou
-                  applications={home.reviews.applications}
-                  reviews={home.reviews.list}
-                  total={home.reviews.total}
-                />
-              ) : null}
-            </div>
-          ) : null}
-
           {showCheckIn ? (
             <div className="mt-3">
               <HomeCheckIn checkIns={home.checkIns} />
             </div>
-          ) : null}
-
-          {paused ? (
-            <HomeQueue
-              position={home.queue.position}
-              sendAt={home.queue.sendAt}
-              zone={home.timeZone}
-            />
           ) : null}
 
           {home.strengthen === null ? null : <HomeStrengthen missing={home.strengthen.missing} />}
