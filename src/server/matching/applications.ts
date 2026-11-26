@@ -4,6 +4,7 @@ import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 
 import { applications } from "../platform/db/schema.ts";
 import { companies, postings } from "../platform/db/catalog-schema.ts";
+import { recordApplicationEvent } from "../applications/events.ts";
 
 export const ACTIVE_APPLICATION_STATUSES = [
   "preparing",
@@ -131,6 +132,21 @@ export function createApplication(
     .at(0);
 
   if (inserted !== undefined) {
+    recordApplicationEvent(
+      db,
+      { now: () => at },
+      {
+        applicationId: inserted.id,
+        detail: { score: input.score },
+        fromValue: null,
+        kind: "stage",
+        reason: input.origin === "auto" ? "selected_automatically" : "selected_by_user",
+        source: input.origin === "auto" ? "system" : "user",
+        toValue: "queued",
+        userId: input.userId,
+      },
+    );
+
     return inserted.id;
   }
 

@@ -37,8 +37,8 @@ export interface WorkableRunPlan {
 }
 
 export interface WorkableHooks {
-  onWillSubmit: () => void;
-  onResponse: (status: number | null) => void;
+  onWillSubmit: () => Promise<void> | void;
+  onResponse: (status: number | null) => Promise<void> | void;
 }
 
 export type WorkableOutcome =
@@ -341,7 +341,7 @@ export const runWorkableAttempt: (
     };
   }
 
-  hooks.onWillSubmit();
+  await hooks.onWillSubmit();
 
   const settled = await Promise.allSettled([
     submitControl(scope).click({ timeout: APPLICATION_RESPONSE_MS }),
@@ -351,7 +351,7 @@ export const runWorkableAttempt: (
   const [clickOutcome, response] = settled;
   const status = response.status === "fulfilled" ? response.value.status() : null;
 
-  hooks.onResponse(status);
+  await hooks.onResponse(status);
 
   if (clickOutcome.status === "rejected") {
     return {

@@ -18,6 +18,7 @@ import type { AdminEnv } from "./admin-refusals.ts";
 import { resolveAdminAccessOwner } from "../admin/access-owner.ts";
 import { buildUserInsight, signedInUserIds } from "../admin/user-insight.ts";
 import { dashboardLinks } from "../admin/dashboards.ts";
+import { lookupApplication } from "../admin/application-lookup.ts";
 import { isOnline, onlineUserIds } from "../auth/presence.ts";
 import { createAdminRevealRoutes } from "./admin-reveal.ts";
 import type { JobActionOutcome } from "../admin/jobs.ts";
@@ -804,6 +805,19 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
               },
       },
     });
+  });
+
+  routes.get("/applications/:id/lookup", async (context) => {
+    const lookup = await lookupApplication(
+      { clock, db, objects: deps.objects, personal: deps.personal },
+      context.req.param("id"),
+    );
+
+    if (lookup === null) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    return context.json(lookup);
   });
 
   routes.get("/dashboards", (context) => {

@@ -27,6 +27,7 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { copy } from "../../shared/copy.ts";
+import { SCREENSHOT_PREFIX } from "../applications/screenshots.ts";
 
 const PAGE_SIZE = 10;
 const MESSAGE_PAGE_SIZE = 1;
@@ -208,6 +209,26 @@ const messageScope = (messageId: string, column: string) => ({
   table: "messages",
 });
 
+async function* screenshotsUnder(objects: ObjectStore, userId: string) {
+  for await (const key of objects.list(`${SCREENSHOT_PREFIX}${userId}/`)) {
+    yield {
+      modifiedAt: new Date(),
+      name: key,
+      read: async function* read() {
+        const stream = await objects.getStream(key);
+
+        if (stream === null) {
+          return;
+        }
+
+        for await (const chunk of stream) {
+          yield chunk;
+        }
+      },
+    } satisfies ZipEntry;
+  }
+}
+
 /**
  * Every file in one user's export, generated as the zip is written. Each table
  * is read in small pages and the rows of one page are opened together, so the
@@ -216,7 +237,7 @@ const messageScope = (messageId: string, column: string) => ({
  * @param userId The one user whose data is exported.
  * @yields {ZipEntry} The archive's next file.
  */
-export function* exportEntries(deps: ExportArchiveDeps, userId: string) {
+export async function* exportEntries(deps: ExportArchiveDeps, userId: string) {
   const { db, clock, objects, personal, mailDomain } = deps;
   const now = clock.now();
   const attachmentFiles: ZipEntry[] = [];
@@ -755,6 +776,8 @@ export function* exportEntries(deps: ExportArchiveDeps, userId: string) {
   for (const entry of attachmentFiles) {
     yield entry;
   }
+
+  yield* screenshotsUnder(objects, userId);
 }
 
 async function* objectEntry(

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
 import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
-import { applications, users } from "../platform/db/schema.ts";
+import { applicationEvents, applications, users } from "../platform/db/schema.ts";
 import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 
 import { createApplication, postingDisplayFor } from "./applications.ts";
@@ -112,6 +112,16 @@ describe("creating an Application", () => {
       salaryMinMinor: 16_000_000,
       salaryPeriod: "year",
     });
+    expect(db.select().from(applicationEvents).all()).toMatchObject([
+      {
+        applicationId: id,
+        fromValue: null,
+        kind: "stage",
+        source: "system",
+        toValue: "queued",
+        userId: "user-1",
+      },
+    ]);
 
     sqlite.close();
   });

@@ -14,6 +14,7 @@ import { enqueueJob } from "../platform/jobs/queue.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { checkLlmCaps, nextUtcMidnight } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
+import { recordLlmSchemaRejection } from "../platform/llm/schema-rejections.ts";
 import { defaultMetrics } from "../platform/telemetry/metrics.ts";
 import { measureSqliteQuery } from "../platform/telemetry/sqlite-metrics.ts";
 import { writePostingTags } from "./tag-store.ts";
@@ -448,6 +449,11 @@ export async function runTagFallbackJob(deps: TagFallbackDeps) {
 
         if (parsed.success) {
           outcomeByCustomId.set(call.customId, parsed.data);
+        } else {
+          recordLlmSchemaRejection(deps.db, deps.clock, {
+            model: call.model,
+            purpose: TAG_FALLBACK_PURPOSE,
+          });
         }
       }
 

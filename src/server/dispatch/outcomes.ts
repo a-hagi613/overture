@@ -9,7 +9,6 @@ import { isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
 import { isSameHostOrSubdomain } from "../../shared/host-match.ts";
 import {
   applications,
-  applicationEvents,
   applicationReceipts,
   applicationSnapshots,
   attempts,
@@ -23,6 +22,7 @@ import { openApprovedPlan } from "../pipeline/approved-plan.ts";
 import { recordSnapshotSent } from "../pipeline/review-events.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { recordApplicationVariableCosts } from "./application-cost.ts";
+import { recordApplicationEvent } from "../applications/events.ts";
 
 const HOUR_MS = 60 * 60_000;
 
@@ -47,32 +47,6 @@ interface ConfirmationTarget {
   companyDomain: string | null;
   companyName: string;
   postingTitle: string;
-}
-
-export function recordApplicationEvent(
-  db: AppDatabase,
-  clock: Clock,
-  input: {
-    applicationId: string;
-    userId: string;
-    kind: "status" | "stage" | "email";
-    fromValue: string | null;
-    toValue: string | null;
-    source: "system" | "email" | "user" | "admin";
-  },
-) {
-  db.insert(applicationEvents)
-    .values({
-      applicationId: input.applicationId,
-      at: clock.now(),
-      fromValue: input.fromValue,
-      id: crypto.randomUUID(),
-      kind: input.kind,
-      source: input.source,
-      toValue: input.toValue,
-      userId: input.userId,
-    })
-    .run();
 }
 
 function confirmWaitMs(db: AppDatabase) {
@@ -307,18 +281,22 @@ export function createOutcomes(deps: OutcomeDeps) {
 
     recordApplicationEvent(db, clock, {
       applicationId: input.applicationId,
+      attemptId: input.attempt.id,
       userId: input.plan.userId,
       kind: "status",
       fromValue: fromStatus,
       toValue: "sent",
+      reason: input.confirmedBy === "email" ? "confirmation_email" : "confirmation_page",
       source,
     });
     recordApplicationEvent(db, clock, {
       applicationId: input.applicationId,
+      attemptId: input.attempt.id,
       userId: input.plan.userId,
       kind: "stage",
       fromValue: "queued",
       toValue: "applied",
+      reason: input.confirmedBy === "email" ? "confirmation_email" : "confirmation_page",
       source,
     });
 
@@ -656,18 +634,22 @@ export function createOutcomes(deps: OutcomeDeps) {
 
       recordApplicationEvent(db, clock, {
         applicationId: application.id,
+        attemptId: attempt?.id ?? null,
         userId: application.userId,
         kind: "status",
         fromValue: "confirming",
         toValue: "failed",
+        reason: "confirm_wait_elapsed",
         source: "system",
       });
       recordApplicationEvent(db, clock, {
         applicationId: application.id,
+        attemptId: attempt?.id ?? null,
         userId: application.userId,
         kind: "stage",
         fromValue: "queued",
         toValue: null,
+        reason: "confirm_wait_elapsed",
         source: "system",
       });
 

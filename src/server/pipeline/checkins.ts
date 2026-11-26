@@ -6,14 +6,8 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { CheckinAnswer } from "../../shared/checkins.ts";
 
 import { copy } from "../../shared/copy.ts";
-import {
-  applications,
-  applicationEvents,
-  checkins,
-  mailThreads,
-  messages,
-  users,
-} from "../platform/db/schema.ts";
+import { applications, checkins, mailThreads, messages, users } from "../platform/db/schema.ts";
+import { recordApplicationEvent } from "../applications/events.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
 import { createNotification } from "../notify/notifications.ts";
@@ -219,33 +213,25 @@ function closeAsNoResponse(
 
     tx.update(checkins).set({ status: "expired" }).where(eq(checkins.applicationId, row.id)).run();
 
-    tx.insert(applicationEvents)
-      .values({
-        applicationId: row.id,
-        at: now,
-        detail: null,
-        fromValue: "applied",
-        id: crypto.randomUUID(),
-        kind: "stage",
-        source: "system",
-        toValue: "closed",
-        userId: input.userId,
-      })
-      .run();
+    recordApplicationEvent(tx, clock, {
+      applicationId: row.id,
+      fromValue: "applied",
+      kind: "stage",
+      reason: "checkin:no_response",
+      source: "system",
+      toValue: "closed",
+      userId: input.userId,
+    });
 
-    tx.insert(applicationEvents)
-      .values({
-        applicationId: row.id,
-        at: now,
-        detail: null,
-        fromValue: "open",
-        id: crypto.randomUUID(),
-        kind: "checkin",
-        source: "checkin",
-        toValue: "no_response",
-        userId: input.userId,
-      })
-      .run();
+    recordApplicationEvent(tx, clock, {
+      applicationId: row.id,
+      fromValue: "open",
+      kind: "checkin",
+      reason: "checkin:no_response",
+      source: "checkin",
+      toValue: "no_response",
+      userId: input.userId,
+    });
   });
 
   publishEvent(
@@ -322,19 +308,15 @@ export function answerCheckin(
         .where(eq(checkins.id, row.id))
         .run();
 
-      tx.insert(applicationEvents)
-        .values({
-          applicationId: row.applicationId,
-          at: now,
-          detail: null,
-          fromValue: "open",
-          id: crypto.randomUUID(),
-          kind: "checkin",
-          source: "user",
-          toValue: input.answer,
-          userId: input.userId,
-        })
-        .run();
+      recordApplicationEvent(tx, clock, {
+        applicationId: row.applicationId,
+        fromValue: "open",
+        kind: "checkin",
+        reason: `checkin:${input.answer}`,
+        source: "user",
+        toValue: input.answer,
+        userId: input.userId,
+      });
     });
 
     publishEvent(
@@ -369,33 +351,25 @@ export function answerCheckin(
       .where(eq(applications.id, row.applicationId))
       .run();
 
-    tx.insert(applicationEvents)
-      .values({
-        applicationId: row.applicationId,
-        at: now,
-        detail: null,
-        fromValue: row.stage,
-        id: crypto.randomUUID(),
-        kind: "stage",
-        source: "checkin",
-        toValue: stage,
-        userId: input.userId,
-      })
-      .run();
+    recordApplicationEvent(tx, clock, {
+      applicationId: row.applicationId,
+      fromValue: row.stage,
+      kind: "stage",
+      reason: `checkin:${input.answer}`,
+      source: "checkin",
+      toValue: stage,
+      userId: input.userId,
+    });
 
-    tx.insert(applicationEvents)
-      .values({
-        applicationId: row.applicationId,
-        at: now,
-        detail: null,
-        fromValue: "open",
-        id: crypto.randomUUID(),
-        kind: "checkin",
-        source: "user",
-        toValue: input.answer,
-        userId: input.userId,
-      })
-      .run();
+    recordApplicationEvent(tx, clock, {
+      applicationId: row.applicationId,
+      fromValue: "open",
+      kind: "checkin",
+      reason: `checkin:${input.answer}`,
+      source: "user",
+      toValue: input.answer,
+      userId: input.userId,
+    });
   });
 
   publishEvent(

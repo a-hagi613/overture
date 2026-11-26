@@ -8,6 +8,7 @@ import type { Claim, GroundingContext, ResumeLine } from "./grounding.ts";
 import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
+import { recordLlmSchemaRejection } from "../platform/llm/schema-rejections.ts";
 import { fitSentences, groundClaims, resumeLines, wordCount } from "./grounding.ts";
 
 export const OPEN_TEXT_PURPOSE = "open_text";
@@ -286,6 +287,10 @@ export function createOpenTextService(deps: { db: AppDatabase; clock: Clock; llm
       const parsed = outputSchema.safeParse(call.result.value);
 
       if (!parsed.success) {
+        recordLlmSchemaRejection(db, clock, {
+          model: call.model,
+          purpose: question.kind === "cover_letter" ? COVER_LETTER_PURPOSE : OPEN_TEXT_PURPOSE,
+        });
         continue;
       }
 

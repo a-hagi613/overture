@@ -431,7 +431,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
       .values({
         applicationId: candidate.id,
         at: now,
-        detail: JSON.stringify({ changes: [problem] }),
+        detail: JSON.stringify({ changes: [problem], reason: "prepare_problem" }),
         fromValue: "approved",
         id: crypto.randomUUID(),
         kind: "status",

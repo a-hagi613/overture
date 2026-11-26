@@ -388,7 +388,7 @@ export function createReadyRoutes(deps: {
         .values({
           applicationId: input.applicationId,
           at: now,
-          detail: null,
+          detail: JSON.stringify({ reason: "user_approved" }),
           fromValue: "ready",
           id: crypto.randomUUID(),
           kind: "status",
@@ -589,7 +589,7 @@ export function createReadyRoutes(deps: {
         .values({
           applicationId: id,
           at: now,
-          detail: null,
+          detail: JSON.stringify({ reason: "user_returned_to_ready" }),
           fromValue: "approved",
           id: crypto.randomUUID(),
           kind: "status",

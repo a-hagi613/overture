@@ -1,7 +1,7 @@
 import { statfs } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-import { and, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
+import { and, count, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -14,7 +14,16 @@ import { capMicros, llmDayBudget, llmSpendAlertRatio } from "../platform/llm/bud
 import { llmSpendTodayMicros } from "../platform/llm/usage.ts";
 import { unhandledRejectionCount } from "../platform/process-guard.ts";
 import { catalogWorkerCrashCount } from "../catalog/worker-restarts.ts";
-import { applications, attempts, bgJobs } from "../platform/db/schema.ts";
+import { LLM_SCHEMA_REJECTION_TOPIC } from "../platform/llm/schema-rejections.ts";
+import {
+  applications,
+  attempts,
+  bgJobs,
+  events,
+  llmUsage,
+  matches,
+  messages,
+} from "../platform/db/schema.ts";
 
 import {
   MAIL_DOMAIN_MIN_SENDS,
@@ -31,6 +40,11 @@ export const QUEUE_AGE_CEILING_MS = 30 * 60_000;
 export const BACKUP_LAG_CEILING_SECONDS = 300;
 export const DISK_CEILING_RATIO = 0.8;
 export const MIN_ATTEMPTS_TO_JUDGE = 5;
+export const CONFIRMING_STUCK_CEILING_MS = 26 * 60 * 60_000;
+export const COST_PER_SENT_CEILING_MICROS = 30_000;
+export const UNSCORED_BACKLOG_CEILING = 2000;
+export const MAIL_FORWARDING_CEILING = 1;
+export const LLM_SCHEMA_REJECTION_CEILING = 0.05;
 
 const ATTEMPTED_EXCLUDED = new Set(["posting_closed", "duplicate", "needs_review"]);
 
@@ -53,6 +67,11 @@ export interface AlertMetrics {
   unhandledRejections: number;
   catalogWorkerCrashes: number;
   mailHealth: MailReplyCounts;
+  confirmingStuck: { applications: number; oldestAgeMs: number };
+  costPerSent: { applications: number; costMicros: number | null };
+  unscoredBacklog: number;
+  mailForwarding: { bouncedOut: number; failedOut: number; failedAuthIn: number };
+  llmSchemaRejection: { accepted: number; rejected: number; rate: number | null };
 }
 
 function rateMetrics(rows: { key: string; outcome: string | null }[]) {
@@ -75,6 +94,37 @@ function rateMetrics(rows: { key: string; outcome: string | null }[]) {
     attempts: group.attempts,
     rate: group.attempts === 0 ? 1 : group.sent / group.attempts,
   }));
+}
+
+function readMailForwarding(db: AppDatabase, since: number) {
+  const sinceDate = new Date(since);
+
+  const outbound = db
+    .select({
+      bounced: sql<number>`coalesce(sum(case when ${messages.outStatus} = 'bounced' then 1 else 0 end), 0)`,
+      failed: sql<number>`coalesce(sum(case when ${messages.outStatus} = 'failed' then 1 else 0 end), 0)`,
+    })
+    .from(messages)
+    .where(and(eq(messages.direction, "out"), gte(messages.createdAt, sinceDate)))
+    .get();
+
+  const inboundFailed = db
+    .select({ total: count() })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.direction, "in"),
+        eq(messages.auth, "fail"),
+        gte(messages.createdAt, sinceDate),
+      ),
+    )
+    .get();
+
+  return {
+    bouncedOut: outbound?.bounced ?? 0,
+    failedAuthIn: inboundFailed?.total ?? 0,
+    failedOut: outbound?.failed ?? 0,
+  };
 }
 
 export async function collectAlertMetrics(deps: {
@@ -140,6 +190,54 @@ export async function collectAlertMetrics(deps: {
 
   const usedRatio = fs === null || fs.blocks === 0 ? 0 : 1 - fs.bavail / fs.blocks;
 
+  const stuck = db
+    .select({
+      applications: count(),
+      oldest: sql<number | null>`min(${applications.updatedAt})`,
+    })
+    .from(applications)
+    .where(
+      and(
+        eq(applications.status, "confirming"),
+        lte(applications.updatedAt, clock.now() - CONFIRMING_STUCK_CEILING_MS),
+      ),
+    )
+    .get();
+
+  const sentCost = db
+    .select({
+      applications: count(),
+      costMicros: sql<number>`coalesce(sum(${applications.browserCostMicros} + ${applications.retryCostMicros} + ${applications.llmCostMicros}), 0)`,
+    })
+    .from(applications)
+    .where(
+      and(
+        eq(applications.status, "sent"),
+        isNotNull(applications.sentAt),
+        gte(applications.sentAt, since),
+        isNotNull(applications.costRecordedAt),
+      ),
+    )
+    .get();
+
+  const unscored = db.select({ total: count() }).from(matches).where(isNull(matches.score)).get();
+
+  const rejectedRows = db
+    .select({ total: count() })
+    .from(events)
+    .where(and(eq(events.topic, LLM_SCHEMA_REJECTION_TOPIC), gte(events.createdAt, since)))
+    .get();
+
+  const acceptedRows = db
+    .select({ total: count() })
+    .from(llmUsage)
+    .where(gte(llmUsage.createdAt, since))
+    .get();
+
+  const rejected = rejectedRows?.total ?? 0;
+  const accepted = acceptedRows?.total ?? 0;
+  const mailForwarding = readMailForwarding(db, since);
+
   return {
     atsSuccess: rateMetrics(
       attemptRows.flatMap((row) =>
@@ -182,6 +280,27 @@ export async function collectAlertMetrics(deps: {
     unhandledRejections: unhandledRejectionCount(),
     catalogWorkerCrashes: catalogWorkerCrashCount(),
     mailHealth: readMailReplyCounts(db, clock),
+    confirmingStuck: {
+      applications: stuck?.applications ?? 0,
+      oldestAgeMs:
+        stuck?.oldest === null || stuck?.oldest === undefined
+          ? 0
+          : Math.max(0, clock.now() - stuck.oldest),
+    },
+    costPerSent: {
+      applications: sentCost?.applications ?? 0,
+      costMicros:
+        sentCost === undefined || sentCost.applications === 0
+          ? null
+          : Math.round(sentCost.costMicros / sentCost.applications),
+    },
+    unscoredBacklog: unscored?.total ?? 0,
+    mailForwarding,
+    llmSchemaRejection: {
+      accepted,
+      rejected,
+      rate: accepted + rejected === 0 ? null : rejected / (accepted + rejected),
+    },
   };
 }
 
@@ -225,6 +344,7 @@ export function evaluateAlerts(db: AppDatabase, clock: Clock, metrics: AlertMetr
     {
       ats: worstAts?.key ?? null,
       attempts: worstAts?.attempts ?? 0,
+      failureRate: worstAts === undefined ? null : 1 - worstAts.rate,
       floor: ATS_SUCCESS_FLOOR,
       rate: worstAts?.rate ?? null,
     },
@@ -326,6 +446,65 @@ export function evaluateAlerts(db: AppDatabase, clock: Clock, metrics: AlertMetr
     sent: worstEmployer?.sent ?? 0,
   });
 
+  judge(
+    "alert.confirming.stuck",
+    metrics.confirmingStuck.applications > 0,
+    "application.confirming_stuck",
+    {
+      applications: metrics.confirmingStuck.applications,
+      ceilingMs: CONFIRMING_STUCK_CEILING_MS,
+      oldestAgeMs: metrics.confirmingStuck.oldestAgeMs,
+    },
+  );
+
+  judge(
+    "alert.application.cost",
+    metrics.costPerSent.applications >= MIN_ATTEMPTS_TO_JUDGE &&
+      metrics.costPerSent.costMicros !== null &&
+      metrics.costPerSent.costMicros > COST_PER_SENT_CEILING_MICROS,
+    "application.cost",
+    {
+      applications: metrics.costPerSent.applications,
+      ceilingMicros: COST_PER_SENT_CEILING_MICROS,
+      costMicros: metrics.costPerSent.costMicros,
+    },
+  );
+
+  judge(
+    "alert.match.unscored",
+    metrics.unscoredBacklog > UNSCORED_BACKLOG_CEILING,
+    "match.unscored",
+    { backlog: metrics.unscoredBacklog, ceiling: UNSCORED_BACKLOG_CEILING },
+  );
+
+  const forwardingProblems =
+    metrics.mailForwarding.bouncedOut +
+    metrics.mailForwarding.failedOut +
+    metrics.mailForwarding.failedAuthIn;
+
+  judge("alert.mail.forwarding", forwardingProblems >= MAIL_FORWARDING_CEILING, "mail.forwarding", {
+    bouncedOut: metrics.mailForwarding.bouncedOut,
+    ceiling: MAIL_FORWARDING_CEILING,
+    failedAuthIn: metrics.mailForwarding.failedAuthIn,
+    failedOut: metrics.mailForwarding.failedOut,
+  });
+
+  const schemaSamples = metrics.llmSchemaRejection.accepted + metrics.llmSchemaRejection.rejected;
+
+  judge(
+    "alert.llm.schema_rejection",
+    schemaSamples >= MIN_ATTEMPTS_TO_JUDGE &&
+      metrics.llmSchemaRejection.rate !== null &&
+      metrics.llmSchemaRejection.rate > LLM_SCHEMA_REJECTION_CEILING,
+    "llm.schema_rejection",
+    {
+      accepted: metrics.llmSchemaRejection.accepted,
+      ceiling: LLM_SCHEMA_REJECTION_CEILING,
+      rate: metrics.llmSchemaRejection.rate,
+      rejected: metrics.llmSchemaRejection.rejected,
+    },
+  );
+
   const { domain } = metrics.mailHealth;
   const domainRate = domain.sent === 0 ? 1 : domain.replies / domain.sent;
 
@@ -364,6 +543,11 @@ export function drillAlertMetrics() {
         { employer: "Fixture Dynamics", key: "company-mail-drill", replies: 0, sent: 12 },
       ],
     },
+    confirmingStuck: { applications: 1, oldestAgeMs: 48 * 60 * 60_000 },
+    costPerSent: { applications: 10, costMicros: 900_000 },
+    unscoredBacklog: UNSCORED_BACKLOG_CEILING + 1,
+    mailForwarding: { bouncedOut: 2, failedAuthIn: 1, failedOut: 1 },
+    llmSchemaRejection: { accepted: 80, rate: 0.2, rejected: 20 },
   } satisfies AlertMetrics;
 }
 

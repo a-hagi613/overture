@@ -20,6 +20,14 @@ export interface ObjectStore {
 async function keysUnder(root: string) {
   const keys: string[] = [];
 
+  const present = await stat(root)
+    .then((details) => details.isDirectory())
+    .catch(() => false);
+
+  if (!present) {
+    return keys;
+  }
+
   for await (const key of new Bun.Glob("**/*").scan({ cwd: root, onlyFiles: true })) {
     keys.push(key.replaceAll("\\", "/"));
   }

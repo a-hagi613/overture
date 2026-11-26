@@ -21,6 +21,7 @@ import {
 } from "../platform/db/schema.ts";
 import { localDayStart, localPartsAt } from "../platform/local-time.ts";
 import { restartCheckinAfterUndo } from "../pipeline/checkins.ts";
+import { readApplicationTimelineRows } from "../applications/events.ts";
 import { latestEmailNotesOf } from "../pipeline/email-notes.ts";
 import { linkedMailOf } from "../inbox/linked-mail.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
@@ -378,7 +379,7 @@ export function createApplicationRoutes(
         .values({
           at: now,
           applicationId: id,
-          detail: null,
+          detail: JSON.stringify({ reason: "user_stage_move" }),
           fromValue: row.stage,
           id: crypto.randomUUID(),
           kind: "stage",
@@ -464,7 +465,7 @@ export function createApplicationRoutes(
         .values({
           at: now,
           applicationId: id,
-          detail: null,
+          detail: JSON.stringify({ reason: "user_undo" }),
           fromValue: row.stage,
           id: crypto.randomUUID(),
           kind: "stage",
@@ -546,7 +547,7 @@ export function createApplicationRoutes(
         .values({
           at: now,
           applicationId: id,
-          detail: null,
+          detail: JSON.stringify({ reason: "user_withdraw" }),
           fromValue: row.stage,
           id: crypto.randomUUID(),
           kind: "stage",
@@ -676,12 +677,7 @@ export function createApplicationRoutes(
       },
     );
 
-    const timeline = db
-      .select()
-      .from(applicationEvents)
-      .where(eq(applicationEvents.applicationId, id))
-      .orderBy(asc(applicationEvents.at))
-      .all();
+    const timeline = readApplicationTimelineRows(db, id);
 
     const resumeLines =
       snapshotView === null

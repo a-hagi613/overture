@@ -8,6 +8,7 @@ import { MODEL_ANSWER_KINDS } from "../../shared/questions.ts";
 import { FACT_KEYS } from "../../shared/facts.ts";
 import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
+import { recordLlmSchemaRejection } from "../platform/llm/schema-rejections.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 
 export const QUESTION_MAPPING_PURPOSE = "question_mapping";
@@ -144,6 +145,11 @@ export async function mapQuestionsWithLlm(
 
     if (parsed.success) {
       byCustomId.set(call.customId, parsed.data);
+    } else {
+      recordLlmSchemaRejection(deps.db, deps.clock, {
+        model: call.model,
+        purpose: QUESTION_MAPPING_PURPOSE,
+      });
     }
   }
 

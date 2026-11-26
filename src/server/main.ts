@@ -150,6 +150,11 @@ import {
   createDispatcher,
 } from "./dispatch/executor.ts";
 import {
+  SCREENSHOT_CLEANUP_JOB_KIND,
+  ensureScreenshotCleanupQueued,
+  screenshotCleanupJobHandler,
+} from "./applications/screenshots.ts";
+import {
   PLANNER_DAY_JOB_KIND,
   createPlanner,
   ensurePlannerQueuedForRunningUsers,
@@ -458,6 +463,8 @@ if (payments !== null) {
 }
 
 ensureRetentionQueued(db, clock);
+
+ensureScreenshotCleanupQueued(db, clock);
 
 ensureApplyFailuresQueued(db, clock);
 
@@ -901,6 +908,7 @@ const activeDispatcher =
         llm: anthropicLlmPort,
         mail: mailSender,
         mailboxes,
+        objects,
         outcomes,
         personal,
         preparation,
@@ -1051,6 +1059,9 @@ const liveCheckJobHandlers: JobHandlers = {
 const retentionJobHandlers: JobHandlers = {
   [RETENTION_JOB_KIND]: async () => {
     await retentionJobHandler(db, catalogDb, clock, { readOnly: catalogHotSwap !== null });
+  },
+  [SCREENSHOT_CLEANUP_JOB_KIND]: async () => {
+    await screenshotCleanupJobHandler({ clock, db, objects });
   },
 };
 

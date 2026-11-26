@@ -23,6 +23,7 @@ import type {
 } from "./browser/provider.ts";
 import type { createMailboxService } from "../inbox/mailboxes.ts";
 import type { MailSender } from "../platform/mail/port.ts";
+import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { Outcomes } from "./outcomes.ts";
 
 import { applications, attempts, profiles, users } from "../platform/db/schema.ts";
@@ -94,13 +95,14 @@ import { createNotification } from "../notify/notifications.ts";
 import { sendCodeWaitEmailFallback } from "../notify/code-wait-email.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { copy } from "../../shared/copy.ts";
-import { recordApplicationEvent } from "./outcomes.ts";
+import { recordApplicationEvent } from "../applications/events.ts";
 import { acquireBrowserSession } from "./browser/session-slots.ts";
 import { nextSendSlot as nextSlotInWindow, parseSendWindow, planningWindow } from "./planning.ts";
 import { openApprovedPlan } from "../pipeline/approved-plan.ts";
 import { createPlanCache } from "../pipeline/plan-cache.ts";
 import { createFormSelfHealer, planFieldSignature } from "./forms/self-heal.ts";
 import { recordPostingFailure } from "../matching/posting-flags.ts";
+import { captureSubmitScreenshot } from "../applications/screenshots.ts";
 
 class ReservationRefusedError extends Error {
   constructor() {
@@ -138,6 +140,7 @@ export interface DispatcherDeps {
   mailboxes: ReturnType<typeof createMailboxService>;
   outcomes: Outcomes;
   mail: MailSender;
+  objects?: ObjectStore;
   appOrigin: string;
   proxyCountry: string;
   signal?: AbortSignal;
@@ -299,6 +302,7 @@ export function createDispatcher(deps: DispatcherDeps) {
     mailboxes,
     outcomes,
     mail,
+    objects,
     appOrigin,
     proxyCountry,
     signal,
@@ -382,7 +386,7 @@ export function createDispatcher(deps: DispatcherDeps) {
     });
   }
 
-  function scheduleRetry(applicationId: string, userId: string, at: number) {
+  function scheduleRetry(applicationId: string, userId: string, at: number, attemptId: string) {
     const slot = nextSendSlot(db, userId, at + RETRY_DELAY_MS);
 
     db.update(applications)
@@ -398,10 +402,12 @@ export function createDispatcher(deps: DispatcherDeps) {
 
     recordApplicationEvent(db, clock, {
       applicationId,
+      attemptId,
       userId,
       kind: "status",
       fromValue: "sending",
       toValue: "approved",
+      reason: "retry_scheduled",
       source: "system",
     });
 
@@ -410,7 +416,13 @@ export function createDispatcher(deps: DispatcherDeps) {
     return slot;
   }
 
-  function requestInterrupt(applicationId: string, userId: string, at: number) {
+  function requestInterrupt(
+    applicationId: string,
+    userId: string,
+    at: number,
+    attemptId: string,
+    reason: string,
+  ) {
     const slot = nextSendSlot(db, userId, at);
 
     db.update(applications)
@@ -427,10 +439,12 @@ export function createDispatcher(deps: DispatcherDeps) {
 
     recordApplicationEvent(db, clock, {
       applicationId,
+      attemptId,
       userId,
       kind: "status",
       fromValue: "sending",
       toValue: "approved",
+      reason,
       source: "system",
     });
 
@@ -477,10 +491,12 @@ export function createDispatcher(deps: DispatcherDeps) {
 
       recordApplicationEvent(db, clock, {
         applicationId,
+        attemptId,
         userId,
         kind: "status",
         fromValue: "sending",
         toValue: "ready",
+        reason: outcome,
         source: "system",
       });
 
@@ -491,7 +507,7 @@ export function createDispatcher(deps: DispatcherDeps) {
     }
 
     if (used < maxAttempts) {
-      scheduleRetry(applicationId, userId, at);
+      scheduleRetry(applicationId, userId, at, attemptId);
 
       return "retry" as const;
     }
@@ -527,18 +543,22 @@ export function createDispatcher(deps: DispatcherDeps) {
 
     recordApplicationEvent(db, clock, {
       applicationId,
+      attemptId,
       userId,
       kind: "status",
       fromValue: "sending",
       toValue: "failed",
+      reason: outcome,
       source: "system",
     });
     recordApplicationEvent(db, clock, {
       applicationId,
+      attemptId,
       userId,
       kind: "stage",
       fromValue: "queued",
       toValue: null,
+      reason: outcome,
       source: "system",
     });
 
@@ -865,15 +885,41 @@ export function createDispatcher(deps: DispatcherDeps) {
         onCodeTyped: () => {
           updateAttempt(attemptId, { codeUsed: true });
         },
-        onResponse: (status: number | null) => {
+        onResponse: async (status: number | null) => {
           if (status !== null && status >= 400 && status < 500) {
             updateAttempt(attemptId, { submitClickedAt: null, submitResponseStatus: status });
           } else {
             updateAttempt(attemptId, { submitResponseStatus: status });
           }
+
+          if (objects !== undefined) {
+            await captureSubmitScreenshot(
+              { clock, objects },
+              {
+                applicationId,
+                attemptId,
+                page,
+                phase: "after_submit",
+                userId: claimed.userId,
+              },
+            );
+          }
         },
-        onWillSubmit: () => {
+        onWillSubmit: async () => {
           updateAttempt(attemptId, { submitClickedAt: clock.now() });
+
+          if (objects !== undefined) {
+            await captureSubmitScreenshot(
+              { clock, objects },
+              {
+                applicationId,
+                attemptId,
+                page,
+                phase: "before_submit",
+                userId: claimed.userId,
+              },
+            );
+          }
         },
         requestCode: async () => {
           const mailbox = await mailboxes.ensureFor(claimed.userId);
@@ -1080,10 +1126,12 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         recordApplicationEvent(db, clock, {
           applicationId,
+          attemptId,
           userId: claimed.userId,
           kind: "status",
           fromValue: "sending",
           toValue: "skipped",
+          reason: "login_wall",
           source: "system",
         });
 
@@ -1109,10 +1157,12 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         recordApplicationEvent(db, clock, {
           applicationId,
+          attemptId,
           userId: claimed.userId,
           kind: "status",
           fromValue: "sending",
           toValue: "skipped",
+          reason: `posting_identity:${reason}`,
           source: "system",
         });
 
@@ -1136,18 +1186,22 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         recordApplicationEvent(db, clock, {
           applicationId,
+          attemptId,
           userId: claimed.userId,
           kind: "status",
           fromValue: "sending",
           toValue: "failed",
+          reason: "ats_flagged",
           source: "system",
         });
         recordApplicationEvent(db, clock, {
           applicationId,
+          attemptId,
           userId: claimed.userId,
           kind: "stage",
           fromValue: "queued",
           toValue: null,
+          reason: "ats_flagged",
           source: "system",
         });
 
@@ -1183,10 +1237,12 @@ export function createDispatcher(deps: DispatcherDeps) {
 
         recordApplicationEvent(db, clock, {
           applicationId,
+          attemptId,
           userId: claimed.userId,
           kind: "status",
           fromValue: "sending",
           toValue: "needs_review",
+          reason: "unknown_question",
           source: "system",
         });
 
@@ -1205,11 +1261,28 @@ export function createDispatcher(deps: DispatcherDeps) {
             .where(eq(applications.id, applicationId))
             .run();
 
+          recordApplicationEvent(db, clock, {
+            applicationId,
+            attemptId,
+            userId: claimed.userId,
+            kind: "status",
+            fromValue: "sending",
+            toValue: "confirming",
+            reason: submitted === null ? "unconfirmed_after_submit" : run.outcome,
+            source: "system",
+          });
+
           announce(applicationId, claimed.userId, "confirming");
           updateAttempt(attemptId, { endedAt: clock.now(), outcome: outcomeOf(run.outcome) });
         } else if (codeWaitCancelled) {
           releaseAttempt(applicationId, claimed.userId, attemptId);
-          requestInterrupt(applicationId, claimed.userId, clock.now());
+          requestInterrupt(
+            applicationId,
+            claimed.userId,
+            clock.now(),
+            attemptId,
+            "code_wait_cancelled",
+          );
           updateAttempt(attemptId, { endedAt: clock.now(), outcome: "interrupted" });
         } else {
           const preflight = "preflight" in run ? (run.preflight ?? []) : [];
@@ -1251,6 +1324,17 @@ export function createDispatcher(deps: DispatcherDeps) {
           .where(eq(applications.id, applicationId))
           .run();
 
+        recordApplicationEvent(db, clock, {
+          applicationId,
+          attemptId,
+          userId: claimed.userId,
+          kind: "status",
+          fromValue: "sending",
+          toValue: "confirming",
+          reason: isShuttingDown() ? "deploy_interruption" : "attempt_crash_after_submit",
+          source: "system",
+        });
+
         announce(applicationId, claimed.userId, "confirming");
         updateAttempt(attemptId, {
           endedAt: clock.now(),
@@ -1258,7 +1342,13 @@ export function createDispatcher(deps: DispatcherDeps) {
         });
       } else if (isShuttingDown()) {
         releaseAttempt(applicationId, claimed.userId, attemptId);
-        requestInterrupt(applicationId, claimed.userId, clock.now());
+        requestInterrupt(
+          applicationId,
+          claimed.userId,
+          clock.now(),
+          attemptId,
+          "deploy_interruption",
+        );
         updateAttempt(attemptId, { endedAt: clock.now(), outcome: "interrupted" });
       } else {
         finishBeforeSubmit({
@@ -1346,6 +1436,17 @@ export function createDispatcher(deps: DispatcherDeps) {
           .where(eq(applications.id, application.id))
           .run();
 
+        recordApplicationEvent(db, clock, {
+          applicationId: application.id,
+          attemptId: attempt.id,
+          userId: application.userId,
+          kind: "status",
+          fromValue: "sending",
+          toValue: "confirming",
+          reason: "recovered_after_submit",
+          source: "system",
+        });
+
         announce(application.id, application.userId, "confirming");
         updateAttempt(attempt.id, {
           browserMs: attempt.browserMs ?? Math.max(0, clock.now() - attempt.startedAt),
@@ -1372,7 +1473,13 @@ export function createDispatcher(deps: DispatcherDeps) {
         });
       }
 
-      requestInterrupt(application.id, application.userId, clock.now());
+      requestInterrupt(
+        application.id,
+        application.userId,
+        clock.now(),
+        attempt?.id ?? application.id,
+        "deploy_interruption",
+      );
 
       released += 1;
     }

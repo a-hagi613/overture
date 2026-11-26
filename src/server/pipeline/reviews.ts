@@ -15,6 +15,7 @@ import { reviewCategory } from "../catalog/question-normalize.ts";
 import { createFactService } from "../profile/facts.ts";
 import { factLabelFor } from "../../shared/facts.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
+import { recordApplicationEvent } from "../applications/events.ts";
 import { applicationIdsForReview, detachApplication, dismissEmptyReview } from "./review-store.ts";
 import { recordReviewResolved } from "./review-events.ts";
 import { enqueueApplicationPrepare } from "./prepare-jobs.ts";
@@ -468,6 +469,16 @@ export function createReviewService(deps: {
     const applicationIds = applicationIdsForReview(db, reviewId);
 
     for (const applicationId of applicationIds) {
+      const application = db
+        .select({
+          stage: applications.stage,
+          status: applications.status,
+          userId: applications.userId,
+        })
+        .from(applications)
+        .where(eq(applications.id, applicationId))
+        .get();
+
       db.update(applications)
         .set({
           status: "skipped",
@@ -477,6 +488,27 @@ export function createReviewService(deps: {
         })
         .where(eq(applications.id, applicationId))
         .run();
+
+      if (application !== undefined) {
+        recordApplicationEvent(db, clock, {
+          applicationId,
+          fromValue: application.status,
+          kind: "status",
+          reason: "review_dismissed",
+          source: "user",
+          toValue: "skipped",
+          userId: application.userId,
+        });
+        recordApplicationEvent(db, clock, {
+          applicationId,
+          fromValue: application.stage,
+          kind: "stage",
+          reason: "review_dismissed",
+          source: "user",
+          toValue: null,
+          userId: application.userId,
+        });
+      }
     }
 
     db.update(reviews)

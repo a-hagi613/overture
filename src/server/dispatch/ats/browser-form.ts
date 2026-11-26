@@ -61,8 +61,8 @@ export interface BrowserFormPlan {
 }
 
 export interface BrowserFormHooks {
-  onWillSubmit: () => void;
-  onResponse: (status: number | null) => void;
+  onWillSubmit: () => Promise<void> | void;
+  onResponse: (status: number | null) => Promise<void> | void;
   /**
    * The audited ARIA self-heal, wired only by the dispatcher. It runs after the
    * deterministic locator for an answered field missed, and must write the
@@ -1010,7 +1010,7 @@ export const runBrowserFormAttempt: (
     };
   }
 
-  hooks.onWillSubmit();
+  await hooks.onWillSubmit();
 
   const { origin } = new URL(page.url());
 
@@ -1037,7 +1037,7 @@ export const runBrowserFormAttempt: (
   const [clickOutcome, response] = settled;
   const status = response.status === "fulfilled" ? response.value.status() : null;
 
-  hooks.onResponse(status);
+  await hooks.onResponse(status);
 
   if (clickOutcome.status === "rejected") {
     return {

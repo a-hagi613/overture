@@ -18,6 +18,7 @@ import type { FormScope } from "./engine.ts";
 import { checkLlmCaps } from "../../platform/llm/caps.ts";
 import { raiseAlert } from "../../platform/alerts.ts";
 import { recordLlmUsage } from "../../platform/llm/usage.ts";
+import { recordLlmSchemaRejection } from "../../platform/llm/schema-rejections.ts";
 import { SELF_HEAL_ACTIONS } from "../../pipeline/plan-cache.ts";
 import { isPositiveAnswer } from "./engine.ts";
 import { clickComboboxOption, fillControlledField, openComboboxPortal } from "./widgets.ts";
@@ -369,7 +370,16 @@ export function createFormSelfHealer(deps: FormSelfHealerDeps) {
 
       const parsed = outputSchema.safeParse(call.result.value);
 
-      if (!parsed.success || parsed.data.confidence < MIN_CONFIDENCE) {
+      if (!parsed.success) {
+        recordLlmSchemaRejection(db, clock, {
+          model: call.model,
+          purpose: FORM_SELF_HEAL_PURPOSE,
+        });
+
+        return null;
+      }
+
+      if (parsed.data.confidence < MIN_CONFIDENCE) {
         return null;
       }
 

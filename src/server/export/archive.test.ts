@@ -78,8 +78,8 @@ function seededDatabase() {
   return { clock: createClock(), databasePath, db, objects, personal, sqlite };
 }
 
-function applicationsEntry(entries: Iterable<ZipEntry>) {
-  for (const entry of entries) {
+async function applicationsEntry(entries: AsyncIterable<ZipEntry>) {
+  for await (const entry of entries) {
     if (entry.name === "applications.json") {
       return entry;
     }
@@ -89,10 +89,48 @@ function applicationsEntry(entries: Iterable<ZipEntry>) {
 }
 
 describe("the account export's pagination", () => {
+  test("exports the Submit screenshots stored under the user's account prefix", async () => {
+    const { clock, db, objects, personal, sqlite } = seededDatabase();
+    const key = `screenshots/${USER_ID}/application-000/attempt-1-before_submit-${String(NOW)}.png`;
+
+    try {
+      await objects.put(key, new Uint8Array([1, 2, 3]));
+
+      let found: Uint8Array | null = null;
+
+      for await (const entry of exportEntries(
+        { clock, db, mailDomain: "example.test", objects, personal },
+        USER_ID,
+      )) {
+        if (entry.name !== key) {
+          continue;
+        }
+
+        const chunks: Uint8Array[] = [];
+
+        for await (const chunk of entry.read()) {
+          chunks.push(chunk);
+        }
+
+        found = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+        let offset = 0;
+
+        for (const chunk of chunks) {
+          found.set(chunk, offset);
+          offset += chunk.length;
+        }
+      }
+
+      expect(found).toEqual(new Uint8Array([1, 2, 3]));
+    } finally {
+      sqlite.close();
+    }
+  });
+
   test("reads each page in its own statement, so a commit between pages is visible", async () => {
     const { clock, databasePath, db, objects, personal, sqlite } = seededDatabase();
 
-    const entry = applicationsEntry(
+    const entry = await applicationsEntry(
       exportEntries({ clock, db, mailDomain: "example.test", objects, personal }, USER_ID),
     );
 

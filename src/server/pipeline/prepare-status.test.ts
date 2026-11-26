@@ -3,7 +3,8 @@ import { eq } from "drizzle-orm";
 
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
-import { applications, users } from "../platform/db/schema.ts";
+import { applicationEvents, applications, users } from "../platform/db/schema.ts";
+import { readApplicationTimeline } from "../applications/events.ts";
 
 import { updatePreparableApplication } from "./preparable-status.ts";
 
@@ -84,6 +85,36 @@ describe("the preparation status guard", () => {
     expect(
       db.select().from(applications).where(eq(applications.id, APPLICATION)).get()?.status,
     ).toBe("ready");
+    expect(db.select().from(applicationEvents).all()).toHaveLength(0);
+
+    sqlite.close();
+  });
+
+  test("a preparation outcome records why the status and stage moved", () => {
+    const { db, sqlite } = database();
+    const clock = { now: () => NOW + 2 };
+
+    const changed = updatePreparableApplication(
+      db,
+      APPLICATION,
+      { stage: "ready", status: "ready", updatedAt: NOW + 2 },
+      { clock, reason: "prepared" },
+    );
+
+    expect(changed).toBe(true);
+    expect(
+      readApplicationTimeline(db, APPLICATION)
+        .map((entry) => ({
+          from: entry.fromValue,
+          kind: entry.kind,
+          reason: entry.reason,
+          to: entry.toValue,
+        }))
+        .toSorted((left, right) => left.kind.localeCompare(right.kind)),
+    ).toEqual([
+      { from: null, kind: "stage", reason: "prepared", to: "ready" },
+      { from: "preparing", kind: "status", reason: "prepared", to: "ready" },
+    ]);
 
     sqlite.close();
   });
