@@ -61,7 +61,7 @@ export function OnboardingTargetsPage() {
 
   if (targets.data === undefined || state.data === undefined) {
     return (
-      <OnboardingShell step={2}>
+      <OnboardingShell step={3}>
         <OnboardingLoadState
           onRetry={retry}
           retrying={targets.isFetching || state.isFetching}
@@ -81,7 +81,7 @@ export function OnboardingTargetsPage() {
 
   if (nothingToPick) {
     return (
-      <OnboardingShell step={2}>
+      <OnboardingShell step={3}>
         <OnboardingLoadState
           onRetry={retry}
           retrying={targets.isFetching || state.isFetching}
@@ -92,9 +92,9 @@ export function OnboardingTargetsPage() {
   }
 
   return (
-    <OnboardingShell step={2}>
+    <OnboardingShell step={3}>
       <OnboardingTargetsCard
-        backTo={`/onboarding/resume${suffix}`}
+        backTo={`/onboarding/gaps${suffix}`}
         currentEmployer={state.data.currentEmployer}
         onContinue={async () => {
           if (!preview) {
@@ -104,7 +104,7 @@ export function OnboardingTargetsPage() {
               return;
             }
 
-            await finish.mutateAsync(2);
+            await finish.mutateAsync(4);
           }
 
           queryClient.removeQueries({ queryKey: matchesKey });

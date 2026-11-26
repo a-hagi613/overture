@@ -90,6 +90,11 @@ const OnboardingResumePage = lazyRoute(
   "OnboardingResumePage",
 );
 
+const OnboardingGapsPage = lazyRoute(
+  async () => import("./routes/onboarding-gaps.tsx"),
+  "OnboardingGapsPage",
+);
+
 const OnboardingTargetsPage = lazyRoute(
   async () => import("./routes/onboarding-targets.tsx"),
   "OnboardingTargetsPage",
@@ -247,6 +252,7 @@ const publicRoutes: RouteObject[] = withRouteError([
   { path: "/consent", element: <ConsentPage /> },
   { path: "/onboarding", element: <OnboardingPage /> },
   { path: "/onboarding/resume", element: <OnboardingResumePage /> },
+  { path: "/onboarding/gaps", element: <OnboardingGapsPage /> },
   { path: "/onboarding/targets", element: <OnboardingTargetsPage /> },
   { path: "/onboarding/matches", element: <OnboardingMatchesPage /> },
   { path: "/onboarding/trial", element: <OnboardingTrialPage /> },

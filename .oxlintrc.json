@@ -364,6 +364,7 @@
           "src/shared/esco-roles.test.ts",
           "src/shared/host-match.test.ts",
           "src/shared/http-url.test.ts",
+          "src/shared/key-details.test.ts",
           "src/shared/plain-english.test.ts",
           "src/shared/role-taxonomy.test.ts",
           "src/shared/security-headers.test.ts",

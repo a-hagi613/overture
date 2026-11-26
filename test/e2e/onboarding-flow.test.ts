@@ -9,6 +9,7 @@ import type { AppServer } from "./app-server.ts";
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
 import { startAnthropicFixtureServer } from "./anthropic-fixture-server.ts";
+import { completeOnboardingGaps } from "./onboarding-walk.ts";
 import { latestMailLink, requestMagicLink } from "./sign-in.ts";
 
 const test = appTest.extend<{ onboardingServer: AppServer }>({
@@ -123,6 +124,16 @@ test("a new user uploads a resume, confirms preferences and returns to the step 
   await page.goto(`${onboardingServer.url}/`);
   await page.goto(`${onboardingServer.url}/onboarding`);
 
+  await expect(page).toHaveURL(/\/onboarding\/resume$/u);
+
+  await continueButton.click();
+  await expect(page).toHaveURL(/\/onboarding\/gaps$/u);
+
+  await page.goto(`${onboardingServer.url}/onboarding`);
+  await expect(page).toHaveURL(/\/onboarding\/gaps$/u);
+
+  await completeOnboardingGaps(page);
+
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
 
@@ -131,7 +142,7 @@ test("a new user uploads a resume, confirms preferences and returns to the step 
 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
-  expect(state.step).toBe(2);
+  expect(state.step).toBe(4);
   expect(state.onboardedAt).toBeNull();
   expect(state.pauseReason).toBe("onboarding");
   expect(state.currentEmployer).toBe("Brightwave Analytics");
@@ -188,6 +199,7 @@ test("an unreadable PDF still continues to preferences", async ({ browser, onboa
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Continue" }).click();
+  await completeOnboardingGaps(page);
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
 

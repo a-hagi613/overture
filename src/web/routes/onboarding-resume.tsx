@@ -7,7 +7,11 @@ import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingResumeCard } from "../components/onboarding-resume-card.tsx";
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
 import type { OnboardingState } from "../lib/onboarding-api.ts";
-import { useOnboardingState, useUploadOnboardingResume } from "../lib/onboarding-api.ts";
+import {
+  useFinishOnboardingStep,
+  useOnboardingState,
+  useUploadOnboardingResume,
+} from "../lib/onboarding-api.ts";
 import { resumeFileUrl } from "../lib/profile-api.ts";
 
 type ResumeView = NonNullable<OnboardingState["resume"]>;
@@ -19,6 +23,7 @@ export function OnboardingResumePage() {
   const suffix = preview ? "?preview=1" : "";
   const { data: state, isFetching, isPending, refetch } = useOnboardingState();
   const upload = useUploadOnboardingResume();
+  const finish = useFinishOnboardingStep();
   const [previewResume, setPreviewResume] = useState<ResumeView | null>(null);
   const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null);
 
@@ -54,7 +59,11 @@ export function OnboardingResumePage() {
           backTo={preview ? "/home" : undefined}
           error={upload.isError && !preview}
           onContinue={async () => {
-            await navigate(`/onboarding/targets${suffix}`);
+            if (!preview) {
+              await finish.mutateAsync(2);
+            }
+
+            await navigate(`/onboarding/gaps${suffix}`);
           }}
           onUpload={(file) => {
             if (localPdfUrl !== null) {

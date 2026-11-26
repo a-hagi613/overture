@@ -52,7 +52,7 @@ test("a brand-new user picks three matches and the trial prepares them", async (
 
   const state = stateSchema.parse(await (await request.get("/api/onboarding")).json());
 
-  expect(state.step).toBe(4);
+  expect(state.step).toBe(5);
   expect(state.onboardedAt).toBeNull();
 
   const dialog = page.getByRole("dialog");

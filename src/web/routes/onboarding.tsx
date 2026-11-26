@@ -52,19 +52,29 @@ export function OnboardingPage() {
       return;
     }
 
-    if (state.step >= 4) {
-      void navigate("/onboarding/matches?trial=1", { replace: true });
-
-      return;
-    }
-
-    if (state.step === 3) {
+    if (state.step >= 5) {
       void navigate("/onboarding/matches", { replace: true });
 
       return;
     }
 
-    void navigate(state.resume === null ? "/onboarding/resume" : "/onboarding/targets", {
+    if (state.step === 4) {
+      void navigate(state.resume === null ? "/onboarding/resume" : "/onboarding/targets", {
+        replace: true,
+      });
+
+      return;
+    }
+
+    if (state.step === 3) {
+      void navigate(state.resume === null ? "/onboarding/resume" : "/onboarding/gaps", {
+        replace: true,
+      });
+
+      return;
+    }
+
+    void navigate("/onboarding/resume", {
       replace: true,
     });
   }, [navigate, preview, refetch, state, suffix]);

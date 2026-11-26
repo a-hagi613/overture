@@ -23,6 +23,7 @@ import { createConsentService } from "../profile/consent.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createOnboardingProgressService } from "../profile/onboarding-progress.ts";
 import { createOnboardingStepService } from "../profile/onboarding-step.ts";
+import { createOnboardingGapsService } from "../profile/onboarding-gaps.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService } from "../profile/resume.ts";
@@ -39,6 +40,7 @@ import {
   ONBOARDING_STEP_COUNT,
   onboardingCurrentEmployerInputSchema,
   onboardingFactsInputSchema,
+  onboardingGapsInputSchema,
   onboardingMatchSelectionInputSchema,
   onboardingPrepareInputSchema,
   onboardingTimezoneInputSchema,
@@ -85,6 +87,8 @@ export function createOnboardingRoutes(deps: {
 
   const skipCompanies = createSkipCompanyService({ db, catalogDb: deps.catalogDb, clock });
   const consent = createConsentService({ db, clock });
+
+  const gaps = createOnboardingGapsService({ db, clock, personal, skipCompanies });
 
   const choicesCache = createTargetChoicesCache({
     catalogDb: deps.catalogDb,
@@ -382,12 +386,16 @@ export function createOnboardingRoutes(deps: {
       return context.json({ error: "start_required" }, 409);
     }
 
-    if (finished === 2 && (await resumes.current(account.id)) === null) {
+    if ((finished === 2 || finished === 3) && (await resumes.current(account.id)) === null) {
       return context.json({ error: "resume_required" }, 409);
     }
 
-    if (finished === 3 && savedPostingIds(account.id).length === 0) {
-      return context.json({ error: "selection_required" }, 409);
+    if (finished === 4) {
+      const { targets } = await targetsService.read(account.id);
+
+      if (targets.roles.length === 0 || targets.locations.length === 0) {
+        return context.json({ error: "targets_required" }, 409);
+      }
     }
 
     await progress.finish(account.id, finished);
@@ -463,6 +471,36 @@ export function createOnboardingRoutes(deps: {
     }
 
     return context.json(await step.save(account.id, context.req.valid("json")));
+  });
+
+  routes.get("/onboarding/gaps", async (context) => {
+    const account = await readSessionUser(auth, context.req.raw.headers);
+
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    context.header("Cache-Control", "no-store");
+
+    return context.json(await gaps.read(account.id));
+  });
+
+  routes.put("/onboarding/gaps", validJson(onboardingGapsInputSchema), async (context) => {
+    const account = await readSessionUser(auth, context.req.raw.headers);
+
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
+    context.header("Cache-Control", "no-store");
+
+    return context.json(await gaps.save(account.id, context.req.valid("json")));
   });
 
   return routes;

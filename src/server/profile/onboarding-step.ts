@@ -202,14 +202,23 @@ export function currenciesFor(input: {
   return currencies;
 }
 
-export function homeCountryCode(facts: readonly FactRecord[]) {
-  const value = factValue(facts, "current_country").trim();
+/**
+ * Resolves a place or country the person wrote to an ISO 3166-1 alpha-2 code.
+ * @param value A country name, city, or country code.
+ * @returns The country code, or null when the text names no known country.
+ */
+export function countryCodeFrom(value: string) {
+  const trimmed = value.trim();
 
-  if (value === "") {
+  if (trimmed === "") {
     return null;
   }
 
-  return resolveLocation(value).countryCode ?? countryCodesNamedIn(value).at(0) ?? null;
+  return resolveLocation(trimmed).countryCode ?? countryCodesNamedIn(trimmed).at(0) ?? null;
+}
+
+export function homeCountryCode(facts: readonly FactRecord[]) {
+  return countryCodeFrom(factValue(facts, "current_country"));
 }
 
 function targetCountryCodes(targets: Targets) {

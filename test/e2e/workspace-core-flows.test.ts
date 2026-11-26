@@ -241,6 +241,7 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
 
       const previewSteps = [
         { heading: /Upload your resume/u, path: "/onboarding/resume?preview=1" },
+        { heading: /Fill the gaps/u, path: "/onboarding/gaps?preview=1" },
         { heading: /Job preferences/u, path: "/onboarding/targets?preview=1" },
         { heading: /Your matches/u, path: "/onboarding/matches?preview=1" },
         { heading: /Your first 3 applications are free/u, path: "/onboarding/trial?preview=1" },

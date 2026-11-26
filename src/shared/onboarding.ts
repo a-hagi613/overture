@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+import type { KeyDetailFactKey } from "./key-details.ts";
 import type { TargetsInput } from "./targets.ts";
 import type { EmploymentType, Seniority, Workplace } from "./tag-taxonomy.ts";
 
+import { KEY_DETAIL_FACT_KEYS } from "./key-details.ts";
 import { timezoneSchema } from "./targets.ts";
 
-export const ONBOARDING_STEP_COUNT = 4;
+export const ONBOARDING_STEP_COUNT = 5;
 
 /** How many openings a person previews and picks before the trial card (SPEC, M3). */
 export const ONBOARDING_MATCH_PICK_LIMIT = 3;
@@ -146,4 +148,27 @@ export interface OnboardingFactsView {
     hear: string;
     eeo: EeoAnswers;
   };
+}
+
+export const keyDetailFieldInputSchema = z.object({
+  key: z.enum(KEY_DETAIL_FACT_KEYS),
+  value: z.string().trim().max(2000),
+});
+
+export const onboardingGapsInputSchema = z.object({
+  fields: z.array(keyDetailFieldInputSchema).max(KEY_DETAIL_FACT_KEYS.length),
+});
+
+export type OnboardingGapsInput = z.infer<typeof onboardingGapsInputSchema>;
+
+export interface KeyDetailFieldView {
+  confirmed: boolean;
+  key: KeyDetailFactKey;
+  label: string;
+  source: "resume" | "user" | "review" | "import" | null;
+  value: string;
+}
+
+export interface OnboardingGapsView {
+  fields: KeyDetailFieldView[];
 }

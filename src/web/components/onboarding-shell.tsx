@@ -17,7 +17,7 @@ export function OnboardingShell({
 }: {
   children: ReactNode;
   labels?: readonly string[] | undefined;
-  step: 1 | 2 | 3;
+  step: 1 | 2 | 3 | 4;
 }) {
   const navigate = useNavigate();
   const { data: session, isPending } = authClient.useSession();
