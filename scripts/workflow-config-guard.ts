@@ -48,6 +48,205 @@ export interface AdminHostWorkflowInput {
   readonly workflow: string;
 }
 
+/**
+ * Every repository secret that spends real money at a third party. Browser Use, Anthropic and freehire bill per
+ * session, token and call, and Gemini is retired; a workflow that names one of them can spend without a user doing
+ * anything.
+ */
+export const SPEND_SECRET_NAMES = [
+  "ANTHROPIC_API_KEY",
+  "BROWSER_USE_API_KEY",
+  "FREEHIRE_API_KEY",
+  "GEMINI_API_KEY",
+] as const;
+
+const AUTOMATIC_TRIGGERS = [
+  "pull_request",
+  "pull_request_target",
+  "push",
+  "release",
+  "schedule",
+  "workflow_run",
+] as const;
+
+export interface WorkflowSource {
+  readonly path: string;
+  readonly source: string;
+}
+
+export interface SpendAllowlistEntry {
+  readonly workflow: string;
+  readonly secrets: readonly string[];
+  readonly reason: string;
+}
+
+export interface ScheduledSpendInput {
+  readonly workflows: readonly WorkflowSource[];
+  readonly allow?: readonly SpendAllowlistEntry[];
+}
+
+function triggerBlock(source: string) {
+  const lines = source.split("\n");
+  const start = lines.findIndex((line) => /^on:\s*$/u.test(line));
+
+  if (start === -1) {
+    return lines.filter((line) => /^on:\s*\S+/u.test(line));
+  }
+
+  const block: string[] = [];
+
+  for (const line of lines.slice(start + 1)) {
+    const trimmed = line.trim();
+
+    if (trimmed === "" || trimmed.startsWith("#")) {
+      block.push(line);
+      continue;
+    }
+
+    if (!/^\s/u.test(line)) {
+      break;
+    }
+
+    block.push(line);
+  }
+
+  return block;
+}
+
+/**
+ * The triggers that fire this workflow without a person choosing it, in declaration order.
+ * @param source The workflow source.
+ * @returns The automatic triggers found in the workflow's `on:` block.
+ */
+export function automaticTriggers(source: string) {
+  const found = new Set<string>();
+
+  for (const line of triggerBlock(source)) {
+    const keyed = /^\s*(?<trigger>[a-z_]+)\s*:/u.exec(line)?.groups?.["trigger"];
+    const inline = /^on:\s*\[(?<list>[^\]]*)\]/u.exec(line)?.groups?.["list"];
+    const scalar = /^on:\s*(?<trigger>[a-z_]+)\s*$/u.exec(line)?.groups?.["trigger"];
+
+    if (keyed !== undefined) {
+      found.add(keyed);
+    }
+
+    if (inline !== undefined) {
+      for (const name of inline.split(",")) {
+        found.add(name.trim());
+      }
+    }
+
+    if (scalar !== undefined) {
+      found.add(scalar);
+    }
+  }
+
+  return AUTOMATIC_TRIGGERS.filter((trigger) => found.has(trigger));
+}
+
+interface SpendSecretUse {
+  readonly secret: string;
+  readonly line: number;
+  readonly job: string | null;
+}
+
+function spendSecretUses(source: string) {
+  const uses: SpendSecretUse[] = [];
+  const seen = new Set<string>();
+  let job: string | null = null;
+
+  for (const [index, line] of source.split("\n").entries()) {
+    const jobMatch = /^ {2}(?<job>[A-Za-z0-9_-]+):\s*$/u.exec(line);
+    const matchedJob = jobMatch?.groups?.["job"];
+
+    if (matchedJob !== undefined) {
+      job = matchedJob;
+    }
+
+    for (const secret of SPEND_SECRET_NAMES) {
+      const readsSecret = new RegExp(`secrets(?:\\.|\\[\\s*['"]?)${secret}\\b`, "u").test(line);
+      const setsSecret = new RegExp(`^\\s*(?:-\\s*)?${secret}\\s*[:=]`, "u").test(line);
+
+      if (!readsSecret && !setsSecret) {
+        continue;
+      }
+
+      const key = `${secret}:${String(index)}`;
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        uses.push({ secret, line: index + 1, job });
+      }
+    }
+  }
+
+  return uses;
+}
+
+/**
+ * Checks that no workflow which runs without a person asking can pass a secret that spends real money (#680). A cron
+ * capture run filled real Browser Use sessions every night, and daily catalog ETLs re-ran Haiku over new postings, so
+ * this guard fails the build when an automatic workflow names one of those keys and no allow-list entry says why.
+ * @param input Every workflow source, plus the allow-list entries the owner has approved.
+ * @returns Every workflow that could spend, and every stale allow-list entry, empty when there is nothing to spend.
+ */
+export function findScheduledSpendProblems(input: ScheduledSpendInput) {
+  const problems: string[] = [];
+  const allow = input.allow ?? [];
+
+  for (const workflow of input.workflows) {
+    const triggers = automaticTriggers(workflow.source);
+
+    if (triggers.length === 0) {
+      continue;
+    }
+
+    const entry = allow.find((candidate) => candidate.workflow === workflow.path);
+
+    for (const use of spendSecretUses(workflow.source)) {
+      if (entry?.secrets.includes(use.secret) === true) {
+        continue;
+      }
+
+      const where = use.job === null ? "" : `, job ${use.job}`;
+
+      problems.push(
+        `.github/workflows/${workflow.path} runs on ${triggers.join(", ")} and passes ${use.secret} (line ${String(use.line)}${where}); no automatic workflow may spend real money — remove the secret, make the job workflow_dispatch only, or add an allow-list entry with the reason`,
+      );
+    }
+  }
+
+  for (const entry of allow) {
+    const workflow = input.workflows.find((candidate) => candidate.path === entry.workflow);
+
+    if (workflow === undefined) {
+      problems.push(
+        `the spend allow-list names .github/workflows/${entry.workflow}, which does not exist; delete the stale entry`,
+      );
+      continue;
+    }
+
+    if (automaticTriggers(workflow.source).length === 0) {
+      problems.push(
+        `the spend allow-list names .github/workflows/${entry.workflow}, which no longer runs automatically; delete the stale entry`,
+      );
+      continue;
+    }
+
+    const uses = spendSecretUses(workflow.source);
+
+    for (const secret of entry.secrets) {
+      if (!uses.some((use) => use.secret === secret)) {
+        problems.push(
+          `the spend allow-list allows ${secret} in .github/workflows/${entry.workflow}, which no longer passes it; delete the stale entry`,
+        );
+      }
+    }
+  }
+
+  return problems;
+}
+
 const ADMIN_HOST_ACTIONS = ["status", "add-cert", "set-access-secrets"] as const;
 const ADMIN_HOST_FLYCTL_SHA = "98172f70657cb3e15db199af139be99bd3e61200";
 

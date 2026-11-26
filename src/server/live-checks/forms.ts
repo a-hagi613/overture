@@ -173,6 +173,13 @@ async function runOneAts(deps: FormsCheckDeps, ats: (typeof ATS_NAMES)[number]) 
   }
 }
 
+/**
+ * Reads one open posting per ATS and records whether its form changed. Every non-Personio ATS opens a real Browser
+ * Use session, so this runs only when an admin posts an explicit `groups: ["forms"]` to the live-checks route; it is
+ * never part of the nightly `live.check` job (#680).
+ * @param deps The catalog, browser provider and storage the capture needs.
+ * @returns One result per ATS.
+ */
 export async function runFormsCheck(deps: FormsCheckDeps) {
   const runFrom: (index: number, results: LiveCheckResult[]) => Promise<LiveCheckResult[]> = async (
     index,

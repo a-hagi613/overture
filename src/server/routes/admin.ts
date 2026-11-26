@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
+import { API_ERRORS } from "../../shared/api-errors.ts";
 import type { BackupMonitor } from "../platform/ports/backup.ts";
 import type { DegradedFlagReader } from "../platform/degraded.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -87,6 +88,8 @@ import { buildMarginReport } from "../billing/margin.ts";
 import { FIXTURE_CAPTURE_JOB_KIND, fixtureCapturePayloadSchema } from "../fixtures/job.ts";
 import { enqueueLiveCheckNow } from "../live-checks/job.ts";
 import { readLiveCheckResults } from "../live-checks/store.ts";
+import { LIVE_CHECK_GROUPS } from "../live-checks/types.ts";
+import type { LiveCheckGroup } from "../live-checks/types.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { readMailSummary } from "../platform/mail/budget.ts";
 import { PERSONIO_PROBE_JOB_KIND, isPersonioProbeUrl } from "../probe/personio.ts";
@@ -295,6 +298,10 @@ const personioProbeBody = z.object({
     .min(1)
     .max(20)
     .optional(),
+});
+
+const liveCheckRunBody = z.object({
+  groups: z.array(z.enum(LIVE_CHECK_GROUPS)).min(1).optional(),
 });
 
 const personioProbeDetailSchema = z.object({
@@ -1874,22 +1881,35 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
 
   routes.get("/live-checks", (context) => context.json({ results: readLiveCheckResults(db, 100) }));
 
-  async function runLiveChecksNow(actorId: string) {
-    const job = enqueueLiveCheckNow(db, clock);
+  async function runLiveChecksNow(actorId: string, groups?: readonly LiveCheckGroup[]) {
+    const job = enqueueLiveCheckNow(db, clock, groups);
 
     await recordAdminAudit(db, clock, {
       actorId,
       action: "live-checks.run",
-      reason: "Run the daily live checks now",
-      detail: { jobId: job.id },
+      reason:
+        groups === undefined
+          ? "Run the daily live checks now"
+          : `Run the live checks the owner chose: ${groups.join(", ")}`,
+      detail:
+        groups === undefined ? { jobId: job.id } : { groups: groups.join(","), jobId: job.id },
     });
 
     return job.id;
   }
 
-  routes.post("/live-checks", async (context) =>
-    context.json({ jobId: await runLiveChecksNow(context.get("owner").userId) }),
-  );
+  routes.post("/live-checks", async (context) => {
+    const body: unknown = (await context.req.json().catch(() => null)) ?? {};
+    const parsed = liveCheckRunBody.safeParse(body);
+
+    if (!parsed.success) {
+      return context.json({ error: API_ERRORS.invalidRequest, issues: parsed.error.issues }, 400);
+    }
+
+    return context.json({
+      jobId: await runLiveChecksNow(context.get("owner").userId, parsed.data.groups),
+    });
+  });
 
   routes.post("/live-checks/run", async (context) =>
     context.json({ jobId: await runLiveChecksNow(context.get("owner").userId) }),
