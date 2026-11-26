@@ -1371,7 +1371,7 @@ export function shardNeedsMarker(files: readonly string[], marker: string) {
  * @param value The label names, for example `bug, high-risk`.
  * @returns The normalized labels, without empty entries.
  */
-export function parseLabels(value: string): string[] {
+export function parseLabels(value: string) {
   return value
     .split(",")
     .map((label) => label.trim().toLowerCase())
@@ -1383,7 +1383,7 @@ export function parseLabels(value: string): string[] {
  * @param labels The pull request labels.
  * @returns True when `high-risk` is present.
  */
-export function hasHighRiskLabel(labels: readonly string[]): boolean {
+export function hasHighRiskLabel(labels: readonly string[]) {
   return labels.some((label) => label === "high-risk");
 }
 

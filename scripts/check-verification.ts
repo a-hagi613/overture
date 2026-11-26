@@ -4,22 +4,20 @@ const headingPattern = /^(?:#{1,6}\s+verification|\*\*verification\*\*)\s*$/iu;
 const anyHeadingPattern = /^(?:#{1,6}\s|\*\*[^*]+\*\*\s*$)/iu;
 const entryPattern = /^\s*[-*]\s+(?<key>[^:]+?)\s*:\s*(?<value>.*)$/u;
 const placeholderPattern = /^(?:<[^>]*>|todo|tbd)$/iu;
-// Only a verdict that opens with one of these says the skill was not run; prose that mentions the phrase mid-sentence
-// (a verdict describing this check, for example) is still a verdict.
 const notRunPattern =
   /^(?:(?:it|this|the\s+\S+)\s+)?(?:(?:was|is|were|has|had|have)\s+)?(?:not[\s-]*run|never\s+run|skipped)\b/iu;
 
-/** The two skills every ticket runs (epic #678), so every Verification block must list them. */
 const requiredSkills = ["code-review-and-quality", "test-driven-development"] as const;
 
-/** The required, always-present lines of a Verification block. */
 const requiredLines = ["verify", "e2e"] as const;
 
+/** One `- key: verdict` line of a Verification block. */
 export interface VerificationEntry {
   key: string;
   value: string;
 }
 
+/** A parsed Verification block: whether the body has one, and the entries it lists. */
 export interface VerificationBlock {
   found: boolean;
   entries: VerificationEntry[];
@@ -45,12 +43,12 @@ function normalizeKey(key: string) {
  * @param body The pull request body, with either line ending.
  * @returns Whether the block exists and its `- key: verdict` entries.
  */
-export function parseVerificationBlock(body: string): VerificationBlock {
+export function parseVerificationBlock(body: string) {
   const lines = body.replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
   const start = lines.findIndex((line) => headingPattern.test(line.trim()));
 
   if (start === -1) {
-    return { found: false, entries: [] };
+    return { found: false, entries: [] } satisfies VerificationBlock;
   }
 
   const entries: VerificationEntry[] = [];
@@ -70,7 +68,7 @@ export function parseVerificationBlock(body: string): VerificationBlock {
     }
   }
 
-  return { found: true, entries };
+  return { found: true, entries } satisfies VerificationBlock;
 }
 
 /**
@@ -78,7 +76,7 @@ export function parseVerificationBlock(body: string): VerificationBlock {
  * @param body The pull request body.
  * @returns One message per problem; an empty list means the block is complete and clean.
  */
-export function findVerificationProblems(body: string): string[] {
+export function findVerificationProblems(body: string) {
   const block = parseVerificationBlock(body);
 
   if (!block.found) {
