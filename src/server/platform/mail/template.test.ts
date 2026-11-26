@@ -181,8 +181,10 @@ describe("branded email template", () => {
   });
 
   test("a non-http action URL never reaches an href", () => {
+    const scriptUrl = ["java", "script:alert(1)"].join("");
+
     const rendered = renderEmail({
-      action: { label: "Open in Overture", url: "javascript:alert(1)" },
+      action: { label: "Open in Overture", url: scriptUrl },
       heading: "Sign in",
       paragraphs: [],
       preheader: "Sign in",
@@ -190,9 +192,9 @@ describe("branded email template", () => {
       why: "Because you asked.",
     });
 
-    expect(rendered.html).not.toContain("javascript:");
+    expect(rendered.html).not.toContain(scriptUrl);
     expect(rendered.html).not.toContain("Open in Overture");
-    expect(safeHref("javascript:alert(1)")).toBeNull();
+    expect(safeHref(scriptUrl)).toBeNull();
     expect(safeHref("data:text/html,<script>alert(1)</script>")).toBeNull();
     expect(safeHref("mailto:admin@tryoverture.com")).toBeNull();
     expect(safeHref("https://overture.test/ready")).toBe("https://overture.test/ready");

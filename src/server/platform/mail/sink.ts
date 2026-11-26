@@ -128,6 +128,7 @@ export function createSinkMailSender(clock: Clock) {
       failIfAsked();
 
       const bounced = nextBounce();
+
       const input: Parameters<typeof record>[0] = {
         attachments: (mail.attachments ?? []).map((attachment) => ({
           bytes: attachment.content.byteLength,

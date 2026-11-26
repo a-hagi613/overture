@@ -1,20 +1,8 @@
-/**
- * The Overture email builders. Each one produces the subject, the plain-text
- * part and the HTML part for one kind of mail, so an adapter only has to send
- * it. Copy stays in `src/shared/copy.ts` and the layout in `template.ts`.
- */
-
 import { copy } from "../../../shared/copy.ts";
 
 import type { EmailAction, EmailRow, EmailTemplateInput } from "./template.ts";
 
 import { renderEmail, safeHref } from "./template.ts";
-
-export interface BuiltEmail {
-  body: string;
-  html: string;
-  subject: string;
-}
 
 export interface NotificationEmailItem {
   detail?: string;
@@ -42,7 +30,7 @@ function paragraphsOf(text: string, url?: string, omit: readonly string[] = []) 
   });
 }
 
-function build(input: EmailTemplateInput): BuiltEmail {
+function build(input: EmailTemplateInput) {
   const rendered = renderEmail(input);
 
   return { body: rendered.text, html: rendered.html, subject: input.subject };
@@ -52,7 +40,7 @@ function preferencesFor(url: string) {
   const parsed = safeHref(url);
 
   if (parsed === null) {
-    return undefined;
+    return;
   }
 
   return { label: "Manage email preferences", url: new URL("/profile/account", parsed).toString() };
@@ -68,7 +56,7 @@ function withPreferences(input: {
   subject: string;
   url: string;
   why: string;
-}): EmailTemplateInput {
+}) {
   const template: EmailTemplateInput = {
     heading: input.heading,
     paragraphs: input.paragraphs,

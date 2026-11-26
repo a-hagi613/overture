@@ -1,13 +1,3 @@
-/**
- * Render every Overture email kind to HTML and plain text for a local look.
- *
- *   bun run email:preview
- *
- * The files land in `tmp/email-preview/`; open `index.html` to read the branded
- * shell, then the `.txt` beside it to check the plain-text part. Nothing is
- * sent and no network is touched.
- */
-
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -141,4 +131,5 @@ writeFileSync(
 process.stdout.write(
   `Rendered ${String(Object.keys(previews).length)} emails to ${outputDirectory}\n`,
 );
+
 process.stdout.write(`Open ${join(outputDirectory, "index.html")}\n`);

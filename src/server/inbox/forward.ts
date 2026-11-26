@@ -383,6 +383,7 @@ export function inboundCopyOf(input: { parsed: ParsedMail; rcptTo: string; inbox
 
   const headers = forwardedHeaders(parsed);
   const replyTo = senderAddress(parsed);
+
   const forwarded = forwardedMessage({
     attachments,
     inboxUrl,

@@ -1,13 +1,3 @@
-/**
- * The one Overture email template. Every message is a table-based document with
- * inline CSS, so Gmail, Outlook and a plain-text client read the same content:
- * the Ember mark and wordmark, the subject, the heading, an optional block of
- * machine facts, the CTA, and the footer that says why the person got it.
- *
- * Edit this file to change every Overture email at once. `bun run email:preview`
- * renders each kind to HTML and text for a local look.
- */
-
 const FONT_SANS =
   "-apple-system,BlinkMacSystemFont,'Segoe UI','Plus Jakarta Sans',Arial,sans-serif";
 
@@ -71,11 +61,6 @@ export interface EmailTemplateInput {
   rows?: readonly EmailRow[];
   subject: string;
   why: string;
-}
-
-export interface RenderedEmail {
-  html: string;
-  text: string;
 }
 
 /**
@@ -148,6 +133,7 @@ function rowsHtml(rows: readonly EmailRow[]) {
         row.detail === undefined
           ? ""
           : `<br><span class="oe-mut" style="font-family:${FONT_SANS};font-size:13px;line-height:1.5;color:${EMAIL_COLORS.muted};">${escapeHtml(row.detail)}</span>`;
+
       const meta =
         row.meta === undefined
           ? ""
@@ -241,11 +227,12 @@ function textOf(input: EmailTemplateInput) {
  * @param input Every fact the email shows.
  * @returns The HTML document and the accurate plain-text part.
  */
-export function renderEmail(input: EmailTemplateInput): RenderedEmail {
+export function renderEmail(input: EmailTemplateInput) {
   const subject = input.subject
     .replaceAll(/[\r\n]+/gu, " ")
     .trim()
     .slice(0, MAX_SUBJECT_LENGTH);
+
   const heading = escapeHtml(input.heading);
   const paragraphs = input.paragraphs.filter((paragraph) => paragraph.trim() !== "");
 
@@ -318,7 +305,7 @@ a{text-decoration:none;}
 <tr><td class="oe-pad" style="padding:22px 36px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="left" valign="middle">${markHtml()}</td>${dateSection}</tr></table></td></tr>
 <tr><td class="oe-pad" style="padding:0 36px;"><div class="oe-rule" style="height:1px;background-color:${EMAIL_COLORS.border};font-size:0;line-height:0;">&nbsp;</div></td></tr>
 <tr><td class="oe-pad" style="padding:34px 36px 0;"><h1 class="oe-heading oe-ink" style="margin:0;font-family:${FONT_SERIF};font-size:40px;line-height:1.08;letter-spacing:-0.015em;font-weight:400;color:${EMAIL_COLORS.foreground};word-break:break-word;overflow-wrap:anywhere;">${heading}</h1></td></tr>
-<tr><td class="oe-pad" style="padding:0 36px;">${paragraphs.map(paragraphHtml).join("")}</td></tr>
+<tr><td class="oe-pad" style="padding:0 36px;">${paragraphs.map((paragraph) => paragraphHtml(paragraph)).join("")}</td></tr>
 ${metaSection}
 ${quoteSection}
 ${rowsSection}
