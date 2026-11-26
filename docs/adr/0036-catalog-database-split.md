@@ -74,3 +74,15 @@ between the files is a fast path rather than the only path.
   owns, against ADR 0002's scale argument.
 - **Restore `catalog.sqlite` from backup.** It is public, rebuildable feed data; a restore would only replay a stale
   catalog over a fresh one.
+
+## Amendment (2026-11-26, issue #700)
+
+The Stapply feed catalog this ADR describes is retired. When freehire became the only job source (#700), the shared,
+deduplicated `jobs` and `job_places` tables moved to `app.sqlite`, next to the pull state and the counters that write
+them. They are written at runtime by the production job worker, are small (a paged pull, not a 340k-row sweep), and
+every user reads the same rows, so putting them in the replicated user database keeps one writer and one migration
+chain instead of adding a second file to keep in step.
+
+`catalog.sqlite` and its `postings`-shaped tables stay untouched and read-only until #706 removes them; no new code
+writes that file. The retirement of the separate catalog database and its snapshot/hot-swap is #706's change, not
+this one.

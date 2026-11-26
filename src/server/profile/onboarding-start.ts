@@ -4,6 +4,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { ensurePrepNextQueued } from "../pipeline/daily-prep.ts";
+import { enqueueUserPull } from "../jobs/pull.ts";
 import { profiles } from "../platform/db/schema.ts";
 import { ONBOARDING_STEP_COUNT } from "../../shared/onboarding.ts";
 
@@ -21,7 +22,7 @@ import { ONBOARDING_STEP_COUNT } from "../../shared/onboarding.ts";
 export function startOnboarding(db: AppDatabase, clock: Clock, userId: string) {
   const at = new Date(clock.now());
 
-  return db.transaction(() => {
+  const clearedPause = db.transaction(() => {
     db.insert(profiles)
       .values({
         createdAt: at,
@@ -54,4 +55,8 @@ export function startOnboarding(db: AppDatabase, clock: Clock, userId: string) {
 
     return cleared.length > 0;
   });
+
+  enqueueUserPull(db, clock, userId);
+
+  return clearedPause;
 }

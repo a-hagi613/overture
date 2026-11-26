@@ -25,6 +25,8 @@ import { createLanguagesService } from "../profile/languages.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import { createStrengthenService } from "../profile/strengthen.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
+import { enqueueUserPull } from "../jobs/pull.ts";
+import { preferencesChanged } from "../jobs/preferences.ts";
 import { returnStaleApprovals } from "../pipeline/approval-invalidation.ts";
 import { TIER_2_FACT_KEYS } from "../../shared/facts.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
@@ -343,7 +345,13 @@ export function createProfileRoutes(deps: {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
+    const before = await targetsService.read(account.id);
     const saved = await targetsService.save(account.id, context.req.valid("json"));
+
+    if (preferencesChanged(before.targets, saved.targets)) {
+      enqueueUserPull(db, clock, account.id);
+    }
+
     const { languages } = await languagesService.read(account.id);
 
     return context.json({

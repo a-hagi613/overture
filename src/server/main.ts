@@ -44,6 +44,7 @@ import { createDemoSafeMailSender } from "./demo/mail-guard.ts";
 import { isDemoUser } from "./demo/role.ts";
 import { demoStartupNotice } from "./demo/startup.ts";
 import { logError, logInfo } from "./platform/log.ts";
+import { raiseAlert } from "./platform/alerts.ts";
 import { openCatalogDatabase, openDatabase } from "./platform/db/client.ts";
 import type { CatalogDatabase } from "./platform/db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "./platform/db/migrate.ts";
@@ -51,6 +52,17 @@ import { createCatalogHotSwap } from "./catalog/hot-swap.ts";
 import type { CatalogHotSwap } from "./catalog/hot-swap.ts";
 import { createConfiguredObjectStore } from "./platform/object-store.ts";
 import { createClock } from "./platform/ports/clock.ts";
+import { createFreehireJobSource } from "./jobs/freehire-source.ts";
+import type { FreehireSourceOptions } from "./jobs/freehire-source.ts";
+import { createJobStore } from "./jobs/store.ts";
+import { resolveApplyTarget } from "./jobs/apply-link.ts";
+import { createRateLimiter } from "./catalog/rate-limiter.ts";
+import {
+  JOBS_PULL_JOB_KIND,
+  createPullJobHandlers,
+  createPullService,
+  ensurePullQueued,
+} from "./jobs/pull.ts";
 import { createRandom } from "./platform/ports/random.ts";
 import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
 import { setSetting } from "./platform/settings/index.ts";
@@ -438,6 +450,7 @@ const jobSingletons = [
   EXPORT_BUILD_JOB_KIND,
   APPLY_FAILURES_JOB_KIND,
   MASTER_KEY_ROTATION_JOB_KIND,
+  JOBS_PULL_JOB_KIND,
 ];
 
 recoverStaleLocks(db, clock, jobSingletons);
@@ -450,6 +463,8 @@ if (env.ENABLE_TEST_ROUTES) {
     JSON.stringify({ end: "24:00", start: "00:00" }),
     "system:test",
   );
+
+  setSetting(db, clock, "jobs.pull_enabled", "false", "system:test");
 }
 
 recoverBootRunningJobs(db, clock);
@@ -467,6 +482,41 @@ ensureRetentionQueued(db, clock);
 ensureScreenshotCleanupQueued(db, clock);
 
 ensureApplyFailuresQueued(db, clock);
+
+ensurePullQueued(db, clock);
+
+const jobSourceConfig: FreehireSourceOptions = {
+  baseUrl: env.FREEHIRE_BASE_URL,
+  clock,
+};
+
+if (env.FREEHIRE_API_KEY !== undefined && env.FREEHIRE_API_KEY !== "") {
+  jobSourceConfig.apiKey = env.FREEHIRE_API_KEY;
+}
+
+const jobSource = createFreehireJobSource(jobSourceConfig);
+
+const applyLinkLimiter = createRateLimiter(clock, {
+  maxConcurrent: 2,
+  minIntervalMs: 500,
+});
+
+const pullService = createPullService({
+  applyTarget: async (job) =>
+    await applyLinkLimiter.run(
+      async () => await resolveApplyTarget(job, { baseUrl: env.FREEHIRE_BASE_URL }),
+    ),
+  db,
+  clock,
+  hasApiKey: env.FREEHIRE_API_KEY !== undefined && env.FREEHIRE_API_KEY !== "",
+  onAlert: (detail) => {
+    raiseAlert(db, clock, "jobs.pull", detail);
+  },
+  source: jobSource,
+  store: createJobStore({ db, clock }),
+});
+
+const pullJobHandlers = createPullJobHandlers(db, clock, pullService);
 
 const tracer = trace.getTracer("overture");
 
@@ -1132,6 +1182,7 @@ const allJobHandlers: JobHandlers = {
   ...accountJobHandlers,
   ...exportJobHandlers,
   ...masterKeyRotationJobHandlers,
+  ...pullJobHandlers,
   ...testJobHandlers,
 };
 
