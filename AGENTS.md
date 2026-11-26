@@ -11,7 +11,7 @@ Lint, format, typecheck and tests define what is allowed. ADR 0023 lists the rul
 - **Single-sweep CI fix:** watch `gh pr checks <n> --watch --fail-fast`. If `gate` fails, fetch the **full** failed log (`gh run view <id> --log-failed` — NEVER truncate with `tail`), read EVERY error across all 7 parallel checks at once, fix EVERY error in ONE edit batch + ONE commit, run `bun fmt` + targeted `bun test`, and push once so Push #2 is 100% green. CI fails fast across e2e shards: one failing shard cancels the rest.
 - **Box resource queue (`heavy`):** heavy commands (`tsgolint` ~1.5 GB / 150%+ CPU, `vite build`, Playwright, `bun run verify`) route through `~/.local/bin/heavy` via the box `bun`/`bunx` shims — never invoke `~/.bun/bin/bun` directly or set `HEAVY_HELD=1` manually.
 - **Playwright e2e:** off locally during parallel build waves (fast delta CI handles browser regression). Run local browser Playwright ONLY when authoring/editing a browser spec or capturing required `390/1280` UI screenshots, always a single spec file with `--workers=1`.
-- Done means CI `gate` (`verify` 7/7 checks), required CI shards, and CodeQL are 100% green, and you paste the CI verification summary in your report; e2e and the container build run in CI.
+- Done means CI `gate` (`verify` 7/7 checks), required CI shards, the Verification-block check, and CodeQL are 100% green, and you paste the CI verification summary in your report; e2e and the container build run in CI.
 - The commands are `bun lint`, `bun fmt --check`, `bun check`, `bun test src`, `bun run build`, `bun run lint:config`
   and `bun run db:verify`; `bun run verify` runs them all in parallel. `bun run lint:parity` compares lint findings with
   a canary Bun.
@@ -41,14 +41,15 @@ Any PR that touches the web UI (`src/web`, styles, copy) must pass three gates b
 
 ## Work
 
-- One issue, one branch from `main`, one pull request with `Closes #<n>`. Merge only on green CI.
+- One issue, one branch from `main`, one pull request with `Closes #<n>`, its body filled from `.github/PULL_REQUEST_TEMPLATE.md` with a complete `Verification` block (the `verification` job fails on a missing block, an empty or placeholder verdict, or a `not run` line). Merge only on green CI.
 - When reality differs from the spec or an ADR, update it in the same pull request.
 - Never print or commit secrets or `.env`.
 
 ### Parallel wave & merge specifics
 
 - **No concurrent `docs/SPEC.md` edits:** feature PRs in parallel waves must NOT edit `docs/SPEC.md` (prevents `DIRTY` rebase storms); sync `docs/SPEC.md` in one clean wave-end PR per wave.
-- **High-risk PRs require orchestrator `YES, MERGE NOW`:** auth/sessions, billing/Stripe/ledger, database splits or destructive migrations / backups / Litestream, security boundaries / secrets / encryption, deploy/infra workflows, breaking core user flows (`apply`, onboarding, sign-in/up), and Canvas Parity / `DO NOT AUTO-MERGE` PRs never self-merge.
+- **Every PR auto-merges on green CI (owner, 2026-11-26):** workers no longer wait for an orchestrator `"YES, MERGE NOW"`. When `ci-ok` (the `gate` verify checks, worker dry runs, security and restore drill, e2e shards, container build and the Verification-block check) and `Analyze (javascript-typescript)` are green and the branch is up to date with `main`, `.github/workflows/auto-merge.yml` arms `gh pr merge --auto --squash` and the PR merges itself. High-risk PRs (auth/sessions, billing/Stripe/ledger, database splits or destructive migrations / backups / Litestream, security boundaries / secrets / encryption, deploy/infra workflows, breaking core user flows: `apply`, onboarding, sign-in/up) auto-merge too, but a PR labelled `high-risk` must pass the full e2e suite rather than the changed-area shards. Only a PR labelled `do-not-auto-merge` waits for the owner's `YES, MERGE NOW`.
+- **`main` is protected:** the `main protection` ruleset requires a pull request, the `ci-ok` and `Analyze (javascript-typescript)` checks, a branch up to date with `main`, and squash merges, and it blocks force-pushes, deletion and direct pushes for every actor. Never push to `main` directly: open a PR and let it auto-merge on green.
 - **Sequential migrations:** only one open PR may hold the next migration number in `drizzle/` or `drizzle-catalog/` at a time; subsequent PRs renumber on rebase.
 
 ## Agent skills

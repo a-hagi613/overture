@@ -182,8 +182,10 @@
         "allow": [
           "scripts/check-admin-host.test.ts",
           "scripts/check-production.test.ts",
+          "scripts/check-verification.test.ts",
           "scripts/database-sync-guard.test.ts",
           "scripts/design-scale-guard.test.ts",
+          "scripts/e2e-ci.test.ts",
           "scripts/lint-config-guard.test.ts",
           "scripts/ops-live-stripe.test.ts",
           "scripts/setup-stripe.test.ts",
