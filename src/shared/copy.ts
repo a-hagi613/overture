@@ -2599,7 +2599,41 @@ export const copy = {
     groupMany: "Unlocks 3 or more jobs",
     groupFew: "Unlocks 1 or 2 jobs",
     listTitle: "Blocked applications",
-    listNote: "Answer a missing field once to unblock every matching application.",
+    listAria: "Applications waiting on answers",
+    applicationQuestions: (count: number) =>
+      `${String(count)} ${plural(count, "question", "questions")}`,
+    applicationShared: (count: number) =>
+      `${String(count)} ${plural(count, "shared question", "shared questions")}`,
+    everyQuestionOnce: "Each question is asked once",
+    applicationNext: (prompt: string) => `Next: ${prompt}`,
+    openApplication: (company: string, title: string) => `Answer ${company}: ${title}`,
+    answerApplication: "Answer",
+    alsoUsedFor: (count: number) =>
+      count === 1
+        ? "Also used for 1 other application"
+        : `Also used for ${String(count)} other applications`,
+    questionPosition: (current: number, total: number) =>
+      `Question ${String(current)} of ${String(total)}`,
+    formIntro:
+      "Answer every question once. Overture saves each answer to your saved answers unless you turn that off.",
+    saveForFutureForm: "Save these answers for future applications",
+    saveForFutureFormOn:
+      "Every answer becomes a saved answer, reused whenever another form asks it.",
+    saveForFutureFormOff:
+      "Answers are used for this application only. Overture will not save them to your saved answers.",
+    saveForFutureFormMixed:
+      "Some of these answers look specific to this application, so saving is off by default.",
+    saveAndContinue: "Save and continue",
+    savingAnswers: "Saving…",
+    answerEveryQuestion: "Answer every question to save.",
+    savedGroupReady: (count: number) =>
+      count === 1
+        ? "Saved. 1 application moved to Ready"
+        : `Saved. ${String(count)} applications moved to Ready`,
+    savedGroupScoped: "Saved for this application.",
+    skipApplication: "Skip this application",
+    skipApplicationNote:
+      "Skipping closes these questions and skips every application waiting on them.",
     blockedBadge: "Blocked",
     blockedRolesTitle: (count: number) =>
       count === 1 ? "Waiting application" : `Waiting applications (${String(count)})`,

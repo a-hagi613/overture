@@ -302,7 +302,10 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await page.goto(`${demoServer.url}/review`);
       await expect(page.getByRole("heading", { level: 1, name: "Review Queue" })).toBeVisible();
       await expect(
-        page.getByText("What are your salary expectations for this role?").first(),
+        page
+          .getByRole("list", { name: "Applications waiting on answers" })
+          .getByRole("listitem")
+          .first(),
       ).toBeVisible();
 
       await page.goto(`${demoServer.url}/inbox`);

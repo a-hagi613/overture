@@ -190,33 +190,41 @@ test("Review defaults the save-for-future switch and confirms the save", async (
   const page = await context.newPage();
 
   const toggle = page.getByRole("switch", {
-    name: "Save for future applications",
+    name: "Save these answers for future applications",
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${viewsServer.url}/review?question=${encodeURIComponent(reusable.id)}`);
-  await expect(toggle).toBeChecked();
-  await expect(page.getByText("This is a reusable answer, so it is on by default.")).toBeVisible();
 
-  await page.goto(`${viewsServer.url}/review?question=${encodeURIComponent(specific.id)}`);
+  const dialog = page.getByRole("dialog");
+
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(specific.prompt)).toBeVisible();
   await expect(toggle).not.toBeChecked();
   await expect(
-    page.getByText("This answer looks specific to these applications, so it is off by default."),
+    page.getByText(
+      "Some of these answers look specific to this application, so saving is off by default.",
+    ),
   ).toBeVisible();
 
   await toggle.click();
   await expect(toggle).toBeChecked();
   await expect(
-    page.getByText("Overture reuses this answer whenever another form asks the same thing."),
+    page.getByText("Every answer becomes a saved answer, reused whenever another form asks it."),
   ).toBeVisible();
 
-  await page.getByRole("textbox").fill("I use the product every day.");
+  await page.getByRole("textbox", { name: specific.prompt }).fill("I use the product every day.");
+  await page
+    .getByRole("group", { name: reusable.prompt })
+    .getByRole("button", { name: "Yes" })
+    .click();
 
   const answered = page.waitForResponse(
-    (candidate) => candidate.request().method() === "POST" && candidate.url().includes("/answer"),
+    (candidate) =>
+      candidate.request().method() === "POST" && candidate.url().endsWith("/api/reviews/answers"),
   );
 
-  await page.getByRole("button", { name: /Save & unblock/u }).click();
+  await page.getByRole("button", { name: "Save and continue" }).click();
   await answered;
 
   await expect(page.getByText("Saved for this application.")).toBeVisible();

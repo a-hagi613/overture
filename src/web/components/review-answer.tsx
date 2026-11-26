@@ -40,14 +40,28 @@ function inputType(type: QuestionFieldType) {
   return "text";
 }
 
+/**
+ * Renders the interactive control for one Review question. Every field type
+ * produces an input: option types get choice tiles, long text gets a textarea,
+ * and every other type gets a matching text input.
+ * @param props The question shape, its visible label id, accessible name and current value.
+ * @param props.field The question's field type and options.
+ * @param props.label The question prompt used as the accessible name.
+ * @param props.labelledBy The id of the visible question heading.
+ * @param props.value The current answer.
+ * @param props.onChange Receives the new answer.
+ * @returns A fieldset of options, a checkbox, a textarea or a text input.
+ */
 export function ReviewAnswer({
   field,
-  labelledBy = "rev-lbl",
+  label,
+  labelledBy,
   value,
   onChange,
 }: {
   field: AnswerField;
-  labelledBy?: string;
+  label: string;
+  labelledBy: string;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -60,7 +74,7 @@ export function ReviewAnswer({
         aria-labelledby={labelledBy}
         className="m-0 grid min-w-0 grid-cols-1 gap-2 border-0 p-0 sm:grid-cols-2"
       >
-        {field.options.map((option, index) => {
+        {field.options.map((option) => {
           const selected = chosen.includes(option);
 
           return (
@@ -87,20 +101,10 @@ export function ReviewAnswer({
               }}
               type="button"
             >
-              <span className="min-w-0 truncate">{option}</span>
-              <span className="flex shrink-0 items-center gap-2">
-                {selected ? (
-                  <Check aria-hidden="true" className="text-signal-text" size={14} />
-                ) : null}
-                {index < 9 ? (
-                  <kbd
-                    aria-hidden="true"
-                    className="hidden rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block"
-                  >
-                    {String(index + 1)}
-                  </kbd>
-                ) : null}
-              </span>
+              <span className="min-w-0 break-words">{option}</span>
+              {selected ? (
+                <Check aria-hidden="true" className="shrink-0 text-signal-text" size={14} />
+              ) : null}
             </button>
           );
         })}
@@ -112,6 +116,7 @@ export function ReviewAnswer({
     return (
       <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-foreground">
         <input
+          aria-label={`${label}: ${copy.review.checkboxYes}`}
           checked={value === "Yes"}
           className="h-5 w-5 rounded border-input accent-signal"
           onChange={(event) => {
@@ -140,7 +145,7 @@ export function ReviewAnswer({
 
   return (
     <Input
-      ariaLabel={copy.review.yourAnswer}
+      ariaLabel={label}
       className="h-12 text-sm"
       onChange={(event) => {
         onChange(event.target.value);

@@ -13,6 +13,19 @@ const answerBody = z.object({
   saveForFuture: z.boolean().optional(),
 });
 
+const batchAnswerBody = z.object({
+  answers: z
+    .array(
+      z.object({
+        reviewId: z.string().min(1),
+        value: z.string().trim().min(1).max(2000),
+        saveForFuture: z.boolean().optional(),
+      }),
+    )
+    .min(1)
+    .max(50),
+});
+
 export function createReviewRoutes(deps: { auth: Auth; reviews: ReviewService }) {
   const { auth, reviews } = deps;
 
@@ -31,6 +44,34 @@ export function createReviewRoutes(deps: { auth: Auth; reviews: ReviewService })
       reviews: list,
       totalApplications: list.reduce((total, review) => total + review.unlocked, 0),
     });
+  });
+
+  routes.post("/reviews/answers", validJson(batchAnswerBody), async (context) => {
+    const account = await readSessionUser(auth, context.req.raw.headers);
+
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
+    const { answers } = context.req.valid("json");
+
+    if (new Set(answers.map((answer) => answer.reviewId)).size !== answers.length) {
+      return context.json({ error: API_ERRORS.notFound }, 404);
+    }
+
+    const answered = await reviews.answerMany(account.id, answers);
+
+    if (answered === null) {
+      return context.json({ error: API_ERRORS.notFound }, 404);
+    }
+
+    return context.json(answered);
   });
 
   routes.post("/reviews/:id/answer", validJson(answerBody), async (context) => {

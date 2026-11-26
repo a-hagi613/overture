@@ -234,10 +234,7 @@ async function expectReviewMatchesBoard(
   await expect(summary.getByText("Blocked applications")).toBeVisible();
   await expect(summary.getByText("10", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("heading", {
-      level: 2,
-      name: "Are you comfortable with a weekly on-call rotation?",
-    }),
+    page.getByText("Are you comfortable with a weekly on-call rotation?").first(),
   ).toBeVisible();
   await page.evaluate(async () => document.fonts.ready);
 
@@ -286,30 +283,30 @@ test("mobile Review drawer opens from the list and Close returns without hiding 
 
   const firstPrompt = "Are you comfortable with a weekly on-call rotation?";
 
-  const firstPromptButton = page.getByRole("button", {
-    name: /Are you comfortable with a weekly on-call rotation\?/u,
+  const firstApplicationButton = page.getByRole("button", {
+    name: "Answer Northwind Labs: Platform Engineer",
   });
 
-  await expect(page.getByRole("heading", { level: 2, name: firstPrompt })).toBeVisible();
+  await expect(page.getByText(firstPrompt).first()).toBeVisible();
   await expect(page.getByRole("region", { name: "Review summary" })).toBeVisible();
-  await expect(firstPromptButton).toBeVisible();
+  await expect(firstApplicationButton).toBeVisible();
 
-  await firstPromptButton.click();
+  await firstApplicationButton.click();
 
   const dialog = page.getByRole("dialog");
 
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("heading", { name: firstPrompt })).toBeVisible();
-  await expect(page).toHaveURL(/[?&]question=/u);
+  await expect(dialog.getByText(firstPrompt)).toBeVisible();
+  await expect(page).toHaveURL(/[?&]application=/u);
 
   await dialog.getByRole("button", { name: "Close" }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(firstPromptButton).toBeVisible();
+  await expect(firstApplicationButton).toBeVisible();
 
-  await firstPromptButton.click();
+  await firstApplicationButton.click();
 
-  await expect(dialog.getByRole("heading", { name: firstPrompt })).toBeVisible();
+  await expect(dialog.getByText(firstPrompt)).toBeVisible();
 
   await context.close();
 });
