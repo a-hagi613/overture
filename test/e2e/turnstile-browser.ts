@@ -4,7 +4,7 @@ import { expect } from "@playwright/test";
 import { z } from "zod";
 
 export const turnstileBrowserScenarioSchema = z.object({
-  mode: z.enum(["pass", "error", "timeout", "expired", "hang"]).default("pass"),
+  mode: z.enum(["pass", "interaction", "error", "timeout", "expired", "hang"]).default("pass"),
   delayMs: z.number().int().min(0).max(10_000).default(25),
 });
 
@@ -17,10 +17,18 @@ export interface TurnstileStubCounts {
   resets: number;
 }
 
+export interface TurnstileStubRender {
+  action: string | undefined;
+  appearance: string | undefined;
+  execution: string | undefined;
+}
+
 declare global {
   var turnstileStub:
     | {
         counts: () => TurnstileStubCounts;
+        expire: () => void;
+        lastRender: () => TurnstileStubRender | null;
         mode: () => string;
       }
     | undefined;
@@ -58,4 +66,12 @@ export async function waitForTurnstileStub(page: Page) {
   await expect
     .poll(async () => await page.evaluate(() => globalThis.turnstileStub !== undefined))
     .toBe(true);
+}
+
+export async function turnstileStubLastRender(page: Page) {
+  return page.evaluate(() => globalThis.turnstileStub?.lastRender() ?? null);
+}
+
+export async function expireTurnstileStub(page: Page) {
+  await page.evaluate(() => globalThis.turnstileStub?.expire());
 }

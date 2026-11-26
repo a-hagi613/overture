@@ -78,6 +78,11 @@ interface CachedToken {
   token: string;
 }
 
+interface InflightChallenge {
+  consumed: boolean;
+  promise: Promise<TurnstileTokenResult>;
+}
+
 const scriptLoadTimeoutMs = 10_000;
 const configWaitTimeoutMs = 10_000;
 const challengeTimeoutMs = 30_000;
@@ -160,8 +165,10 @@ export function useTurnstile(
   const tokenRef = useRef<CachedToken | null>(null);
   const serialRef = useRef(0);
   const waiterRef = useRef<((result: TurnstileTokenResult) => void) | null>(null);
-  const pendingRef = useRef<Promise<TurnstileTokenResult> | null>(null);
+  const inflightRef = useRef<InflightChallenge | null>(null);
   const needsResetRef = useRef(false);
+  const autoRefreshRef = useRef(false);
+  const refreshRef = useRef<(() => void) | null>(null);
   const siteKeyRef = useRef<string | null | undefined>(siteKey);
   const actionRef = useRef<TurnstileAction>(action);
   const scriptUrlRef = useRef(scriptUrl);
@@ -172,6 +179,10 @@ export function useTurnstile(
     const waiter = waiterRef.current;
 
     waiterRef.current = null;
+
+    if (result.token !== null) {
+      autoRefreshRef.current = false;
+    }
 
     if (waiter === null) {
       if (result.token !== null) {
@@ -197,6 +208,7 @@ export function useTurnstile(
     widgetRef.current = null;
     tokenRef.current = null;
     needsResetRef.current = false;
+    autoRefreshRef.current = false;
 
     if (widget !== null && widget.element.isConnected && globalThis.turnstile !== undefined) {
       globalThis.turnstile.remove(widget.id);
@@ -282,7 +294,7 @@ export function useTurnstile(
     const id = turnstile.render(element, {
       sitekey: key,
       action: widgetAction,
-      appearance: "execute",
+      appearance: "interaction-only",
       execution: "execute",
       callback: (token) => {
         if (active()) {
@@ -295,14 +307,28 @@ export function useTurnstile(
         }
       },
       "expired-callback": () => {
-        if (active()) {
-          tokenRef.current = null;
+        if (!active()) {
+          return;
+        }
+
+        tokenRef.current = null;
+        needsResetRef.current = true;
+
+        if (waiterRef.current !== null) {
           fail("expired");
+        }
+
+        if (!autoRefreshRef.current) {
+          autoRefreshRef.current = true;
+          globalThis.setTimeout(() => {
+            refreshRef.current?.();
+          }, 0);
         }
       },
       "timeout-callback": () => {
         if (active()) {
           tokenRef.current = null;
+          needsResetRef.current = true;
           fail("timeout");
         }
       },
@@ -313,7 +339,7 @@ export function useTurnstile(
     return widgetRef.current;
   }, [fail, removeWidget, settle]);
 
-  const requestToken = useCallback(async () => {
+  const challenge = useCallback(async () => {
     if (siteKeyRef.current === undefined) {
       configReadyRef.current ??= new Promise<void>((resolve) => {
         configWaiterRef.current = resolve;
@@ -330,18 +356,13 @@ export function useTurnstile(
       return failed("missing");
     }
 
-    const cached = tokenRef.current;
+    let widget: RenderedWidget | null;
 
-    if (cached !== null && cached.action === actionRef.current) {
-      tokenRef.current = null;
-      needsResetRef.current = true;
-
-      return succeeded(cached.token);
+    try {
+      widget = await widgetFor();
+    } catch {
+      return failed("error");
     }
-
-    tokenRef.current = null;
-
-    const widget = await widgetFor();
 
     if (widget === null || globalThis.turnstile === undefined) {
       return failed("unavailable");
@@ -351,7 +372,12 @@ export function useTurnstile(
 
     if (needsResetRef.current) {
       needsResetRef.current = false;
-      turnstile.reset(widget.id);
+
+      try {
+        turnstile.reset(widget.id);
+      } catch {
+        return failed("error");
+      }
     }
 
     const result = await new Promise<TurnstileTokenResult>((resolve) => {
@@ -387,29 +413,84 @@ export function useTurnstile(
     return result;
   }, [widgetFor]);
 
+  const prewarm = useCallback(async () => {
+    if (tokenRef.current !== null || inflightRef.current !== null) {
+      return;
+    }
+
+    const key = siteKeyRef.current;
+
+    if (key === null || key === undefined) {
+      return;
+    }
+
+    const widgetAction = actionRef.current;
+    const entry: InflightChallenge = { consumed: false, promise: challenge() };
+
+    inflightRef.current = entry;
+
+    const result = await entry.promise.catch(() => null);
+
+    if (inflightRef.current === entry) {
+      inflightRef.current = null;
+    }
+
+    if (
+      result !== null &&
+      !entry.consumed &&
+      result.token !== null &&
+      siteKeyRef.current === key &&
+      actionRef.current === widgetAction
+    ) {
+      tokenRef.current = { action: widgetAction, token: result.token };
+    }
+  }, [challenge]);
+
+  useEffect(() => {
+    refreshRef.current = () => {
+      void prewarm();
+    };
+  }, [prewarm]);
+
+  const hasToken = useCallback(
+    () => tokenRef.current !== null && tokenRef.current.action === actionRef.current,
+    [],
+  );
+
   const obtainToken = useCallback(async () => {
-    const running = pendingRef.current;
+    autoRefreshRef.current = false;
+
+    const cached = tokenRef.current;
+
+    if (cached !== null && cached.action === actionRef.current) {
+      tokenRef.current = null;
+      needsResetRef.current = true;
+
+      return succeeded(cached.token);
+    }
+
+    tokenRef.current = null;
+
+    const running = inflightRef.current;
 
     if (running !== null) {
-      return await running;
+      running.consumed = true;
+
+      return await running.promise.catch(() => failed("error"));
     }
 
-    const started = requestToken();
+    const entry: InflightChallenge = { consumed: true, promise: challenge() };
 
-    pendingRef.current = started;
+    inflightRef.current = entry;
 
-    let result: TurnstileTokenResult;
+    const result = await entry.promise.catch(() => failed("error"));
 
-    try {
-      result = await started;
-    } catch {
-      result = failed("error");
+    if (inflightRef.current === entry) {
+      inflightRef.current = null;
     }
-
-    pendingRef.current = null;
 
     return result;
-  }, [requestToken]);
+  }, [challenge]);
 
-  return { containerRef, obtainToken };
+  return { containerRef, hasToken, obtainToken, prewarm };
 }

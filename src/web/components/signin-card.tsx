@@ -120,20 +120,27 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
   const [socialProviders, setSocialProviders] = useState<SocialProvider[]>([]);
   const [adminOwnerEmail, setAdminOwnerEmail] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [verifying, setVerifying] = useState(false);
   const pendingRef = useRef(false);
   const siteKey = turnstileConfig === undefined ? undefined : turnstileConfig.siteKey;
 
-  const { containerRef: socialContainer, obtainToken: obtainSocialToken } = useTurnstile(
+  const {
+    containerRef: socialContainer,
+    hasToken: hasSocialToken,
+    obtainToken: obtainSocialToken,
+    prewarm: prewarmSocial,
+  } = useTurnstile(
     socialProviders.length > 0 ? siteKey : null,
     "signin",
     turnstileConfig?.scriptUrl,
   );
 
-  const { containerRef: magicContainer, obtainToken: obtainMagicToken } = useTurnstile(
-    siteKey,
-    "magiclink",
-    turnstileConfig?.scriptUrl,
-  );
+  const {
+    containerRef: magicContainer,
+    hasToken: hasMagicToken,
+    obtainToken: obtainMagicToken,
+    prewarm: prewarmMagic,
+  } = useTurnstile(siteKey, "magiclink", turnstileConfig?.scriptUrl);
 
   useEffect(() => {
     let alive = true;
@@ -175,6 +182,22 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
   }, []);
 
   useEffect(() => {
+    if (siteKey === undefined || siteKey === null) {
+      return;
+    }
+
+    const warm = async () => {
+      await prewarmMagic();
+
+      if (socialProviders.length > 0) {
+        await prewarmSocial();
+      }
+    };
+
+    void warm();
+  }, [prewarmMagic, prewarmSocial, siteKey, socialProviders.length]);
+
+  useEffect(() => {
     if (phase !== "form") {
       return;
     }
@@ -191,8 +214,17 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
     void check();
   }, [navigate, phase, queryClient]);
 
-  const confirmToken = async (obtainToken: () => Promise<TurnstileTokenResult>) => {
+  const confirmToken = async (
+    hasToken: () => boolean,
+    obtainToken: () => Promise<TurnstileTokenResult>,
+  ) => {
+    if (!hasToken()) {
+      setVerifying(true);
+    }
+
     const result = await obtainToken();
+
+    setVerifying(false);
 
     if (result.token === null) {
       setActionError(turnstileFailureMessage(result.failure));
@@ -224,7 +256,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
 
   const onSocial = async (provider: SocialProvider) => {
     await runPending(provider, async () => {
-      const token = await confirmToken(obtainSocialToken);
+      const token = await confirmToken(hasSocialToken, obtainSocialToken);
 
       if (token === null) {
         return;
@@ -268,7 +300,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
   };
 
   const submitMagic = async () => {
-    const token = await confirmToken(obtainMagicToken);
+    const token = await confirmToken(hasMagicToken, obtainMagicToken);
 
     if (token === null) {
       return;
@@ -450,7 +482,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
             <p className="mt-1 text-xs text-muted-foreground">{copy.signIn.sentDetail}</p>
           </output>
           <Button
-            ariaBusy={busyResend}
+            ariaBusy={busyResend || verifying}
             className="w-full"
             disabled={pending !== null}
             onClick={() => {
@@ -459,7 +491,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
             variant="secondary"
           >
             {busyResend ? <BusyIndicator /> : null}
-            {copy.signIn.resend}
+            {verifying ? copy.signIn.verifying : copy.signIn.resend}
           </Button>
           <p className="text-center text-sm text-muted-foreground">{copy.signIn.resendHint}</p>
           <Button
@@ -475,8 +507,18 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
             {copy.signIn.changeEmail}
           </Button>
         </div>
-        <div data-turnstile="social" ref={socialContainer} />
-        <div data-turnstile="magic" ref={magicContainer} />
+        <div className="mt-3 grid min-h-[65px] w-full place-items-center">
+          <div
+            className="col-start-1 row-start-1 flex w-full justify-center"
+            data-turnstile="social"
+            ref={socialContainer}
+          />
+          <div
+            className="col-start-1 row-start-1 flex w-full justify-center"
+            data-turnstile="magic"
+            ref={magicContainer}
+          />
+        </div>
         {actionError === null ? null : (
           <p className="mt-3 text-center text-xs font-semibold text-need" role="alert">
             {actionError}
@@ -541,6 +583,7 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
             primary
             refused={isRefused}
             submitLabel={isSignUp ? copy.signIn.signUpMagicSubmit : copy.signIn.magicSubmit}
+            verifying={verifying}
           />
           {isRefused ? null : (
             <p className="mt-1 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
@@ -549,8 +592,18 @@ export function SignInCard({ mode = "signin" }: { mode?: "signin" | "signup" }) 
             </p>
           )}
         </div>
-        <div data-turnstile="social" ref={socialContainer} />
-        <div data-turnstile="magic" ref={magicContainer} />
+        <div className="mt-3 grid min-h-[65px] w-full place-items-center">
+          <div
+            className="col-start-1 row-start-1 flex w-full justify-center"
+            data-turnstile="social"
+            ref={socialContainer}
+          />
+          <div
+            className="col-start-1 row-start-1 flex w-full justify-center"
+            data-turnstile="magic"
+            ref={magicContainer}
+          />
+        </div>
         {actionError === null ? null : (
           <p className="mt-3 text-center text-xs font-semibold text-need" role="alert">
             {actionError}

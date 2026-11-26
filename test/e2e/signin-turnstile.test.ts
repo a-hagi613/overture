@@ -1,9 +1,13 @@
+import type { Page } from "@playwright/test";
+
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, test } from "./app.fixture.ts";
 import { clearSinkMail, setTurnstileScenario, sinkMailCount } from "./sign-in.ts";
 import {
+  expireTurnstileStub,
   setTurnstileBrowserScenario,
   turnstileStubCounts,
+  turnstileStubLastRender,
   waitForTurnstileStub,
 } from "./turnstile-browser.ts";
 
@@ -11,6 +15,7 @@ const labels = {
   email: "Email",
   magic: "Send sign-in link",
   sent: "Link sent to",
+  verifying: "Verifying…",
 };
 
 const failureModes = [
@@ -28,7 +33,13 @@ const failureModes = [
   },
 ] as const;
 
-test("a click shows pending feedback at once and runs a single bot check", async ({
+async function waitForPrewarm(page: Page) {
+  await expect
+    .poll(async () => (await turnstileStubCounts(page)).executes)
+    .toBeGreaterThanOrEqual(2);
+}
+
+test("the bot check is interaction-only and pre-verified before the click", async ({
   page,
   request,
   isolatedAppServer,
@@ -41,23 +52,61 @@ test("a click shows pending feedback at once and runs a single bot check", async
 
   await page.goto(`${url}/signin`);
   await waitForTurnstileStub(page);
+  await waitForPrewarm(page);
 
-  expect((await turnstileStubCounts(page)).renders).toBe(0);
+  const beforeClick = await turnstileStubCounts(page);
+  const lastRender = await turnstileStubLastRender(page);
+
+  expect(beforeClick.renders).toBe(2);
+  expect(beforeClick.executes).toBe(2);
+  expect(lastRender?.appearance).toBe("interaction-only");
+  expect(lastRender?.execution).toBe("execute");
 
   await page.getByLabel(labels.email).fill(authTestIdentity.ownerEmail);
+
+  await page.getByRole("button", { name: labels.magic }).click();
+  await expect(page.getByText(labels.sent)).toBeVisible();
+
+  const afterClick = await turnstileStubCounts(page);
+
+  expect(afterClick.executes).toBe(beforeClick.executes);
+  expect(afterClick.renders).toBe(beforeClick.renders);
+  expect(afterClick.resets).toBe(0);
+  expect(await sinkMailCount(url, request)).toBe(1);
+});
+
+test("Verifying… keeps the primary button in place while a token is pending", async ({
+  page,
+  request,
+  isolatedAppServer,
+}) => {
+  const { url } = isolatedAppServer;
+
+  await setTurnstileBrowserScenario(request, url, { delayMs: 1500, mode: "pass" });
+  await setTurnstileScenario(request, url, { action: "magiclink" });
+  await clearSinkMail(url, request);
+
+  await page.goto(`${url}/signin`);
+  await waitForTurnstileStub(page);
+  await page.getByLabel(labels.email).fill(authTestIdentity.ownerEmail);
+
   const submit = page.getByRole("button", { name: labels.magic });
+  const before = await submit.boundingBox();
 
   await submit.click();
 
-  await expect(submit).toBeDisabled();
-  await expect(submit).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByText(labels.sent)).toBeVisible();
+  const verifying = page.getByRole("button", { name: labels.verifying });
 
-  const counts = await turnstileStubCounts(page);
+  await expect(verifying).toBeVisible();
 
-  expect(counts.renders).toBe(1);
-  expect(counts.executes).toBe(1);
-  expect(counts.resets).toBe(0);
+  const during = await verifying.boundingBox();
+
+  expect(during?.x).toBe(before?.x);
+  expect(during?.y).toBe(before?.y);
+  expect(during?.width).toBe(before?.width);
+  expect(during?.height).toBe(before?.height);
+
+  await expect(page.getByText(labels.sent)).toBeVisible({ timeout: 10_000 });
   expect(await sinkMailCount(url, request)).toBe(1);
 });
 
@@ -74,9 +123,8 @@ test("repeated clicks never render extra widgets or reset the challenge", async 
 
   await page.goto(`${url}/signin`);
   await waitForTurnstileStub(page);
+  await waitForPrewarm(page);
   await page.getByLabel(labels.email).fill(authTestIdentity.ownerEmail);
-
-  expect((await turnstileStubCounts(page)).renders).toBe(0);
 
   const submit = page.getByRole("button", { name: labels.magic });
 
@@ -90,8 +138,8 @@ test("repeated clicks never render extra widgets or reset the challenge", async 
 
   const first = await turnstileStubCounts(page);
 
-  expect(first.renders).toBe(1);
-  expect(first.executes).toBe(1);
+  expect(first.renders).toBe(2);
+  expect(first.executes).toBe(2);
   expect(first.resets).toBe(0);
   expect(await sinkMailCount(url, request)).toBe(1);
 
@@ -100,13 +148,13 @@ test("repeated clicks never render extra widgets or reset the challenge", async 
 
   const second = await turnstileStubCounts(page);
 
-  expect(second.renders).toBe(1);
-  expect(second.executes).toBe(2);
+  expect(second.renders).toBe(2);
+  expect(second.executes).toBe(3);
   expect(second.resets).toBe(1);
 });
 
 for (const failure of failureModes) {
-  test(`a ${failure.mode} bot check shows a clear message and retries cleanly`, async ({
+  test(`a ${failure.mode} bot check shows a clear message and retries without clearing the email`, async ({
     page,
     request,
     isolatedAppServer,
@@ -126,11 +174,103 @@ for (const failure of failureModes) {
 
     await expect(page.getByRole("alert")).toContainText(failure.message);
     await expect(submit).toBeEnabled();
+    await expect(page.getByLabel(labels.email)).toHaveValue(authTestIdentity.ownerEmail);
 
     await setTurnstileBrowserScenario(request, url, { delayMs: 25, mode: "pass" });
     await submit.click();
 
     await expect(page.getByText(labels.sent)).toBeVisible();
     expect(await sinkMailCount(url, request)).toBe(1);
+  });
+}
+
+test("an expired token is refreshed in the background before the next click", async ({
+  page,
+  request,
+  isolatedAppServer,
+}) => {
+  const { url } = isolatedAppServer;
+
+  await setTurnstileBrowserScenario(request, url, { delayMs: 25, mode: "pass" });
+  await setTurnstileScenario(request, url, { action: "magiclink" });
+  await clearSinkMail(url, request);
+
+  await page.goto(`${url}/signin`);
+  await waitForTurnstileStub(page);
+  await waitForPrewarm(page);
+  await page.getByLabel(labels.email).fill(authTestIdentity.ownerEmail);
+
+  const beforeExpiry = await turnstileStubCounts(page);
+
+  await expireTurnstileStub(page);
+
+  await expect
+    .poll(async () => (await turnstileStubCounts(page)).executes)
+    .toBe(beforeExpiry.executes + 2);
+
+  const refreshed = await turnstileStubCounts(page);
+
+  await page.getByRole("button", { name: labels.magic }).click();
+  await expect(page.getByText(labels.sent)).toBeVisible();
+
+  const afterClick = await turnstileStubCounts(page);
+
+  expect(afterClick.executes).toBe(refreshed.executes);
+  expect(await sinkMailCount(url, request)).toBe(1);
+});
+
+for (const width of [390, 1280]) {
+  test(`the bot check is centred inside the input column without moving the button at ${String(width)}`, async ({
+    page,
+    request,
+    isolatedAppServer,
+  }) => {
+    const { url } = isolatedAppServer;
+
+    await page.setViewportSize({ height: width === 1280 ? 900 : 844, width });
+    await setTurnstileBrowserScenario(request, url, { delayMs: 25, mode: "pass" });
+    await setTurnstileScenario(request, url, { action: "magiclink" });
+
+    await page.goto(`${url}/signin`);
+    await waitForTurnstileStub(page);
+    await waitForPrewarm(page);
+
+    const submit = page.getByRole("button", { name: labels.magic });
+    const hiddenButton = await submit.boundingBox();
+
+    await setTurnstileBrowserScenario(request, url, { delayMs: 2000, mode: "interaction" });
+    await page.reload();
+    await waitForTurnstileStub(page);
+
+    const widget = page.locator('[data-turnstile-stub="widget"]').first();
+
+    await expect(widget).toBeVisible();
+
+    const widgetBox = await widget.boundingBox();
+    const cardBox = await page.locator('section[aria-labelledby="signin-heading"]').boundingBox();
+    const visibleButton = await submit.boundingBox();
+
+    expect(widgetBox).not.toBeNull();
+    expect(cardBox).not.toBeNull();
+    expect(hiddenButton).not.toBeNull();
+    expect(visibleButton).not.toBeNull();
+
+    if (widgetBox !== null && cardBox !== null) {
+      const widgetCentre = widgetBox.x + widgetBox.width / 2;
+      const cardCentre = cardBox.x + cardBox.width / 2;
+
+      expect(Math.abs(widgetCentre - cardCentre)).toBeLessThanOrEqual(1);
+    }
+
+    expect(visibleButton?.x).toBe(hiddenButton?.x);
+    expect(visibleButton?.y).toBe(hiddenButton?.y);
+    expect(visibleButton?.width).toBe(hiddenButton?.width);
+    expect(visibleButton?.height).toBe(hiddenButton?.height);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+
+    expect(overflow).toBe(false);
   });
 }

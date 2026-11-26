@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const turnstileBrowserScenarioBody = z.object({
-  mode: z.enum(["pass", "error", "timeout", "expired", "hang"]).default("pass"),
+  mode: z.enum(["pass", "interaction", "error", "timeout", "expired", "hang"]).default("pass"),
   delayMs: z.coerce.number().int().min(0).max(10_000).default(25),
 });
 

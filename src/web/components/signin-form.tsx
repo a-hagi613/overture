@@ -14,6 +14,7 @@ export function SignInForm({
   primary = false,
   refused = false,
   submitLabel = copy.signIn.magicSubmit,
+  verifying = false,
 }: {
   email: string;
   onEmail: (value: string) => void;
@@ -23,6 +24,7 @@ export function SignInForm({
   primary?: boolean;
   refused?: boolean;
   submitLabel?: string;
+  verifying?: boolean;
 }) {
   return (
     <form
@@ -59,7 +61,7 @@ export function SignInForm({
         </p>
       ) : null}
       <Button
-        ariaBusy={busy}
+        ariaBusy={busy || verifying}
         className="w-full"
         disabled={pending}
         size="default"
@@ -67,8 +69,11 @@ export function SignInForm({
         variant={refused || primary ? "primary" : "secondary"}
       >
         {busy ? <BusyIndicator /> : null}
-        {submitLabel}
+        {verifying ? copy.signIn.verifying : submitLabel}
       </Button>
+      <span aria-live="polite" className="sr-only">
+        {verifying ? copy.signIn.verifying : ""}
+      </span>
     </form>
   );
 }
