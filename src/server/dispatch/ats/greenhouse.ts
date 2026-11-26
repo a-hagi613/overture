@@ -43,8 +43,8 @@ export interface GreenhouseRunPlan {
 }
 
 export interface GreenhouseHooks {
-  onWillSubmit: () => void;
-  onResponse: (status: number | null) => void;
+  onWillSubmit: () => Promise<void> | void;
+  onResponse: (status: number | null) => Promise<void> | void;
   requestCode: () => Promise<string | null>;
   onCodeTyped: () => void;
 }
@@ -146,7 +146,7 @@ export const runGreenhouseAttempt: (
   }
 
   const submitAndWatch = async () => {
-    hooks.onWillSubmit();
+    await hooks.onWillSubmit();
 
     const submitPathname = await submitPathnameOf(page, null);
 
@@ -158,7 +158,7 @@ export const runGreenhouseAttempt: (
     const [, response] = settled;
     const status = response.status === "fulfilled" ? response.value.status() : null;
 
-    hooks.onResponse(status);
+    await hooks.onResponse(status);
 
     return status;
   };

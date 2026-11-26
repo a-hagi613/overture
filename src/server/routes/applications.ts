@@ -378,7 +378,7 @@ export function createApplicationRoutes(
         .values({
           at: now,
           applicationId: id,
-          detail: null,
+          detail: JSON.stringify({ reason: "user_stage_move" }),
           fromValue: row.stage,
           id: crypto.randomUUID(),
           kind: "stage",
@@ -464,7 +464,7 @@ export function createApplicationRoutes(
         .values({
           at: now,
           applicationId: id,
-          detail: null,
+          detail: JSON.stringify({ reason: "user_undo" }),
           fromValue: row.stage,
           id: crypto.randomUUID(),
           kind: "stage",
@@ -546,7 +546,7 @@ export function createApplicationRoutes(
         .values({
           at: now,
           applicationId: id,
-          detail: null,
+          detail: JSON.stringify({ reason: "user_withdraw" }),
           fromValue: row.stage,
           id: crypto.randomUUID(),
           kind: "stage",

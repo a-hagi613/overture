@@ -45,8 +45,8 @@ export interface PersonioRunPlan {
 }
 
 export interface PersonioHooks {
-  onWillSubmit: () => void;
-  onResponse: (status: number | null) => void;
+  onWillSubmit: () => Promise<void> | void;
+  onResponse: (status: number | null) => Promise<void> | void;
 }
 
 export type PersonioOutcome =
@@ -497,7 +497,7 @@ export const runPersonioAttempt: (
 
   const submitButton = scope.root.locator("button[type='submit']").first();
 
-  hooks.onWillSubmit();
+  await hooks.onWillSubmit();
 
   const settled = await Promise.allSettled([
     submitButton.click({ timeout: APPLICATION_RESPONSE_MS }),
@@ -512,7 +512,7 @@ export const runPersonioAttempt: (
   const [clickOutcome, response] = settled;
   const status = response.status === "fulfilled" ? response.value.status() : null;
 
-  hooks.onResponse(status);
+  await hooks.onResponse(status);
 
   if (clickOutcome.status === "rejected") {
     return {

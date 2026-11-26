@@ -86,7 +86,7 @@ export function returnToReady(
       .values({
         applicationId,
         at: now,
-        detail: JSON.stringify({ changes: [problem] }),
+        detail: JSON.stringify({ changes: [problem], reason: "approval_invalidated" }),
         fromValue: "approved",
         id: crypto.randomUUID(),
         kind: "status",

@@ -800,12 +800,17 @@ export function createPreparationService(deps: {
       (row.ats === "workable" || row.ats === "personio") &&
       isKillSwitchEnabled(db, "ats", row.ats)
     ) {
-      const updated = updatePreparableApplication(db, applicationId, {
-        status: "skipped",
-        statusReason: "ats_not_enabled",
-        stage: null,
-        updatedAt: clock.now(),
-      });
+      const updated = updatePreparableApplication(
+        db,
+        applicationId,
+        {
+          status: "skipped",
+          statusReason: "ats_not_enabled",
+          stage: null,
+          updatedAt: clock.now(),
+        },
+        { clock, reason: "ats_not_enabled" },
+      );
 
       return updated ? { status: "skipped" as const, blocked: 0 } : null;
     }
@@ -839,12 +844,17 @@ export function createPreparationService(deps: {
         `application ${applicationId} skipped: ${knockout.statusReason} (${knockout.explanation})`,
       );
 
-      const skipped = updatePreparableApplication(db, applicationId, {
-        status: "skipped",
-        statusReason: knockout.statusReason,
-        stage: null,
-        updatedAt: clock.now(),
-      });
+      const skipped = updatePreparableApplication(
+        db,
+        applicationId,
+        {
+          status: "skipped",
+          statusReason: knockout.statusReason,
+          stage: null,
+          updatedAt: clock.now(),
+        },
+        { clock, reason: knockout.statusReason },
+      );
 
       if (!skipped) {
         return null;
@@ -868,12 +878,17 @@ export function createPreparationService(deps: {
         reason: "unsupported_login_required",
       });
 
-      const skipped = updatePreparableApplication(db, applicationId, {
-        status: "skipped",
-        statusReason: LOGIN_WALL_REASON,
-        stage: null,
-        updatedAt: clock.now(),
-      });
+      const skipped = updatePreparableApplication(
+        db,
+        applicationId,
+        {
+          status: "skipped",
+          statusReason: LOGIN_WALL_REASON,
+          stage: null,
+          updatedAt: clock.now(),
+        },
+        { clock, reason: LOGIN_WALL_REASON },
+      );
 
       return skipped ? { status: "skipped" as const, blocked: 0 } : null;
     }
@@ -1060,12 +1075,17 @@ export function createPreparationService(deps: {
     }
 
     if (unsupportedReason !== null) {
-      const skipped = updatePreparableApplication(db, applicationId, {
-        status: "skipped",
-        statusReason: unsupportedReason,
-        stage: null,
-        updatedAt: clock.now(),
-      });
+      const skipped = updatePreparableApplication(
+        db,
+        applicationId,
+        {
+          status: "skipped",
+          statusReason: unsupportedReason,
+          stage: null,
+          updatedAt: clock.now(),
+        },
+        { clock, reason: unsupportedReason },
+      );
 
       if (!skipped) {
         return null;
@@ -1113,13 +1133,21 @@ export function createPreparationService(deps: {
     if (status !== row.status) {
       const now = clock.now();
 
-      changed = updatePreparableApplication(db, applicationId, {
-        status,
-        statusReason: status === "needs_review" ? "unknown_question" : null,
-        stage: stageForStatus(status),
-        readyAt: status === "ready" ? now : null,
-        updatedAt: now,
-      });
+      changed = updatePreparableApplication(
+        db,
+        applicationId,
+        {
+          status,
+          statusReason: status === "needs_review" ? "unknown_question" : null,
+          stage: stageForStatus(status),
+          readyAt: status === "ready" ? now : null,
+          updatedAt: now,
+        },
+        {
+          clock,
+          reason: status === "needs_review" ? "unknown_question" : "prepared",
+        },
+      );
     }
 
     if (!changed) {

@@ -75,6 +75,154 @@ export const ackAlertsResponseSchema = z.object({
   readAt: z.number(),
 });
 
+const applicationLookupTimelineSchema = z.object({
+  at: z.number(),
+  attemptId: z.string().nullable(),
+  detail: z.record(z.string(), z.unknown()).nullable(),
+  fromValue: z.string().nullable(),
+  id: z.string(),
+  kind: z.string(),
+  reason: z.string().nullable(),
+  source: z.string(),
+  toValue: z.string().nullable(),
+});
+
+export const applicationLookupSchema = z.object({
+  now: z.number(),
+  application: z
+    .object({
+      approvedAt: z.number().nullable(),
+      ats: z.string().nullable(),
+      attempts: z.number(),
+      closedReason: z.string().nullable(),
+      companyName: z.string(),
+      cost: z.object({
+        browserMicros: z.number(),
+        llmMicros: z.number(),
+        recordedAt: z.number().nullable(),
+        retryMicros: z.number(),
+      }),
+      createdAt: z.number(),
+      id: z.string(),
+      origin: z.string(),
+      postingTitle: z.string(),
+      postingUrl: z.string(),
+      readyAt: z.number().nullable(),
+      scheduledFor: z.number().nullable(),
+      scoreAtQueue: z.number().nullable(),
+      sentAt: z.number().nullable(),
+      stage: z.string().nullable(),
+      stageLocked: z.boolean(),
+      status: z.string(),
+      statusReason: z.string().nullable(),
+      updatedAt: z.number(),
+      userId: z.string(),
+    })
+    .nullable(),
+  attempts: z.array(
+    z.object({
+      browserMs: z.number().nullable(),
+      costMicros: z.number().nullable(),
+      endedAt: z.number().nullable(),
+      errorCode: z.string().nullable(),
+      id: z.string(),
+      n: z.number(),
+      outcome: z.string().nullable(),
+      provider: z.string(),
+      providerSessionId: z.string().nullable(),
+      startedAt: z.number(),
+      submitClickedAt: z.number().nullable(),
+      submitResponseStatus: z.number().nullable(),
+    }),
+  ),
+  balance: z
+    .object({
+      balances: z.record(z.string(), z.number()),
+      grants: z.array(
+        z.object({
+          expiresAt: z.number().nullable(),
+          id: z.string(),
+          quantity: z.number(),
+          source: z.string(),
+          startsAt: z.number(),
+        }),
+      ),
+      ledger: z.array(
+        z.object({
+          amount: z.number(),
+          createdAt: z.number(),
+          creditAccount: z.string(),
+          debitAccount: z.string(),
+          grantId: z.string(),
+          id: z.string(),
+          kind: z.string(),
+        }),
+      ),
+    })
+    .nullable(),
+  confirmation: z.object({
+    receipt: z.object({ confirmedAt: z.number(), messageId: z.string() }).nullable(),
+    snapshot: z
+      .object({
+        approvedAt: z.number().nullable(),
+        confirmedBy: z.string(),
+        consentVersion: z.string(),
+        costMicros: z.number(),
+        provider: z.string(),
+        submittedAt: z.number(),
+      })
+      .nullable(),
+  }),
+  mail: z.array(
+    z.object({
+      employerStarted: z.boolean(),
+      id: z.string(),
+      lastMessageAt: z.number(),
+      messages: z.array(
+        z.object({
+          auth: z.string(),
+          classification: z.string().nullable(),
+          createdAt: z.number(),
+          direction: z.string(),
+          id: z.string(),
+          outStatus: z.string().nullable(),
+          senderDomain: z.string(),
+          subject: z.string().nullable(),
+        }),
+      ),
+      subject: z.string().nullable(),
+    }),
+  ),
+  queue: z.object({
+    jobs: z.array(
+      z.object({
+        attempts: z.number(),
+        createdAt: z.number(),
+        id: z.string(),
+        kind: z.string(),
+        lastError: z.string().nullable(),
+        maxAttempts: z.number(),
+        runAt: z.number(),
+        status: z.string(),
+        updatedAt: z.number(),
+      }),
+    ),
+    scheduledFor: z.number().nullable(),
+  }),
+  screenshots: z.array(
+    z.object({
+      at: z.number(),
+      attemptId: z.string(),
+      bytes: z.number().nullable(),
+      key: z.string(),
+      phase: z.string(),
+    }),
+  ),
+  timeline: z.array(applicationLookupTimelineSchema),
+});
+
+export type ApplicationLookup = z.infer<typeof applicationLookupSchema>;
+
 export const overviewSchema = z.object({
   now: z.number(),
   jobs: z.record(z.string(), z.number()),
@@ -892,6 +1040,12 @@ export const replyToSupportTicket = async (id: string, message: string) =>
     `/admin/api/support/${encodeURIComponent(id)}/reply`,
     { message },
     adminSupportReplyResponseSchema,
+  );
+
+export const loadApplicationLookup = async (applicationId: string) =>
+  adminGet(
+    `/admin/api/applications/${encodeURIComponent(applicationId)}/lookup`,
+    applicationLookupSchema,
   );
 
 export const loadSettings = async () => adminGet("/admin/api/settings", settingsResponseSchema);

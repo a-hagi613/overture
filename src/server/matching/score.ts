@@ -16,6 +16,7 @@ import type { SpendGate } from "../billing/spend.ts";
 import { ungatedSpend } from "../billing/spend.ts";
 import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
+import { recordLlmSchemaRejection } from "../platform/llm/schema-rejections.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { getSettingNumber } from "../platform/settings/index.ts";
@@ -309,6 +310,8 @@ export function createMatchingService(deps: MatchDeps) {
 
       if (parsed.success) {
         scores.set(call.customId, parsed.data);
+      } else {
+        recordLlmSchemaRejection(db, clock, { model: call.model, purpose: SCORE_PURPOSE });
       }
     }
 

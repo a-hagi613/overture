@@ -9,7 +9,8 @@ import type { SpendGate } from "../billing/spend.ts";
 
 import { isAtsMailDomain } from "../../shared/ats-mail-domains.ts";
 import { isSameHostOrSubdomain } from "../../shared/host-match.ts";
-import { applications, applicationEvents, mailThreads, messages } from "../platform/db/schema.ts";
+import { applications, mailThreads, messages } from "../platform/db/schema.ts";
+import { recordApplicationEvent } from "../applications/events.ts";
 import {
   notifyCardMoved,
   notifyEmployerReply,
@@ -213,19 +214,15 @@ export function createMailMoves(deps: {
         .where(eq(applications.id, input.applicationId))
         .run();
 
-      tx.insert(applicationEvents)
-        .values({
-          applicationId: input.applicationId,
-          at: now,
-          detail: null,
-          fromValue: fromStage,
-          id: crypto.randomUUID(),
-          kind: "stage",
-          source: "email",
-          toValue: target.stage,
-          userId: input.userId,
-        })
-        .run();
+      recordApplicationEvent(tx, clock, {
+        applicationId: input.applicationId,
+        fromValue: fromStage,
+        kind: "stage",
+        reason: `mail:${input.classification}`,
+        source: "email",
+        toValue: target.stage,
+        userId: input.userId,
+      });
     });
 
     const context = db

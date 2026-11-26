@@ -8,6 +8,7 @@ import type { SpendGate } from "../billing/spend.ts";
 
 import { checkLlmCaps } from "../platform/llm/caps.ts";
 import { recordLlmUsage } from "../platform/llm/usage.ts";
+import { recordLlmSchemaRejection } from "../platform/llm/schema-rejections.ts";
 import { raiseAlert } from "../platform/alerts.ts";
 import { logInfo } from "../platform/log.ts";
 import { ungatedSpend } from "../billing/spend.ts";
@@ -144,6 +145,11 @@ export async function classifyWithLlm(
       const { classification: found } = parsed.data;
 
       classification = found;
+    } else {
+      recordLlmSchemaRejection(deps.db, deps.clock, {
+        model: call.model,
+        purpose: EMAIL_CLASSIFY_PURPOSE,
+      });
     }
   }
 

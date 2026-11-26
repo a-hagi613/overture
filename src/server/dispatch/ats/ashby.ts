@@ -51,8 +51,8 @@ export interface AshbyRunPlan {
 }
 
 export interface AshbyHooks {
-  onWillSubmit: () => void;
-  onResponse: (status: number | null) => void;
+  onWillSubmit: () => Promise<void> | void;
+  onResponse: (status: number | null) => Promise<void> | void;
 }
 
 export type AshbyOutcome =
@@ -707,7 +707,7 @@ export const runAshbyAttempt: (
 
   const submitButton = scope.root.locator(".ashby-application-form-submit-button").first();
 
-  hooks.onWillSubmit();
+  await hooks.onWillSubmit();
 
   const settled = await Promise.allSettled([
     submitButton.click({ timeout: APPLICATION_RESPONSE_MS }),
@@ -728,7 +728,7 @@ export const runAshbyAttempt: (
   const [clickOutcome, response] = settled;
   const status = response.status === "fulfilled" ? response.value.status() : null;
 
-  hooks.onResponse(status);
+  await hooks.onResponse(status);
 
   if (clickOutcome.status === "rejected") {
     return {

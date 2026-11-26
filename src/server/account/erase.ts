@@ -58,7 +58,12 @@ type VendorProfile = z.infer<typeof vendorProfileSchema>;
 type AccountErasure = typeof accountErasures.$inferSelect;
 
 function objectPrefixesFor(userId: string) {
-  return [`files/${userId}/`, `mail/${userId}/`, `exports/${userId}/`] as const;
+  return [
+    `files/${userId}/`,
+    `mail/${userId}/`,
+    `exports/${userId}/`,
+    `screenshots/${userId}/`,
+  ] as const;
 }
 
 function parseVendorProfiles(raw: string) {

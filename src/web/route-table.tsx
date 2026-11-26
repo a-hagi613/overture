@@ -112,6 +112,11 @@ const AdminSupportPage = lazyRoute(
   "AdminSupportPage",
 );
 
+const ApplicationLookupPage = lazyRoute(
+  async () => import("./routes/admin/lookup.tsx"),
+  "ApplicationLookupPage",
+);
+
 const JobsPage = lazyRoute(async () => import("./routes/admin/jobs.tsx"), "JobsPage");
 
 const ProviderReportPage = lazyRoute(
@@ -209,6 +214,7 @@ const appShellChildren: RouteObject[] = withRouteError([
 const adminShellChildren: RouteObject[] = withRouteError([
   { path: "/admin", element: <OverviewPage /> },
   { path: "/admin/support", element: <AdminSupportPage /> },
+  { path: "/admin/lookup", element: <ApplicationLookupPage /> },
   { path: "/admin/jobs", element: <JobsPage /> },
   { path: "/admin/provider-report", element: <ProviderReportPage /> },
   { path: "/admin/attempts", element: <AttemptsPage /> },

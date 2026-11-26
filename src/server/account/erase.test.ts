@@ -36,12 +36,13 @@ import { masterKeyringFor } from "../platform/crypto.ts";
 const USER_ID = "user-erase-1";
 const PROFILE_ID = "vendor-profile-1";
 const MAILBOX_LOCAL_PART = "in-erase-test";
-const OBJECT_PREFIXES = ["files", "mail", "exports"] as const;
+const OBJECT_PREFIXES = ["files", "mail", "exports", "screenshots"] as const;
 
 const OBJECT_KEYS = [
   `files/${USER_ID}/resume.pdf`,
   `mail/${USER_ID}/letter.pdf`,
   `exports/${USER_ID}/data.zip`,
+  `screenshots/${USER_ID}/app-1/attempt-1-before_submit-1764000000000.png`,
 ];
 
 const payload = JSON.stringify({ userId: USER_ID });
@@ -382,7 +383,7 @@ describe("account erasure across external cleanup failures", () => {
         }),
       );
 
-      expect(leftovers).toEqual([null, null, null]);
+      expect(leftovers).toEqual(OBJECT_KEYS.map(() => null));
 
       expect(erasure(account)?.objectsCleanedAt).not.toBeNull();
       expect(erasure(account)?.lastError).toBeNull();
