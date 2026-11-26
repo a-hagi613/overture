@@ -32,6 +32,10 @@ risk that one shared `mail.tryoverture.com` domain is blocklisted for every user
 used on new application forms unless the person chooses their personal email in Profile → Account. The forwarding
 address in this section is unchanged.*
 
+*Amended again 2026-11-26 (#679, #693): the apply alias is now the only inbound path. It is provisioned with the
+account, every accepted message is copied to that user's current verified login email, and there is no shared or owner
+fallback anywhere. The `in-{id}-{mac}` forwarding address and its filter guide are retired (ADR 0040).*
+
 ## Inbound mail goes through Cloudflare Email Routing and an Email Worker
 
 - Email Routing on the apex `tryoverture.com` sends the catch-all to one Email Worker. Literal rules such as `hello@`

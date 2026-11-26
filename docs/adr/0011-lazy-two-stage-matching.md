@@ -10,3 +10,7 @@ Code filters and ranks every candidate Posting for free; Claude Haiku 5.5 scores
 
 - Scoring every candidate: about 15 times the cost for no extra sends.
 - No LLM in matching: code alone cannot judge fit well enough to send on its own.
+
+*Amendment of 2026-11-26 (#679, #686): the lazy threshold and its 3 × daily-cap search bound are gone. The pool is the
+role + location code filter; the score is one Haiku 5.5 job per call, stored once, and the order is a band-first code
+sort, never a ranking-point score. See ADR 0045 ("Matching score and sort").*
