@@ -1,11 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase, DatabaseWriter } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PushSender } from "../platform/ports/push.ts";
 
-import { notifications, pushSubscriptions } from "../platform/db/schema.ts";
+import { bgJobs, notifications, pushSubscriptions } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { isDemoUser } from "../demo/role.ts";
 import { isNotificationKind } from "../../shared/notifications.ts";
@@ -54,12 +54,47 @@ export function hasActivePushEndpoint(db: Pick<AppDatabase, "select">, userId: s
  * @param db The application database.
  * @param clock The clock the job is scheduled from.
  * @param notificationId The notification to push.
+ * @param options The delay before the push runs; a batched row waits out its window.
  * @returns The queue receipt, with `inserted` false on a repeated request.
  */
-export function enqueueNotificationPush(db: DatabaseWriter, clock: Clock, notificationId: string) {
+export function enqueueNotificationPush(
+  db: DatabaseWriter,
+  clock: Clock,
+  notificationId: string,
+  options: { delayMs?: number } = {},
+) {
   return enqueueJob(db, clock, PUSH_NOTIFY_JOB_KIND, pushNotifyPayload(notificationId), {
     dedupeKey: `${PUSH_NOTIFY_JOB_KIND}:${notificationId}`,
+    runAt: clock.now() + (options.delayMs ?? 0),
   });
+}
+
+/**
+ * Move a queued push later, so a burst keeps debouncing instead of sending the
+ * first event's copy. A push that already ran is left alone: the row and the
+ * list still carry the grouped copy, and the phone is not buzzed again.
+ * @param db The application database.
+ * @param clock The clock the delay is measured from.
+ * @param notificationId The notification whose push moves.
+ * @param delayMs How long from now the push should run.
+ */
+export function deferNotificationPush(
+  db: DatabaseWriter,
+  clock: Clock,
+  notificationId: string,
+  delayMs: number,
+) {
+  const now = clock.now();
+
+  db.update(bgJobs)
+    .set({ runAt: now + delayMs, updatedAt: now })
+    .where(
+      and(
+        eq(bgJobs.dedupeKey, `${PUSH_NOTIFY_JOB_KIND}:${notificationId}`),
+        eq(bgJobs.status, "queued"),
+      ),
+    )
+    .run();
 }
 
 /**

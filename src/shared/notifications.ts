@@ -29,6 +29,13 @@ export type NotificationPreferenceKey = (typeof NOTIFICATION_PREFERENCE_KEYS)[nu
 export type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
 
 /**
+ * How long one kind collects events before the row stands on its own. A burst
+ * inside the window updates the row already there, so a form that asks sixteen
+ * questions raises one notice rather than sixteen (#705).
+ */
+export const NOTIFICATION_BATCH_WINDOW_MS = 2 * 60_000;
+
+/**
  * Every kind starts on, so a new user hears about each event until they turn
  * it off (SPEC §15.1).
  */
