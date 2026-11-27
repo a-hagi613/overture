@@ -230,7 +230,7 @@ describe("the plain reader's JSON form routes", () => {
         return await Promise.resolve(new Response(manatalForm, { status: 200 }));
       }
 
-      if (href.includes("zohorecruit.com")) {
+      if (new URL(href).hostname === "icschools.zohorecruit.com") {
         return await Promise.resolve(new Response(zohoPage, { status: 200 }));
       }
 
