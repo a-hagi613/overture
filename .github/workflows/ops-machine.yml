@@ -15,6 +15,7 @@ on:
           - memory
           - zero
           - one
+          - logs
       value:
         description: "Memory in MB for the memory action"
         required: false
@@ -54,6 +55,9 @@ jobs:
             status)
               flyctl status -a "$APP"
               flyctl machine list -a "$APP"
+              ;;
+            logs)
+              flyctl logs -a "$APP" --no-tail | tail -n 400
               ;;
             zero)
               yes | flyctl scale count 0 -a "$APP"
