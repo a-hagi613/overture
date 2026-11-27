@@ -418,7 +418,7 @@ export function createMatchScoringService(deps: MatchScoringDeps) {
     limit: number,
     options: { dailyCap?: boolean; paidOnly?: boolean } = {},
   ) {
-    if (!spendGate.allows(userId)) {
+    if (!spendGate.allowsOnboarding(userId)) {
       return { candidates: 0, rejected: 0, scored: 0, skippedForBudget: true };
     }
 

@@ -62,6 +62,9 @@ export const SCORE_OUTPUT_SCHEMA = {
     },
     reasons: {
       type: "array",
+      // Anthropic structured output accepts only minItems 0 or 1, so the 2–3 range is stated in words here and
+      // enforced by `scoreReplySchema` before a reply is stored (#710).
+      description: "Two or three short reasons with no more than 110 characters each.",
       items: { type: "string", maxLength: 110 },
     },
   },

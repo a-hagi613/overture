@@ -80,6 +80,16 @@ describe("the v1 prompt", () => {
     expect(SCORE_SYSTEM_PROMPT.match(/^Example [12]$/gmu)).toHaveLength(2);
   });
 
+  test("sends only the array bounds Anthropic structured output accepts", () => {
+    const reasons = SCORE_OUTPUT_SCHEMA.properties.reasons;
+
+    expect(Object.hasOwn(reasons, "minItems")).toBe(false);
+    expect(Object.hasOwn(reasons, "maxItems")).toBe(false);
+    expect(
+      parseScoreReply(JSON.stringify({ ...valid, reasons: ["one", "two", "three", "four"] })),
+    ).toBeNull();
+  });
+
   test("puts the candidate resume and targets before the job so caching covers them", () => {
     const candidate = { resume: "Five years of Go.", targets: "roles: Backend" };
     const prefix = scoreCandidatePrefix(candidate);
