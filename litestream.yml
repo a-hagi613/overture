@@ -4,7 +4,7 @@
 shutdown-timeout: 280s
 snapshot:
   interval: 24h
-  retention: 720h
+  retention: 168h
 retention:
   enabled: true
 # The L0 retention monitor's only job is to delete compacted level-0 files after l0-retention (5m).
