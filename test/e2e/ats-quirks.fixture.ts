@@ -92,8 +92,7 @@ function uploadListener() {
 </script>`;
 }
 
-export const greenhousePage = (action: string) => `<!doctype html>
-<html lang="en">
+export const greenhousePage = (action: string) => `<!doctype html><html lang="en">
 <head><title>Platform Engineer at Example</title><script type="application/json">{"submitPath":"${action}"}</script></head>
 <body>
 <form id="application_form" method="post" action="${action}" enctype="multipart/form-data">
@@ -106,6 +105,55 @@ export const greenhousePage = (action: string) => `<!doctype html>
 <form id="decoy" method="post" action="/decoy">
   <label for="decoy_email">Email</label><input id="decoy_email" name="email" type="email" value="decoy@example.com">
   <button type="submit">Subscribe</button>
+</form>
+</body>
+</html>`;
+
+export const greenhouseLiveShapePage = (
+  action: string,
+  options: { changed?: boolean } = {},
+) => `<!doctype html>
+<html lang="en">
+<head><title>Platform Engineer at Example</title><script type="application/json">{"submitPath":"${action}"}</script></head>
+<body>
+<form id="application_form" method="post" action="${action}" enctype="multipart/form-data">
+  <div class="field-wrapper">
+    <label for="first_name">First name</label>
+    <input id="first_name" name="first_name" type="text" required>
+  </div>
+  <div class="field-wrapper">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required>
+  </div>
+  <div class="field-wrapper">
+    <label for="phone_number">Phone</label>
+    <input id="phone_number" name="phone_number" type="tel" value="+1">
+  </div>
+  <div class="field-wrapper">
+    <label for="country_field">Country</label>
+    <select id="country_field" name="country_field">
+      <option value="">Select…</option>
+      <option value="CA">Canada</option>
+      <option value="FR"${options.changed === true ? " selected" : ""}>France</option>
+      <option value="US">United States</option>
+    </select>
+  </div>
+  <div class="field-wrapper">
+    <label for="candidate_location">Location (City)</label>
+    <select id="candidate_location" name="candidate_location">
+      <option value="">Select…</option>
+      <option value="ottawa">Ottawa</option>
+      <option value="toronto"${options.changed === true ? " selected" : ""}>Toronto</option>
+    </select>
+  </div>
+  <div class="field-wrapper">
+    <div class="file-upload">
+      <div class="label">Resume/CV<span class="required">*</span></div>
+      <span class="filename"></span>
+      <input id="resume_upload" name="resume_file" class="visually-hidden" type="file" required>
+    </div>
+  </div>
+  <button type="submit">Submit application</button>
 </form>
 </body>
 </html>`;

@@ -266,36 +266,48 @@ async function committedLocation(scope: FormScope) {
 }
 
 async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
-  const fillFrom: (index: number) => Promise<boolean> = async (index) => {
+  let locationFailed = false;
+
+  const fillFrom: (index: number) => Promise<void> = async (index) => {
     const field = fields[index];
 
     if (field === undefined) {
-      return true;
+      return;
     }
 
     if (field.fieldType === "file" || field.answer === null) {
-      return fillFrom(index + 1);
+      await fillFrom(index + 1);
+
+      return;
     }
 
     if (field.fieldName === null || field.fieldName === "") {
-      return fillFrom(index + 1);
+      await fillFrom(index + 1);
+
+      return;
     }
 
-    if (!(await fillField(scope, field.fieldName, field.answer))) {
-      return false;
-    }
+    await fillField(scope, field.fieldName, field.answer);
 
     if (
       normText(field.fieldName) === LOCATION_FIELD &&
       !(await verifyLocationCommitted(scope, field.answer))
     ) {
-      return false;
+      locationFailed = true;
+
+      return;
     }
 
-    return fillFrom(index + 1);
+    await fillFrom(index + 1);
   };
 
-  return fillFrom(0);
+  await fillFrom(0);
+
+  // Every field is attempted; preflight is the judge of whether the form holds the approved
+  // answers, and can fill an untouched one through its label (issue #757). A location whose
+  // suggestion did not commit its backing id is different: the ATS needs that id, so it still
+  // stops before Submit.
+  return !locationFailed;
 }
 
 async function waitForResumeRead(page: Page) {

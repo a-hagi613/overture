@@ -529,17 +529,24 @@ export const isPositiveAnswer = (answer: string | null) =>
   answer !== null && !["", "0", "false", "no", "unchecked"].includes(norm(answer));
 
 function liveMatchesExpectation(expectation: LiveFormExpectation, control: LiveControl) {
-  if (expectation.fieldName !== null && expectation.fieldName !== "") {
-    return control.key === expectation.fieldName || control.name === expectation.fieldName;
+  const wantedName = expectation.fieldName ?? "";
+  const wanted = normaliseLabel(expectation.label);
+  const live = normaliseLabel(control.label);
+
+  if (wantedName !== "") {
+    if (control.key === wantedName || control.name === wantedName) {
+      return true;
+    }
+
+    // A control whose id or name changed is still the same question when its label is exactly the
+    // approved one; a looser match would let a neighbouring "Country" question claim a long
+    // "…country or countries…" answer (the Stripe form has both).
+    return wanted !== "" && live === wanted;
   }
 
-  const wanted = normaliseLabel(expectation.label);
-
-  if (wanted === "") {
+  if (wanted === "" || live === "") {
     return false;
   }
-
-  const live = normaliseLabel(control.label);
 
   return live === wanted || live.includes(wanted) || wanted.includes(live);
 }
@@ -571,6 +578,225 @@ function sameSelectedOptions(control: LiveControl, answer: string) {
   const wanted = multiValueParts(answer);
 
   return selected.length === wanted.length && wanted.every((part) => selected.includes(part));
+}
+
+/**
+ * The labels and values of the options this control currently has selected. A react-select keeps its
+ * option id in the hidden input while the visible face shows the label, so both are compared.
+ *
+ * @param control The live option control.
+ * @returns Every normalized label and value that counts as selected.
+ */
+function selectedOptionKeys(control: LiveControl) {
+  const parts = multiValueParts(control.value ?? "");
+
+  const keys = new Set(parts);
+
+  for (const option of control.options) {
+    if (parts.includes(norm(option.label)) || parts.includes(norm(option.value))) {
+      keys.add(norm(option.label));
+      keys.add(norm(option.value));
+    }
+  }
+
+  return keys;
+}
+
+/**
+ * Whether the live selection answers the plan. An untouched select is not a change (issue #757): an
+ * empty value is judged by the preflight reconciliation, while a real selected option must match the
+ * approved answer by label or id, tolerating the ATS's own punctuation around it.
+ *
+ * @param control The live option control.
+ * @param answer The approved answer.
+ * @returns True when the live selection is the approved one.
+ */
+function liveOptionSelected(control: LiveControl, answer: string) {
+  const wanted = norm(answer);
+
+  if (wanted === "") {
+    return false;
+  }
+
+  const keys = selectedOptionKeys(control);
+
+  if (keys.has(wanted)) {
+    return true;
+  }
+
+  for (const key of keys) {
+    if (key === "") {
+      continue;
+    }
+
+    if (key.startsWith(wanted) || wanted.startsWith(key) || key.includes(wanted)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+const digitsOf = (raw: string) => raw.replaceAll(/\D+/gu, "");
+
+/**
+ * Compares two phone numbers by their digits, so the ATS's own formatting is not a form change. A
+ * leading country code of `1` on one side only is ignored, because some inputs show it and others
+ * keep it in a separate control; a genuinely different number still differs.
+ *
+ * @param live The value the form currently holds.
+ * @param answer The approved answer.
+ * @returns True when both values are the same phone number.
+ */
+function samePhoneNumber(live: string, answer: string) {
+  const left = digitsOf(live);
+  const right = digitsOf(answer);
+
+  if (left === "" || right === "") {
+    return false;
+  }
+
+  if (left === right) {
+    return true;
+  }
+
+  if (left.length === right.length + 1 && left.startsWith("1")) {
+    return left.slice(1) === right;
+  }
+
+  return right.length === left.length + 1 && right.startsWith("1") && right.slice(1) === left;
+}
+
+/**
+ * Whether an option control is still at its untouched default, so preflight can fill the approved
+ * answer instead of reporting the ATS's empty first state as a form change.
+ *
+ * @param expectation The approved answer for this control.
+ * @param control The live control.
+ * @returns True when the filler should apply the approved answer before preflight judges it.
+ */
+function untouchedOption(control: LiveControl) {
+  return norm(control.value ?? "") === "" || control.checked === false;
+}
+
+/**
+ * Whether a text-like control is still blank (or, for a phone, only holds an untouched dial code).
+ *
+ * @param expectation The approved answer for this control.
+ * @param control The live control.
+ * @returns True when the filler should apply the approved answer before preflight judges it.
+ */
+function untouchedText(expectation: LiveFormExpectation, control: LiveControl) {
+  const live = control.value ?? "";
+
+  if (norm(live) === "") {
+    return true;
+  }
+
+  if (expectation.fieldType !== "phone") {
+    return false;
+  }
+
+  const digits = digitsOf(live);
+  const answer = digitsOf(expectation.answer ?? "");
+
+  return digits !== "" && digits.length <= 3 && answer.startsWith(digits);
+}
+
+function needsFill(expectation: LiveFormExpectation, control: LiveControl) {
+  if (expectation.answer === null || norm(expectation.answer) === "") {
+    return false;
+  }
+
+  if (expectation.fieldType === "file" || control.disabled) {
+    return false;
+  }
+
+  if (expectation.fieldType === "checkbox") {
+    return control.checked === false && isPositiveAnswer(expectation.answer);
+  }
+
+  if (optionField(expectation.fieldType)) {
+    return untouchedOption(control);
+  }
+
+  return untouchedText(expectation, control);
+}
+
+/**
+ * Finds the file control an uploaded resume landed in, even when the board's hidden input has no
+ * usable label or a different name than the prepared plan (issue #757). Only a control that already
+ * holds the approved file (or the only file control on a form with a resume hint) is accepted; a
+ * removed input still reports `field_missing`.
+ *
+ * @param controls Every live control on the verified form.
+ * @param expectation The approved file answer.
+ * @returns The matching file control, or undefined when the form really lost it.
+ */
+function fileControlFor(controls: readonly LiveControl[], expectation: LiveFormExpectation) {
+  if (expectation.file === null) {
+    return undefined;
+  }
+
+  const files = controls.filter((control) => control.fieldType === "file");
+  const attached = files.filter((control) => control.file !== null);
+  const exact = attached.filter((control) => control.file?.name === expectation.file?.name);
+
+  if (exact.length === 1) {
+    return exact[0];
+  }
+
+  const wanted = `${normaliseLabel(expectation.label)} ${norm(expectation.fieldName ?? "")}`;
+  const resume = /resume|cv|curriculum/u.test(wanted);
+  const hinted = resume
+    ? attached.filter((control) =>
+        /resume|cv|curriculum/u.test(`${normaliseLabel(control.label)} ${norm(control.key)}`),
+      )
+    : [];
+
+  if (hinted.length === 1) {
+    return hinted[0];
+  }
+
+  return attached.length === 1 ? attached[0] : undefined;
+}
+
+/**
+ * Re-applies the approved answers to controls that are still at their untouched default. The ATS can
+ * reveal its real controls only after the resume upload, and some widgets normalize a phone or an
+ * option id on the way in; judging that raw intermediate state treated every live send as a change
+ * (issue #757). Only an approved answer is ever written, and only into a still-default control, so a
+ * form with a genuine new question, a changed option or a user-edited value still stops.
+ *
+ * @param scope The one verified live form.
+ * @param expectations Every planned answer.
+ * @returns True when at least one control was filled.
+ */
+async function fillUntouched(scope: FormScope, expectations: readonly LiveFormExpectation[]) {
+  const live = await readLiveForm(scope);
+  let filled = false;
+
+  for (const expectation of expectations) {
+    if (expectation.fieldType === "file") {
+      continue;
+    }
+
+    const control = live.controls.find((candidate) =>
+      liveMatchesExpectation(expectation, candidate),
+    );
+
+    if (control === undefined || !needsFill(expectation, control)) {
+      continue;
+    }
+
+    const answer = expectation.answer;
+
+    if (answer !== null && (await fillField(scope, control.key, answer))) {
+      filled = true;
+    }
+  }
+
+  return filled;
 }
 
 async function menuOpened(page: Page, field: Locator) {
@@ -1180,15 +1406,16 @@ const checkLiveForm: (
   }
 
   const problems = new Map<string, LiveFormProblem>();
+  const matched = new Map<string, LiveFormExpectation>();
 
   const add = (problem: LiveFormProblem) => {
     problems.set(`${problem.kind}\u0000${problem.fieldName ?? ""}\u0000${problem.label}`, problem);
   };
 
   for (const expectation of expectations) {
-    const control = live.controls.find((candidate) =>
-      liveMatchesExpectation(expectation, candidate),
-    );
+    const control =
+      live.controls.find((candidate) => liveMatchesExpectation(expectation, candidate)) ??
+      (expectation.fieldType === "file" ? fileControlFor(live.controls, expectation) : undefined);
 
     if (control === undefined) {
       add({
@@ -1203,6 +1430,8 @@ const checkLiveForm: (
 
       continue;
     }
+
+    matched.set(control.key, expectation);
 
     if (expectation.fieldType === "file") {
       if (
@@ -1273,7 +1502,7 @@ const checkLiveForm: (
 
       const selected = multi
         ? sameSelectedOptions(control, answer)
-        : norm(control.value ?? "") === norm(answer);
+        : liveOptionSelected(control, answer);
 
       if (expectation.options.length > 0 && !present(control, answer)) {
         add({
@@ -1320,7 +1549,11 @@ const checkLiveForm: (
       continue;
     }
 
-    if (norm(control.value ?? "") !== norm(answer)) {
+    if (
+      expectation.fieldType === "phone"
+        ? !samePhoneNumber(control.value ?? "", answer)
+        : norm(control.value ?? "") !== norm(answer)
+    ) {
       add({
         answer,
         fieldName: expectation.fieldName,
@@ -1342,9 +1575,9 @@ const checkLiveForm: (
       continue;
     }
 
-    const expectation = expectations.find((candidate) =>
-      liveMatchesExpectation(candidate, control),
-    );
+    const expectation =
+      matched.get(control.key) ??
+      expectations.find((candidate) => liveMatchesExpectation(candidate, control));
 
     const covered =
       expectation !== undefined &&
@@ -1413,6 +1646,13 @@ const decideLiveFormVerdict: (check: LiveFormCheck) => LiveFormVerdict = (check)
  * before Submit. A form that no longer matches the plan never submits: a
  * missing durable Fact becomes a Review, and anything else is a form change.
  *
+ * It first re-applies any approved answer whose live control is still at its
+ * untouched default (an empty select, a blank field, a phone holding only its
+ * dial code). That is the state a live board shows between "the resume
+ * uploaded" and "the filler reached the field", and judging it as a change is
+ * what stopped every real Greenhouse/Lever send (issue #757). Only approved
+ * answers are written, and only into controls the plan already owns.
+ *
  * The reads happen against one verified live form root only. A page with a
  * second form, or a hidden duplicate control, never contributes an answer to
  * the plan that was approved.
@@ -1438,6 +1678,10 @@ export const preflightForm: (
   }
 
   await waitForStableForm(scope);
+
+  if (await fillUntouched(scope, expectations)) {
+    await waitForStableForm(scope);
+  }
 
   return decideLiveFormVerdict(await checkLiveForm(scope, expectations));
 };
