@@ -16,6 +16,7 @@ export type NavKey =
   | "tracker"
   | "ready"
   | "review"
+  | "matches"
   | "inbox"
   | "calendar"
   | "profile"
@@ -39,6 +40,7 @@ export type PrimaryNavKey = (typeof NAV_DESTINATIONS)[number]["glyph"];
  */
 export const SIDEBAR_DESTINATIONS = [
   ...NAV_DESTINATIONS,
+  { glyph: "matches", to: "/matches" },
   { glyph: "calendar", to: "/calendar" },
 ] as const satisfies readonly { glyph: NavKey; to: string }[];
 
@@ -80,6 +82,7 @@ export const APPLICATIONS_SUBMENU = [
   { key: "tracker", label: copy.nav.tracker, to: "/tracker" },
   { key: "ready", label: copy.nav.ready, to: "/ready" },
   { key: "review", label: copy.nav.review, to: "/review" },
+  { key: "matches", label: copy.nav.matches, to: "/matches" },
 ] as const;
 
 export const JOB_PROFILE_SUBMENU = [
@@ -190,6 +193,10 @@ export function navTitleForPath(pathname: string, search = "") {
 
   if (pathname === "/review") {
     return copy.nav.review;
+  }
+
+  if (pathname === "/matches") {
+    return copy.nav.matches;
   }
 
   if (pathname === "/home") {

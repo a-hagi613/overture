@@ -12,6 +12,7 @@ import {
   ListChecks,
   MessageCircle,
   SlidersHorizontal,
+  Target,
   UserSearch,
 } from "lucide-react";
 import { Link, NavLink, useLocation } from "react-router";
@@ -77,6 +78,14 @@ export function SideNav({
       label: copy.nav.review,
       srLabel: navLabel("review", reviewCount),
       to: "/review",
+    },
+    {
+      icon: Target,
+      isActive: isSidebarNavActive("matches", pathname, search),
+      key: "matches",
+      label: copy.nav.matches,
+      srLabel: navLabel("matches", 0),
+      to: "/matches",
     },
   ];
 

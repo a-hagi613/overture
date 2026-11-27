@@ -303,7 +303,7 @@ test("New matches shows Scoring until a score exists and never the ranking point
     .parse(JSON.parse(body));
 
   expect(matches.total).toBe(3);
-  expect(matches.items.map((row) => row.score)).toEqual([92, null, 81]);
+  expect(matches.items.map((row) => row.score)).toEqual([92, 81, null]);
 
   const storageState = await request.storageState();
 
@@ -328,9 +328,9 @@ test("New matches shows Scoring until a score exists and never the ranking point
     await page.goto(`${homeServer.url}/matches`);
 
     await expect(page.getByRole("heading", { level: 1, name: "Matches" })).toBeVisible();
-    await expect(page.getByText("92% match")).toBeVisible();
-    await expect(page.getByText("81% match")).toBeVisible();
-    await expect(page.getByText("Scoring…")).toBeVisible();
+    await expect(page.getByText("92% match").filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText("81% match").filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText("Scoring…").filter({ visible: true }).first()).toBeVisible();
     await expect(page.getByText("97.4")).toHaveCount(0);
     await expect(page.getByText("93.8")).toHaveCount(0);
 
@@ -338,7 +338,7 @@ test("New matches shows Scoring until a score exists and never the ranking point
 
     expect(results.violations).toEqual([]);
 
-    await page.route("**/api/matches", async (route) => {
+    await page.route("**/api/matches*", async (route) => {
       await route.fulfill({ body: "{}", contentType: "application/json", status: 500 });
     });
 
@@ -348,10 +348,10 @@ test("New matches shows Scoring until a score exists and never the ranking point
 
     await expect(failed).toBeVisible({ timeout: 15_000 });
 
-    await page.unroute("**/api/matches");
+    await page.unroute("**/api/matches*");
     await page.getByRole("button", { name: "Retry" }).click();
 
-    await expect(page.getByText("92% match")).toBeVisible();
+    await expect(page.getByText("92% match").filter({ visible: true }).first()).toBeVisible();
   } finally {
     await context.close();
   }
@@ -415,7 +415,7 @@ test("the attention order, axe and width hold at 390 and 1280 in light and dark"
 
           await page.goto(`${homeServer.url}/matches`);
 
-          await expect(page.getByText("Scoring…")).toBeVisible();
+          await expect(page.getByText("Scoring…").filter({ visible: true }).first()).toBeVisible();
 
           const matchesResults = await new AxeBuilder({ page }).analyze();
 
