@@ -14,6 +14,7 @@ on:
           - seed-catalog
           - setup-stripe
           - live-diagnostics
+          - pull-error
           - vacuum-db
           - reset-catalog
           - sync-ops-secrets
@@ -428,6 +429,30 @@ jobs:
           fi
           set -e
           timeout 120s flyctl ssh console -a overture-web -C "bun run /app/scripts/live-diagnostics.ts"
+
+      - name: Print the last failed job pulls from overture-web
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'pull-error'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          status=0
+          output="$(timeout 120s flyctl ssh console -a overture-web -C "bun run /app/scripts/ops-pull-error.ts" 2>&1)" || status=$?
+          printf '%s\n' "$output"
+          {
+            echo "### Last failed job pulls"
+            echo '```json'
+            printf '%s\n' "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -eq 124 ]; then
+            echo "::error::The pull-error script did not answer within 120s (machine down or unresponsive)."
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "::error::The pull-error script exited $status."
+            exit 1
+          fi
 
       - name: Check the database sizes before a vacuum on overture-web
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'vacuum-db'
