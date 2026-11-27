@@ -220,14 +220,11 @@ function fresh() {
 
   db.insert(targets)
     .values({
-      employmentTypes: JSON.stringify([]),
       locations: JSON.stringify(["city:ca:toronto"]),
       roles: JSON.stringify(["backend"]),
-      seniorities: JSON.stringify(["senior"]),
       updatedAt: new Date(NOW),
       userId: "user-1",
       version: 2,
-      workplaces: JSON.stringify([]),
     })
     .run();
 
