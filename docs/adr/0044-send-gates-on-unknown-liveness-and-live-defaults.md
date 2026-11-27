@@ -83,4 +83,3 @@ unsupported is still a genuine change if the plan answered it; the guard is not 
 
 The Apply click, the consent click and the "I'm interested" click only advance the same posting's page. They never
 write an answer or press Submit, and the dry-submit switch still throws before the Submit click.
-
