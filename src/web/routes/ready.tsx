@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
@@ -77,7 +78,21 @@ export function ReadyPage() {
   const focusedIdRef = useRef<string | null>(null);
   const keyHandlerRef = useRef<((event: KeyboardEvent) => void) | null>(null);
 
-  const [inspectedId, setInspectedId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const inspectedId = searchParams.get("application");
+
+  const setInspectedId = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+
+    if (id === null) {
+      next.delete("application");
+    } else {
+      next.set("application", id);
+    }
+
+    setSearchParams(next, { replace: true });
+  };
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [removedIds, setRemovedIds] = useState<readonly string[]>([]);
   const [confirmTarget, setConfirmTarget] = useState<ReadyConfirmTarget | null>(null);

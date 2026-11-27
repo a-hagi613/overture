@@ -60,10 +60,12 @@ export type BoardResponse = z.infer<typeof boardResponseSchema>;
 const timelineEventSchema = z.object({
   applicationId: z.string(),
   at: z.number(),
+  attemptId: z.string().nullable(),
   detail: z.string().nullable(),
   fromValue: z.string().nullable(),
   id: z.string(),
   kind: z.enum(["status", "stage", "email", "checkin", "note"]),
+  reason: z.string().nullable(),
   source: z.enum(["system", "user", "email", "checkin", "admin"]),
   toValue: z.string().nullable(),
   userId: z.string(),
@@ -134,6 +136,19 @@ export const applicationDetailSchema = z.object({
     title: z.string(),
     url: z.string(),
   }),
+  receipt: z.object({ confirmedAt: z.number(), messageId: z.string() }).nullable().default(null),
+  screenshots: z
+    .array(
+      z.object({
+        at: z.number(),
+        attemptId: z.string(),
+        bytes: z.number().nullable(),
+        key: z.string(),
+        phase: z.enum(["before_submit", "after_submit"]),
+        url: z.string(),
+      }),
+    )
+    .default([]),
   timeZone: z.string(),
   snapshot: z
     .object({
@@ -150,6 +165,7 @@ export const applicationDetailSchema = z.object({
     })
     .nullable(),
   timeline: z.array(timelineEventSchema),
+  workplace: z.enum(["remote", "hybrid", "onsite"]).nullable().default(null),
 });
 
 export type ApplicationDetail = z.infer<typeof applicationDetailSchema>;

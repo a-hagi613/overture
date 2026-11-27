@@ -26,6 +26,7 @@ interface CardSeed {
   closedReason?: "rejected" | "no_response" | "withdrawn" | "offer_declined";
   salary?: { min: number; max: number };
   createdAt?: number;
+  workplace?: "remote" | "hybrid" | "onsite" | "unknown";
 }
 
 const queuedVisible: CardSeed[] = [
@@ -127,6 +128,7 @@ const rest: CardSeed[] = [
     stage: "screening",
     status: "sent",
     title: "Senior Backend Engineer",
+    workplace: "unknown",
   },
   {
     ageDays: 9,
@@ -372,7 +374,7 @@ async function seedCard(request: APIRequestContext, userId: string, card: CardSe
           ],
           title: card.title,
           url: `https://${card.company.toLowerCase().replaceAll(/[^a-z]+/gu, "-")}.example/${String(index)}`,
-          workplace: "hybrid",
+          workplace: card.workplace ?? "hybrid",
         },
       })
     ).json(),

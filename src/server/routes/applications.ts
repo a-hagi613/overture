@@ -3,16 +3,19 @@ import { Hono } from "hono";
 import { validJson } from "./validators.ts";
 import { z } from "zod";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
+import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { Auth } from "../auth/index.ts";
 import { readSession } from "../auth/session.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { openOrNull } from "../profile/personal-crypto.ts";
 
+import { postings } from "../platform/db/catalog-schema.ts";
 import {
   applications,
   applicationEvents,
+  applicationReceipts,
   applicationSnapshots,
   matches,
   resumes,
@@ -22,6 +25,7 @@ import {
 import { localDayStart, localPartsAt } from "../platform/local-time.ts";
 import { restartCheckinAfterUndo } from "../pipeline/checkins.ts";
 import { readApplicationTimelineRows } from "../applications/events.ts";
+import { listApplicationScreenshots } from "../applications/screenshots.ts";
 import { latestEmailNotesOf } from "../pipeline/email-notes.ts";
 import { linkedMailOf } from "../inbox/linked-mail.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
@@ -203,6 +207,7 @@ export function createApplicationRoutes(
   clock: Clock,
   auth: Auth,
   personal: PersonalCrypto,
+  options: { catalogDb?: CatalogDatabase; objects?: ObjectStore } = {},
 ) {
   const routes = new Hono();
   const zones = createTimeZoneService({ db, clock });
@@ -684,6 +689,33 @@ export function createApplicationRoutes(
         ? []
         : await citedResumeLines(userId, snapshot?.resumeId ?? null, snapshotView);
 
+    const receipt = db
+      .select()
+      .from(applicationReceipts)
+      .where(eq(applicationReceipts.applicationId, id))
+      .get();
+
+    const catalogPosting =
+      options.catalogDb === undefined
+        ? undefined
+        : options.catalogDb
+            .select({ workplace: postings.workplace })
+            .from(postings)
+            .where(eq(postings.id, application.postingId))
+            .get();
+
+    const screenshots =
+      options.objects === undefined
+        ? []
+        : (await listApplicationScreenshots(options.objects, userId, id)).map((screenshot) => ({
+            at: screenshot.at,
+            attemptId: screenshot.attemptId,
+            bytes: screenshot.bytes,
+            key: screenshot.key,
+            phase: screenshot.phase,
+            url: `/api/applications/${encodeURIComponent(id)}/screenshots/${screenshot.phase}`,
+          }));
+
     return context.json({
       ageDays: Math.max(0, Math.floor((now - application.createdAt) / DAY_MS)),
       dossier:
@@ -729,8 +761,69 @@ export function createApplicationRoutes(
         url: application.postingUrl,
       },
       snapshot: snapshotView === null ? null : { ...snapshotView, resumeLines },
+      screenshots,
+      receipt:
+        receipt === undefined
+          ? null
+          : { confirmedAt: receipt.confirmedAt, messageId: receipt.messageId },
       timeZone,
       timeline,
+      workplace:
+        catalogPosting === undefined || catalogPosting.workplace === "unknown"
+          ? null
+          : catalogPosting.workplace,
+    });
+  });
+
+  routes.get("/applications/:id/screenshots/:phase", async (context) => {
+    const session = await readSession(auth, context.req.raw.headers);
+
+    if (session === null) {
+      return context.json({ error: "sign_in_required" }, 401);
+    }
+
+    const { id, phase } = context.req.param();
+
+    if (phase !== "before_submit" && phase !== "after_submit") {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    if (options.objects === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const { objects } = options;
+
+    const owned = db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(and(eq(applications.id, id), eq(applications.userId, session.user.id)))
+      .get();
+
+    if (owned === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const screenshots = await listApplicationScreenshots(objects, session.user.id, id);
+    const latest = screenshots.findLast((screenshot) => screenshot.phase === phase);
+
+    if (latest === undefined) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    const bytes = await objects.get(latest.key);
+
+    if (bytes === null) {
+      return context.json({ error: "not_found" }, 404);
+    }
+
+    return new Response(bytes, {
+      headers: {
+        "cache-control": "private, no-store",
+        "content-length": String(bytes.byteLength),
+        "content-type": "image/png",
+        "x-content-type-options": "nosniff",
+      },
     });
   });
 

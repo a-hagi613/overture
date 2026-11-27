@@ -255,7 +255,7 @@ test("archiving a queued card removes it from the Board", async ({ boardServer, 
     (candidate) => candidate.request().method() === "POST" && candidate.url().includes("/withdraw"),
   );
 
-  await page.getByRole("button", { name: "Archive" }).click();
+  await page.getByRole("button", { name: "Cancel application" }).click();
   await response;
 
   expect(await cardState(request, id)).toBeNull();

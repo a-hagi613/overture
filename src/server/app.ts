@@ -610,7 +610,13 @@ export function createApp(deps: AppDependencies) {
       payments: deps.payments,
     }),
   );
-  app.route("/api", createApplicationRoutes(deps.db, deps.clock, deps.auth, personal));
+  app.route(
+    "/api",
+    createApplicationRoutes(deps.db, deps.clock, deps.auth, personal, {
+      catalogDb: deps.catalogDb,
+      objects: deps.objects,
+    }),
+  );
   app.route("/api", createCheckinRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route("/api", createCalendarRoutes({ auth: deps.auth, clock: deps.clock, db: deps.db }));
   app.route(
