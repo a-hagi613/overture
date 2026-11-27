@@ -1,6 +1,3 @@
-import { nextSendSlot } from "../dispatch/planning.ts";
-import type { SendWindow } from "../dispatch/planning.ts";
-
 function scheduledOf(scheduledFor: readonly (number | null)[]) {
   return scheduledFor
     .filter((at): at is number => at !== null)
@@ -26,15 +23,15 @@ export function sendQueueOf(scheduledFor: readonly (number | null)[], now: numbe
 
 /**
  * When the next Application will leave, from one pass over the approved rows.
- * @param input The approved rows' send times, how many are approved, the instant, the zone and the send window.
+ * An approved Application with no slot yet is planned for right now, so it
+ * reports the current instant rather than a send window.
+ * @param input The approved rows' send times, how many are approved and the instant.
  * @returns The next send time, or null when nothing is approved.
  */
 export function nextSendAtOf(input: {
   approved: number;
   now: number;
   scheduledFor: readonly (number | null)[];
-  window: SendWindow;
-  zone: string;
 }) {
   const scheduled = scheduledOf(input.scheduledFor);
 
@@ -42,5 +39,5 @@ export function nextSendAtOf(input: {
     return Math.min(...scheduled);
   }
 
-  return input.approved > 0 ? nextSendSlot(input.now, input.zone, input.window) : null;
+  return input.approved > 0 ? input.now : null;
 }

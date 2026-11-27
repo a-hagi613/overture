@@ -90,24 +90,24 @@ test("the soft alert fires at the default 80 % share of the daily budget", () =>
   const { db, sqlite } = freshDatabase();
 
   try {
-    expect(llmSpendRaised(db, 8_500_000)).toBe(true);
-    expect(llmSpendRaised(db, 7_900_000)).toBe(false);
+    expect(llmSpendRaised(db, 41_000_000)).toBe(true);
+    expect(llmSpendRaised(db, 39_000_000)).toBe(false);
   } finally {
     sqlite.close();
   }
 });
 
-test("a budget grown by paying subscribers no longer alerts at the old ceiling's share", () => {
+test("a budget grown by paying subscribers raises the alert ceiling", () => {
   const { db, sqlite } = freshDatabase();
 
   try {
-    expect(llmSpendRaised(db, 8_400_000)).toBe(true);
+    expect(llmSpendRaised(db, 40_200_000)).toBe(true);
 
     addPeriod(db, "paying-1");
     addPeriod(db, "paying-2");
 
-    expect(llmSpendRaised(db, 8_400_000)).toBe(false);
-    expect(llmSpendRaised(db, 8_500_000)).toBe(true);
+    expect(llmSpendRaised(db, 40_200_000)).toBe(false);
+    expect(llmSpendRaised(db, 41_000_000)).toBe(true);
   } finally {
     sqlite.close();
   }
@@ -119,8 +119,8 @@ test("the admin sets the alert share", () => {
   try {
     setSetting(db, clock, "llm.spend_alert_ratio", "0.5", "test");
 
-    expect(llmSpendRaised(db, 5_100_000)).toBe(true);
-    expect(llmSpendRaised(db, 4_900_000)).toBe(false);
+    expect(llmSpendRaised(db, 25_100_000)).toBe(true);
+    expect(llmSpendRaised(db, 24_900_000)).toBe(false);
   } finally {
     sqlite.close();
   }
@@ -132,8 +132,8 @@ test("a full-share alert fires when spend reaches the budget exactly", () => {
   try {
     setSetting(db, clock, "llm.spend_alert_ratio", "1", "test");
 
-    expect(llmSpendRaised(db, 9_900_000)).toBe(false);
-    expect(llmSpendRaised(db, 10_000_000)).toBe(true);
+    expect(llmSpendRaised(db, 49_900_000)).toBe(false);
+    expect(llmSpendRaised(db, 50_000_000)).toBe(true);
   } finally {
     sqlite.close();
   }

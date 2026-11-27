@@ -1,145 +1,241 @@
-import { describe, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
 
-import { localDateAt, localPartsAt, zonedTimeToEpoch } from "../platform/local-time.ts";
-import { DEFAULT_SEND_WINDOW, nextSendSlot, parseSendWindow, planSlots } from "./planning.ts";
+import type { AppDatabase } from "../platform/db/client.ts";
 
-const SPACING_MS = 20 * 60_000;
+import { openDatabase } from "../platform/db/client.ts";
+import { migrateDatabase } from "../platform/db/migrate.ts";
+import { applications, profiles, users } from "../platform/db/schema.ts";
+import { grantApplications } from "../billing/ledger.ts";
+import { startOnboarding } from "../profile/onboarding-start.ts";
+import { planSendSlots } from "./planning.ts";
+import { createPlanner } from "./planner.ts";
 
-function slotsAt(now: number, timeZone: string, count: number, blocked: number[] = []) {
-  return planSlots({
-    blocked,
-    count,
-    now,
-    random: () => 0.5,
-    spacingMs: SPACING_MS,
-    timeZone,
-    window: DEFAULT_SEND_WINDOW,
+const AT = Date.UTC(2026, 2, 10, 7, 0, 0);
+const MINUTE_MS = 60_000;
+const clock = { now: () => AT };
+
+function freshDatabase() {
+  const { db, sqlite } = openDatabase(":memory:");
+
+  migrateDatabase(db, "drizzle");
+
+  return { db, sqlite };
+}
+
+function addUser(db: AppDatabase, userId: string, running = true) {
+  db.insert(users)
+    .values({
+      createdAt: new Date(AT),
+      email: `${userId}@example.com`,
+      emailVerified: true,
+      id: userId,
+      name: userId,
+      role: "user",
+      updatedAt: new Date(AT),
+    })
+    .run();
+
+  db.insert(profiles)
+    .values({
+      createdAt: new Date(AT),
+      onboardedAt: new Date(AT),
+      pauseReason: null,
+      running,
+      updatedAt: new Date(AT),
+      userId,
+    })
+    .run();
+}
+
+function addApproved(db: AppDatabase, userId: string, id: string, approvedAt = AT) {
+  db.insert(applications)
+    .values({
+      approvedAt,
+      companyId: `company-${id}`,
+      companyName: `Company ${id}`,
+      companyNameNorm: `company-${id}`,
+      createdAt: approvedAt,
+      id,
+      origin: "manual",
+      postingId: `posting-${id}`,
+      postingTitle: "Engineer",
+      postingUrl: "https://example.com/job",
+      status: "approved",
+      updatedAt: approvedAt,
+      userId,
+    })
+    .run();
+}
+
+function grant(db: AppDatabase, userId: string, source: "admin" | "trial", quantity: number) {
+  grantApplications(db, clock, {
+    idempotencyKey: `grant:${userId}:${source}`,
+    quantity,
+    source,
+    userId,
   });
 }
 
-function localHour(at: number, timeZone: string) {
-  return localPartsAt(at, timeZone).hour;
+function slotsOf(db: AppDatabase, userId: string) {
+  return db
+    .select({ scheduledFor: applications.scheduledFor })
+    .from(applications)
+    .where(eq(applications.userId, userId))
+    .all()
+    .map((row) => row.scheduledFor);
 }
 
-describe("parseSendWindow", () => {
-  test("reads the admin setting and falls back when it is malformed", () => {
-    expect(parseSendWindow('{"start":"09:30","end":"18:00"}')).toEqual({
-      endMinutes: 18 * 60,
-      startMinutes: 9 * 60 + 30,
-    });
+function plannedPlanner(db: AppDatabase) {
+  return createPlanner({ clock, db });
+}
 
-    expect(parseSendWindow("{not json")).toEqual(DEFAULT_SEND_WINDOW);
-    expect(parseSendWindow('{"start":"20:00","end":"08:00"}')).toEqual(DEFAULT_SEND_WINDOW);
-    expect(parseSendWindow(null)).toEqual(DEFAULT_SEND_WINDOW);
-  });
+test("an approved Application with a free slot is eligible at once", () => {
+  const { db, sqlite } = freshDatabase();
 
-  test("reads a whole-day window that ends at midnight", () => {
-    const window = parseSendWindow('{"start":"00:00","end":"24:00"}');
-    const lastMinute = Date.UTC(2026, 2, 10, 23, 59);
+  try {
+    addUser(db, "solo");
+    grant(db, "solo", "admin", 5);
+    addApproved(db, "solo", "app-1");
 
-    expect(window).toEqual({ endMinutes: 24 * 60, startMinutes: 0 });
-    expect(nextSendSlot(lastMinute, "UTC", window)).toBe(lastMinute);
-  });
+    plannedPlanner(db).plan("solo");
+
+    expect(slotsOf(db, "solo")).toEqual([AT]);
+  } finally {
+    sqlite.close();
+  }
 });
 
-describe("planSlots", () => {
-  test("places slots inside 08:00-20:00 and after the current time", () => {
-    const now = Date.UTC(2026, 2, 10, 12, 0);
-    const slots = slotsAt(now, "UTC", 5);
+test("a second paid Application for one person waits five minutes", () => {
+  const { db, sqlite } = freshDatabase();
 
-    expect(slots.length).toBe(5);
+  try {
+    addUser(db, "paid");
+    grant(db, "paid", "admin", 5);
+    addApproved(db, "paid", "app-1", AT);
+    addApproved(db, "paid", "app-2", AT + 1);
 
-    for (const slot of slots) {
-      expect(slot).toBeGreaterThanOrEqual(now);
-      expect(localHour(slot, "UTC")).toBeGreaterThanOrEqual(8);
-      expect(localHour(slot, "UTC")).toBeLessThan(20);
-    }
-  });
+    plannedPlanner(db).plan("paid");
 
-  test("waits for the window when the planner runs at local midnight", () => {
-    const now = Date.UTC(2026, 2, 10, 0, 30);
-    const windowStart = zonedTimeToEpoch({ day: 10, month: 3, year: 2026 }, 8, 0, "UTC");
-    const slots = slotsAt(now, "UTC", 3);
+    expect(slotsOf(db, "paid")).toEqual([AT, AT + 5 * MINUTE_MS]);
+  } finally {
+    sqlite.close();
+  }
+});
 
-    expect(slots.length).toBe(3);
+test("the onboarding trial's three Applications all go at once", () => {
+  const { db, sqlite } = freshDatabase();
 
-    for (const slot of slots) {
-      expect(slot).toBeGreaterThanOrEqual(windowStart);
-    }
-  });
+  try {
+    addUser(db, "trial");
+    grant(db, "trial", "trial", 3);
+    addApproved(db, "trial", "app-1", AT);
+    addApproved(db, "trial", "app-2", AT + 1);
+    addApproved(db, "trial", "app-3", AT + 2);
 
-  test("rolls to the next day when the window has closed", () => {
-    const now = Date.UTC(2026, 2, 10, 21, 0);
-    const slots = slotsAt(now, "UTC", 3);
+    plannedPlanner(db).plan("trial");
 
-    expect(slots.length).toBe(3);
+    expect(slotsOf(db, "trial")).toEqual([AT, AT, AT]);
+  } finally {
+    sqlite.close();
+  }
+});
 
-    for (const slot of slots) {
-      expect(slot).toBeGreaterThan(now);
-      expect(localDateAt(slot, "UTC")).toEqual({ day: 11, month: 3, year: 2026 });
-    }
-  });
+test("one person's spacing never delays another person's send", () => {
+  const { db, sqlite } = freshDatabase();
 
-  test("keeps every pair of slots at least twenty minutes apart", () => {
-    const slots = slotsAt(Date.UTC(2026, 2, 10, 8, 0), "UTC", 10);
+  try {
+    addUser(db, "busy");
+    addUser(db, "quiet");
+    grant(db, "busy", "admin", 5);
+    grant(db, "quiet", "admin", 5);
+    addApproved(db, "busy", "busy-1", AT);
+    addApproved(db, "busy", "busy-2", AT + 1);
+    addApproved(db, "busy", "busy-3", AT + 2);
+    addApproved(db, "quiet", "quiet-1", AT + 3);
 
-    expect(slots.length).toBe(10);
+    plannedPlanner(db).plan("busy");
+    plannedPlanner(db).plan("quiet");
 
-    for (let index = 1; index < slots.length; index += 1) {
-      const previous = slots[index - 1] ?? 0;
-      const current = slots[index] ?? 0;
+    expect(slotsOf(db, "quiet")).toEqual([AT]);
+  } finally {
+    sqlite.close();
+  }
+});
 
-      expect(current - previous).toBeGreaterThanOrEqual(SPACING_MS);
-    }
-  });
+test("finishing onboarding switches the account on", () => {
+  const { db, sqlite } = freshDatabase();
 
-  test("never plans more slots than the remaining window can space", () => {
-    const now = Date.UTC(2026, 2, 10, 19, 30);
-    const slots = slotsAt(now, "UTC", 10);
+  try {
+    db.insert(users)
+      .values({
+        createdAt: new Date(AT),
+        email: "new@example.com",
+        emailVerified: true,
+        id: "new",
+        name: "New",
+        role: "user",
+        updatedAt: new Date(AT),
+      })
+      .run();
 
-    expect(slots.length).toBe(2);
+    db.insert(profiles)
+      .values({
+        createdAt: new Date(AT),
+        onboardingStep: 3,
+        pauseReason: null,
+        running: false,
+        updatedAt: new Date(AT),
+        userId: "new",
+      })
+      .run();
 
-    for (let index = 1; index < slots.length; index += 1) {
-      expect((slots[index] ?? 0) - (slots[index - 1] ?? 0)).toBeGreaterThanOrEqual(SPACING_MS);
-    }
-  });
+    expect(startOnboarding(db, clock, "new")).toBe(true);
 
-  test("keeps existing slots apart when new Applications join the day", () => {
-    const blocked = [Date.UTC(2026, 2, 10, 12, 0)];
-    const slots = slotsAt(Date.UTC(2026, 2, 10, 10, 0), "UTC", 3, blocked);
+    expect(
+      db
+        .select({ pauseReason: profiles.pauseReason, running: profiles.running })
+        .from(profiles)
+        .where(eq(profiles.userId, "new"))
+        .get(),
+    ).toEqual({ pauseReason: null, running: true });
+  } finally {
+    sqlite.close();
+  }
+});
 
-    expect(slots.length).toBe(3);
+test("a new approval follows the last scheduled send, even when that send is in the future", () => {
+  const scheduled = AT + 10 * MINUTE_MS;
 
-    for (const slot of slots) {
-      expect(Math.abs(slot - (blocked[0] ?? 0))).toBeGreaterThanOrEqual(SPACING_MS);
-    }
-  });
+  expect(
+    planSendSlots({
+      count: 1,
+      dailyCap: 10,
+      now: AT,
+      scheduled: [scheduled],
+      spacingMs: 5 * MINUTE_MS,
+      timeZone: "UTC",
+      usedToday: 0,
+    }),
+  ).toEqual([scheduled + 5 * MINUTE_MS]);
+});
 
-  test("follows the local window across a spring-forward change", () => {
-    const timeZone = "America/Toronto";
-    const now = zonedTimeToEpoch({ day: 8, month: 3, year: 2026 }, 7, 0, timeZone);
-    const slots = slotsAt(now, timeZone, 3);
+test("a daily cap that is used up moves the next Application to local midnight, not a daytime window", () => {
+  const { sqlite } = freshDatabase();
 
-    expect(slots.length).toBe(3);
-
-    for (const slot of slots) {
-      expect(localDateAt(slot, timeZone)).toEqual({ day: 8, month: 3, year: 2026 });
-      expect(localHour(slot, timeZone)).toBeGreaterThanOrEqual(8);
-      expect(localHour(slot, timeZone)).toBeLessThan(20);
-    }
-  });
-
-  test("follows the local window across a fall-back change", () => {
-    const timeZone = "America/Toronto";
-    const now = zonedTimeToEpoch({ day: 1, month: 11, year: 2026 }, 7, 0, timeZone);
-    const slots = slotsAt(now, timeZone, 3);
-
-    expect(slots.length).toBe(3);
-
-    for (const slot of slots) {
-      expect(localDateAt(slot, timeZone)).toEqual({ day: 1, month: 11, year: 2026 });
-      expect(localHour(slot, timeZone)).toBeGreaterThanOrEqual(8);
-      expect(localHour(slot, timeZone)).toBeLessThan(20);
-    }
-  });
+  try {
+    expect(
+      planSendSlots({
+        count: 2,
+        dailyCap: 10,
+        now: AT,
+        scheduled: [],
+        spacingMs: 5 * MINUTE_MS,
+        timeZone: "UTC",
+        usedToday: 9,
+      }),
+    ).toEqual([AT, Date.UTC(2026, 2, 11, 0, 0, 0)]);
+  } finally {
+    sqlite.close();
+  }
 });

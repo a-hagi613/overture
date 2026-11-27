@@ -202,6 +202,30 @@ export function planApplications(db: BillingDb, userId: string, at: number) {
   return billingSummary(db, userId, at).planApplications;
 }
 
+/**
+ * Whether a person is still on the one-time onboarding trial: an unspent
+ * `trial` grant and no paid `period` grant. The trial's three Applications go
+ * together, without the paid 5-minute spacing that applies after an upgrade.
+ * @param db The billing database.
+ * @param userId The person whose grants are read.
+ * @param at The instant to read them at.
+ * @returns True while the trial funds the person and no paid period does.
+ */
+export function isOnboardingTrial(db: BillingDb, userId: string, at: number) {
+  const per = balancesPerGrant(db, userId);
+  const active = activeGrantsOf(db, userId, at);
+
+  const trialLeft = active.some(
+    (grant) => grant.source === "trial" && (per.get(grant.id)?.available ?? 0) > 0,
+  );
+
+  if (!trialLeft) {
+    return false;
+  }
+
+  return !active.some((grant) => grant.source === "period");
+}
+
 export function endingGrantOf(db: BillingDb, userId: string, at: number) {
   return billingSummary(db, userId, at).endingGrant;
 }

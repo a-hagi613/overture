@@ -63,7 +63,6 @@ import {
   createPullService,
   ensurePullQueued,
 } from "./jobs/pull.ts";
-import { createRandom } from "./platform/ports/random.ts";
 import { createEventLoopLagMonitor } from "./platform/event-loop-lag.ts";
 import { setSetting } from "./platform/settings/index.ts";
 import { createBackupMonitor } from "./platform/ports/backup.ts";
@@ -354,7 +353,6 @@ if (env.ENABLE_TEST_ROUTES) {
 }
 
 const clock = createClock();
-const random = createRandom();
 
 installProcessGuards(db, clock);
 
@@ -456,14 +454,6 @@ const jobSingletons = [
 recoverStaleLocks(db, clock, jobSingletons);
 
 if (env.ENABLE_TEST_ROUTES) {
-  setSetting(
-    db,
-    clock,
-    "limits.send_window",
-    JSON.stringify({ end: "24:00", start: "00:00" }),
-    "system:test",
-  );
-
   setSetting(db, clock, "jobs.pull_enabled", "false", "system:test");
 }
 
@@ -602,7 +592,7 @@ if (env.DEMO_LOGIN_ENABLED && catalogHotSwap !== null) {
   );
 }
 
-const planner = createPlanner({ clock, db, random });
+const planner = createPlanner({ clock, db });
 
 const preparation = createPreparationService({
   db,

@@ -375,7 +375,7 @@ publicTest.describe("public sign-up with spend protection", () => {
       await context.post("/__test__/llm/usage", {
         data: {
           cachedTokens: 0,
-          costMicros: 10_000_000,
+          costMicros: 50_000_000,
           inputTokens: 0,
           model: "claude-test",
           outputTokens: 0,

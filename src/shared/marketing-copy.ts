@@ -1,7 +1,6 @@
-import { formatHour, formatUsd, PLANS, PUBLIC_ATS, SEND_WINDOW, TRIAL } from "./plans.ts";
+import { formatUsd, PLANS, PUBLIC_ATS, SEND_RULES, TRIAL } from "./plans.ts";
 
 const countWords = ["Zero", "One", "Two", "Three", "Four", "Five", "Six"];
-const sendHours = `${formatHour(SEND_WINDOW.startHour)} to ${formatHour(SEND_WINDOW.endHour)}`;
 const atsList = `${PUBLIC_ATS.slice(0, -1).join(", ")} and ${PUBLIC_ATS.at(-1) ?? ""}`;
 
 export const marketingCopy = {
@@ -61,7 +60,7 @@ export const marketingCopy = {
       {
         label: "Step 3",
         title: "Approve the ones you want",
-        body: `Send goes out in daytime hours, ${sendHours} your local time, at least ${String(SEND_WINDOW.minGapMinutes)} minutes apart. Undo until sending starts.`,
+        body: `Send goes out as soon as you approve, about ${String(SEND_RULES.paidGapMinutes)} minutes apart for paid sends. Undo until sending starts.`,
       },
     ],
     boardTitle: "Each application moves across the Board",
@@ -125,7 +124,7 @@ export const marketingCopy = {
     includesTitle: "Every plan includes",
     includes: [
       `Every application is shown to you as Ready to send before anything is sent.`,
-      `Sends go out ${sendHours} your local time, at least ${String(SEND_WINDOW.minGapMinutes)} minutes apart, up to ${String(SEND_WINDOW.maxPerDay)} a day.`,
+      `Sends go out as soon as you approve, about ${String(SEND_RULES.paidGapMinutes)} minutes apart for paid sends, up to ${String(SEND_RULES.maxPerDay)} a day.`,
       `One company per ${String(PLANS.month.periodDays)} days.`,
       `${atsList}.`,
     ],

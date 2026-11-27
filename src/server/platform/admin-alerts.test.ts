@@ -249,10 +249,12 @@ describe("validateAdminSettingValue", () => {
     expect(validateAdminSettingValue("limits.send_spacing_minutes", "20")).toBe(true);
   });
 
-  test("validates the subscriber-scaled budget and alert share settings", () => {
+  test("validates the LLM cap and alert share settings", () => {
+    expect(validateAdminSettingValue("llm.cap_onboarding_usd", "0.50")).toBe(true);
     expect(validateAdminSettingValue("llm.cap_per_subscriber_day_usd", "0.30")).toBe(true);
-    expect(validateAdminSettingValue("llm.cap_subscriber_user_day_usd", "0.25")).toBe(true);
-    expect(validateAdminSettingValue("llm.cap_per_subscriber_day_usd", "a lot")).toBe(false);
+    expect(validateAdminSettingValue("llm.cap_user_day_usd", "0.10")).toBe(true);
+    expect(validateAdminSettingValue("llm.cap_global_day_usd", "50")).toBe(true);
+    expect(validateAdminSettingValue("llm.cap_user_day_usd", "a lot")).toBe(false);
 
     expect(validateAdminSettingValue("llm.spend_alert_ratio", "0.8")).toBe(true);
     expect(validateAdminSettingValue("llm.spend_alert_ratio", "0")).toBe(false);

@@ -97,7 +97,6 @@ import { publishEvent } from "../platform/sse/stream.ts";
 import { copy } from "../../shared/copy.ts";
 import { recordApplicationEvent } from "../applications/events.ts";
 import { acquireBrowserSession } from "./browser/session-slots.ts";
-import { nextSendSlot as nextSlotInWindow, parseSendWindow, planningWindow } from "./planning.ts";
 import { openApprovedPlan } from "../pipeline/approved-plan.ts";
 import { createPlanCache } from "../pipeline/plan-cache.ts";
 import { createFormSelfHealer, planFieldSignature } from "./forms/self-heal.ts";
@@ -262,21 +261,6 @@ function settingNumber(db: AppDatabase, key: string, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function sendWindow(db: AppDatabase) {
-  return parseSendWindow(getSetting(db, "limits.send_window"));
-}
-
-function nextSendSlot(db: AppDatabase, userId: string, earliest: number) {
-  const timezone =
-    db
-      .select({ timezone: profiles.timezone })
-      .from(profiles)
-      .where(eq(profiles.userId, userId))
-      .get()?.timezone ?? "UTC";
-
-  return nextSlotInWindow(earliest, timezone, sendWindow(db));
-}
-
 function combineSignals(first?: AbortSignal, second?: AbortSignal) {
   if (first === undefined) {
     return second;
@@ -387,7 +371,7 @@ export function createDispatcher(deps: DispatcherDeps) {
   }
 
   function scheduleRetry(applicationId: string, userId: string, at: number, attemptId: string) {
-    const slot = nextSendSlot(db, userId, at + RETRY_DELAY_MS);
+    const slot = at + RETRY_DELAY_MS;
 
     db.update(applications)
       .set({
@@ -423,7 +407,7 @@ export function createDispatcher(deps: DispatcherDeps) {
     attemptId: string,
     reason: string,
   ) {
-    const slot = nextSendSlot(db, userId, at);
+    const slot = at;
 
     db.update(applications)
       .set({
@@ -664,12 +648,6 @@ export function createDispatcher(deps: DispatcherDeps) {
               }
 
               const timeZone = row.timezone ?? "UTC";
-              const window = planningWindow(at, timeZone, sendWindow(db));
-
-              if (at < window.start || at >= window.end) {
-                return null;
-              }
-
               const dailyCap = settingNumber(db, "limits.daily_cap", 10);
 
               if (dailyUsageSince(tx, row.userId, localDayStart(at, timeZone)) >= dailyCap) {

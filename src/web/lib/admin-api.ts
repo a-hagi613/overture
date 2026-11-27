@@ -1557,7 +1557,6 @@ export const llmUsageCapsSchema = z.object({
   monthlySpendCapMicros: z.number().nullable(),
   taggingDailyCapMicros: z.number(),
   userDailyCapMicros: z.number(),
-  subscriberUserDailyCapMicros: z.number(),
 });
 
 export const llmUsageResponseSchema = z.object({

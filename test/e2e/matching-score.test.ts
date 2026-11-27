@@ -209,7 +209,7 @@ test("the daily run fills the free Ready slots in rank order and never scores tw
   await owner.dispose();
 });
 
-test("a strict threshold over a large pool stops at the scoring bound, alerts once and leaves the LLM cap untripped", async ({
+test("a strict threshold scores the whole pool without a scoring bound or a tripped LLM cap", async ({
   matching,
 }) => {
   const { owner, userId } = await ownerContextFor(matching.server.url);
@@ -219,7 +219,7 @@ test("a strict threshold over a large pool stops at the scoring bound, alerts on
   await configureMatching(owner);
 
   await owner.put("/__test__/settings/match.auto_threshold_default", { data: { value: "95" } });
-  await owner.put("/__test__/settings/llm.cap_user_day_usd", { data: { value: "0.018" } });
+  await owner.put("/__test__/settings/llm.cap_user_day_usd", { data: { value: "0.05" } });
 
   await seedCompanies(owner, "bound", 40, { salaryMinMinor: 15_000_000 });
 
@@ -228,27 +228,15 @@ test("a strict threshold over a large pool stops at the scoring bound, alerts on
   const scored = (await matchesFor(owner, userId)).filter((row) => row.score !== null);
   const alerts = await alertsFor(owner, userId);
 
-  expect(scored).toHaveLength(30);
-  expect(matching.anthropic.requests()).toHaveLength(30);
+  expect(scored).toHaveLength(40);
+  expect(matching.anthropic.requests()).toHaveLength(40);
   expect(await applicationsFor(owner, userId)).toHaveLength(0);
-
-  const boundAlerts = alerts.filter((alert) => alert.title === "Overture alert: match.score_bound");
-
-  expect(boundAlerts).toHaveLength(1);
   expect(alerts.filter((alert) => alert.title === "Overture alert: llm.cap")).toHaveLength(0);
-
-  expect(JSON.parse(boundAlerts[0]?.body ?? "{}")).toMatchObject({
-    attempts: 30,
-    bound: 30,
-    candidates: 40,
-    need: 10,
-    threshold: 95,
-  });
 
   const spendMicros = await scoreSpendMicros(owner);
 
   expect(spendMicros).toBeGreaterThan(0);
-  expect(spendMicros).toBeLessThan(18_000);
+  expect(spendMicros).toBeLessThan(50_000);
 
   await owner.dispose();
 });
@@ -283,7 +271,7 @@ test("a run after the daily time schedules only tomorrow, never a second run tod
   const { jobs } = jobsSchema.parse(await (await owner.get("/__test__/jobs")).json());
   const scheduled = jobs.filter((job) => job.kind === "prep.daily" && job.dedupeKey !== null);
 
-  expect(matching.anthropic.requests()).toHaveLength(30);
+  expect(matching.anthropic.requests()).toHaveLength(40);
   expect(scheduled.filter((job) => job.runAt <= now)).toHaveLength(0);
   expect(
     scheduled.filter((job) => job.runAt === tomorrowRunAt && job.status === "queued"),

@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-import { DEFAULT_SEND_WINDOW } from "../dispatch/planning.ts";
 import { nextSendAtOf, sendQueueOf } from "./send-queue.ts";
 
 const HOUR_MS = 3_600_000;
@@ -29,7 +28,7 @@ describe("the send queue", () => {
     expect(sendQueueOf([null], AT)).toStrictEqual({ position: null, sendAt: null });
   });
 
-  test("takes the earliest send time, or the next slot when none is scheduled", () => {
+  test("takes the earliest send time, or now when an Approval has no slot yet", () => {
     const scheduled = [AT + 3 * HOUR_MS, AT + HOUR_MS];
 
     expect(
@@ -37,27 +36,22 @@ describe("the send queue", () => {
         approved: 2,
         now: AT,
         scheduledFor: scheduled,
-        window: DEFAULT_SEND_WINDOW,
-        zone: "UTC",
       }),
     ).toBe(AT + HOUR_MS);
 
-    const nextSlot = nextSendAtOf({
-      approved: 1,
-      now: AT,
-      scheduledFor: [null],
-      window: DEFAULT_SEND_WINDOW,
-      zone: "UTC",
-    });
+    expect(
+      nextSendAtOf({
+        approved: 1,
+        now: AT,
+        scheduledFor: [null],
+      }),
+    ).toBe(AT);
 
-    expect(nextSlot).not.toBeNull();
     expect(
       nextSendAtOf({
         approved: 0,
         now: AT,
         scheduledFor: [],
-        window: DEFAULT_SEND_WINDOW,
-        zone: "UTC",
       }),
     ).toBeNull();
   });

@@ -21,7 +21,7 @@ import {
 } from "../platform/db/schema.ts";
 import { companyBoards, postings } from "../platform/db/catalog-schema.ts";
 
-import { applicationsLeft, dailyUsageSince } from "../billing/ledger.ts";
+import { applicationsLeft, dailyUsageSince, isOnboardingTrial } from "../billing/ledger.ts";
 import { skipClosedPostingApplications } from "../catalog/posting-close.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
@@ -31,7 +31,6 @@ import { approvalProblem, openApprovedPlan } from "../pipeline/approved-plan.ts"
 import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { pauseForBlocker } from "../profile/running-state.ts";
-import { parseSendWindow, planningWindow } from "./planning.ts";
 import { APPLICATION_SEND_JOB_KIND } from "./executor.ts";
 import { browserSessionAvailability, freeSendSlots } from "./browser/session-slots.ts";
 import { bestEffortCatalogWrite } from "../platform/db/read-only-catalog.ts";
@@ -208,6 +207,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
     now: number,
     dailyCap: number,
     activeSendUsers: ReadonlySet<string>,
+    trial: boolean,
   ) {
     const profile = db
       .select({ running: profiles.running })
@@ -267,7 +267,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
       return { block: { reason: "daily_cap", scope: "user" }, timeZone };
     }
 
-    if (activeSendUsers.has(userId)) {
+    if (!trial && activeSendUsers.has(userId)) {
       return { block: { reason: "sending", scope: "user" }, timeZone };
     }
 
@@ -573,7 +573,6 @@ export function createDispatcherTick(deps: DispatchDeps) {
     });
 
     const dailyCap = Math.max(0, settingNumber(db, "limits.daily_cap", 10));
-    const window = parseSendWindow(getSetting(db, "limits.send_window"));
     const eligible: Candidate[] = [];
 
     const headroom: TickHeadroom = {
@@ -587,7 +586,8 @@ export function createDispatcherTick(deps: DispatchDeps) {
         break;
       }
 
-      const gate = userGate(userId, now, dailyCap, activeSends.userIds);
+      const trial = isOnboardingTrial(db, userId, now);
+      const gate = userGate(userId, now, dailyCap, activeSends.userIds, trial);
 
       if (gate.block !== null) {
         summary.blocked += 1;
@@ -595,41 +595,34 @@ export function createDispatcherTick(deps: DispatchDeps) {
         continue;
       }
 
-      const localWindow = planningWindow(now, gate.timeZone, window);
+      const candidates = byUser.get(userId) ?? [];
+      const limit = trial ? candidates.length : 1;
+      let taken = 0;
 
-      if (now < localWindow.start || now >= localWindow.end) {
-        summary.blocked += 1;
+      for (const candidate of candidates) {
+        if (taken >= limit) {
+          break;
+        }
 
-        continue;
+        if (atsOff.has(candidate.ats) || employerOff.has(candidate.companyId)) {
+          if (!trial) {
+            summary.blocked += 1;
+          }
+
+          continue;
+        }
+
+        if (postingBlock(candidate, now, headroom) !== null) {
+          if (!trial) {
+            summary.blocked += 1;
+          }
+
+          continue;
+        }
+
+        eligible.push(candidate);
+        taken += 1;
       }
-
-      const candidate = byUser.get(userId)?.at(0);
-
-      if (candidate === undefined) {
-        continue;
-      }
-
-      const todayStart = localDayStart(now, gate.timeZone);
-
-      if (candidate.scheduledFor !== null && candidate.scheduledFor < todayStart) {
-        summary.blocked += 1;
-
-        continue;
-      }
-
-      if (atsOff.has(candidate.ats) || employerOff.has(candidate.companyId)) {
-        summary.blocked += 1;
-
-        continue;
-      }
-
-      if (postingBlock(candidate, now, headroom) !== null) {
-        summary.blocked += 1;
-
-        continue;
-      }
-
-      eligible.push(candidate);
     }
 
     const livenessByApplication = new Map<string, PostingLiveness>();

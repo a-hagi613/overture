@@ -13,7 +13,7 @@ const PLAN = {
 };
 
 const TRIAL_APPS = 3;
-const SEND = { endHour: 20, startHour: 8 };
+const PAID_GAP_MINUTES = 5;
 const PUBLIC_ATS = ["Greenhouse", "Lever", "Ashby", "Personio", "Workable"];
 
 const widths = [390, 768, 1280, 1440, 1920, 2560] as const;
@@ -61,7 +61,7 @@ test.describe("public landing and embedded pricing, readable without JavaScript"
     expect(html).toContain('href="/privacy"');
     expect(html).toContain('href="#pricing"');
     expect(text).toContain(
-      `between ${String(SEND.startHour).padStart(2, "0")}:00 to ${String(SEND.endHour).padStart(2, "0")}:00 local time`,
+      `the trial's ${String(TRIAL_APPS)} together, then paid sends about ${String(PAID_GAP_MINUTES)} minutes apart`,
     );
   });
 

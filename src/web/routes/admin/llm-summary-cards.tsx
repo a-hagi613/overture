@@ -21,7 +21,7 @@ function dailyHintOf(view: LlmUsageResponse) {
     return copy.admin.llmStatTodayOver(dailyCapLabel);
   }
 
-  if (view.caps.subscribers > 0) {
+  if (view.caps.subscribers > 0 && view.caps.perSubscriberDayMicros > 0) {
     return copy.admin.llmStatTodayScaled(
       dailyCapLabel,
       formatUsdMicros(view.caps.baseDailySpendCapMicros),
