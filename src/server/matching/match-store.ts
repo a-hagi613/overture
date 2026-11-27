@@ -22,6 +22,7 @@ export interface ScoreIdentity {
 export interface StoredMatch extends SortableMatch {
   userId: string;
   codeRank: number;
+  reason: string | null;
   scoredAt: number | null;
   reasons: readonly string[];
   roleFit: number | null;
@@ -82,6 +83,7 @@ export function readStoredMatches(db: AppDatabase, userId: string) {
       level: row.level,
       logistics: row.logistics,
       postedAt: row.postedAt,
+      reason: row.reason,
       reasons: stringList(row.reasons),
       resumeId: row.resumeId,
       roleFit: row.roleFit,
