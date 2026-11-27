@@ -56,9 +56,9 @@ if [ "${LITESTREAM_RESTORE_ONLY:-false}" = "true" ]; then
 fi
 
 if [ "${LITESTREAM_ENABLED:-true}" != "true" ]; then
-  exec bun run /app/src/server/main.ts
+  exec bun --smol run /app/src/server/main.ts
 fi
 
 # Only this process replicates, so only it owns the checkpoints (wal_autocheckpoint = 0 in the app).
 export LITESTREAM_OWNS_CHECKPOINTS=true
-exec litestream replicate -config "$LITESTREAM_CONFIG" -restore-if-db-not-exists -exec "bun run /app/src/server/main.ts"
+exec litestream replicate -config "$LITESTREAM_CONFIG" -restore-if-db-not-exists -exec "bun --smol run /app/src/server/main.ts"
