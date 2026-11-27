@@ -2,6 +2,8 @@ import { and, asc, count, eq, gte, inArray, isNotNull, isNull, lte, sql } from "
 
 import { z } from "zod";
 
+import { isApplySupportedAts } from "../../shared/ats.ts";
+import type { ApplySupportedAts } from "../../shared/ats.ts";
 import type { BoardRegion } from "../catalog/board-feed.ts";
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -25,6 +27,7 @@ import { applicationsLeft, dailyUsageSince, isOnboardingTrial } from "../billing
 import { skipClosedPostingApplications } from "../catalog/posting-close.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
+import { logInfo } from "../platform/log.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { localDayStart } from "../platform/local-time.ts";
 import { approvalProblem, openApprovedPlan } from "../pipeline/approved-plan.ts";
@@ -46,6 +49,8 @@ export interface DispatchSummary {
   claimed: number;
   skipped: number;
   blocked: number;
+  /** Approved Applications whose posting had no liveness source; they were sent anyway (#756). */
+  unknownLiveness: number;
 }
 
 export interface DispatcherTick {
@@ -68,27 +73,15 @@ interface Block {
   reason: string;
 }
 
-const DISPATCHABLE_ATS = [
-  "greenhouse",
-  "lever",
-  "ashby",
-  "workable",
-  "hiringthing",
-  "rippling",
-  "gem",
-  "isolved_hire",
-  "applicantpro",
-  "catsone",
-  "onlyfy",
-  "varbi",
-  "jobvite",
-  "herp",
-] as const;
-
-type DispatchAts = (typeof DISPATCHABLE_ATS)[number];
+/**
+ * Every board with a shipped apply adapter is dispatchable. Keeping a hand-written subset here is what
+ * left JazzHR, BambooHR, Zoho Recruit, Manatal and the other Wave 1A adapters permanently unclaimed
+ * (issue #756): the registry already says who can be sent, so the dispatcher reads it instead.
+ */
+type DispatchAts = ApplySupportedAts;
 
 function isDispatchAts(ats: string): ats is DispatchAts {
-  return DISPATCHABLE_ATS.some((name) => name === ats);
+  return isApplySupportedAts(ats);
 }
 
 interface Candidate {
@@ -458,7 +451,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
 
   async function run() {
     const now = clock.now();
-    const summary: DispatchSummary = { blocked: 0, claimed: 0, skipped: 0 };
+    const summary: DispatchSummary = { blocked: 0, claimed: 0, skipped: 0, unknownLiveness: 0 };
 
     const switches = db.select().from(killSwitches).where(eq(killSwitches.enabled, 1)).all();
 
@@ -660,9 +653,13 @@ export function createDispatcherTick(deps: DispatchDeps) {
       }
 
       if (status === "unknown") {
-        summary.blocked += 1;
-
-        continue;
+        // An ATS with no liveness source is not a failed check (issue #756). Only a confirmed closed
+        // posting stops a send; the log and the tick summary record that this one went out unverified.
+        summary.unknownLiveness += 1;
+        logInfo(
+          "dispatch.liveness",
+          `application ${candidate.id} on ${candidate.ats}: posting liveness unknown; sending anyway`,
+        );
       }
 
       const approved = approvalPlans.get(candidate.id) ?? null;

@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import type { Ats as RegistryAts } from "../../shared/ats.ts";
-import { isBatchFourAts, isWaveTwoAts } from "../../shared/ats.ts";
 import type { BoardRegion } from "../catalog/board-feed.ts";
 import type { Env } from "../config/env.ts";
 
@@ -135,23 +134,31 @@ export function createPostingLiveness(env: Env) {
 
   return {
     check: async (target) => {
-      if (target.ats === "workable") {
-        return "open";
-      }
+      switch (target.ats) {
+        case "workable": {
+          // Its daily snapshot is the closure signal; a form that 404s at send ends as a form change.
+          return "open";
+        }
 
-      if (target.ats === "personio" || isBatchFourAts(target.ats) || isWaveTwoAts(target.ats)) {
-        return "unknown";
-      }
+        case "greenhouse": {
+          return greenhouse(target);
+        }
 
-      if (target.ats === "greenhouse") {
-        return greenhouse(target);
-      }
+        case "lever": {
+          return lever(target);
+        }
 
-      if (target.ats === "lever") {
-        return lever(target);
-      }
+        case "ashby": {
+          return ashby(target);
+        }
 
-      return ashby(target);
+        default: {
+          // Personio and every later-wave board have no per-posting liveness source. Asking Ashby
+          // (the old fallthrough) turned another board's 404 into a false `closed`, so an unsupported
+          // board is honestly unknown and dispatch sends it (issue #756).
+          return "unknown";
+        }
+      }
     },
   } satisfies PostingLivenessChecker;
 }
