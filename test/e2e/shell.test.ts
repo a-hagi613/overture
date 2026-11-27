@@ -13,6 +13,7 @@ const desktopDestinations = [
   "Tracker",
   "Ready",
   "Review",
+  "Matches",
   "Resume & Cover Letter",
   "Job Preferences",
   "Saved answers",

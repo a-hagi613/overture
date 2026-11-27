@@ -50,7 +50,8 @@ with Closed / Cancelled / Not sent behind an explicit "Show closed" filter, so t
 Each card opens the job drawer at `?application=<id>`: opening pushes a history entry so Back closes it, closing
 replaces, and a shared deep link opens the drawer directly. ⌘K searches jobs and applications and navigates to
 the selected application's page with the drawer open. The sidebar puts Tracker above Ready and Review; Ready and
-Review remain pages.
+Review remain pages. Matches is a sidebar destination between Review and Inbox (`/matches`, #690), so the
+Applications group reads Tracker · Ready · Review · Matches.
 
 **Page titles.** Each page title's final emphasis word is italic serif in `text-signal` (DESIGN §3).
 
