@@ -765,6 +765,7 @@
         "**/*.config.{ts,mts,mjs,js}",
         "test/e2e/global-setup.ts",
         "tools/oxlint/architecture/index.ts",
+        "workers/freehire-proxy/src/index.ts",
         "workers/inbound-mail/src/index.ts",
         "workers/sentinel/src/index.ts"
       ],
