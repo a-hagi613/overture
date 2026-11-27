@@ -314,7 +314,7 @@ describe("the resume reader", () => {
       clock,
       db,
       llm,
-      spendGate: { allows: () => false, gated: true },
+      spendGate: { allows: () => false, allowsOnboarding: () => false, gated: true },
     }).read(userId, fixture.identity, fixture.text);
 
     expect(read.status).toBe("skipped");

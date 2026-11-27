@@ -235,33 +235,24 @@ publicTest.describe("public sign-up with spend protection", () => {
   );
 
   publicTest(
-    "a scanned resume costs no LLM call until Applications exist, then it may",
+    "a scanned resume is read during onboarding, before Applications exist",
     async ({ anthropic, publicServer, publicUrl }) => {
       const { context } = await signInNewEmail(publicUrl, NEW_EMAIL);
 
-      const blocked = await uploadResume(context);
+      const read = await uploadResume(context);
 
-      expect(blocked.parsedWith).toBe("unpdf");
-      expect(blocked.unreadable).toBe(true);
-      expect(anthropic.singleMessages()).toEqual([]);
-      expect(llmUsageRows(publicServer)).toEqual([]);
-
-      const granted = await context.post("/__test__/ledger/grant", {
-        data: { email: NEW_EMAIL, idempotencyKey: "public-signup-trial", quantity: 3 },
-      });
-
-      expect(applicationsLeftSchema.parse(await granted.json()).applicationsLeft).toBe(3);
-
-      const allowed = await uploadResume(context);
-
-      expect(allowed.parsedWith).toBe("llm");
-      expect(allowed.unreadable).toBe(false);
+      expect(read.parsedWith).toBe("llm");
+      expect(read.unreadable).toBe(false);
       expect(anthropic.singleMessages()).toHaveLength(2);
       expect(
         llmUsageRows(publicServer)
           .map((row) => row.purpose)
           .toSorted(),
       ).toEqual(["resume_facts", "resume_pdf"]);
+
+      const state = onboardingSchema.parse(await (await context.get("/api/onboarding")).json());
+
+      expect(state.onboardedAt).toBeNull();
 
       await context.dispose();
     },
@@ -312,7 +303,7 @@ publicTest.describe("public sign-up with spend protection", () => {
   );
 
   publicTest(
-    "opening a posting spends nothing before the trial card or a plan",
+    "opening a posting scores once during onboarding and reuses the stored score after a grant",
     async ({ anthropic, publicServer, publicUrl }) => {
       const { context } = await signInNewEmail(publicUrl, EXISTING_EMAIL);
 
@@ -329,13 +320,17 @@ publicTest.describe("public sign-up with spend protection", () => {
         url: "https://open-gate.example/jobs/1",
       });
 
-      const blocked = postingSchema.parse(
+      const scored = postingSchema.parse(
         await (await context.get(`/api/postings/${postingId}`)).json(),
       );
 
-      expect(blocked.score).toBeNull();
-      expect(anthropic.batchesCreated()).toBe(0);
-      expect(llmUsageRows(publicServer)).toEqual([]);
+      expect(scored.score).not.toBeNull();
+      expect(anthropic.batchesCreated()).toBe(1);
+      expect(
+        llmUsageRows(publicServer)
+          .map((row) => row.purpose)
+          .toSorted(),
+      ).toEqual(["resume_facts", "score"]);
 
       await context.post("/__test__/ledger/grant", {
         data: { email: EXISTING_EMAIL, idempotencyKey: "open-gate-trial", quantity: 3 },
@@ -345,9 +340,9 @@ publicTest.describe("public sign-up with spend protection", () => {
         await (await context.get(`/api/postings/${postingId}`)).json(),
       );
 
-      expect(allowed.score).not.toBeNull();
+      expect(allowed.score).toBe(scored.score);
       expect(anthropic.batchesCreated()).toBe(1);
-      expect(llmUsageRows(publicServer)).toHaveLength(1);
+      expect(llmUsageRows(publicServer)).toHaveLength(2);
 
       await context.dispose();
     },

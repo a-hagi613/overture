@@ -25,7 +25,7 @@ import {
   searchQueryFor,
 } from "./preferences.ts";
 import type { JobStore } from "./store.ts";
-import { enqueueMatchScoreNew } from "../matching/match-jobs.ts";
+import { enqueueMatchScoreNew, enqueueMatchScorePool } from "../matching/match-jobs.ts";
 
 export const JOBS_PULL_JOB_KIND = "jobs.pull";
 export const JOBS_PULL_USER_JOB_KIND = "jobs.pull.user";
@@ -652,8 +652,12 @@ export function createPullJobHandlers(db: AppDatabase, clock: Clock, service: Pu
       const { userId } = userPullPayload.parse(JSON.parse(payload));
       const result = await service.runUser(userId);
 
-      if (result !== null && isPaidUser(db, userId, clock.now())) {
-        enqueueMatchScoreNew(db, clock, userId);
+      if (result !== null) {
+        enqueueMatchScorePool(db, clock, userId);
+
+        if (isPaidUser(db, userId, clock.now())) {
+          enqueueMatchScoreNew(db, clock, userId);
+        }
       }
     },
   } satisfies JobHandlers;

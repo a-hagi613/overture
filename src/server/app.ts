@@ -584,8 +584,8 @@ export function createApp(deps: AppDependencies) {
       payments: deps.payments,
       personal,
       reviews: deps.reviews,
-      spendGate: deps.spendGate,
       matching,
+      spendGate: deps.spendGate,
     }),
   );
   app.route(

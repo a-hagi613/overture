@@ -5,7 +5,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { AnswerKind, QuestionFieldType, QuestionMapper } from "../../shared/questions.ts";
 import type { AtsQuestion } from "./greenhouse-questions.ts";
 
-import { questionVariants, questions } from "../platform/db/schema.ts";
+import { jobQuestions, questionVariants, questions } from "../platform/db/schema.ts";
 import { postingQuestions } from "../platform/db/catalog-schema.ts";
 import { bestEffortCatalogWrite } from "../platform/db/read-only-catalog.ts";
 import {
@@ -218,20 +218,15 @@ export function createQuestionCatalog(deps: {
     });
   }
 
-  function forPosting(postingId: string) {
-    const linked = catalogDb
-      .select({
-        questionId: postingQuestions.questionId,
-        required: postingQuestions.required,
-        position: postingQuestions.position,
-        options: postingQuestions.options,
-        fieldName: postingQuestions.fieldName,
-      })
-      .from(postingQuestions)
-      .where(eq(postingQuestions.postingId, postingId))
-      .orderBy(postingQuestions.position)
-      .all();
-
+  function joinedQuestions(
+    linked: readonly {
+      questionId: string;
+      required: boolean;
+      position: number;
+      options: string;
+      fieldName: string | null;
+    }[],
+  ) {
     if (linked.length === 0) {
       return [];
     }
@@ -256,12 +251,105 @@ export function createQuestionCatalog(deps: {
     });
   }
 
+  function forPosting(postingId: string) {
+    return joinedQuestions(
+      catalogDb
+        .select({
+          questionId: postingQuestions.questionId,
+          required: postingQuestions.required,
+          position: postingQuestions.position,
+          options: postingQuestions.options,
+          fieldName: postingQuestions.fieldName,
+        })
+        .from(postingQuestions)
+        .where(eq(postingQuestions.postingId, postingId))
+        .orderBy(postingQuestions.position)
+        .all(),
+    );
+  }
+
+  function forJob(jobId: string) {
+    return joinedQuestions(
+      db
+        .select({
+          questionId: jobQuestions.questionId,
+          required: jobQuestions.required,
+          position: jobQuestions.position,
+          options: jobQuestions.options,
+          fieldName: jobQuestions.fieldName,
+        })
+        .from(jobQuestions)
+        .where(eq(jobQuestions.jobId, jobId))
+        .orderBy(jobQuestions.position)
+        .all(),
+    );
+  }
+
+  function saveJobQuestions(
+    jobId: string,
+    entries: readonly {
+      questionId: string;
+      required: boolean;
+      position: number;
+      options: string[];
+      fieldName: string | null;
+    }[],
+  ) {
+    db.transaction((tx) => {
+      tx.delete(jobQuestions).where(eq(jobQuestions.jobId, jobId)).run();
+
+      for (const entry of entries) {
+        tx.insert(jobQuestions)
+          .values({
+            jobId,
+            questionId: entry.questionId,
+            required: entry.required,
+            position: entry.position,
+            options: JSON.stringify(entry.options),
+            fieldName: entry.fieldName,
+          })
+          .onConflictDoNothing()
+          .run();
+      }
+    });
+  }
+
+  function addJobQuestion(
+    jobId: string,
+    entry: { questionId: string; required: boolean; options: string[]; fieldName: string | null },
+  ) {
+    let highest = -1;
+
+    for (const row of db
+      .select({ position: jobQuestions.position })
+      .from(jobQuestions)
+      .where(eq(jobQuestions.jobId, jobId))
+      .all()) {
+      highest = Math.max(highest, row.position);
+    }
+
+    db.insert(jobQuestions)
+      .values({
+        jobId,
+        questionId: entry.questionId,
+        required: entry.required,
+        position: highest + 1,
+        options: JSON.stringify(entry.options),
+        fieldName: entry.fieldName,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
   return {
+    addJobQuestion,
     addPostingQuestion,
     byId,
     byLabel,
     findOrCreate,
+    forJob,
     forPosting,
+    saveJobQuestions,
     savePostingQuestions,
     setMapping,
     unmapped,

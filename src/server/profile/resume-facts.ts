@@ -441,7 +441,7 @@ export function createResumeFactsReader(deps: {
       return { facts: identityDrafts(identity), status: "skipped" };
     }
 
-    if (!spendGate.allows(userId)) {
+    if (!spendGate.allowsOnboarding(userId)) {
       return { facts: identityDrafts(identity), status: "skipped" };
     }
 

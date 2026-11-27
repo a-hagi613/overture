@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -12,13 +12,9 @@ import type {
 } from "../../shared/onboarding.ts";
 
 import { applications, onboardingBatches, onboardingPicks } from "../platform/db/schema.ts";
-import { postings } from "../platform/db/catalog-schema.ts";
-import { postingDisplayFor } from "../matching/applications.ts";
-import {
-  isOnboardingPickFailureReason,
-  onboardingPickLimitFor,
-  pickStatusOfApplication,
-} from "../../shared/onboarding.ts";
+import { jobPostingsById } from "../jobs/job-posting.ts";
+import { displayFromJobPosting } from "./freehire-job.ts";
+import { onboardingPickLimitFor, pickStatusOfApplication } from "../../shared/onboarding.ts";
 
 export interface PickPreparationResult {
   applicationId: string | null;
@@ -43,6 +39,17 @@ function batchStatusAfter(results: readonly PickPreparationResult[]) {
   }
 
   return "prepared" as const;
+}
+
+function isFailureReason(value: string | null): value is OnboardingPickFailureReason {
+  return (
+    value === "posting_closed" ||
+    value === "apply_unsupported" ||
+    value === "language" ||
+    value === "company_excluded" ||
+    value === "already_applied" ||
+    value === "prepare_failed"
+  );
 }
 
 /**
@@ -142,7 +149,7 @@ export function createOnboardingPicks(deps: {
         company: row.companyName,
         location: row.locationRaw,
         postingId: row.postingId,
-        reason: isOnboardingPickFailureReason(row.reason) ? row.reason : null,
+        reason: isFailureReason(row.reason) ? row.reason : null,
         status: live,
         title: row.postingTitle,
       };
@@ -166,29 +173,21 @@ export function createOnboardingPicks(deps: {
       return null;
     }
 
-    if (unique.length > 0) {
-      const open = catalogDb
-        .select({ id: postings.id })
-        .from(postings)
-        .where(and(inArray(postings.id, unique), eq(postings.status, "open")))
-        .all();
-
-      if (open.length !== unique.length) {
-        return null;
-      }
-    }
-
     const snapshots = new Map<string, PostingDisplay>();
 
     if (unique.length > 0) {
-      for (const postingId of unique) {
-        const display = postingDisplayFor(catalogDb, postingId);
+      const resolved = jobPostingsById({ catalogDb, db }, unique);
 
-        if (display === undefined) {
+      if (resolved.size !== unique.length) {
+        return null;
+      }
+
+      for (const posting of resolved.values()) {
+        if (!posting.open) {
           return null;
         }
 
-        snapshots.set(postingId, display);
+        snapshots.set(posting.postingId, displayFromJobPosting(posting));
       }
     }
 

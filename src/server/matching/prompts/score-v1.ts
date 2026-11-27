@@ -62,6 +62,7 @@ export const SCORE_OUTPUT_SCHEMA = {
     },
     reasons: {
       type: "array",
+      description: "Two or three short reasons with no more than 110 characters each.",
       items: { type: "string", maxLength: 110 },
     },
   },

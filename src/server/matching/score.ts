@@ -239,7 +239,7 @@ export function createMatchingService(deps: MatchDeps) {
   async function runScoreRequests(userId: string, requests: LlmRequest[]) {
     const scores = new Map<string, ScoreOutput>();
 
-    if (requests.length === 0 || !spendGate.allows(userId)) {
+    if (requests.length === 0 || !spendGate.allowsOnboarding(userId)) {
       return scores;
     }
 

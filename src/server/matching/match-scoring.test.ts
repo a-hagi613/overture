@@ -379,7 +379,7 @@ describe("live scoring", () => {
           return plaintext;
         },
       },
-      spendGate: { allows: () => false, gated: true },
+      spendGate: { allows: () => false, allowsOnboarding: () => false, gated: true },
     });
 
     const result = await service.scorePool("user-1");

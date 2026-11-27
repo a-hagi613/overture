@@ -13,6 +13,7 @@ import { TabBar } from "./components/tab-bar.tsx";
 import { Toaster } from "./components/ui/sonner.tsx";
 import { WorkspaceSearchDialog } from "./components/workspace-search-dialog.tsx";
 import { authClient } from "./lib/auth-client.ts";
+import { allowsUnonboarded } from "./lib/route-guard.ts";
 import { useLiveUpdates } from "./lib/live-events.ts";
 import { useMediaQuery } from "./lib/media-query.ts";
 import { useNavCounts } from "./lib/nav-api.ts";
@@ -21,17 +22,6 @@ import { useOnboardingState } from "./lib/onboarding-api.ts";
 import { closeAllTopLayerHosts, useTopLayerHost } from "./lib/top-layer-host.ts";
 
 const collapsedStorageKey = "overture.rail";
-
-const UNONBOARDED_ALLOWED_PATHS = new Set([
-  "/profile/account",
-  "/profile/billing",
-  "/settings",
-  "/settings/billing",
-  "/settings/billing/plans",
-  "/settings/delete",
-  "/settings/export",
-  "/settings/support-access",
-]);
 
 export function AppShell() {
   const navigate = useNavigate();
@@ -65,7 +55,7 @@ export function AppShell() {
 
   useLiveUpdates();
 
-  const allowUnonboarded = UNONBOARDED_ALLOWED_PATHS.has(location.pathname);
+  const allowUnonboarded = allowsUnonboarded(location.pathname, location.search);
   const onboardingBlocked = onboarding.data?.needsOnboarding === true && !allowUnonboarded;
   const waitingForOnboarding = session !== null && onboarding.isPending && !allowUnonboarded;
 

@@ -418,8 +418,13 @@ export function createPreparationService(deps: {
     applyUrl: string | null;
     url: string | null;
     questionsFetchedAt: number | null;
+    origin: "jobs" | "catalog";
   }) {
-    if (posting.questionsFetchedAt !== null) {
+    if (posting.origin === "jobs") {
+      if (catalog.forJob(posting.postingId).length > 0) {
+        return null;
+      }
+    } else if (posting.questionsFetchedAt !== null) {
       return null;
     }
 
@@ -470,7 +475,11 @@ export function createPreparationService(deps: {
         },
       );
 
-      catalog.savePostingQuestions(posting.postingId, entries);
+      if (posting.origin === "jobs") {
+        catalog.saveJobQuestions(posting.postingId, entries);
+      } else {
+        catalog.savePostingQuestions(posting.postingId, entries);
+      }
 
       return entries;
     };
@@ -485,7 +494,9 @@ export function createPreparationService(deps: {
 
       await recordQuestions(inputs);
 
-      markQuestionsFetched(posting.postingId);
+      if (posting.origin === "catalog") {
+        markQuestionsFetched(posting.postingId);
+      }
 
       return null;
     }
@@ -691,12 +702,18 @@ export function createPreparationService(deps: {
         fieldName: field.fieldName,
       });
 
-      catalog.addPostingQuestion(posting.postingId, {
+      const link = {
         fieldName: field.fieldName,
         options: field.options,
         questionId: question.id,
         required: true,
-      });
+      };
+
+      if (posting.origin === "jobs") {
+        catalog.addJobQuestion(posting.postingId, link);
+      } else {
+        catalog.addPostingQuestion(posting.postingId, link);
+      }
 
       const [scope] = countriesNamedIn(field.label);
 
@@ -875,7 +892,8 @@ export function createPreparationService(deps: {
             resume.textEnc,
           );
 
-    const questionRows = catalog.forPosting(row.postingId);
+    const questionRows =
+      row.origin === "jobs" ? catalog.forJob(row.postingId) : catalog.forPosting(row.postingId);
 
     const blocked: BlockedQuestion[] = [];
     const resolutions = new Map<string, PlanResolution>();
@@ -1305,7 +1323,10 @@ export function createPreparationService(deps: {
     );
 
     const fields = await Promise.all(
-      catalog.forPosting(row.postingId).map(async (question) => {
+      (row.origin === "jobs"
+        ? catalog.forJob(row.postingId)
+        : catalog.forPosting(row.postingId)
+      ).map(async (question) => {
         const options = optionsSchema.parse(JSON.parse(question.options));
 
         if (question.answerKind === "open_text" && isFreeText(question.fieldType)) {
@@ -1496,7 +1517,10 @@ export function createPreparationService(deps: {
     );
 
     return Promise.all(
-      catalog.forPosting(row.postingId).map(async (question) => {
+      (row.origin === "jobs"
+        ? catalog.forJob(row.postingId)
+        : catalog.forPosting(row.postingId)
+      ).map(async (question) => {
         const options = optionsSchema.parse(JSON.parse(question.options));
 
         if (question.answerKind === "open_text" && isFreeText(question.fieldType)) {

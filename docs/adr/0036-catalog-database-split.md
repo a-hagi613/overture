@@ -117,3 +117,21 @@ still opens and passes `bun run db:verify` unchanged. The legacy file still answ
 the stored-match fallback, preparation/review/dispatch for catalog-backed
 Applications, the demo seed and the admin reports; the public count is one fewer
 reader that depends on it.
+
+## Amendment (2026-11-27, issue #710)
+
+The onboarding matches, picks and the preparation/Review question list now read freehire `jobs` in `app.sqlite`, so a
+new Application really is created from a freehire row rather than from a catalog Posting:
+
+- Onboarding's match list (`onboarding/freehire-matches.ts`) reads the stored freehire scores and displays the job
+  row; `onboarding_picks` snapshots those fields, and a pick saves only a freehire job id.
+- `pipeline/prepare.ts` reads the posting through one `postingFor` lookup: the catalog first, then `jobs`. For a
+  freehire job the board token and ATS job id come from `external_id`, and the description, places, URL and apply URL
+  come from the job row itself.
+- A freehire job's form questions are stored in the new `job_questions` table in `app.sqlite`, keyed by the freehire
+  posting id with no foreign key into the catalog. `catalog.sqlite`'s `posting_questions` stays the store for a
+  catalog-backed Application during the transition.
+- `openAttemptReviews` reads the Application's own snapshot (`ats`, `companyName`) instead of the catalog, so a form
+  field found during a send still opens a Review after the catalog is gone.
+
+No catalog mirror and no second job source are introduced.

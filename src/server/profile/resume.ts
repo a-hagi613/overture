@@ -164,7 +164,7 @@ export function createResumeService(deps: {
       } satisfies ParsedResume;
     }
 
-    if (!spendGate.allows(userId)) {
+    if (!spendGate.allowsOnboarding(userId)) {
       return {
         text: "",
         parsedWith: "unpdf" as const,

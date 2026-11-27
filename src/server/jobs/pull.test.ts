@@ -7,6 +7,7 @@ import type { FreehireJobRecord } from "../../shared/freehire.ts";
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
 import {
+  bgJobs,
   grants,
   jobPullRuns,
   jobPullState,
@@ -17,7 +18,8 @@ import {
 } from "../platform/db/schema.ts";
 import { createJobStore } from "./store.ts";
 import { setSetting } from "../platform/settings/index.ts";
-import { createPullService } from "./pull.ts";
+import { createPullJobHandlers, createPullService } from "./pull.ts";
+import type { PullService } from "./pull.ts";
 import { createFakeJobSource } from "./testing/fake-source.ts";
 import type { ApplyTarget } from "./apply-link.ts";
 
@@ -450,5 +452,77 @@ describe("resilience", () => {
 
     expect(await service.jobIsOpen(job.public_slug)).toBe(false);
     expect(db.select().from(jobs).where(eq(jobs.id, job.public_slug)).get()?.status).toBe("closed");
+  });
+});
+
+describe("a user pull scores after it finishes", () => {
+  test("queues the match pool once the pull returns, so an earlier empty score run is repeated", async () => {
+    const { db } = migrated();
+
+    const clock = { now: () => NOW };
+
+    const keys = [
+      ["matching.score.pool:user-1", "matching.score.pool"],
+      ["jobs.pull.user:user-1", "jobs.pull.user"],
+    ] as const;
+
+    for (const [key] of keys) {
+      db.insert(bgJobs)
+        .values({
+          createdAt: NOW,
+          dedupeKey: key,
+          id: crypto.randomUUID(),
+          kind: "done",
+          maxAttempts: 1,
+          payload: "{}",
+          priority: 0,
+          runAt: NOW,
+          status: "done",
+          updatedAt: NOW,
+        })
+        .run();
+    }
+
+    const service: PullService = {
+      jobIsOpen: async () => await Promise.resolve(false),
+      runChanges: async () => await Promise.resolve(0),
+      runTick: async () => await Promise.resolve(0),
+      runUser: async () =>
+        await Promise.resolve({
+          counters: {
+            droppedClosed: 0,
+            droppedDuplicate: 0,
+            droppedNoLink: 0,
+            droppedUnsupported: 0,
+            fetched: 0,
+            kept: 0,
+          },
+          failed: false,
+        }),
+    };
+
+    const handlers = createPullJobHandlers(db, clock, service);
+
+    const previous = Bun.env.ENABLE_TEST_ROUTES;
+
+    Bun.env.ENABLE_TEST_ROUTES = "false";
+
+    try {
+      await handlers["jobs.pull.user"](JSON.stringify({ userId: "user-1" }));
+    } finally {
+      if (previous === undefined) {
+        delete Bun.env.ENABLE_TEST_ROUTES;
+      } else {
+        Bun.env.ENABLE_TEST_ROUTES = previous;
+      }
+    }
+
+    const queued = db
+      .select()
+      .from(bgJobs)
+      .all()
+      .filter((row) => row.status === "queued");
+
+    expect(queued.map((row) => row.kind)).toContain("matching.score.pool");
   });
 });
