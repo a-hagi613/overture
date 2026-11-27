@@ -58,12 +58,11 @@ try {
   sqlite.close();
 }
 
-// The pull gets HTTP 403 from production while the same URL answers 200 elsewhere. Probe from this machine with the
-// headers freehire's edge may key on, so a block can be told apart from a bad request without guessing.
 const probeUrl =
   "https://freehire.me/api/v1/jobs/search?category=backend&countries=ca&cities=Toronto&limit=5&q=Platform+Engineer&q_fields=title";
 
 const apiKey = Bun.env.FREEHIRE_API_KEY ?? "";
+
 const probes: [label: string, headers: Record<string, string>][] = [
   ["default", {}],
   ["overture-ua", { "user-agent": "Overture/1.0 (+https://tryoverture.com)" }],
@@ -85,21 +84,25 @@ if (apiKey !== "") {
 
 write("freehire probe from this machine (GET, read-only)");
 
-for (const [label, headers] of probes) {
-  try {
-    const response = await fetch(probeUrl, { headers, signal: AbortSignal.timeout(20_000) });
-    const body = await response.text();
+const probeResults = await Promise.all(
+  probes.map(async ([label, headers]) => {
+    try {
+      const response = await fetch(probeUrl, { headers, signal: AbortSignal.timeout(20_000) });
+      const body = await response.text();
 
-    write(
-      JSON.stringify({
+      return {
         body: body.slice(0, 120),
         cf_mitigated: response.headers.get("cf-mitigated"),
         label,
         ratelimit: response.headers.get("x-ratelimit-limit"),
         status: response.status,
-      }),
-    );
-  } catch (error) {
-    write(JSON.stringify({ error: String(error), label }));
-  }
+      };
+    } catch (error) {
+      return { error: String(error), label };
+    }
+  }),
+);
+
+for (const result of probeResults) {
+  write(JSON.stringify(result));
 }
