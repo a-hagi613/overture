@@ -13,6 +13,8 @@ on:
         options:
           - status
           - memory
+          - zero
+          - one
       value:
         description: "Memory in MB for the memory action"
         required: false
@@ -52,6 +54,12 @@ jobs:
             status)
               flyctl status -a "$APP"
               flyctl machine list -a "$APP"
+              ;;
+            zero)
+              yes | flyctl scale count 0 -a "$APP"
+              ;;
+            one)
+              yes | flyctl scale count 1 -a "$APP"
               ;;
             memory)
               case "$VALUE" in
