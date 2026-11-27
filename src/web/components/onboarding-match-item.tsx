@@ -60,15 +60,21 @@ export function OnboardingMatchItem({
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-signal/30 bg-signal-soft/70 px-2.5 py-1">
+        <section
+          aria-label={match.score === null ? text.scoringAria : text.scoreAria(match.score)}
+          className="flex shrink-0 items-center gap-2 rounded-lg border border-signal/30 bg-signal-soft/70 px-2.5 py-1"
+        >
           <span className="text-sm font-bold text-signal-text tabular-nums">{scoreText}</span>
           <span aria-hidden="true" className="h-3.5 w-px bg-signal/30" />
           <span className="text-xs font-medium text-foreground">{scoreDetail}</span>
-        </div>
+        </section>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 border-t border-border pt-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        <section
+          aria-label={match.why.length > 0 ? text.whyTitle : undefined}
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
+        >
           <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground">
             <Briefcase aria-hidden="true" size={12} />
             <span>{salaryText(match)}</span>
@@ -82,7 +88,7 @@ export function OnboardingMatchItem({
               <span>{reason}</span>
             </span>
           ))}
-        </div>
+        </section>
         <Button
           ariaLabel={
             on
