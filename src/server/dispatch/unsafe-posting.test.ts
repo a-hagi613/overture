@@ -39,7 +39,7 @@ function seeded() {
       companyNameNorm: "ferro cloud",
       createdAt: NOW,
       id: APPLICATION_ID,
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-unsafe",
       postingTitle: "Senior Platform Engineer",
       postingUrl: "http://169.254.169.254/latest/meta-data/",
