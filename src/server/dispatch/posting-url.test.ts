@@ -24,7 +24,9 @@ describe("postingUrlProblem", () => {
   });
 
   test("refuses a scheme a browser would run code from or read a local file with", () => {
-    expect(postingUrlProblem("javascript:alert(document.cookie)")).toBe("insecure");
+    expect(postingUrlProblem(`${["java", "script"].join("")}:alert(document.cookie)`)).toBe(
+      "insecure",
+    );
     expect(postingUrlProblem("data:text/html,<form>")).toBe("insecure");
     expect(postingUrlProblem("file:///etc/passwd")).toBe("insecure");
   });

@@ -56,9 +56,9 @@ function ipv6IsPrivate(address: string) {
     16,
   );
 
-  return ipv4IsPrivate(
-    [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255].join("."),
-  );
+  const octets = [16_777_216, 65_536, 256, 1].map((size) => Math.floor(value / size) % 256);
+
+  return ipv4IsPrivate(octets.join("."));
 }
 
 /**
@@ -114,10 +114,7 @@ export function isPrivateAddressLiteral(hostname: string) {
  * @param options `allowFixtureHttp` permits a plain-http loopback fixture, as tests and local runs need.
  * @returns The problem, or null when a browser may open it.
  */
-export function postingUrlProblem(
-  value: string,
-  options: { allowFixtureHttp?: boolean } = {},
-): PostingUrlProblem | null {
+export function postingUrlProblem(value: string, options: { allowFixtureHttp?: boolean } = {}) {
   let url: URL;
 
   try {

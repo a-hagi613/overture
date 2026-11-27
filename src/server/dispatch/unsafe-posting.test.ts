@@ -43,7 +43,7 @@ function seeded() {
       postingId: "posting-unsafe",
       postingTitle: "Senior Platform Engineer",
       postingUrl: "http://169.254.169.254/latest/meta-data/",
-      stage: "applying",
+      stage: "ready",
       status: "sending",
       updatedAt: NOW,
       userId: USER_ID,
