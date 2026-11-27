@@ -133,4 +133,21 @@ describe("answers saved for one Application", () => {
     expect(scopedAnswer("Maybe", question)).toBeNull();
     expect(scopedAnswer(undefined, question)).toBeNull();
   });
+
+  test("accepts a typed value for an open combobox and still rejects a blank one", () => {
+    const city = {
+      fieldType: "select",
+      options: [],
+      prompt: "Location (City)",
+      questionId: QUESTION,
+    } as const;
+
+    expect(scopedAnswer("Ottawa", city)).toMatchObject({ kind: "answer", value: "Ottawa" });
+    expect(scopedAnswer("   ", city)).toBeNull();
+
+    const radio = { ...city, fieldType: "radio" } as const;
+
+    expect(scopedAnswer("Ottawa", radio)).toBeNull();
+    expect(scopedAnswer("Yes", radio)).toMatchObject({ kind: "answer", value: "Yes" });
+  });
 });

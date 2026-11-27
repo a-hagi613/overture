@@ -90,3 +90,48 @@ test("a BambooHR whole-host board token still resolves to its subdomain", async 
     }),
   ).toEqual({ ok: false, reason: "host" });
 });
+
+const flexstaf = {
+  ats: "manatal" as const,
+  boardToken: "flexstaf-it-plan",
+  companyName: "Flexstaf IT",
+  jobId: "W3994VR9",
+  url: "https://www.careers-page.com/flexstaf-it/job/W3994VR9",
+};
+
+test("a Freehire Manatal posting is grounded on the careers-page URL", async () => {
+  expect(
+    await checkPostingIdentity(
+      pageAt("https://www.careers-page.com/flexstaf-it/job/W3994VR9/apply"),
+      flexstaf,
+    ),
+  ).toEqual({ ok: true });
+});
+
+test("a Manatal posting on another careers-page board is a board mismatch", async () => {
+  expect(
+    await checkPostingIdentity(
+      pageAt("https://www.careers-page.com/otherco/job/W3994VR9/apply"),
+      flexstaf,
+    ),
+  ).toEqual({ ok: false, reason: "board_token" });
+});
+
+test("a Manatal posting for another job still stops the send", async () => {
+  expect(
+    await checkPostingIdentity(
+      pageAt("https://www.careers-page.com/flexstaf-it/job/OTHER123/apply"),
+      flexstaf,
+    ),
+  ).toEqual({ ok: false, reason: "job_id" });
+});
+
+test("a Manatal board on its own subdomain still matches the hosted board", async () => {
+  expect(
+    await checkPostingIdentity(pageAt("https://flexstaf-it.manatal.com/jobs/W3994VR9"), {
+      ...flexstaf,
+      boardToken: "flexstaf-it",
+      url: "https://flexstaf-it.manatal.com/jobs/W3994VR9",
+    }),
+  ).toEqual({ ok: true });
+});

@@ -1,0 +1,386 @@
+{
+  "id": 8396492,
+  "questions": [
+    {
+      "description": null,
+      "label": "First Name",
+      "required": true,
+      "fields": [
+        {
+          "name": "first_name",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "Last Name",
+      "required": true,
+      "fields": [
+        {
+          "name": "last_name",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "Email",
+      "required": true,
+      "fields": [
+        {
+          "name": "email",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "Phone",
+      "required": true,
+      "fields": [
+        {
+          "name": "phone",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "label": "Location (City)",
+      "required": true,
+      "fields": [
+        {
+          "name": "candidate_location",
+          "type": "multi_value_single_select",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "Resume/CV",
+      "required": true,
+      "fields": [
+        {
+          "name": "resume",
+          "type": "input_file",
+          "values": []
+        },
+        {
+          "name": "resume_text",
+          "type": "textarea",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "Cover Letter",
+      "required": false,
+      "fields": [
+        {
+          "name": "cover_letter",
+          "type": "input_file",
+          "values": []
+        },
+        {
+          "name": "cover_letter_text",
+          "type": "textarea",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "LinkedIn Profile",
+      "required": false,
+      "fields": [
+        {
+          "name": "question_70900522",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "Website",
+      "required": false,
+      "fields": [
+        {
+          "name": "question_70900523",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "To make sure we are in the same solar system of expectations, what base salary are you targeting for the impact you will make? (Please provide in local currency)",
+      "required": false,
+      "fields": [
+        {
+          "name": "question_70900524",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "How did you first hear about Planet before applying for this position?",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_70900525",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "BuiltIn Article",
+              "value": 765360417
+            },
+            {
+              "label": "BuiltIn Job Search",
+              "value": 765360418
+            },
+            {
+              "label": "Conference",
+              "value": 765360419
+            },
+            {
+              "label": "Event",
+              "value": 765360420
+            },
+            {
+              "label": "Glassdoor Article",
+              "value": 765360421
+            },
+            {
+              "label": "Glassdoor Job Search",
+              "value": 765360422
+            },
+            {
+              "label": "Indeed",
+              "value": 765360423
+            },
+            {
+              "label": "Instagram",
+              "value": 765360424
+            },
+            {
+              "label": "LinkedIn Company Post",
+              "value": 765360425
+            },
+            {
+              "label": "LinkedIn Employee Post",
+              "value": 765360426
+            },
+            {
+              "label": "LinkedIn Job Search",
+              "value": 765360427
+            },
+            {
+              "label": "News Article",
+              "value": 765360428
+            },
+            {
+              "label": "Other - Event",
+              "value": 765360429
+            },
+            {
+              "label": "Other - Job Site",
+              "value": 765360430
+            },
+            {
+              "label": "Other - Social Media",
+              "value": 765360431
+            },
+            {
+              "label": "Other - Webinar",
+              "value": 765360432
+            },
+            {
+              "label": "Otta",
+              "value": 765360433
+            },
+            {
+              "label": "Planet Event",
+              "value": 765360434
+            },
+            {
+              "label": "Planet Webinar",
+              "value": 765360435
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "If you selected 'Conference' or 'Event' for the previous question, we would love to hear which conference / event you connected with us at.",
+      "required": false,
+      "fields": [
+        {
+          "name": "question_70900526",
+          "type": "input_text",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "How did you find this position? ",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_70900527",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "BuiltIn Article",
+              "value": 765360436
+            },
+            {
+              "label": "BuiltIn Job Search",
+              "value": 765360437
+            },
+            {
+              "label": "Conference",
+              "value": 765360438
+            },
+            {
+              "label": "Employee Referral",
+              "value": 765360439
+            },
+            {
+              "label": "Event",
+              "value": 765360440
+            },
+            {
+              "label": "Glassdoor Article",
+              "value": 765360441
+            },
+            {
+              "label": "Glassdoor Job Search",
+              "value": 765360442
+            },
+            {
+              "label": "Indeed",
+              "value": 765360443
+            },
+            {
+              "label": "Instagram",
+              "value": 765360444
+            },
+            {
+              "label": "LinkedIn Job Post",
+              "value": 765360445
+            },
+            {
+              "label": "LinkedIn Employee Post",
+              "value": 765360446
+            },
+            {
+              "label": "LinkedIn Reach Out from Planet",
+              "value": 765360447
+            },
+            {
+              "label": "News Article",
+              "value": 765360448
+            },
+            {
+              "label": "Other - Event",
+              "value": 765360449
+            },
+            {
+              "label": "Other - Job Site",
+              "value": 765360450
+            },
+            {
+              "label": "Other - Social Media",
+              "value": 765360451
+            },
+            {
+              "label": "Other - Webinar",
+              "value": 765360452
+            },
+            {
+              "label": "Otta",
+              "value": 765360453
+            },
+            {
+              "label": "Planet Event",
+              "value": 765360454
+            },
+            {
+              "label": "Planet Careers Page",
+              "value": 765360455
+            },
+            {
+              "label": "Planet Webinar",
+              "value": 765360456
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "<p class=\"p1\"><em>(i.e. you are a former Planet employee)</em></p>",
+      "label": "Have you previously worked for Planet or any Planet subsidiary?",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_70900528",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "Yes",
+              "value": 1
+            },
+            {
+              "label": "No",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "Why Planet?",
+      "required": false,
+      "fields": [
+        {
+          "name": "question_70900529",
+          "type": "textarea",
+          "values": []
+        }
+      ]
+    },
+    {
+      "description": null,
+      "label": "Do you reside in or maintain an established permanent residence in any of the following countries: Cuba, Iran, North Korea, Syria, or the following territories of Ukraine (Luhansk, Donetsk, Crimea)?",
+      "required": true,
+      "fields": [
+        {
+          "name": "question_70900530",
+          "type": "multi_value_single_select",
+          "values": [
+            {
+              "label": "Yes",
+              "value": 1
+            },
+            {
+              "label": "No",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
