@@ -188,7 +188,7 @@ async function seedApplication(input: {
       companyNameNorm: "example co",
       createdAt: AT,
       id: input.id,
-      origin: "auto",
+      origin: "pick",
       postingId,
       postingTitle: "Platform Engineer",
       postingUrl: `https://example.test/${input.id}`,
@@ -252,7 +252,6 @@ describe("dispatch claims an approved application whose liveness is unknown", ()
       const summary = await seeded.tick.run();
 
       expect(summary.claimed).toBe(1);
-      expect(summary.unknownLiveness).toBe(1);
       expect(seeded.enqueued).toEqual(["app-jazzhr"]);
     } finally {
       seeded.app.sqlite.close();

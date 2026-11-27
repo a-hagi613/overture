@@ -49,8 +49,6 @@ export interface DispatchSummary {
   claimed: number;
   skipped: number;
   blocked: number;
-  /** Approved Applications whose posting had no liveness source; they were sent anyway (#756). */
-  unknownLiveness: number;
 }
 
 export interface DispatcherTick {
@@ -446,7 +444,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
 
   async function run() {
     const now = clock.now();
-    const summary: DispatchSummary = { blocked: 0, claimed: 0, skipped: 0, unknownLiveness: 0 };
+    const summary: DispatchSummary = { blocked: 0, claimed: 0, skipped: 0 };
 
     const switches = db.select().from(killSwitches).where(eq(killSwitches.enabled, 1)).all();
 
@@ -648,7 +646,6 @@ export function createDispatcherTick(deps: DispatchDeps) {
       }
 
       if (status === "unknown") {
-        summary.unknownLiveness += 1;
         logInfo(
           "dispatch.liveness",
           `application ${candidate.id} on ${candidate.ats}: posting liveness unknown; sending anyway`,
