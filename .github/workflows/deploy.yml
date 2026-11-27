@@ -203,7 +203,7 @@ jobs:
           bun-version: 1.4.5
       - name: Cache Bun dependencies
         if: steps.guard.outputs.skip != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache
