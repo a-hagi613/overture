@@ -376,3 +376,10 @@ jobs:
         # --keep-vars is mandatory: ALERT_NTFY_URL and the analytics token are dashboard-set secrets, and a deploy
         # without it would silence the spend alerts.
         run: bunx wrangler deploy --keep-vars
+      - name: Deploy the freehire proxy Worker
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: workers/freehire-proxy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler deploy
