@@ -151,6 +151,56 @@ async function readValue(field: Locator) {
   }
 }
 
+const ISO_DATE = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?:$|[T ])/u;
+
+async function dateValueFor(field: Locator, value: string) {
+  const match = ISO_DATE.exec(value);
+
+  if (match?.groups === undefined) {
+    return value;
+  }
+
+  const widget = await field
+    .evaluate((element) => ({
+      placeholder: element.getAttribute("placeholder") ?? "",
+      type: element instanceof HTMLInputElement ? element.type : "",
+    }))
+    .catch(() => ({ placeholder: "", type: "" }));
+
+  if (widget.type === "date") {
+    return value;
+  }
+
+  const tokens = widget.placeholder.toLowerCase().match(/dd|mm|yyyy/gu);
+
+  if (
+    tokens?.length !== 3 ||
+    !tokens.includes("dd") ||
+    !tokens.includes("mm") ||
+    !tokens.includes("yyyy")
+  ) {
+    return value;
+  }
+
+  const parts = {
+    day: match.groups["day"] ?? "",
+    month: match.groups["month"] ?? "",
+    year: match.groups["year"] ?? "",
+  };
+
+  const separator = widget.placeholder.replaceAll(/[dmy]/giu, "")[0] ?? "/";
+
+  return tokens
+    .map((token) => {
+      if (token === "yyyy") {
+        return parts.year;
+      }
+
+      return token === "mm" ? parts.month : parts.day;
+    })
+    .join(separator);
+}
+
 /**
  * Fills a text-like control and proves the value stuck. SPA forms that keep the
  * input in React state can wipe `Locator.fill()` on the next render; this
@@ -164,37 +214,25 @@ async function readValue(field: Locator) {
  * @returns `true` when the control reads back the answer.
  */
 export async function fillControlledField(page: Page, field: Locator, value: string) {
-  try {
-    await field.fill(value, { timeout: 5000 });
-  } catch {
-    await field.focus({ timeout: 1000 }).catch(() => undefined);
-  }
+  const wanted = await dateValueFor(field, value);
 
-  if ((await readValue(field)) === value) {
-    return true;
-  }
+  const settled = async () => {
+    await page.waitForTimeout(300);
 
-  try {
-    await field.click({ timeout: 2000 });
-    await page.keyboard.press("ControlOrMeta+A");
-    await page.keyboard.insertText(value);
-  } catch {
-    await field.focus({ timeout: 1000 }).catch(() => undefined);
-  }
+    return (await readValue(field)) === wanted;
+  };
 
-  if ((await readValue(field)) === value) {
-    return true;
-  }
+  const sequential = await field
+    .evaluate((element) => element.closest("lyte-input") !== null)
+    .catch(() => false);
 
-  try {
+  const nativeSet = async () => {
     await field.evaluate((element, next) => {
       if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
         return;
       }
 
-      const textTypes = ["text", "search", "tel", "url", "email", "password"];
-
-      if (element instanceof HTMLTextAreaElement || textTypes.includes(element.type)) {
+      if (element instanceof HTMLTextAreaElement) {
         element.setRangeText(next, 0, element.value.length, "end");
       } else {
         element.value = next;
@@ -202,10 +240,57 @@ export async function fillControlledField(page: Page, field: Locator, value: str
 
       element.dispatchEvent(new Event("input", { bubbles: true }));
       element.dispatchEvent(new Event("change", { bubbles: true }));
-    }, value);
+    }, wanted);
+  };
+
+  if (sequential) {
+    try {
+      await field.click({ timeout: 2000 });
+      await page.keyboard.type(wanted, { delay: 25 });
+      await page.keyboard.press("Tab").catch(() => undefined);
+    } catch {
+      await field.focus({ timeout: 1000 }).catch(() => undefined);
+    }
+
+    if (await settled()) {
+      return true;
+    }
+
+    await nativeSet().catch(() => undefined);
+
+    if (await settled()) {
+      return true;
+    }
+  }
+
+  try {
+    await field.fill(wanted, { timeout: 5000 });
+  } catch {
+    await field.focus({ timeout: 1000 }).catch(() => undefined);
+  }
+
+  if (await settled()) {
+    return true;
+  }
+
+  try {
+    await field.click({ timeout: 2000 });
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.press("Backspace");
+    await field.pressSequentially(wanted, { delay: 25, timeout: 8000 });
+  } catch {
+    await field.focus({ timeout: 1000 }).catch(() => undefined);
+  }
+
+  if (await settled()) {
+    return true;
+  }
+
+  try {
+    await nativeSet();
   } catch {
     return false;
   }
 
-  return (await readValue(field)) === value;
+  return await settled();
 }

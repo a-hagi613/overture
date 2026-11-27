@@ -52,7 +52,7 @@ const PINPOINT_HOST = /^(?<token>[a-z0-9-]+)\.pinpointhq\.com$/iu;
 
 const TEAMTAILOR_HOST = /^(?<token>[a-z0-9-]+)\.teamtailor\.com$/iu;
 
-const ZOHO_RECRUIT_HOST = /^(?<token>[a-z0-9-]+)\.zohorecruit\.com$/iu;
+const ZOHO_RECRUIT_HOST = /^(?<token>[a-z0-9-]+)\.zohorecruit\.[a-z]{2,3}(?:\.[a-z]{2})?$/iu;
 
 const BAMBOOHR_HOST = /^(?<token>[a-z0-9-]+)\.bamboohr\.com$/iu;
 
@@ -119,6 +119,37 @@ const manatalToken = (host: string) =>
 
 const tokenFromHost = (pattern: RegExp, host: string) =>
   pattern.exec(host)?.groups?.["token"]?.toLowerCase() ?? null;
+
+/**
+ * The board token in the shape one board family compares.
+ *
+ * Freehire packs Zoho Recruit's board as the employer's whole careers host
+ * (`icschools.zohorecruit.com`), while the live posting URL yields its
+ * subdomain (`icschools`). Both name the same board, so compare the subdomain
+ * whenever the token is one of the board's own hosts; every other board keeps
+ * its token unchanged.
+ *
+ * @param ats The board the token belongs to.
+ * @param token The plan's or live token.
+ * @returns The canonical token for comparison.
+ */
+export function canonicalBoardToken(ats: ApplySupportedAts, token: string) {
+  const lower = token.toLowerCase();
+
+  const pattern =
+    ats === "breezy" ||
+    ats === "softgarden" ||
+    ats === "pinpoint" ||
+    ats === "teamtailor" ||
+    ats === "zoho_recruit" ||
+    ats === "bamboohr" ||
+    ats === "recruitee" ||
+    ats === "hireology"
+      ? BOARD_HOST_PATTERNS[ats]
+      : null;
+
+  return pattern === null ? lower : (tokenFromHost(pattern, lower) ?? lower);
+}
 
 const hostnameOf = (host: string) => {
   try {
@@ -644,7 +675,10 @@ export function waveTwoIdentityProblem(expected: PostingIdentity, liveUrl: strin
   return null;
 }
 
-export async function checkPostingIdentity(page: Page, expected: PostingIdentity) {
+export async function checkPostingIdentity(
+  page: Pick<Page, "title" | "url">,
+  expected: PostingIdentity,
+) {
   let live: URL;
   let posting: URL;
 
@@ -695,7 +729,8 @@ export async function checkPostingIdentity(page: Page, expected: PostingIdentity
   if (
     !skipEmptyBoardToken &&
     !appliesWithoutToken &&
-    liveBoardToken !== expected.boardToken.toLowerCase()
+    canonicalBoardToken(expected.ats, liveBoardToken) !==
+      canonicalBoardToken(expected.ats, expected.boardToken)
   ) {
     return mismatch("board_token");
   }

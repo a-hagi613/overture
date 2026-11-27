@@ -52,6 +52,8 @@ export interface BrowserFormConfig {
   closed?: RegExp | undefined;
   /** The board's own confirmation copy, when the shared English list does not fit. */
   confirmationSources?: readonly string[] | undefined;
+  /** A page-level Submit control, for boards that portal it outside the form (BambooHR's footer). */
+  submitSelector?: string | undefined;
 }
 
 export interface BrowserFormPlan {
@@ -466,7 +468,7 @@ async function fillPlannedField(scope: FormScope, field: SendPlanField) {
     return false;
   }
 
-  return fillByLabel(scope, field);
+  return await fillByLabel(scope, field);
 }
 
 async function fillPlannedFields(
@@ -474,8 +476,12 @@ async function fillPlannedFields(
   fields: readonly SendPlanField[],
   healField?: (scope: FormScope, field: SendPlanField) => Promise<boolean>,
 ) {
+  const ordered = [...fields].toSorted(
+    (left, right) => Number(left.fieldType === "phone") - Number(right.fieldType === "phone"),
+  );
+
   const fillFrom: (index: number) => Promise<boolean> = async (index) => {
-    const field = fields[index];
+    const field = ordered[index];
 
     if (field === undefined) {
       return true;
@@ -631,8 +637,27 @@ async function fileInputFacts(scope: FormScope) {
           .closest("[class*='form-field'], [class*='field'], [class*='question']")
           ?.querySelector("label, legend, [class*='question-title']")?.textContent ?? "";
 
+      const upload = element.closest("[data-fabric-component='FileUpload']");
+
+      const previousNode =
+        upload?.previousElementSibling ??
+        element.previousElementSibling ??
+        element.parentElement?.previousElementSibling ??
+        null;
+
+      const previous = (previousNode?.textContent ?? "").replaceAll(/\s+/gu, " ");
+
+      const aria = element.getAttribute("aria-label") ?? "";
+
       const label =
-        [element.getAttribute("aria-label") ?? "", labelledBy, wrapping, forLabel, block]
+        [
+          /^(?:file-input|file input|upload|choose file|file)$/iu.test(aria.trim()) ? "" : aria,
+          labelledBy,
+          wrapping,
+          forLabel,
+          previous,
+          block,
+        ]
           .map((text) => text.replaceAll(/\s+/gu, " ").trim())
           .find((text) => text !== "") ?? "";
 
@@ -678,9 +703,24 @@ export async function findResumeFileInput(
   const labelled = facts.filter((fact) => mentionsResume(fact, words));
   const [onlyLabelled] = labelled;
 
-  return labelled.length === 1 && onlyLabelled !== undefined
-    ? inputs.nth(onlyLabelled.index)
-    : null;
+  if (labelled.length === 1 && onlyLabelled !== undefined) {
+    return inputs.nth(onlyLabelled.index);
+  }
+
+  const resumeSlot = fieldName !== null && /resume|cv|curriculum/iu.test(fieldName);
+  const first = facts.at(0);
+
+  if (first === undefined) {
+    return null;
+  }
+
+  const namelessSingle = facts.length === 1 && first.name === "" && first.id === "";
+
+  if (resumeSlot && namelessSingle) {
+    return inputs.nth(first.index);
+  }
+
+  return null;
 }
 
 async function uploadResume(
@@ -714,11 +754,29 @@ async function uploadResume(
       : { fieldName: null, uploaded: false };
   }
 
-  const input = await findResumeFileInput(scope, fieldName);
+  const input = await (async () => {
+    const find: (attempt: number) => ReturnType<typeof findResumeFileInput> = async (attempt) => {
+      const found = await findResumeFileInput(scope, fieldName);
+
+      if (found !== null || attempt >= 10) {
+        return found;
+      }
+
+      await page.waitForTimeout(300);
+
+      return await find(attempt + 1);
+    };
+
+    return await find(0);
+  })();
 
   if (input === null) {
     return { fieldName: null, uploaded: false };
   }
+
+  const liveName =
+    (await input.getAttribute("name").catch(() => null)) ??
+    (await input.getAttribute("id").catch(() => null));
 
   try {
     await input.setInputFiles({
@@ -729,8 +787,6 @@ async function uploadResume(
   } catch {
     return { fieldName: null, uploaded: false };
   }
-
-  const liveName = (await input.getAttribute("name")) ?? (await input.getAttribute("id"));
 
   return { fieldName: liveName, uploaded: true };
 }
@@ -878,6 +934,8 @@ export const runBrowserFormAttempt: (
     };
   }
 
+  await waitForStableForm(scope);
+
   const resumeField = plan.fields.find((field) => isResumeField(field));
   let liveResumeField = resumeField?.fieldName ?? null;
 
@@ -999,7 +1057,10 @@ export const runBrowserFormAttempt: (
     };
   }
 
-  const submitControl = scope.root.locator("button[type='submit'], input[type='submit']");
+  const submitControl =
+    config.submitSelector !== undefined && (await page.locator(config.submitSelector).count()) > 0
+      ? page.locator(config.submitSelector).first()
+      : scope.root.locator("button[type='submit'], input[type='submit']").first();
 
   if ((await submitControl.count()) === 0) {
     return {
@@ -1015,7 +1076,7 @@ export const runBrowserFormAttempt: (
   const { origin } = new URL(page.url());
 
   const settled = await Promise.allSettled([
-    submitControl.first().click({ timeout: APPLICATION_RESPONSE_MS }),
+    submitControl.click({ timeout: APPLICATION_RESPONSE_MS }),
     page.waitForResponse(
       (candidate) => {
         if (candidate.request().method() !== "POST") {

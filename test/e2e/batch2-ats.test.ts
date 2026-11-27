@@ -17,6 +17,8 @@ import type { SendPlanField } from "../../src/server/pipeline/send-plan.ts";
 import type { BrowserFormPlan } from "../../src/server/dispatch/ats/browser-form.ts";
 import type { QuestionFieldType } from "../../src/shared/questions.ts";
 
+import { bambooHrFabricPage, zohoRecruitWebformPage } from "./live-board-forms.fixture.ts";
+
 import { runTeamtailorAttempt } from "../../src/server/dispatch/ats/teamtailor.ts";
 import { runZohoRecruitAttempt } from "../../src/server/dispatch/ats/zoho-recruit.ts";
 import { runBambooHRAttempt } from "../../src/server/dispatch/ats/bamboohr.ts";
@@ -329,6 +331,150 @@ test("a plan for another board never drives this board's form", async ({ page })
     expect(run.outcome).toBe("identity_mismatch");
     expect(run.submitMayHaveLanded).toBe(false);
     expect(server.posts).toHaveLength(0);
+  } finally {
+    server.close();
+  }
+});
+
+test("BambooHR opens its Fabric form, fills the popup selects and submits the resume", async ({
+  page,
+}) => {
+  const server = startBatch2Page(bambooHrFabricPage());
+
+  try {
+    const plan = {
+      fields: [
+        answered("firstName", "text", "First Name", "Maya"),
+        answered("lastName", "text", "Last Name", "Okafor"),
+        answered("email", "email", "Email", "maya.okafor@example.com"),
+        answered("phone", "phone", "Phone", "+1 415 555 0134"),
+        answered("streetAddress.value", "text", "Address", "123 Main St"),
+        answered("city.value", "text", "City", "Ottawa"),
+        answered("state.value", "select", "Province", "Ontario", ["Ontario", "Quebec"]),
+        answered("zip.value", "text", "Postal Code", "K1A 0B1"),
+        answered("countryId.value", "select", "Country", "Canada", ["Canada", "United States"]),
+        answered("dateAvailable", "date", "Date Available", "2026-12-01"),
+        answered("desiredPay", "text", "Desired Pay", "CAD 150,000 a year"),
+        field("coverLetterFileId", "file", "Cover Letter", {
+          answerKind: "fact",
+          file: null,
+          required: false,
+        }),
+        resumeField("resumeFileId"),
+      ],
+      identity: {
+        ats: "bamboohr" as const,
+        boardToken: "example",
+        companyName: "Victoria Park",
+        jobId: "1",
+        url: `${server.url}/example/careers/1`,
+      },
+      resume: { bytes: RESUME_BYTES, fieldName: null, filename: "resume-board.pdf" },
+    };
+
+    const run = await runBambooHRAttempt(page, plan, silentHooks);
+
+    expect(run.outcome).toBe("sent");
+    expect(run.preflight).toBeUndefined();
+    expect(run.submitMayHaveLanded).toBe(true);
+    expect(server.posts).toHaveLength(1);
+
+    const [post] = server.posts;
+
+    expect(post?.fields["firstName"]).toBe("Maya");
+    expect(post?.fields["state.value"]).toBe("ON");
+    expect(post?.fields["countryId.value"]).toBe("Canada");
+    expect(post?.fields["dateAvailable"]).toBe("01/12/2026");
+    expect(post?.fields["resumeFileId"]).toBe("resume-board.pdf");
+  } finally {
+    server.close();
+  }
+});
+
+test("BambooHR still stops on a genuinely new required question in the Fabric form", async ({
+  page,
+}) => {
+  const server = startBatch2Page(bambooHrFabricPage({ extraRequired: true }));
+
+  try {
+    const plan = {
+      fields: [
+        answered("firstName", "text", "First Name", "Maya"),
+        answered("lastName", "text", "Last Name", "Okafor"),
+        answered("email", "email", "Email", "maya.okafor@example.com"),
+        answered("phone", "phone", "Phone", "+1 415 555 0134"),
+        answered("streetAddress.value", "text", "Address", "123 Main St"),
+        answered("city.value", "text", "City", "Ottawa"),
+        answered("state.value", "select", "Province", "Ontario", ["Ontario", "Quebec"]),
+        answered("zip.value", "text", "Postal Code", "K1A 0B1"),
+        answered("countryId.value", "select", "Country", "Canada", ["Canada", "United States"]),
+        answered("dateAvailable", "date", "Date Available", "2026-12-01"),
+        answered("desiredPay", "text", "Desired Pay", "CAD 150,000 a year"),
+        field("coverLetterFileId", "file", "Cover Letter", {
+          answerKind: "fact",
+          file: null,
+          required: false,
+        }),
+        resumeField("resumeFileId"),
+      ],
+      identity: {
+        ats: "bamboohr" as const,
+        boardToken: "example",
+        companyName: "Victoria Park",
+        jobId: "1",
+        url: `${server.url}/example/careers/1`,
+      },
+      resume: { bytes: RESUME_BYTES, fieldName: null, filename: "resume-board.pdf" },
+    };
+
+    const run = await runBambooHRAttempt(page, plan, silentHooks);
+
+    expect(run.outcome).toBe("needs_review");
+    expect(run.submitMayHaveLanded).toBe(false);
+    expect(run.unexpectedRequired?.map((problem) => problem.label)).toEqual(["Current employer"]);
+    expect(server.posts).toHaveLength(0);
+  } finally {
+    server.close();
+  }
+});
+
+test("Zoho Recruit opens its webform, fills the picklist and the phone network, and submits", async ({
+  page,
+}) => {
+  const server = startBatch2Page(zohoRecruitWebformPage());
+
+  try {
+    const plan = {
+      fields: [
+        answered("rec-form_last", "text", "Last Name", "Okafor"),
+        answered("rec-form_email", "email", "Email", "maya.okafor@example.com"),
+        answered("rec-form_gender", "select", "Gender", "Female", ["Female", "Male"]),
+        answered("rec-form_phone", "phone", "Mobile", "613-555-0142"),
+        resumeField("rec-form_resume_file"),
+      ],
+      identity: {
+        ats: "zoho_recruit" as const,
+        boardToken: "example",
+        companyName: "International Community Schools",
+        jobId: "1",
+        url: `${server.url}/example/jobs/Careers/1`,
+      },
+      resume: { bytes: RESUME_BYTES, fieldName: null, filename: "resume-board.pdf" },
+    };
+
+    const run = await runZohoRecruitAttempt(page, plan, silentHooks);
+
+    expect(run.outcome).toBe("sent");
+    expect(run.preflight).toBeUndefined();
+    expect(run.submitMayHaveLanded).toBe(true);
+    expect(server.posts).toHaveLength(1);
+
+    const [post] = server.posts;
+
+    expect(post?.fields["rec-form_last"]).toBe("Okafor");
+    expect(post?.fields["gender_posted"]).toBe("Female");
+    expect(post?.fields["rec-form_phone"]).toBe("613-555-0142");
+    expect(post?.files["rec-form_resume_file"]).toBe("resume-board.pdf");
   } finally {
     server.close();
   }

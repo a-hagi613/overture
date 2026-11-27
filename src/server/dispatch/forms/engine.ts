@@ -456,6 +456,22 @@ export async function waitForStableForm(scope: FormScope, timeout = DOM_STABILIT
 export const fieldById = (scope: FormScope, id: string) =>
   scope.root.locator(`[id="${cssValue(id)}"], [name="${cssValue(id)}"]`).first();
 
+/**
+ * The real form control for a field name. Custom elements can carry the same
+ * `name` (Zoho Recruit's `crux-text-component` wraps its input), so filling
+ * looks for the input/select/textarea before falling back to the host.
+ *
+ * @param scope The verified form.
+ * @param id The field name or id.
+ * @returns The first matching form control, or an empty locator.
+ */
+export const controlById = (scope: FormScope, id: string) =>
+  scope.root
+    .locator(
+      `input[id="${cssValue(id)}"], input[name="${cssValue(id)}"], select[id="${cssValue(id)}"], select[name="${cssValue(id)}"], textarea[id="${cssValue(id)}"], textarea[name="${cssValue(id)}"], [name="${cssValue(id)}"] input, [name="${cssValue(id)}"] select, [name="${cssValue(id)}"] textarea, [id="${cssValue(id)}"] input, [id="${cssValue(id)}"] select, [id="${cssValue(id)}"] textarea`,
+    )
+    .first();
+
 export const submitButton = (
   scope: FormScope,
   selector = "button[type='submit'], input[type='submit']",
@@ -517,6 +533,7 @@ interface LiveControl {
   required: boolean;
   disabled: boolean;
   hidden: boolean;
+  widget?: "custom_select" | null;
   options: LiveOption[];
   value: string | null;
   checked: boolean | null;
@@ -548,12 +565,28 @@ function liveMatchesExpectation(expectation: LiveFormExpectation, control: LiveC
   return live === wanted || live.includes(wanted) || wanted.includes(live);
 }
 
+const optionValueMatches = (option: LiveOption, wanted: string) => {
+  const label = norm(option.label);
+  const value = norm(option.value);
+
+  if (wanted === "") {
+    return false;
+  }
+
+  if (label === wanted || value === wanted) {
+    return true;
+  }
+
+  return (
+    (label !== "" && (label.startsWith(wanted) || wanted.startsWith(label))) ||
+    (value !== "" && (value.startsWith(wanted) || wanted.startsWith(value)))
+  );
+};
+
 function liveOptionPresent(control: LiveControl, answer: string) {
   const wanted = norm(answer);
 
-  return control.options.some(
-    (option) => norm(option.label) === wanted || norm(option.value) === wanted,
-  );
+  return control.options.some((option) => optionValueMatches(option, wanted));
 }
 
 const multiValueParts = (answer: string) =>
@@ -564,9 +597,7 @@ const multiValueParts = (answer: string) =>
 
 function liveOptionsPresent(control: LiveControl, answer: string) {
   return multiValueParts(answer).every((wanted) =>
-    control.options.some(
-      (option) => norm(option.label) === wanted || norm(option.value) === wanted,
-    ),
+    control.options.some((option) => optionValueMatches(option, wanted)),
   );
 }
 
@@ -637,6 +668,43 @@ function samePhoneNumber(live: string, answer: string) {
   }
 
   return right.length === left.length + 1 && right.startsWith("1") && right.slice(1) === left;
+}
+
+const ISO_DATE = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?:$|[T ])/u;
+
+function sameDate(live: string, answer: string) {
+  const match = ISO_DATE.exec(answer);
+
+  if (match?.groups === undefined) {
+    return norm(live) === norm(answer);
+  }
+
+  const parts = (live.match(/\d+/gu) ?? []).map(Number);
+
+  if (parts.length !== 3) {
+    return false;
+  }
+
+  const year = Number(match.groups["year"]);
+  const month = Number(match.groups["month"]);
+  const day = Number(match.groups["day"]);
+
+  return parts.includes(year) && parts.includes(month) && parts.includes(day);
+}
+
+function liveValueMatches(expectation: LiveFormExpectation, control: LiveControl) {
+  const live = control.value ?? "";
+  const answer = expectation.answer ?? "";
+
+  if (expectation.fieldType === "phone") {
+    return samePhoneNumber(live, answer);
+  }
+
+  if (expectation.fieldType === "date") {
+    return sameDate(live, answer);
+  }
+
+  return norm(live) === norm(answer);
 }
 
 function untouchedOption(control: LiveControl) {
@@ -806,6 +874,135 @@ function optionField(fieldType: QuestionFieldType | null) {
   );
 }
 
+const CUSTOM_SELECT_WAIT_MS = 8000;
+
+function customSelectToggle(field: Locator) {
+  return field
+    .locator(
+      "xpath=ancestor-or-self::div[contains(@class,'fab-Select')][1]//button[contains(@class,'fab-SelectToggle')]",
+    )
+    .first();
+}
+
+async function toggleFor(field: Locator) {
+  const fab = customSelectToggle(field);
+
+  if ((await fab.count()) > 0) {
+    return fab;
+  }
+
+  const descendant = field.locator("[role='combobox']").first();
+
+  if ((await descendant.count()) > 0) {
+    return descendant;
+  }
+
+  return (await field.getAttribute("role")) === "combobox" ? field : null;
+}
+
+async function openCustomSelectMenu(page: Page, toggle: Locator, timeout = CUSTOM_SELECT_WAIT_MS) {
+  await toggle.scrollIntoViewIfNeeded({ timeout: 1000 }).catch(() => undefined);
+  await toggle.click({ timeout: 2000 }).catch(() => undefined);
+
+  const controlsId = await toggle.getAttribute("aria-controls").catch(() => null);
+
+  const menu =
+    controlsId === null || controlsId === ""
+      ? page.locator("[role='listbox']:visible").first()
+      : page.locator(`[id="${cssValue(controlsId)}"]`);
+
+  try {
+    await menu.locator("[role='option']").first().waitFor({ state: "attached", timeout });
+
+    return menu;
+  } catch {
+    await page.keyboard.press("Escape").catch(() => undefined);
+
+    return null;
+  }
+}
+
+async function readCustomSelectOptions(page: Page, toggle: Locator) {
+  const menu = await openCustomSelectMenu(page, toggle);
+
+  if (menu === null) {
+    return [];
+  }
+
+  const options = await menu
+    .locator("[role='option']")
+    .evaluateAll((elements) =>
+      elements.map((element) => ({
+        label: element.textContent.replaceAll(/\s+/gu, " ").trim(),
+        value: element instanceof HTMLElement ? (element.dataset["value"] ?? "") : "",
+      })),
+    )
+    .catch(() => []);
+
+  await page.keyboard.press("Escape").catch(() => undefined);
+
+  return options;
+}
+
+async function fillCustomSelect(scope: FormScope, field: Locator, value: string) {
+  const toggle = await toggleFor(field);
+
+  if (toggle === null) {
+    return false;
+  }
+
+  const menu = await openCustomSelectMenu(scope.page, toggle);
+
+  if (menu === null) {
+    return false;
+  }
+
+  const options = menu.locator("[role='option']");
+  const count = await options.count();
+
+  const tryFrom: (index: number) => Promise<boolean> = async (index) => {
+    if (index >= count) {
+      return false;
+    }
+
+    const option = options.nth(index);
+    const label = (await option.textContent().catch(() => "")) ?? "";
+
+    const dataValue = await option
+      .evaluate((element) =>
+        element instanceof HTMLElement ? (element.dataset["value"] ?? "") : "",
+      )
+      .catch(() => "");
+
+    const wanted = norm(value);
+    const foldedLabel = norm(label);
+    const foldedValue = norm(dataValue);
+
+    if (
+      foldedLabel === wanted ||
+      (foldedValue !== "" && foldedValue === wanted) ||
+      (wanted !== "" && foldedLabel.startsWith(wanted)) ||
+      (wanted !== "" && foldedValue !== "" && foldedValue.startsWith(wanted)) ||
+      (wanted !== "" && foldedLabel.includes(wanted))
+    ) {
+      await option.scrollIntoViewIfNeeded({ timeout: 1000 }).catch(() => undefined);
+      await option.click({ timeout: 2000 }).catch(() => undefined);
+
+      return true;
+    }
+
+    return tryFrom(index + 1);
+  };
+
+  const filled = await tryFrom(0);
+
+  if (!filled) {
+    await scope.page.keyboard.press("Escape").catch(() => undefined);
+  }
+
+  return filled;
+}
+
 async function readLiveForm(scope: FormScope) {
   return scope.root.evaluate((root) => {
     const dom = {
@@ -893,17 +1090,50 @@ async function readLiveForm(scope: FormScope) {
           element.getAttribute("aria-hidden") === "true"
         );
       },
-      keyOf: (element: Element) => {
-        const id = element.getAttribute("id");
+      hostNameOf: (element: Element) => {
+        let node = element.parentElement;
 
-        if (id !== null && id !== "") {
-          return id;
+        while (node !== null && node !== root) {
+          const name = node.getAttribute("name") ?? "";
+          const id = node.getAttribute("id") ?? "";
+
+          if (node.tagName.includes("-") && name !== "") {
+            return name;
+          }
+
+          if (node.tagName.includes("-") && id.startsWith("rec-form_")) {
+            return id;
+          }
+
+          node = node.parentElement;
         }
 
-        const name = element.getAttribute("name");
+        return "";
+      },
+      keyOf: (element: Element) => {
+        const ownName = element.getAttribute("name") ?? "";
+        const ownId = element.getAttribute("id") ?? "";
 
-        if (name !== null && name !== "") {
-          return name;
+        if (ownName.startsWith("rec-form_")) {
+          return ownName;
+        }
+
+        if (ownId.startsWith("rec-form_")) {
+          return ownId;
+        }
+
+        const host = dom.hostNameOf(element);
+
+        if (host !== "") {
+          return host;
+        }
+
+        if (ownName !== "") {
+          return ownName;
+        }
+
+        if (ownId !== "") {
+          return ownId;
         }
 
         const entry = element.closest("[class*='fieldEntry']");
@@ -960,7 +1190,11 @@ async function readLiveForm(scope: FormScope) {
 
         return wrapping === null ? (element.getAttribute("name") ?? "") : dom.textOf(wrapping);
       },
-      nameOf: (element: Element) => element.getAttribute("name") ?? dom.keyOf(element),
+      nameOf: (element: Element) => {
+        const own = element.getAttribute("name") ?? "";
+
+        return own.startsWith("rec-form_") ? own : dom.keyOf(element);
+      },
       optionLabel: (element: HTMLInputElement) => {
         const wrapping = element.closest("label");
 
@@ -1019,6 +1253,14 @@ async function readLiveForm(scope: FormScope) {
 
     for (const element of root.querySelectorAll("input, select, textarea")) {
       if (element instanceof HTMLInputElement && element.type === "hidden") {
+        continue;
+      }
+
+      if (
+        element instanceof HTMLInputElement &&
+        element.closest("lyte-search") !== null &&
+        (element.getAttribute("name") ?? "") === ""
+      ) {
         continue;
       }
 
@@ -1108,6 +1350,31 @@ async function readLiveForm(scope: FormScope) {
       }
 
       if (element instanceof HTMLSelectElement) {
+        const fab = element.closest(".fab-Select");
+
+        if (fab !== null) {
+          const content = fab.querySelector(".fab-SelectToggle__content");
+          const placeholder = fab.querySelector(".fab-SelectToggle__placeholder");
+          const shown = placeholder === null ? dom.textOf(content) : "";
+
+          controls.push({
+            checked: null,
+            disabled: dom.disabledOf(element),
+            fieldType,
+            file: null,
+            hidden: false,
+            key: dom.keyOf(element),
+            label: dom.labelFor(element),
+            name: dom.nameOf(element),
+            options: [],
+            required: dom.requiredOf(element),
+            value: shown,
+            widget: "custom_select",
+          });
+
+          continue;
+        }
+
         const selected = [...element.selectedOptions];
 
         const blank = selected.every((option) => option.value === "");
@@ -1296,6 +1563,82 @@ async function readLiveForm(scope: FormScope) {
       }
     }
 
+    for (const host of root.querySelectorAll("crux-picklist-component")) {
+      const id = host.getAttribute("id") ?? "";
+
+      if (id === "") {
+        continue;
+      }
+
+      const button = host.querySelector("lyte-drop-button, [role='combobox']");
+      const placeholder = host.querySelector(".lyteDropPlaceholderNormal");
+      const shown = dom.textOf(button ?? null);
+      const placeholderText = dom.textOf(placeholder ?? null);
+      const blank = shown === "" || shown === "-None-" || shown === placeholderText;
+
+      const row = host.closest(".crc-form-row, [class*='form-field'], [class*='field']");
+      const labelNode = row?.querySelector("label, legend") ?? null;
+      const label = dom.textOf(labelNode) || dom.labelFor(host);
+
+      const required =
+        row?.querySelector(
+          "[class*='mandatory'], [class*='Mandatory'], [class*='required'], [class*='Required']",
+        ) !== null || host.querySelector("[class*='mandatoryField']") !== null;
+
+      controls.push({
+        checked: null,
+        disabled: false,
+        fieldType: "select",
+        file: null,
+        hidden: false,
+        key: id,
+        label,
+        name: id,
+        options: [],
+        required,
+        value: blank ? "" : shown,
+        widget: "custom_select",
+      });
+    }
+
+    const attachedFileInput = [...root.querySelectorAll("input[type='file']")].some(
+      (element) => element instanceof HTMLInputElement && (element.files?.length ?? 0) > 0,
+    );
+
+    if (!attachedFileInput) {
+      for (const list of root.querySelectorAll("[data-fabric-component='FileUploadList']")) {
+        const nameNode =
+          list.querySelector("[class*='name']") ??
+          [...list.querySelectorAll("span, a, p")].find((node) =>
+            /\.\w{2,5}$/u.test(node.textContent.trim()),
+          ) ??
+          null;
+
+        const fileName = dom.textOf(nameNode);
+
+        if (fileName === "" || !/\.\w{2,5}$/u.test(fileName)) {
+          continue;
+        }
+
+        const row = list.closest("[class*='field'], [class*='Field'], [class*='form-row']");
+        const labelNode = row?.querySelector("label, legend") ?? null;
+
+        controls.push({
+          checked: null,
+          disabled: false,
+          fieldType: "file",
+          file: { name: fileName, size: -1 },
+          hidden: false,
+          key: "",
+          label: dom.textOf(labelNode) || "Resume",
+          name: "",
+          options: [],
+          required: false,
+          value: null,
+        });
+      }
+    }
+
     return { controls };
   });
 }
@@ -1343,6 +1686,31 @@ const checkLiveForm: (
       control.options = options;
     }
   }
+
+  const discoverFrom: (index: number) => Promise<void> = async (index) => {
+    const control = live.controls[index];
+
+    if (control === undefined) {
+      return;
+    }
+
+    if (control.widget === "custom_select" && control.options.length === 0) {
+      const field = fieldById(scope, control.key).first();
+      const toggle = await toggleFor(field);
+
+      if (toggle !== null && (await toggle.count()) > 0) {
+        const options = await readCustomSelectOptions(scope.page, toggle);
+
+        if (options.length > 0) {
+          control.options = options;
+        }
+      }
+    }
+
+    await discoverFrom(index + 1);
+  };
+
+  await discoverFrom(0);
 
   const problems = new Map<string, LiveFormProblem>();
   const matched = new Map<string, LiveFormExpectation>();
@@ -1488,11 +1856,7 @@ const checkLiveForm: (
       continue;
     }
 
-    if (
-      expectation.fieldType === "phone"
-        ? !samePhoneNumber(control.value ?? "", answer)
-        : norm(control.value ?? "") !== norm(answer)
-    ) {
+    if (!liveValueMatches(expectation, control)) {
       add({
         answer,
         fieldName: expectation.fieldName,
@@ -1618,18 +1982,98 @@ export const preflightForm: (
 
   await waitForStableForm(scope);
 
-  if (await fillUntouched(scope, expectations)) {
+  const settleFrom: (pass: number) => Promise<void> = async (pass) => {
+    if (pass >= 2) {
+      return;
+    }
+
+    if (!(await fillUntouched(scope, expectations))) {
+      return;
+    }
+
     await waitForStableForm(scope);
-  }
+    await settleFrom(pass + 1);
+  };
+
+  await settleFrom(0);
 
   return decideLiveFormVerdict(await checkLiveForm(scope, expectations));
 };
 
+async function primePhoneCountry(scope: FormScope, field: Locator) {
+  const row = field.locator("xpath=ancestor::div[contains(@class,'crc-form-row')][1]").first();
+
+  if ((await row.count()) === 0) {
+    return;
+  }
+
+  const combo = row.locator("[role='combobox']").first();
+
+  if ((await combo.count()) === 0) {
+    return;
+  }
+
+  const controlsId = await combo.getAttribute("aria-controls").catch(() => null);
+
+  await combo.click({ timeout: 2000 }).catch(() => undefined);
+
+  const menu =
+    controlsId === null || controlsId === ""
+      ? scope.page.locator("[role='listbox']:visible").first()
+      : scope.page.locator(`[id="${cssValue(controlsId)}"]`);
+
+  const selected = menu.locator("[role='option'][aria-selected='true']").first();
+
+  try {
+    await selected.waitFor({ state: "attached", timeout: CUSTOM_SELECT_WAIT_MS });
+    await selected.click({ timeout: 2000 });
+  } catch {
+    await scope.page.keyboard.press("Escape").catch(() => undefined);
+  }
+}
+
+async function hasSeparateCountryCombobox(field: Locator) {
+  return await field
+    .evaluate((element) => {
+      const row = element.closest(".crc-form-row");
+
+      if (row === null) {
+        return false;
+      }
+
+      return [...row.querySelectorAll("[role='combobox']")].some(
+        (candidate) => !candidate.contains(element),
+      );
+    })
+    .catch(() => false);
+}
+
 export async function fillField(scope: FormScope, id: string, value: string) {
-  const field = fieldById(scope, id);
+  let field = controlById(scope, id);
+
+  if ((await field.count()) === 0) {
+    field = fieldById(scope, id);
+  }
 
   if ((await field.count()) === 0) {
     return false;
+  }
+
+  const customSelect = await field
+    .evaluate((element) => {
+      if (element instanceof HTMLSelectElement) {
+        return element.closest(".fab-Select") !== null;
+      }
+
+      return (
+        element.tagName.toLowerCase() === "crux-picklist-component" ||
+        element.closest("crux-picklist-component") !== null
+      );
+    })
+    .catch(() => false);
+
+  if (customSelect) {
+    return await fillCustomSelect(scope, field, value);
   }
 
   const group = await checkboxGroup(scope.root, id);
@@ -1654,6 +2098,15 @@ export async function fillField(scope: FormScope, id: string, value: string) {
     tag: element.tagName.toLowerCase(),
     type: element instanceof HTMLInputElement ? element.type : "",
   }));
+
+  if (
+    widget.tag === "input" &&
+    widget.type !== "checkbox" &&
+    widget.type !== "file" &&
+    (await hasSeparateCountryCombobox(field))
+  ) {
+    await primePhoneCountry(scope, field);
+  }
 
   if (widget.tag === "textarea") {
     return fillControlledField(scope.page, field, value);

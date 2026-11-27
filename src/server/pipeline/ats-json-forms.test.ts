@@ -76,6 +76,36 @@ describe("the BambooHR application-form detail read", () => {
     );
     expect(bamboohrDetailUrl("https://acme.bamboohr.com/about")).toBeNull();
   });
+
+  test("reads the Cover Letter upload as a file, not a text answer", () => {
+    const read = readBambooHRFormJson(
+      JSON.stringify({
+        result: {
+          formFields: {
+            coverLetterFileId: { isRequired: false, label: "Cover Letter" },
+            resumeFileId: { isRequired: true, label: "Resume" },
+          },
+        },
+      }),
+    );
+
+    expect(read?.questions).toEqual([
+      {
+        fieldName: "coverLetterFileId",
+        fieldType: "file",
+        label: "Cover Letter",
+        options: [],
+        required: false,
+      },
+      {
+        fieldName: "resumeFileId",
+        fieldType: "file",
+        label: "Resume",
+        options: [],
+        required: true,
+      },
+    ]);
+  });
 });
 
 describe("the Zoho Recruit application-form read", () => {
