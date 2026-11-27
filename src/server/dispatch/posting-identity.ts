@@ -44,6 +44,8 @@ const JAZZHR_BOARD_HOSTS: ReadonlySet<string> = new Set(["jobs.jazzhr.com", "app
 
 const MANATAL_HOST = /^(?<token>[a-z0-9-]+)\.manatal\.com$/iu;
 
+const MANATAL_CAREERS_HOST = /^(?:[a-z0-9-]+\.)?careers-page\.com$/iu;
+
 const BREEZY_HOST = /^(?<token>[a-z0-9-]+)\.breezy\.hr$/iu;
 
 const SOFTGARDEN_HOST = /^(?<token>[a-z0-9-]+)\.softgarden\.io$/iu;
@@ -161,6 +163,9 @@ const hostnameOf = (host: string) => {
 
 const firstSegment = (segments: readonly string[]) => segments[0] ?? "";
 
+const isManatalHost = (host: string) =>
+  manatalToken(host) !== null || MANATAL_CAREERS_HOST.test(hostnameOf(host));
+
 const sameHost = (ats: ApplySupportedAts, expected: string, live: string) => {
   if (ats === "personio") {
     if (expected === live && isFixtureHost(hostnameOf(expected))) {
@@ -239,10 +244,7 @@ const sameHost = (ats: ApplySupportedAts, expected: string, live: string) => {
   }
 
   if (ats === "manatal") {
-    const expectedToken = manatalToken(expected);
-    const liveToken = manatalToken(live);
-
-    return expectedToken !== null && liveToken !== null && expectedToken === liveToken;
+    return isManatalHost(expected) && isManatalHost(live);
   }
 
   if (ats === "jobvite") {
@@ -274,6 +276,19 @@ const pathSegments = (pathname: string) =>
     .split("/")
     .filter((segment) => segment !== "")
     .map((segment) => decodeURIComponent(segment));
+
+function manatalPostingPath(url: URL) {
+  const segments = pathSegments(url.pathname);
+
+  const jobIndex = segments.findIndex((segment) => /^jobs?$/iu.test(segment));
+
+  const jobId = jobIndex === -1 ? null : (segments[jobIndex + 1] ?? null);
+
+  const boardToken =
+    manatalToken(url.host.toLowerCase()) ?? (jobIndex > 0 ? (segments[0] ?? "") : "");
+
+  return jobId === null || boardToken === "" ? null : { boardToken, jobId };
+}
 
 function jobIdFromPath(ats: ApplySupportedAts, segments: readonly string[]) {
   if (ats === "greenhouse") {
@@ -344,12 +359,6 @@ function jobIdFromPath(ats: ApplySupportedAts, segments: readonly string[]) {
       /^\/Recruiting\/Jobs\/(?:Details|Apply)\/(?<id>\d+)\/?$/iu.exec(`/${segments.join("/")}`)
         ?.groups?.["id"] ?? null
     );
-  }
-
-  if (ats === "manatal") {
-    const jobsIndex = segments.indexOf("jobs");
-
-    return jobsIndex === -1 ? null : (segments[jobsIndex + 1] ?? null);
   }
 
   if (ats === "teamtailor" || ats === "hireology") {
@@ -428,18 +437,6 @@ function boardTokenFrom(ats: ApplySupportedAts, url: URL, segments: readonly str
     return "";
   }
 
-  if (ats === "manatal") {
-    const hostToken = manatalToken(host);
-
-    if (hostToken !== null) {
-      return hostToken;
-    }
-
-    const jobsIndex = segments.indexOf("jobs");
-
-    return jobsIndex > 0 ? (segments[jobsIndex - 1] ?? "") : "";
-  }
-
   if (ats === "careerplug") {
     const jobsIndex = segments.indexOf("jobs");
 
@@ -504,6 +501,10 @@ function postingPath(ats: ApplySupportedAts, url: URL) {
     const jobId = /^\/job\/(?<id>\d+)(?:\/apply)?\/?$/u.exec(url.pathname)?.groups?.["id"];
 
     return jobId === undefined ? null : { boardToken, jobId };
+  }
+
+  if (ats === "manatal") {
+    return manatalPostingPath(url);
   }
 
   if (ats === "greenhouse" && url.pathname === "/embed/job_app") {
@@ -724,13 +725,18 @@ export async function checkPostingIdentity(
 
   const liveBoardToken = livePosting.boardToken.toLowerCase();
 
+  const expectedBoardToken =
+    expected.ats === "manatal"
+      ? (manatalPostingPath(posting)?.boardToken ?? expected.boardToken)
+      : expected.boardToken;
+
   const appliesWithoutToken = expected.ats === "hireology" && APPLY_HOST_TOKENS.has(liveBoardToken);
 
   if (
     !skipEmptyBoardToken &&
     !appliesWithoutToken &&
     canonicalBoardToken(expected.ats, liveBoardToken) !==
-      canonicalBoardToken(expected.ats, expected.boardToken)
+      canonicalBoardToken(expected.ats, expectedBoardToken)
   ) {
     return mismatch("board_token");
   }

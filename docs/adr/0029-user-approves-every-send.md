@@ -85,6 +85,8 @@ attempted applications reach `sent`; cost at most $0.03 per completed applicatio
 sends. *Attempted* and *cost* keep ADR 0026's definitions; an Application the user never approves is never
 attempted. The testing phase keeps spend minimal.
 
+**Amendment of 2026-11-27: shared career-page hosts (#788).** Some boards serve every employer from one host and name the board only in the path. Manatal is one: `<token>.manatal.com` and `careers-page.com/<token>/job/<id>` are the same board, and Freehire stores a synthetic plan token rather than the live one. The identity check therefore grounds a Manatal board from the posting URL itself — the host subdomain or the first path segment — and compares that with the same place on the live page, so the same employer and job pass while another path board or job still stops the send. It never trusts the stored synthetic token as the only identity.
+
 ## Consequences
 
 - SPEC §1's promise "Fully automatic" becomes "You approve every send"; ADR 0004's "fully automatic" is read as

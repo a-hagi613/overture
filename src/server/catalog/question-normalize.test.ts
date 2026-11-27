@@ -121,6 +121,8 @@ describe("normalizeFieldType", () => {
     expect(normalizeFieldType("input_text", "email")).toBe("email");
     expect(normalizeFieldType("input_text", "phone_number")).toBe("phone");
     expect(normalizeFieldType("input_text", "portfolio_url")).toBe("url");
+    expect(normalizeFieldType("multi_value_single_select", "candidate_location")).toBe("select");
+    expect(normalizeFieldType("input_text", "start_date")).toBe("date");
   });
 });
 

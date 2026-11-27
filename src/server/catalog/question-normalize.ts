@@ -116,7 +116,7 @@ function normalizeFieldTypeValue(atsType: string, fieldName: string) {
     return "url";
   }
 
-  if (name.includes("date")) {
+  if (/(?:^|[_\-\s])date(?:$|[_\-\s])/u.test(name)) {
     return "date";
   }
 

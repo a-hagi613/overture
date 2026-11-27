@@ -413,7 +413,10 @@ export function answerIsValid(
       return isIsoDate(value);
     }
 
-    case "select":
+    case "select": {
+      return options.length === 0 ? value.trim() !== "" : options.includes(value);
+    }
+
     case "radio": {
       return options.length === 0
         ? value === AFFIRMATIVE_OPTION || value === NEGATIVE_OPTION
@@ -444,7 +447,11 @@ export function answerIsValid(
   }
 }
 
-function formatSelectValue(value: string, options: readonly string[]) {
+function formatSelectValue(
+  value: string,
+  options: readonly string[],
+  fieldType: QuestionFieldType,
+) {
   if (options.length === 0) {
     const folded = value.trim().toLowerCase();
 
@@ -456,7 +463,9 @@ function formatSelectValue(value: string, options: readonly string[]) {
       return NEGATIVE_OPTION;
     }
 
-    return null;
+    const trimmed = value.trim();
+
+    return fieldType === "select" && trimmed !== "" ? trimmed : null;
   }
 
   const match = matchOption(value, options);
@@ -500,7 +509,7 @@ function formatSalary(input: {
   const unit = parsed === null ? null : unitFor(input.value, parsed.period);
 
   if (isOptionField(input.fieldType)) {
-    const exact = formatSelectValue(input.value, input.options);
+    const exact = formatSelectValue(input.value, input.options, input.fieldType);
 
     if (exact !== null) {
       return { value: exact, unit };
@@ -570,7 +579,7 @@ function formatNotice(input: {
   const unit = parsed === null ? null : { currency: null, period: parsed.unit };
 
   if (isOptionField(input.fieldType)) {
-    const exact = formatSelectValue(input.value, input.options);
+    const exact = formatSelectValue(input.value, input.options, input.fieldType);
 
     if (exact !== null) {
       return { value: exact, unit };
@@ -620,7 +629,7 @@ function formatDateFact(input: {
   }
 
   if (isOptionField(input.fieldType)) {
-    const exact = formatSelectValue(input.value, input.options);
+    const exact = formatSelectValue(input.value, input.options, input.fieldType);
 
     if (exact !== null) {
       return { value: exact, unit: null };
@@ -660,7 +669,7 @@ function formatGeneric(input: {
     const answer =
       input.fieldType === "multiselect"
         ? formatMultiselectValue(value, input.options)
-        : formatSelectValue(value, input.options);
+        : formatSelectValue(value, input.options, input.fieldType);
 
     return answer === null ? null : { value: answer, unit: null };
   }

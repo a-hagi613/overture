@@ -1353,6 +1353,84 @@ test("a recorded five-option work-authorisation select resolves from the scoped 
   ).toMatchObject({ resolved: true, answer: "United Kingdom" });
 });
 
+test("a typed Planet city resolves its open combobox Review and preparation moves on", async ({
+  preparation,
+}) => {
+  const { owner, userId } = await ownerContextFor(preparation.server.url);
+
+  await saveFacts(owner, [
+    { key: "legal_name", value: "Maya Okafor" },
+    { key: "email", value: "maya.okafor@mail.overture.test" },
+    { key: "phone", value: "+1 416 555 0199" },
+  ]);
+
+  const recorded = recordedQuestions("planetlabs", "8396492");
+
+  const identityQuestions = recorded.filter((question) =>
+    ["First Name", "Last Name", "Email", "Phone"].includes(question.text),
+  );
+
+  const cityQuestion = recorded.find((question) => question.text === "Location (City)");
+
+  if (cityQuestion === undefined) {
+    throw new Error("the Planet fixture has no Location (City) question");
+  }
+
+  expect(cityQuestion).toMatchObject({
+    atsFieldType: "multi_value_single_select",
+    options: [],
+    text: "Location (City)",
+  });
+
+  const postingId = await seedRecordedPosting(owner, {
+    atsJobId: "8396492",
+    boardToken: "planetlabs",
+    companyName: "Planet",
+    domain: "planet.example",
+    title: "Senior Software Engineer, Platform",
+    questions: [...identityQuestions, cityQuestion],
+  });
+
+  const applicationId = await seedApplication(owner, {
+    postingId,
+    status: "preparing",
+    userId,
+  });
+
+  await prepare(owner, applicationId);
+
+  const before = (await applicationsFor(owner, userId)).find((row) => row.id === applicationId);
+
+  expect(before?.status).toBe("needs_review");
+
+  const [review] = (await reviewsFor(owner, userId)).reviews;
+
+  if (review === undefined) {
+    throw new Error("no Review was opened for Location (City)");
+  }
+
+  expect(review.prompt).toBe("Location (City)");
+
+  const answered = await owner.post(`/api/reviews/${review.id}/answer`, {
+    data: { value: "Ottawa" },
+  });
+
+  expect(answered.ok()).toBe(true);
+
+  const after = (await applicationsFor(owner, userId)).find((row) => row.id === applicationId);
+
+  expect(after?.status).toBe("ready");
+  expect(after?.statusReason).toBeNull();
+
+  expect(
+    (await reviewsFor(owner, userId)).reviews.filter((candidate) => candidate.status === "open"),
+  ).toEqual([]);
+
+  expect(
+    (await answersFor(owner, applicationId)).find((answer) => answer.text === "Location (City)"),
+  ).toMatchObject({ answer: "Ottawa", resolved: true, required: true });
+});
+
 test("a scoped Fact with no matching option opens a Review with the option_missing reason", async ({
   preparation,
 }) => {
