@@ -153,7 +153,9 @@
           "src/server/pipeline/approved-plan.test.ts",
           "src/server/pipeline/email-notes.test.ts",
           "src/server/pipeline/form-fixes-2026-11-26.test.ts",
-          "src/server/pipeline/reviews.test.ts"
+          "src/server/pipeline/reviews.test.ts",
+          "src/server/jobs/job-posting.test.ts",
+          "src/server/routes/posting-detail-freehire.test.ts"
         ],
         "allowRoots": ["test/e2e", "scripts"]
       }
@@ -232,6 +234,7 @@
           "src/server/config/env.test.ts",
           "src/server/demo/seed.test.ts",
           "src/server/dispatch/application-cost.test.ts",
+          "src/server/dispatch/dispatch-freehire.test.ts",
           "src/server/dispatch/dry-submit.test.ts",
           "src/server/dispatch/ats/batch4.test.ts",
           "src/server/dispatch/ats/wave2.test.ts",
@@ -307,6 +310,7 @@
           "src/server/jobs/apply-link.test.ts",
           "src/server/jobs/filter-proof.test.ts",
           "src/server/jobs/freehire-source.test.ts",
+          "src/server/jobs/job-posting.test.ts",
           "src/server/jobs/preferences.test.ts",
           "src/server/jobs/pull.test.ts",
           "src/server/jobs/reader.test.ts",
@@ -357,6 +361,7 @@
           "src/server/routes/internal-ops.test.ts",
           "src/server/routes/me.test.ts",
           "src/server/routes/places.test.ts",
+          "src/server/routes/posting-detail-freehire.test.ts",
           "src/server/routes/ready.test.ts",
           "src/server/routes/supply.test.ts",
           "src/server/routes/waitlist.test.ts",

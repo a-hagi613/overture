@@ -10,13 +10,63 @@ import { readSessionUser } from "../auth/session.ts";
 import type { MatchingService } from "../matching/score.ts";
 
 import { postingUserState } from "../platform/db/schema.ts";
-import { postings } from "../platform/db/catalog-schema.ts";
+import { jobPostingById } from "../jobs/job-posting.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
 const stateBody = z.object({ state: z.enum(["saved", "hidden"]).nullable() });
 
 const UP_NEXT_LIMIT = 6;
+
+export interface PostingDetail {
+  id: string;
+  title: string;
+  companyId: string;
+  url: string | null;
+  applyUrl: string | null;
+  locationRaw: string | null;
+  workplace: string | null;
+  employmentType: string | null;
+  salaryMinMinor: number | null;
+  salaryMaxMinor: number | null;
+  salaryCurrency: string | null;
+  salaryPeriod: string | null;
+  postedAt: number | null;
+}
+
+/**
+ * The posting drawer's fields, read from the freehire job first and the legacy catalog second.
+ *
+ * @param deps The app database and the catalog fallback.
+ * @param postingId The posting the drawer opened.
+ * @returns The fields the drawer renders, or null when neither table holds the posting.
+ */
+export function postingDetailOf(
+  deps: { db: AppDatabase; catalogDb: CatalogDatabase },
+  postingId: string,
+) {
+  const posting = jobPostingById(deps, postingId);
+
+  if (posting === undefined) {
+    return null;
+  }
+
+  return {
+    applyUrl: posting.applyUrl,
+    companyId: posting.companyId,
+    employmentType: posting.employmentType,
+    id: posting.postingId,
+    locationRaw: posting.locationRaw,
+    postedAt: posting.postedAt,
+    salaryCurrency: posting.salaryCurrency,
+    salaryMaxMinor: posting.salaryMaxMinor,
+    salaryMinMinor: posting.salaryMinMinor,
+    salaryPeriod: posting.salaryPeriod,
+    title: posting.title,
+    url: posting.url,
+    workplace: posting.workplace,
+  } satisfies PostingDetail;
+}
 
 export function createMatchingRoutes(deps: {
   db: AppDatabase;
@@ -55,9 +105,9 @@ export function createMatchingRoutes(deps: {
     }
 
     const { id } = context.req.param();
-    const row = catalogDb.select().from(postings).where(eq(postings.id, id)).get();
+    const detail = postingDetailOf({ catalogDb, db }, id);
 
-    if (row === undefined) {
+    if (detail === null) {
       return context.json({ error: API_ERRORS.notFound }, 404);
     }
 
@@ -70,19 +120,7 @@ export function createMatchingRoutes(deps: {
       .get();
 
     return context.json({
-      id: row.id,
-      title: row.title,
-      companyId: row.companyId,
-      url: row.url,
-      applyUrl: row.applyUrl,
-      locationRaw: row.locationRaw,
-      workplace: row.workplace,
-      employmentType: row.employmentType,
-      salaryMinMinor: row.salaryMinMinor,
-      salaryMaxMinor: row.salaryMaxMinor,
-      salaryCurrency: row.salaryCurrency,
-      salaryPeriod: row.salaryPeriod,
-      postedAt: row.postedAt,
+      ...detail,
       score: scored?.score ?? null,
       reason: scored?.reason ?? null,
       applicationId: scored?.applicationId ?? null,
@@ -127,11 +165,7 @@ export function createMatchingRoutes(deps: {
     const { id } = context.req.param();
     const { state } = context.req.valid("json");
 
-    const posting = catalogDb
-      .select({ id: postings.id })
-      .from(postings)
-      .where(eq(postings.id, id))
-      .get();
+    const posting = jobPostingById({ catalogDb, db }, id);
 
     if (posting === undefined) {
       return context.json({ error: API_ERRORS.notFound }, 404);

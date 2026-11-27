@@ -11,7 +11,6 @@ import { readSession } from "../auth/session.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { openOrNull } from "../profile/personal-crypto.ts";
 
-import { postings } from "../platform/db/catalog-schema.ts";
 import {
   applications,
   applicationEvents,
@@ -39,6 +38,7 @@ import {
 } from "../../shared/board.ts";
 import { buildDossier } from "../../shared/dossier.ts";
 import { safeHttpUrl } from "../../shared/http-url.ts";
+import { jobPostingById } from "../jobs/job-posting.ts";
 
 const STRONG_SCORE = 80;
 
@@ -200,6 +200,13 @@ function noteFor(
   }
 
   return null;
+}
+
+export function applicationWorkplaceOf(
+  deps: { db: AppDatabase; catalogDb?: CatalogDatabase | undefined },
+  postingId: string,
+) {
+  return jobPostingById(deps, postingId)?.workplace ?? null;
 }
 
 export function createApplicationRoutes(
@@ -695,14 +702,10 @@ export function createApplicationRoutes(
       .where(eq(applicationReceipts.applicationId, id))
       .get();
 
-    const catalogPosting =
-      options.catalogDb === undefined
-        ? undefined
-        : options.catalogDb
-            .select({ workplace: postings.workplace })
-            .from(postings)
-            .where(eq(postings.id, application.postingId))
-            .get();
+    const workplace = applicationWorkplaceOf(
+      { catalogDb: options.catalogDb, db },
+      application.postingId,
+    );
 
     const screenshots =
       options.objects === undefined
@@ -768,10 +771,7 @@ export function createApplicationRoutes(
           : { confirmedAt: receipt.confirmedAt, messageId: receipt.messageId },
       timeZone,
       timeline,
-      workplace:
-        catalogPosting === undefined || catalogPosting.workplace === "unknown"
-          ? null
-          : catalogPosting.workplace,
+      workplace,
     });
   });
 

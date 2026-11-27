@@ -10,7 +10,7 @@ import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
 import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
 import { createClock } from "../platform/ports/clock.ts";
-import { applications, users } from "../platform/db/schema.ts";
+import { applications, jobs, users } from "../platform/db/schema.ts";
 import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { masterKeyringFor } from "../platform/crypto.ts";
 
@@ -196,6 +196,105 @@ function applicationRow(db: ReturnType<typeof openDatabase>["db"], id: string) {
   return db.select().from(applications).where(eq(applications.id, id)).get();
 }
 
+function freehireJobValues(description: string) {
+  return {
+    applyUrl: "https://job-boards.greenhouse.io/northwind/jobs/9",
+    applyVia: "direct",
+    atsJobId: "job-9",
+    boardToken: "northwind",
+    cities: JSON.stringify(["Toronto"]),
+    company: "Northwind",
+    companyNorm: "northwind",
+    companySlug: "northwind",
+    countries: JSON.stringify(["ca"]),
+    createdAt: NOW,
+    dedupeKey: "northwind|staff engineer|toronto",
+    description,
+    descriptionHash: "job-hash",
+    externalId: "northwind:job-9",
+    firstSeenAt: NOW,
+    freehireSource: "greenhouse",
+    id: "posting-job",
+    lastSeenAt: NOW,
+    regions: JSON.stringify(["north_america"]),
+    source: "greenhouse" as const,
+    title: "Staff Engineer",
+    titleNorm: "staff engineer",
+    updatedAt: NOW,
+    url: "https://job-boards.greenhouse.io/northwind/jobs/9",
+    workMode: "remote" as const,
+  } satisfies typeof jobs.$inferInsert;
+}
+
+function freshFreehireApplication(description: string) {
+  const app = openDatabase(":memory:");
+  const catalog = openCatalogDatabase(":memory:");
+
+  migrateDatabase(app.db, "drizzle");
+  migrateCatalogDatabase(catalog.db, "drizzle-catalog");
+
+  openHandles.push(app.sqlite, catalog.sqlite);
+
+  app.db
+    .insert(users)
+    .values({
+      createdAt: new Date(NOW),
+      email: "candidate@example.test",
+      emailVerified: true,
+      id: "user-1",
+      name: "Candidate",
+      role: "owner",
+      updatedAt: new Date(NOW),
+    })
+    .run();
+
+  app.db.insert(jobs).values(freehireJobValues(description)).run();
+
+  app.db
+    .insert(applications)
+    .values({
+      ats: "greenhouse",
+      companyId: "northwind",
+      companyName: "Northwind",
+      companyNameNorm: "northwind",
+      createdAt: NOW,
+      id: "application-1",
+      origin: "pick",
+      postingId: "posting-job",
+      postingTitle: "Staff Engineer",
+      postingUrl: "https://job-boards.greenhouse.io/northwind/jobs/9",
+      status: "preparing",
+      updatedAt: NOW,
+      userId: "user-1",
+    })
+    .run();
+
+  const clock = createClock();
+
+  const personal = createPersonalCrypto(app.db, masterKeyringFor(new Uint8Array(32).fill(3)));
+
+  const facts = createFactService({ clock, db: app.db, personal });
+
+  const counted = countedLlm();
+
+  const preparation = createPreparationService({
+    catalogDb: catalog.db,
+    clock,
+    db: app.db,
+    llm: counted.llm,
+    personal,
+    source: null,
+  });
+
+  return {
+    app: app.db,
+    facts,
+    llmCalls: counted.calls,
+    preparation,
+    userId: "user-1",
+  };
+}
+
 describe("the knock-out pre-scan in preparation", () => {
   test("skips an ineligible posting before any LLM call", async () => {
     const setup = freshApplication(
@@ -226,5 +325,41 @@ describe("the knock-out pre-scan in preparation", () => {
 
     expect(result).toMatchObject({ status: "ready" });
     expect(applicationRow(setup.app, "application-1")?.statusReason).not.toStartWith("knockout");
+  });
+
+  test("prepares a freehire job from app.sqlite alone, with catalog.sqlite empty", async () => {
+    const setup = freshFreehireApplication(
+      "You must be authorized to work in the United States. We are unable to sponsor a visa.",
+    );
+
+    await setup.facts.save(setup.userId, "sponsorship_required", "No");
+
+    expect(await setup.preparation.prepare("application-1")).toMatchObject({ status: "ready" });
+
+    const plan = await setup.preparation.sendPlanFor("application-1");
+
+    expect(plan).toMatchObject({
+      ats: "greenhouse",
+      atsJobId: "job-9",
+      boardToken: "northwind",
+      descriptionHash: "job-hash",
+      postingTitle: "Staff Engineer",
+    });
+    expect(plan?.postingUrl).toContain("northwind");
+    expect(await setup.preparation.answersFor("application-1")).toEqual([]);
+  });
+
+  test("knocks out a freehire job using its plain description, never a gzip read", async () => {
+    const setup = freshFreehireApplication(
+      "You must be authorized to work in the United States. We are unable to sponsor a visa.",
+    );
+
+    await setup.facts.save(setup.userId, "sponsorship_required", "Yes, I require sponsorship");
+
+    expect(await setup.preparation.prepare("application-1")).toMatchObject({
+      status: "skipped",
+      blocked: 0,
+    });
+    expect(applicationRow(setup.app, "application-1")?.statusReason).toBe("knockout_sponsorship");
   });
 });

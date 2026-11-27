@@ -1,9 +1,8 @@
-import { gunzipSync } from "node:zlib";
-
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
+import type { BoardRegion } from "../catalog/board-feed.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
@@ -27,7 +26,7 @@ import {
   resumes,
   users,
 } from "../platform/db/schema.ts";
-import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
 
 import type { FormQuestion, SendPlan, SendPlanField } from "./send-plan.ts";
 import { createFactService } from "../profile/facts.ts";
@@ -72,6 +71,7 @@ import { PREPARABLE_STATUSES, updatePreparableApplication } from "./preparable-s
 import { stageForStatus } from "./stage.ts";
 import { recordPostingFailure } from "../matching/posting-flags.ts";
 import { bestEffortCatalogWrite } from "../platform/db/read-only-catalog.ts";
+import { jobPostingById } from "../jobs/job-posting.ts";
 
 const optionsSchema = z.array(z.string());
 
@@ -89,16 +89,8 @@ function isFreeText(fieldType: QuestionFieldType) {
   return fieldType === "text" || fieldType === "textarea";
 }
 
-function descriptionText(descriptionGz: Buffer | null) {
-  if (descriptionGz === null) {
-    return "";
-  }
-
-  try {
-    return guardPosting(gunzipSync(descriptionGz).toString("utf8")).safeText;
-  } catch {
-    return "";
-  }
+function descriptionText(description: string | null) {
+  return guardPosting(description ?? "").safeText;
 }
 
 function employerNames(facts: ReadonlyMap<string, string>) {
@@ -421,10 +413,10 @@ export function createPreparationService(deps: {
     ats: ApplySupportedAts;
     atsJobId: string;
     boardToken: string;
-    boardRegion: "us" | "eu";
+    boardRegion: BoardRegion | null;
     companyName: string;
     applyUrl: string | null;
-    url: string;
+    url: string | null;
     questionsFetchedAt: number | null;
   }) {
     if (posting.questionsFetchedAt !== null) {
@@ -503,8 +495,8 @@ export function createPreparationService(deps: {
       ats: posting.ats,
       atsJobId: posting.atsJobId,
       boardToken: posting.boardToken,
-      region: posting.boardRegion,
-      url: posting.url,
+      region: posting.boardRegion ?? "us",
+      url: posting.url ?? posting.applyUrl ?? "",
     };
 
     let questions: FormQuestion[] = [];
@@ -674,18 +666,9 @@ export function createPreparationService(deps: {
       return [];
     }
 
-    const row = catalogDb
-      .select({
-        ats: postings.ats,
-        companyName: companies.name,
-        postingId: postings.id,
-      })
-      .from(postings)
-      .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(eq(postings.id, application.postingId))
-      .get();
+    const posting = jobPostingById({ catalogDb, db }, application.postingId);
 
-    if (row === undefined || !isApplySupportedAts(row.ats)) {
+    if (posting === undefined || !isApplySupportedAts(posting.ats)) {
       return [];
     }
 
@@ -701,14 +684,14 @@ export function createPreparationService(deps: {
       }
 
       const question = catalog.findOrCreate({
-        companyNames: [row.companyName],
+        companyNames: [posting.companyName],
         fieldType: field.fieldType,
         options: field.options,
         text: field.label,
         fieldName: field.fieldName,
       });
 
-      catalog.addPostingQuestion(row.postingId, {
+      catalog.addPostingQuestion(posting.postingId, {
         fieldName: field.fieldName,
         options: field.options,
         questionId: question.id,
@@ -720,7 +703,7 @@ export function createPreparationService(deps: {
       const factKey = question.answerKind === "fact" ? question.factKey : null;
 
       const reviewId = ensureOpenReview(db, clock, {
-        ats: row.ats,
+        ats: posting.ats,
         attemptId: input.attemptId,
         factKey,
         fieldType: field.fieldType,
@@ -760,30 +743,7 @@ export function createPreparationService(deps: {
       return null;
     }
 
-    const postingRow = catalogDb
-      .select({
-        ats: postings.ats,
-        atsJobId: postings.atsJobId,
-        boardToken: companyBoards.boardToken,
-        boardRegion: companyBoards.region,
-        companyName: companies.name,
-        countryCode: postings.countryCode,
-        city: postings.city,
-        region: postings.region,
-        locationRaw: postings.locationRaw,
-        workplace: postings.workplace,
-        language: postings.language,
-        title: postings.title,
-        descriptionGz: postings.descriptionGz,
-        applyUrl: postings.applyUrl,
-        url: postings.url,
-        questionsFetchedAt: postings.questionsFetchedAt,
-      })
-      .from(postings)
-      .innerJoin(companyBoards, eq(companyBoards.id, postings.boardId))
-      .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(eq(postings.id, application.postingId))
-      .get();
+    const postingRow = jobPostingById({ catalogDb, db }, application.postingId);
 
     if (postingRow === undefined) {
       return null;
@@ -837,7 +797,7 @@ export function createPreparationService(deps: {
     const knockout = knockoutPreScan({
       posting: {
         countryCode: posting.countryCode,
-        description: descriptionText(row.descriptionGz),
+        description: descriptionText(row.description),
         locationRaw: posting.locationRaw,
         title: row.title,
         workplace: row.workplace,
@@ -1023,7 +983,7 @@ export function createPreparationService(deps: {
           title: guardPosting(row.title).safeText,
           company: guardPosting(row.companyName).safeText,
           language: row.language,
-          description: descriptionText(row.descriptionGz),
+          description: descriptionText(row.description),
         },
         facts: factValues.unscoped,
         questions: generatedQuestions.map((question) => ({
@@ -1291,27 +1251,7 @@ export function createPreparationService(deps: {
       return null;
     }
 
-    const postingRow = catalogDb
-      .select({
-        ats: postings.ats,
-        url: postings.url,
-        applyUrl: postings.applyUrl,
-        title: postings.title,
-        descriptionHash: postings.descriptionHash,
-        companyName: companies.name,
-        boardToken: companyBoards.boardToken,
-        boardRegion: companyBoards.region,
-        atsJobId: postings.atsJobId,
-        countryCode: postings.countryCode,
-        city: postings.city,
-        region: postings.region,
-        locationRaw: postings.locationRaw,
-      })
-      .from(postings)
-      .innerJoin(companyBoards, eq(companyBoards.id, postings.boardId))
-      .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(eq(postings.id, application.postingId))
-      .get();
+    const postingRow = jobPostingById({ catalogDb, db }, application.postingId);
 
     if (postingRow === undefined) {
       return null;
@@ -1491,9 +1431,9 @@ export function createPreparationService(deps: {
               atsJobId: row.atsJobId,
               boardToken: row.boardToken,
               origin: greenhouseBoardOrigin,
-              region: row.boardRegion,
+              region: row.boardRegion ?? "us",
             })
-          : (row.applyUrl ?? row.url),
+          : (row.applyUrl ?? row.url ?? ""),
       resume:
         resume === undefined
           ? null
@@ -1524,18 +1464,7 @@ export function createPreparationService(deps: {
       return [];
     }
 
-    const postingRow = catalogDb
-      .select({
-        companyName: companies.name,
-        countryCode: postings.countryCode,
-        city: postings.city,
-        region: postings.region,
-        locationRaw: postings.locationRaw,
-      })
-      .from(postings)
-      .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(eq(postings.id, application.postingId))
-      .get();
+    const postingRow = jobPostingById({ catalogDb, db }, application.postingId);
 
     if (postingRow === undefined) {
       return [];
