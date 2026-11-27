@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import { LANDING_COPY } from "./landing-copy.ts";
@@ -6,9 +6,14 @@ import { LANDING_COPY } from "./landing-copy.ts";
 const BASE_APPLIED = 42_819;
 
 export function LandingLiveCounter() {
+  const reduceMotion = useReducedMotion() === true;
   const [count, setCount] = useState(BASE_APPLIED);
 
   useEffect(() => {
+    if (reduceMotion) {
+      return () => undefined;
+    }
+
     const timer = globalThis.setInterval(() => {
       setCount((current) => current + 1);
     }, 3400);
@@ -16,14 +21,10 @@ export function LandingLiveCounter() {
     return () => {
       globalThis.clearInterval(timer);
     };
-  }, []);
+  }, [reduceMotion]);
 
   return (
-    <output
-      aria-live="polite"
-      className="mt-4 inline-flex items-center gap-2 text-xs text-muted-foreground sm:text-sm"
-      data-testid="hero-counter"
-    >
+    <p className="mt-4 inline-flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
       <span
         aria-hidden="true"
         className="relative flex h-2.5 w-2.5 flex-none items-center justify-center"
@@ -45,6 +46,6 @@ export function LandingLiveCounter() {
         </motion.span>
         <span>{LANDING_COPY.hero.liveCounterSuffix}</span>
       </span>
-    </output>
+    </p>
   );
 }

@@ -63,6 +63,7 @@ export function OnboardingMatchItem({
         <div
           aria-label={match.score === null ? text.scoringAria : text.scoreAria(match.score)}
           className="flex shrink-0 items-center gap-2 rounded-lg border border-signal/30 bg-signal-soft/70 px-2.5 py-1"
+          role="group"
         >
           <span className="text-sm font-bold text-signal-text tabular-nums">{scoreText}</span>
           <span aria-hidden="true" className="h-3.5 w-px bg-signal/30" />
@@ -74,6 +75,7 @@ export function OnboardingMatchItem({
         <div
           aria-label={match.why.length > 0 ? text.whyTitle : undefined}
           className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
+          role="group"
         >
           <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground">
             <Briefcase aria-hidden="true" size={12} />

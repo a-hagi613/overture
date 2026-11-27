@@ -56,13 +56,10 @@ export function UserInsight({ userId }: { userId: string }) {
 
   if (state.kind === "loading") {
     return (
-      <div
-        aria-busy="true"
-        aria-label={copy.admin.insightStatusHeading}
-        className="mt-5 grid gap-5 lg:grid-cols-3"
-      >
+      <div aria-busy="true" className="mt-5 grid gap-5 lg:grid-cols-3" role="status">
+        <span className="sr-only">{copy.shell.loadingPage}</span>
         {[0, 1, 2].map((index) => (
-          <div className="h-40 animate-pulse rounded-lg bg-muted" key={index} />
+          <div aria-hidden="true" className="h-40 animate-pulse rounded-lg bg-muted" key={index} />
         ))}
       </div>
     );

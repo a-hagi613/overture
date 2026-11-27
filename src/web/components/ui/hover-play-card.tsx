@@ -1,5 +1,5 @@
 import { Pause, Play } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 
@@ -46,8 +46,10 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const prevMutedRef = useRef<boolean | null>(null);
+  const reduceMotion = useReducedMotion() === true;
 
   const [isHovering, setIsHovering] = useState(false);
+  const [hasFocus, setHasFocus] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [userStarted, setUserStarted] = useState(false);
 
@@ -76,7 +78,7 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
     }
 
     if (video?.getAttribute("src") === src) {
-      if (isHovering && !userStarted) {
+      if (isHovering && !userStarted && !reduceMotion) {
         void playMuted(video);
       } else if (!isHovering && !userStarted) {
         video.pause();
@@ -90,7 +92,7 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
     return () => {
       ignore = true;
     };
-  }, [isHovering, mutedOnHover, src, userStarted]);
+  }, [isHovering, mutedOnHover, reduceMotion, src, userStarted]);
 
   async function togglePlayback(video: HTMLVideoElement) {
     if (!video.paused) {
@@ -125,7 +127,7 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
   const handleLoadedData = async () => {
     const video = videoRef.current;
 
-    if (video === null || !isHovering || userStarted || !video.paused) {
+    if (video === null || !isHovering || reduceMotion || userStarted || !video.paused) {
       return;
     }
 
@@ -144,6 +146,16 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
   return (
     <div
       className={cn("group relative overflow-hidden rounded-xl shadow-sm", className)}
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+
+        if (!(next instanceof Node) || !event.currentTarget.contains(next)) {
+          setHasFocus(false);
+        }
+      }}
+      onFocus={() => {
+        setHasFocus(true);
+      }}
       onMouseEnter={() => {
         setIsHovering(true);
       }}
@@ -183,7 +195,7 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
       />
 
       <AnimatePresence>
-        {isHovering || !isPlaying ? (
+        {isHovering || hasFocus || !isPlaying ? (
           <motion.div
             animate={{ opacity: 1 }}
             className="pointer-events-none absolute inset-0 flex items-center justify-center"

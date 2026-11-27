@@ -16,6 +16,7 @@ export function HomeActivityFailedCard(props: {
     <div
       aria-label={copy.home.activity.couldNotApplyAria(row.company, row.title)}
       className="flex items-start justify-between gap-3 py-2.5"
+      role="group"
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">

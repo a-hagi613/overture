@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import type { CueCardData } from "./landing-hero-card.tsx";
@@ -219,12 +219,17 @@ export function LandingHeroStack({
   const [stamped, setStamped] = useState(false);
   const [appliedCount, setAppliedCount] = useState(0);
   const [scrubPct, setScrubPct] = useState<number | null>(null);
+  const reduceMotion = useReducedMotion() === true;
 
   const currentCard = cueCards[index] ?? cueCards[0];
   const isScrubbing = scrubPct !== null;
 
   useEffect(() => {
     let timer: ReturnType<typeof globalThis.setTimeout> | null = null;
+
+    if (reduceMotion) {
+      return () => undefined;
+    }
 
     if (!isScrubbing && !stamped) {
       timer = globalThis.setTimeout(() => {
@@ -251,7 +256,7 @@ export function LandingHeroStack({
         globalThis.clearTimeout(timer);
       }
     };
-  }, [isScrubbing, stamped]);
+  }, [isScrubbing, reduceMotion, stamped]);
 
   const handleScrub = (nextPct: number) => {
     const nextIndex = nearestCardIndex(nextPct);

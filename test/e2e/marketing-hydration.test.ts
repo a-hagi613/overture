@@ -103,3 +103,26 @@ test("the prerendered landing hydrates cleanly, shows a live count and ticks the
     await site.stop();
   }
 });
+
+test("reduced motion freezes the landing loops and the hero counter", async ({
+  appServer,
+  page,
+}) => {
+  const site = startMarketingSite(appServer.url);
+
+  try {
+    await page.clock.install({ time: new Date("2026-11-17T12:00:00Z") });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(`${site.base}/`, { waitUntil: "networkidle" });
+
+    const heroCounter = page.getByTestId("hero-counter-value");
+    const firstCount = (await heroCounter.textContent())?.trim() ?? "";
+
+    expect(firstCount).toMatch(/^\d{1,3}(?:,\d{3})*$/u);
+
+    await page.clock.runFor(6000);
+    await expect(heroCounter).toHaveText(firstCount);
+  } finally {
+    await site.stop();
+  }
+});

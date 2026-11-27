@@ -65,6 +65,7 @@ export function InboxThreadListRow({
               <span
                 aria-label={copy.inbox.unreadAria}
                 className="h-2 w-2 shrink-0 rounded-full bg-signal"
+                role="img"
               />
             ) : null}
             <span

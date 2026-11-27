@@ -18,7 +18,7 @@ import { useMediaQuery } from "./lib/media-query.ts";
 import { useNavCounts } from "./lib/nav-api.ts";
 import { useUnreadNotificationCount } from "./lib/notifications-api.ts";
 import { useOnboardingState } from "./lib/onboarding-api.ts";
-import { closeTopLayerHost, useTopLayerHost } from "./lib/top-layer-host.ts";
+import { closeAllTopLayerHosts, useTopLayerHost } from "./lib/top-layer-host.ts";
 
 const collapsedStorageKey = "overture.rail";
 
@@ -47,7 +47,7 @@ export function AppShell() {
 
   const changeSearchOpen = useCallback((open: boolean) => {
     if (open) {
-      closeTopLayerHost();
+      closeAllTopLayerHosts();
     }
 
     setSearchOpen(open);
