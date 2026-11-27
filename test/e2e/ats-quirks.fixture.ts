@@ -109,7 +109,7 @@ export const greenhousePage = (action: string) => `<!doctype html><html lang="en
 </body>
 </html>`;
 
-export const greenhouseLiveShapePage = (
+export const greenhouseLiveFormPage = (
   action: string,
   options: { changed?: boolean } = {},
 ) => `<!doctype html>

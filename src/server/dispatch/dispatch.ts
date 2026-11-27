@@ -73,11 +73,6 @@ interface Block {
   reason: string;
 }
 
-/**
- * Every board with a shipped apply adapter is dispatchable. Keeping a hand-written subset here is what
- * left JazzHR, BambooHR, Zoho Recruit, Manatal and the other Wave 1A adapters permanently unclaimed
- * (issue #756): the registry already says who can be sent, so the dispatcher reads it instead.
- */
 type DispatchAts = ApplySupportedAts;
 
 function isDispatchAts(ats: string): ats is DispatchAts {
@@ -653,8 +648,6 @@ export function createDispatcherTick(deps: DispatchDeps) {
       }
 
       if (status === "unknown") {
-        // An ATS with no liveness source is not a failed check (issue #756). Only a confirmed closed
-        // posting stops a send; the log and the tick summary record that this one went out unverified.
         summary.unknownLiveness += 1;
         logInfo(
           "dispatch.liveness",

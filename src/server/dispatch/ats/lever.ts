@@ -303,10 +303,6 @@ async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanFiel
 
   await fillFrom(0);
 
-  // Every field is attempted; preflight is the judge of whether the form holds the approved
-  // answers, and can fill an untouched one through its label (issue #757). A location whose
-  // suggestion did not commit its backing id is different: the ATS needs that id, so it still
-  // stops before Submit.
   return !locationFailed;
 }
 

@@ -9,7 +9,7 @@ import {
   ashbyOverwritePage,
   ashbyResumePage,
   ashbyYesNoPage,
-  greenhouseLiveShapePage,
+  greenhouseLiveFormPage,
   greenhousePage,
   leverLocationPage,
   leverResumeAutofillPage,
@@ -148,7 +148,7 @@ test("Greenhouse fills and submits the classic application_form root, never the 
 test("a live-shaped Greenhouse form sends after the resume, selects and phone defaults settle", async ({
   page,
 }) => {
-  const server = startAtsPage(greenhouseLiveShapePage("/example/jobs/1"));
+  const server = startAtsPage(greenhouseLiveFormPage("/example/jobs/1"));
 
   try {
     const plan = {
@@ -204,7 +204,7 @@ test("a live-shaped Greenhouse form sends after the resume, selects and phone de
 });
 
 test("a genuinely changed live Greenhouse form still stops before Submit", async ({ page }) => {
-  const server = startAtsPage(greenhouseLiveShapePage("/example/jobs/1", { changed: true }));
+  const server = startAtsPage(greenhouseLiveFormPage("/example/jobs/1", { changed: true }));
 
   try {
     const plan = {
