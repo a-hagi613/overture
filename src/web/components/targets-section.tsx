@@ -184,7 +184,7 @@ export function TargetsSection() {
         <output className="mt-3 block rounded-lg border border-border bg-card p-3">
           <p className="text-sm font-semibold text-foreground">{targets.countZero}</p>
           <a
-            className="mt-1 inline-block text-sm font-semibold text-signal-text underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+            className="mt-1 inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold text-signal-text underline underline-offset-2 transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
             href={limiting.href}
           >
             {limiting.text}
