@@ -60,7 +60,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-          REPO: ${{ github.repository }}
+          # This job checks nothing out, and `gh run`/`gh workflow run` otherwise look for a repository through a git
+          # remote: without `GH_REPO` they stop with "failed to determine base repo: not a git repository" (that is
+          # what the first version of this job hit in production). `GH_REPO` also names the repo in the API path below.
+          GH_REPO: ${{ github.repository }}
           DEPLOY_WORKFLOW: deploy.yml
           # The bounded wait, in seconds; `timeout-minutes` above is the hard cap if this step ever hangs.
           MERGE_WAIT_SECONDS: "3600"
@@ -85,7 +88,7 @@ jobs:
             sleep 30
           done
 
-          main_sha="$(gh api "repos/${REPO}/commits/main" --jq .sha)"
+          main_sha="$(gh api "repos/${GH_REPO}/commits/main" --jq .sha)"
           merged_sha="$(gh pr view "$PR_URL" --json mergeCommit --jq '.mergeCommit.oid // empty')"
           if [ -n "$merged_sha" ] && [ "$merged_sha" != "$main_sha" ]; then
             # Another merge landed on top. That pull request's own run dispatches Deploy for the newer HEAD, which

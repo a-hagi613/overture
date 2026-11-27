@@ -1401,7 +1401,14 @@ test("the dispatch step reads as the merge watcher it must be", () => {
 afterEach(removeDeployDispatchSandboxes);
 
 function runDispatch(input: DispatchRunInput = {}) {
-  return deployDispatchSandbox().run(autoMergeDispatchScript(autoMergeWorkflow()), input);
+  const autoMerge = autoMergeWorkflow();
+  const step = readWorkflowStep(autoMerge, AUTO_MERGE_DISPATCH_STEP) ?? "";
+  const repo = step.includes("GH_REPO:") ? { GH_REPO: "example/repo" } : {};
+
+  return deployDispatchSandbox().run(autoMergeDispatchScript(autoMerge), {
+    ...input,
+    vars: { ...repo, ...input.vars },
+  });
 }
 
 function dispatches(calls: readonly string[]) {
@@ -1432,6 +1439,35 @@ test("the dispatch waits for the merge instead of leaving when the arm job ends"
     calls.filter((call) => call.startsWith("pr view") && call.includes("--json state")),
   ).toHaveLength(2);
   expect(dispatches(calls)).toHaveLength(1);
+});
+
+test("a dispatch step without GH_REPO fails before it dispatches", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    `          GH_REPO: \${{ github.repository }}\n`,
+    "",
+  );
+
+  const { calls, output, status } = deployDispatchSandbox().run(
+    autoMergeDispatchScript(autoMerge),
+    { states: ["MERGED"], mergeSha: "abc1234", mainSha: "abc1234" },
+  );
+
+  expect(status).toBe(1);
+  expect(output).toContain("GH_REPO");
+  expect(dispatches(calls)).toStrictEqual([]);
+});
+
+test("a dispatch step without GH_REPO is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    `          GH_REPO: \${{ github.repository }}\n`,
+    "",
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("does not name the repository"),
+    ),
+  ).toBe(true);
 });
 
 test("a pull request that closes without merging dispatches nothing", () => {

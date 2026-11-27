@@ -1254,6 +1254,10 @@ export function findDeployTriggerProblems(input: DeployTriggerInput) {
   for (const [needle, rule] of [
     ["MERGED", "does not wait for the pull request to merge"],
     ["CLOSED", "does not skip a pull request that closed without merging"],
+    [
+      `GH_REPO: \${{ github.repository }}`,
+      "does not name the repository for `gh` without a checkout",
+    ],
     ["gh run list", "does not skip a tree that already has a Deploy run"],
     ["gh workflow run", "does not dispatch a workflow"],
     ["--ref main", "does not dispatch Deploy for main"],

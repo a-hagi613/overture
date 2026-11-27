@@ -46,6 +46,19 @@ if (args[0] === "api" && args[1]?.startsWith("repos/") === true) {
   process.exit(0);
 }
 
+if (
+  (args[0] === "run" && args[1] === "list") ||
+  (args[0] === "workflow" && args[1] === "run")
+) {
+  // Real gh resolves the repository from a git remote unless it is given one, and this job checks nothing out.
+  if (!process.env["GH_REPO"] && !args.includes("-R") && !args.includes("--repo")) {
+    process.stderr.write(
+      "failed to determine base repo: failed to run git: fatal: not a git repository (or any of the parent directories): .git\n",
+    );
+    process.exit(1);
+  }
+}
+
 if (args[0] === "run" && args[1] === "list") {
   const runs = (process.env["FIXTURE_DEPLOY_RUNS"] ?? "").split(/\s+/u).filter((sha) => sha !== "");
   process.stdout.write(runs.map((sha) => sha + "\n").join(""));
@@ -126,7 +139,6 @@ export function deployDispatchSandbox() {
           MERGE_WAIT_SECONDS: "3600",
           PATH: `${bin}:${Bun.env["PATH"] ?? ""}`,
           PR_URL: "https://github.com/example/repo/pull/1",
-          REPO: "example/repo",
           ...input.vars,
         },
         stderr: "pipe",
