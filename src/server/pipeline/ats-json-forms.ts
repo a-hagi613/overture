@@ -35,6 +35,7 @@ const bamboohrDetailSchema = z.looseObject({
 const BAMBOOHR_ADDRESS_FIELDS = new Set(["city", "countryId", "state", "streetAddress", "zip"]);
 
 const BAMBOOHR_FIELD_TYPES = new Map<string, QuestionFieldType>([
+  ["coverLetterFileId", "file"],
   ["dateAvailable", "date"],
   ["email", "email"],
   ["linkedinUrl", "url"],

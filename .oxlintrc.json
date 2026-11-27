@@ -241,6 +241,7 @@
           "src/server/dispatch/dry-submit.test.ts",
           "src/server/dispatch/ats/batch4.test.ts",
           "src/server/dispatch/dispatch-claim.test.ts",
+          "src/server/dispatch/posting-identity.test.ts",
           "src/server/dispatch/ats/wave2.test.ts",
           "src/server/dispatch/browser/kernel.test.ts",
           "src/server/dispatch/browser/proxy-trim.test.ts",
