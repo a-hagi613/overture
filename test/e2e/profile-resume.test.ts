@@ -1,7 +1,9 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { DatabaseSync } from "node:sqlite";
 import { request as apiRequest } from "@playwright/test";
+import { AxeBuilder } from "@axe-core/playwright";
 import { z } from "zod";
 
 import { authTestIdentity } from "./auth.fixture.ts";
@@ -18,6 +20,15 @@ const uploadSchema = z.object({
   unreadable: z.boolean(),
   prefilledFacts: z.array(z.string()),
 });
+
+const currentResumeSchema = z.object({
+  id: z.string(),
+  filename: z.string(),
+});
+
+function resumeIdFrom(data: string | null) {
+  return data?.match(/\/api\/profile\/resume\/(?<id>[^/]+)\/file/u)?.groups?.id ?? null;
+}
 
 const wrappedKeySchema = z.object({ wrapped_dek: z.instanceof(Uint8Array) });
 
@@ -449,5 +460,257 @@ test("uploading a resume on /profile/resume finishes scanning and settles to PDF
   } finally {
     await owner.dispose();
     await context.close();
+  }
+});
+
+test("a corrupt PDF is a 400 and the saved resume stays current", async ({
+  isolatedAppServer: { url: appServerUrl },
+}) => {
+  const owner = await ownerContextFor(appServerUrl);
+
+  try {
+    const saved = uploadSchema.parse(
+      await (
+        await owner.post("/api/profile/resume", {
+          multipart: {
+            file: {
+              buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+              mimeType: "application/pdf",
+              name: "kept-resume.pdf",
+            },
+          },
+        })
+      ).json(),
+    );
+
+    const corrupt = await owner.post("/api/profile/resume", {
+      multipart: {
+        file: {
+          buffer: Buffer.from("%PDF-1.4\nthis is not a real pdf\n%%EOF\n"),
+          mimeType: "application/pdf",
+          name: "broken.pdf",
+        },
+      },
+    });
+
+    expect(corrupt.status()).toBe(400);
+    expect(await corrupt.json()).toEqual(expect.objectContaining({ error: "invalid_request" }));
+
+    const current = currentResumeSchema.parse(
+      await (await owner.get("/api/profile/resume")).json(),
+    );
+
+    expect(current.id).toBe(saved.id);
+    expect(current.filename).toBe("kept-resume.pdf");
+  } finally {
+    await owner.dispose();
+  }
+});
+
+test("replacing the resume updates the file and the authenticated preview", async ({
+  browser,
+  isolatedAppServer: { url: appServerUrl },
+}) => {
+  const owner = await ownerContextFor(appServerUrl);
+  const context = await browser.newContext({ storageState: await owner.storageState() });
+  const page = await context.newPage();
+  const input = page.locator('#profile-resume input[type="file"]');
+  const preview = page.locator('#profile-resume object[type="application/pdf"]');
+
+  try {
+    await page.goto(`${appServerUrl}/profile/resume`, { waitUntil: "load" });
+    await page.getByRole("button", { name: /Upload PDF/iu }).waitFor({ state: "visible" });
+
+    await input.setInputFiles({
+      buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+      mimeType: "application/pdf",
+      name: "sam-rivera-resume.pdf",
+    });
+
+    await expect(page.getByTestId("resume-scan")).toBeHidden({ timeout: 10_000 });
+    await expect(page.getByText("sam-rivera-resume.pdf", { exact: true }).first()).toBeVisible();
+    await expect(preview).toHaveAttribute("data", /\/api\/profile\/resume\/[^/]+\/file/u);
+
+    const firstId = resumeIdFrom(await preview.getAttribute("data"));
+
+    expect(firstId).not.toBeNull();
+
+    await input.setInputFiles({
+      buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-board.pdf")),
+      mimeType: "application/pdf",
+      name: "sam-rivera-board.pdf",
+    });
+
+    await expect(page.getByTestId("resume-scan")).toBeHidden({ timeout: 10_000 });
+    await expect(page.getByText("sam-rivera-board.pdf", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("sam-rivera-resume.pdf", { exact: true })).toHaveCount(0);
+    await expect
+      .poll(async () => resumeIdFrom(await preview.getAttribute("data")))
+      .not.toBe(firstId);
+    expect(await preview.getAttribute("data")).not.toContain(`resume/${String(firstId)}/file`);
+  } finally {
+    await owner.dispose();
+    await context.close();
+  }
+});
+
+test("a failed replace keeps the saved resume and offers a retry", async ({
+  browser,
+  isolatedAppServer: { url: appServerUrl },
+}) => {
+  const owner = await ownerContextFor(appServerUrl);
+
+  const saved = uploadSchema.parse(
+    await (
+      await owner.post("/api/profile/resume", {
+        multipart: {
+          file: {
+            buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+            mimeType: "application/pdf",
+            name: "saved-resume.pdf",
+          },
+        },
+      })
+    ).json(),
+  );
+
+  const context = await browser.newContext({ storageState: await owner.storageState() });
+  const page = await context.newPage();
+
+  try {
+    await page.goto(`${appServerUrl}/profile/resume`, { waitUntil: "load" });
+    await expect(page.getByText("saved-resume.pdf", { exact: true }).first()).toBeVisible();
+
+    await page.locator('#profile-resume input[type="file"]').setInputFiles({
+      buffer: Buffer.from("%PDF-1.4\nthis is not a real pdf\n%%EOF\n"),
+      mimeType: "application/pdf",
+      name: "broken.pdf",
+    });
+
+    const failure = page.getByTestId("resume-replace-failed");
+
+    await expect(failure).toBeVisible();
+    await expect(failure).toContainText("Your current resume is still saved");
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(page.getByText("saved-resume.pdf", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("broken.pdf", { exact: true })).toHaveCount(0);
+    await expect(page.locator('#profile-resume object[type="application/pdf"]')).toHaveAttribute(
+      "data",
+      new RegExp(`resume/${saved.id}/file`, "u"),
+    );
+
+    const current = currentResumeSchema.parse(
+      await (await owner.get("/api/profile/resume")).json(),
+    );
+
+    expect(current.id).toBe(saved.id);
+  } finally {
+    await owner.dispose();
+    await context.close();
+  }
+});
+
+test("Saved answers is centred, holds no job-search email card and is axe clean", async ({
+  browser,
+  isolatedAppServer: { url: appServerUrl },
+}) => {
+  const owner = await ownerContextFor(appServerUrl);
+
+  const context = await browser.newContext({
+    storageState: await owner.storageState(),
+    viewport: { height: 1000, width: 1280 },
+  });
+
+  const page = await context.newPage();
+
+  try {
+    await page.goto(`${appServerUrl}/profile/details`, { waitUntil: "load" });
+    await expect(page.getByRole("heading", { level: 1, name: "Saved answers" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Key details" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Strengthen your profile" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Learned from Reviews" })).toBeVisible();
+    await expect(page.getByText("You're all caught up.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Job-search address" })).toHaveCount(0);
+    await expect(page.getByText(/^Tier \d/u)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Tier 2" })).toHaveCount(0);
+
+    const detailsAxe = await new AxeBuilder({ page }).analyze();
+
+    expect(detailsAxe.violations).toEqual([]);
+
+    await page.goto(`${appServerUrl}/profile/resume`, { waitUntil: "load" });
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Cover letter", exact: true })).toBeVisible();
+
+    const resumeAxe = await new AxeBuilder({ page }).analyze();
+
+    expect(resumeAxe.violations).toEqual([]);
+  } finally {
+    await owner.dispose();
+    await context.close();
+  }
+});
+
+const shotDirectory = process.env.PROFILE_SHOT_DIR;
+
+test.describe("Profile screenshots", () => {
+  test.skip(shotDirectory === undefined, "only when PROFILE_SHOT_DIR is set");
+
+  for (const width of [390, 1280] as const) {
+    for (const theme of ["light", "dark"] as const) {
+      test(`resume and saved answers at ${String(width)} ${theme}`, async ({
+        browser,
+        isolatedAppServer: { url: appServerUrl },
+      }) => {
+        mkdirSync(shotDirectory ?? "", { recursive: true });
+
+        const owner = await ownerContextFor(appServerUrl);
+
+        await owner.post("/api/profile/resume", {
+          multipart: {
+            file: {
+              buffer: Buffer.from(readFileSync("test/e2e/fixtures/resume-text.pdf")),
+              mimeType: "application/pdf",
+              name: "Maya_Okafor_Resume.pdf",
+            },
+          },
+        });
+
+        const context = await browser.newContext({
+          storageState: await owner.storageState(),
+          viewport: { height: 860, width },
+        });
+
+        const page = await context.newPage();
+
+        await page.addInitScript((mode) => {
+          globalThis.localStorage.setItem("overture.theme", mode);
+        }, theme);
+
+        try {
+          await page.goto(`${appServerUrl}/profile/resume`, { waitUntil: "load" });
+          await expect(
+            page.getByText("Maya_Okafor_Resume.pdf", { exact: true }).first(),
+          ).toBeVisible();
+          await page.evaluate(async () => {
+            await document.fonts.ready;
+          });
+          await page.screenshot({
+            fullPage: true,
+            path: join(shotDirectory ?? "", `profile-resume-${String(width)}-${theme}.png`),
+          });
+
+          await page.goto(`${appServerUrl}/profile/details`, { waitUntil: "load" });
+          await expect(page.getByText("You're all caught up.", { exact: true })).toBeVisible();
+          await page.screenshot({
+            fullPage: true,
+            path: join(shotDirectory ?? "", `profile-saved-answers-${String(width)}-${theme}.png`),
+          });
+        } finally {
+          await owner.dispose();
+          await context.close();
+        }
+      });
+    }
   }
 });

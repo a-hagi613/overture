@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link } from "react-router";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
@@ -11,18 +11,14 @@ import {
   KEY_DETAIL_FACT_LABELS,
   isKeyDetailFactKey,
 } from "../../shared/key-details.ts";
-import { fetchProfileFacts, fetchStrengthen, saveProfileFacts } from "../lib/profile-api.ts";
+import { fetchProfileFacts, saveProfileFacts } from "../lib/profile-api.ts";
 import { FactRow } from "./fact-row.tsx";
 import { SourceChip } from "./source-chip.tsx";
 import { StrengthenFacts } from "./strengthen-facts.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
-import { SegmentedControl } from "./ui/segmented-control.tsx";
-import { SegmentedControlItem } from "./ui/segmented-control-item.tsx";
 import { SectionSkeleton } from "./section-skeleton.tsx";
-
-type Tier = "tier1" | "tier2" | "tier3";
 
 const TIER_1_ORDER: readonly string[] = [...TIER_1_FACT_KEYS];
 const INITIAL_VISIBLE_FACTS = 6;
@@ -36,28 +32,20 @@ function keyDetailFactFor<T extends { key: string; scope: string }>(
   return candidates.find((fact) => fact.scope === "") ?? candidates[0];
 }
 
-function isTier(value: string): value is Tier {
-  return value === "tier1" || value === "tier2" || value === "tier3";
-}
-
 function readableFactKey(key: string) {
   const clean = key.startsWith("q:") ? key.slice(2) : key;
 
   return clean.replaceAll(/[_-]+/gu, " ").replace(/^\w/u, (letter) => letter.toUpperCase());
 }
 
-function chipForFactSource(source: string | undefined, key: string) {
+function chipForFactSource(source: string | undefined) {
   const { facts } = copy.profile;
 
-  if (source === "resume") {
-    return <SourceChip>{facts.fromResume}</SourceChip>;
-  }
-
-  if (key === "apply_email") {
-    return <SourceChip variant="dashed">{facts.assignedBy}</SourceChip>;
-  }
-
-  return <SourceChip variant="dashed">{facts.typedHere}</SourceChip>;
+  return source === "resume" ? (
+    <SourceChip>{facts.fromResume}</SourceChip>
+  ) : (
+    <SourceChip>{facts.typedHere}</SourceChip>
+  );
 }
 
 function tier1SortOrder(key: string) {
@@ -69,24 +57,14 @@ function tier1SortOrder(key: string) {
 export function FactsSection() {
   const { facts } = copy.profile;
   const pw = copy.profileWorkspace;
-  const { hash } = useLocation();
   const queryClient = useQueryClient();
-  const [tier, setTier] = useState<Tier>(hash === "#profile-strengthen" ? "tier2" : "tier1");
   const [localEdits, setLocalEdits] = useState<Record<string, string>>({});
-
-  const [expandedTiers, setExpandedTiers] = useState<{ tier1: boolean; tier3: boolean }>({
-    tier1: false,
-    tier3: false,
-  });
+  const [expandedOthers, setExpandedOthers] = useState(false);
+  const [expandedLearned, setExpandedLearned] = useState(false);
 
   const factsQuery = useQuery({
     queryFn: fetchProfileFacts,
     queryKey: ["profile-facts"],
-  });
-
-  const strengthenQuery = useQuery({
-    queryFn: fetchStrengthen,
-    queryKey: ["profile-strengthen"],
   });
 
   const save = useMutation({
@@ -108,11 +86,6 @@ export function FactsSection() {
     (entry) => entry.key.startsWith("q:") || entry.source === "review",
   );
 
-  const tier2Answered = allServerFacts.filter(
-    (entry) =>
-      !entry.key.startsWith("q:") && entry.source !== "review" && isTier2FactKey(entry.key),
-  );
-
   const tier1Facts = allServerFacts
     .filter(
       (entry) =>
@@ -120,23 +93,13 @@ export function FactsSection() {
     )
     .toSorted((left, right) => tier1SortOrder(left.key) - tier1SortOrder(right.key));
 
-  const otherTier1Facts = tier1Facts.filter((entry) => !isKeyDetailFactKey(entry.key));
+  const otherFacts = tier1Facts.filter((entry) => !isKeyDetailFactKey(entry.key));
 
-  const visibleTier1 = expandedTiers.tier1
-    ? otherTier1Facts
-    : otherTier1Facts.slice(0, INITIAL_VISIBLE_FACTS);
+  const visibleOthers = expandedOthers ? otherFacts : otherFacts.slice(0, INITIAL_VISIBLE_FACTS);
 
-  const visibleTier3 = expandedTiers.tier3
+  const visibleLearned = expandedLearned
     ? learnedFacts
     : learnedFacts.slice(0, INITIAL_VISIBLE_FACTS);
-
-  const tier2RemainingCount = strengthenQuery.data?.facts.length ?? 0;
-  const tier2TotalCount = tier2Answered.length + tier2RemainingCount;
-
-  const tier2CountText =
-    strengthenQuery.data === undefined
-      ? String(tier2Answered.length)
-      : `${String(tier2Answered.length)}/${String(tier2TotalCount)}`;
 
   const clearLocalEdit = (key: string) => {
     setLocalEdits((current) =>
@@ -175,208 +138,174 @@ export function FactsSection() {
       <h2 className={dsCardTitle} id="profile-facts-heading">
         {`${facts.titlePlain} ${facts.titleItalic}`}
       </h2>
-      <p className={`${dsBody} mt-1 max-w-2xl`}>{facts.intro}</p>
+      <p className={`${dsBody} mt-1`}>{facts.intro}</p>
 
-      <div className="mt-5">
-        <SegmentedControl
-          ariaLabel={facts.tiersLabel}
-          className="flex w-full flex-wrap gap-1 max-md:flex-col max-md:items-stretch"
-          onValueChange={(value) => {
-            if (isTier(value)) {
-              setTier(value);
-            }
-          }}
-          value={tier}
-        >
-          <SegmentedControlItem
-            className="flex-1 px-2.5 text-xs whitespace-nowrap max-md:w-full max-md:flex-none"
-            value="tier1"
-          >
-            {`${facts.tier1.label} (${String(tier1Facts.length)})`}
-          </SegmentedControlItem>
-          <SegmentedControlItem
-            className="flex-1 px-2.5 text-xs whitespace-nowrap max-md:w-full max-md:flex-none"
-            value="tier2"
-          >
-            {`${facts.tier2.label} (${tier2CountText})`}
-          </SegmentedControlItem>
-          <SegmentedControlItem
-            className="flex-1 px-2.5 text-xs whitespace-nowrap max-md:w-full max-md:flex-none"
-            value="tier3"
-          >
-            {`${facts.tier3.label} (${String(learnedFacts.length)})`}
-          </SegmentedControlItem>
-        </SegmentedControl>
-      </div>
+      <section className="mt-6">
+        <h3 className={dsCardTitle} id="profile-key-details-heading">
+          {facts.keyDetails}
+        </h3>
+        <p className="mt-1 text-xs text-muted-foreground">{facts.keyDetailsNote}</p>
+        <div className="mt-3" id="profile-key-details-list">
+          {KEY_DETAIL_FACT_KEYS.map((key) => {
+            const label = KEY_DETAIL_FACT_LABELS[key];
+            const fact = keyDetailFactFor(allServerFacts, key);
+            const resolvedValue = localEdits[key] ?? fact?.value ?? "";
 
-      {tier === "tier1" ? (
-        <div className="mt-4">
-          <p className="max-w-2xl text-xs text-muted-foreground">{facts.tier1.note}</p>
+            const note =
+              fact === undefined || fact.scope === "" || fact.scope === "default"
+                ? ""
+                : `${pw.factScopeAccount} · ${fact.scope}`;
+
+            return (
+              <FactRow
+                action="edit"
+                chip={
+                  fact === undefined ? (
+                    <SourceChip>{facts.notSet}</SourceChip>
+                  ) : (
+                    chipForFactSource(fact.source)
+                  )
+                }
+                key={key}
+                kind={key === "email" ? "mono" : "serif"}
+                label={label}
+                note={note}
+                onSave={(nextValue) => {
+                  persistFact(key, label, nextValue, fact?.scope ?? "");
+                }}
+                saving={save.isPending}
+                value={resolvedValue}
+              />
+            );
+          })}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">{facts.coreNote}</p>
+      </section>
+
+      {otherFacts.length === 0 ? null : (
+        <section className="mt-6 border-t border-border pt-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className={dsCardTitle}>{facts.otherSaved}</h3>
+            <span className="font-mono text-xs text-muted-foreground tabular-nums">
+              {String(otherFacts.length)}
+            </span>
+          </div>
           <div className="mt-3">
-            <h3 className={dsCardTitle} id="profile-key-details-heading">
-              {facts.keyDetails}
-            </h3>
-            <p className="max-w-2xl text-xs text-muted-foreground">{facts.keyDetailsNote}</p>
-            <div className="mt-3" id="profile-key-details-list">
-              {KEY_DETAIL_FACT_KEYS.map((key) => {
-                const label = KEY_DETAIL_FACT_LABELS[key];
-                const fact = keyDetailFactFor(allServerFacts, key);
-                const resolvedValue = localEdits[key] ?? fact?.value ?? "";
+            {visibleOthers.map((fact) => {
+              const label = factLabelFor(fact.key) || readableFactKey(fact.key);
+              const resolvedValue = localEdits[fact.key] ?? fact.value;
 
-                const note =
-                  fact === undefined || fact.scope === "" || fact.scope === "default"
-                    ? ""
-                    : `${pw.factScopeAccount} · ${fact.scope}`;
+              const note =
+                fact.scope === "" || fact.scope === "default"
+                  ? ""
+                  : `${pw.factScopeAccount} · ${fact.scope}`;
 
-                return (
-                  <FactRow
-                    action="edit"
-                    chip={
-                      fact === undefined ? (
-                        <SourceChip variant="dashed">{facts.notSet}</SourceChip>
-                      ) : (
-                        chipForFactSource(fact.source, key)
-                      )
-                    }
-                    key={key}
-                    kind={key === "email" ? "mono" : "serif"}
-                    label={label}
-                    note={note}
-                    onSave={(nextValue) => {
-                      persistFact(key, label, nextValue, fact?.scope ?? "");
-                    }}
-                    saving={save.isPending}
-                    value={resolvedValue}
-                  />
-                );
-              })}
-            </div>
-          </div>
-
-          {otherTier1Facts.length === 0 ? null : (
-            <div className="mt-6">
-              <h3 className={dsCardTitle}>{facts.otherSaved}</h3>
-              <div className="mt-3">
-                {visibleTier1.map((fact) => {
-                  const label = factLabelFor(fact.key) || readableFactKey(fact.key);
-                  const resolvedValue = localEdits[fact.key] ?? fact.value;
-                  const readOnly = fact.key === "apply_email";
-
-                  const note =
-                    fact.scope === "" || fact.scope === "default"
-                      ? ""
-                      : `${pw.factScopeAccount} · ${fact.scope}`;
-
-                  return (
-                    <FactRow
-                      action={readOnly ? "read-only" : "edit"}
-                      chip={chipForFactSource(fact.source, fact.key)}
-                      key={`${fact.key}:${fact.scope}`}
-                      kind={fact.key === "apply_email" || fact.key === "email" ? "mono" : "serif"}
-                      label={label}
-                      note={note}
-                      onSave={(nextValue) => {
-                        persistFact(fact.key, label, nextValue, fact.scope);
-                      }}
-                      saving={save.isPending}
-                      value={resolvedValue}
-                    />
-                  );
-                })}
-                {otherTier1Facts.length > INITIAL_VISIBLE_FACTS ? (
-                  <div className="border-t border-border pt-3">
-                    <Button
-                      onClick={() => {
-                        setExpandedTiers((current) => ({ ...current, tier1: !current.tier1 }));
-                      }}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {expandedTiers.tier1
-                        ? facts.showLess
-                        : facts.showMore(otherTier1Facts.length - INITIAL_VISIBLE_FACTS)}
-                    </Button>
-                  </div>
-                ) : null}
+              return (
+                <FactRow
+                  action="edit"
+                  chip={chipForFactSource(fact.source)}
+                  key={`${fact.key}:${fact.scope}`}
+                  kind={fact.key === "email" ? "mono" : "serif"}
+                  label={label}
+                  note={note}
+                  onSave={(nextValue) => {
+                    persistFact(fact.key, label, nextValue, fact.scope);
+                  }}
+                  saving={save.isPending}
+                  value={resolvedValue}
+                />
+              );
+            })}
+            {otherFacts.length > INITIAL_VISIBLE_FACTS ? (
+              <div className="border-t border-border pt-3">
+                <Button
+                  onClick={() => {
+                    setExpandedOthers((current) => !current);
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  {expandedOthers
+                    ? facts.showLess
+                    : facts.showMore(otherFacts.length - INITIAL_VISIBLE_FACTS)}
+                </Button>
               </div>
-            </div>
-          )}
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-            <p className="text-xs text-muted-foreground">{facts.tier1.foot}</p>
-            <div className="flex flex-wrap gap-2">
-              <SourceChip>{facts.fromResume}</SourceChip>
-              <SourceChip variant="dashed">{facts.typedHere}</SourceChip>
-            </div>
+            ) : null}
           </div>
-        </div>
-      ) : null}
+        </section>
+      )}
 
-      {tier === "tier2" ? (
-        <div id="profile-strengthen">
-          <StrengthenFacts />
-          <div className="border-t border-border pt-4">
-            <p className="text-xs text-muted-foreground">{facts.strengthen.foot}</p>
+      <section className="mt-6 border-t border-border pt-5" id="profile-strengthen">
+        <h3 className={dsCardTitle}>{facts.strengthen.heading}</h3>
+        <StrengthenFacts />
+        <p className="mt-4 text-xs text-muted-foreground">{facts.strengthen.foot}</p>
+      </section>
+
+      <section className="mt-6 border-t border-border pt-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className={dsCardTitle}>{facts.learned.heading}</h3>
+          <span className="font-mono text-xs text-muted-foreground tabular-nums">
+            {String(learnedFacts.length)}
+          </span>
+        </div>
+        {learnedFacts.length === 0 ? (
+          <div className="mt-3">
+            <p className="text-sm font-semibold text-foreground">{facts.learned.emptyTitle}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{facts.learned.emptyBody}</p>
+            <Button asChild className="mt-3" size="sm" variant="outline">
+              <Link to="/review">
+                <span>{facts.learned.openReview}</span>
+                <ArrowRight aria-hidden="true" size={14} />
+              </Link>
+            </Button>
           </div>
-        </div>
-      ) : null}
+        ) : (
+          <div className="mt-3">
+            {visibleLearned.map((fact) => {
+              const label = readableFactKey(fact.key);
+              const resolvedValue = localEdits[fact.key] ?? fact.value;
 
-      {tier === "tier3" ? (
-        <div className="mt-4">
-          {learnedFacts.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-muted/30 px-5 py-8 text-center">
-              <p className="text-sm font-semibold text-foreground">
-                {copy.nav.profilePages.tier3EmptyTitle}
-              </p>
-              <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-                {copy.nav.profilePages.tier3EmptyBody}
-              </p>
-              <Button asChild className="mt-4" size="sm" variant="outline">
-                <Link to="/review">
-                  <span>{copy.nav.profilePages.tier3OpenReview}</span>
-                  <ArrowRight aria-hidden="true" size={14} />
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <div>
-              {visibleTier3.map((fact) => {
-                const label = readableFactKey(fact.key);
-                const resolvedValue = localEdits[fact.key] ?? fact.value;
+              return (
+                <FactRow
+                  action="edit"
+                  chip={<SourceChip>{facts.typedHere}</SourceChip>}
+                  key={`${fact.key}:${fact.scope}`}
+                  label={label}
+                  note={pw.factReusedHint}
+                  onSave={(nextValue) => {
+                    persistFact(fact.key, label, nextValue, fact.scope);
+                  }}
+                  saving={save.isPending}
+                  value={resolvedValue}
+                />
+              );
+            })}
+            {learnedFacts.length > INITIAL_VISIBLE_FACTS ? (
+              <div className="border-t border-border pt-3">
+                <Button
+                  onClick={() => {
+                    setExpandedLearned((current) => !current);
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  {expandedLearned
+                    ? facts.showLess
+                    : facts.showMore(learnedFacts.length - INITIAL_VISIBLE_FACTS)}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </section>
 
-                return (
-                  <FactRow
-                    action="edit"
-                    chip={<SourceChip variant="dashed">{facts.typedHere}</SourceChip>}
-                    key={`${fact.key}:${fact.scope}`}
-                    label={label}
-                    note={pw.factReusedHint}
-                    onSave={(nextValue) => {
-                      persistFact(fact.key, label, nextValue, fact.scope);
-                    }}
-                    saving={save.isPending}
-                    value={resolvedValue}
-                  />
-                );
-              })}
-              {learnedFacts.length > INITIAL_VISIBLE_FACTS ? (
-                <div className="border-t border-border pt-3">
-                  <Button
-                    onClick={() => {
-                      setExpandedTiers((current) => ({ ...current, tier3: !current.tier3 }));
-                    }}
-                    size="sm"
-                    variant="outline"
-                  >
-                    {expandedTiers.tier3
-                      ? facts.showLess
-                      : facts.showMore(learnedFacts.length - INITIAL_VISIBLE_FACTS)}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          )}
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+        <p className="text-xs text-muted-foreground">{facts.foot}</p>
+        <div className="flex flex-wrap gap-2">
+          <SourceChip>{facts.fromResume}</SourceChip>
+          <SourceChip>{facts.typedHere}</SourceChip>
         </div>
-      ) : null}
+      </div>
     </Card>
   );
 }

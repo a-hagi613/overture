@@ -17,7 +17,8 @@ import { safeFilename } from "../safe-filename.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
-import { createResumeService, MAX_RESUME_BYTES } from "../profile/resume.ts";
+import { createResumeService, MAX_RESUME_BYTES, ResumeUnreadableError } from "../profile/resume.ts";
+import type { ResumeUpload } from "../profile/resume.ts";
 import { createResumeFactsReader } from "../profile/resume-facts.ts";
 import { hasPdfMagicBytes } from "../profile/pdf.ts";
 import { clearBlockerIfRecovered } from "../profile/running-state.ts";
@@ -145,10 +146,28 @@ export function createProfileRoutes(deps: {
       );
     }
 
-    const upload = await resumesService.upload(account.id, {
-      name: parsed.data.file.name === "" ? "resume.pdf" : parsed.data.file.name,
-      bytes,
-    });
+    let upload: ResumeUpload | null = null;
+
+    try {
+      upload = await resumesService.upload(account.id, {
+        name: parsed.data.file.name === "" ? "resume.pdf" : parsed.data.file.name,
+        bytes,
+      });
+    } catch (error) {
+      if (!(error instanceof ResumeUnreadableError)) {
+        throw error;
+      }
+    }
+
+    if (upload === null) {
+      return context.json(
+        {
+          error: API_ERRORS.invalidRequest,
+          issues: [{ message: "The PDF could not be read" }],
+        },
+        400,
+      );
+    }
 
     const read = await resumeFactsReader.read(
       account.id,

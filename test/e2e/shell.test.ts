@@ -15,7 +15,7 @@ const desktopDestinations = [
   "Review",
   "Resume & Cover Letter",
   "Job Preferences",
-  "Application Answers",
+  "Saved answers",
   "Inbox",
   "Calendar",
   "Notifications",
@@ -177,7 +177,7 @@ test("the phone header and tab bar reach search, notifications, the profile hub 
     [
       "Resume & Cover Letter",
       "Job Preferences",
-      "Application Answers",
+      "Saved answers",
       "Billing",
       "Account settings",
       "Support",

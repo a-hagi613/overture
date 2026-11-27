@@ -27,7 +27,7 @@ test("Applications, Profile, and Follow-ups groups start open, collapse cleanly,
   await expect(followUpsToggle).toHaveAttribute("aria-expanded", "true");
 
   await Promise.all(
-    ["Resume & Cover Letter", "Job Preferences", "Application Answers"].map(async (item) => {
+    ["Resume & Cover Letter", "Job Preferences", "Saved answers"].map(async (item) => {
       await expect(aside.getByRole("link", { name: item })).toBeVisible();
     }),
   );
@@ -200,7 +200,7 @@ test("sidebar search queries the backend, usage card reflects /api/home quota, t
     [
       "Resume & Cover Letter",
       "Job Preferences",
-      "Application Answers",
+      "Saved answers",
       "Billing",
       "Account settings",
     ].map(async (label) => expect(searchDialog.getByText(label, { exact: true })).toBeVisible()),

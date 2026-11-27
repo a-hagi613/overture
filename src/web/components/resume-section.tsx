@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileText, Upload } from "lucide-react";
+import { CheckCircle2, Download, FileText, Info, RotateCcw, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { toast } from "sonner";
@@ -41,9 +41,11 @@ function formatUploadedDate(iso: string) {
 
 export function ResumeSection() {
   const { resume: copyResume } = copy.profile;
+  const pw = copy.profileWorkspace;
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scanTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const failedFileRef = useRef<File | null>(null);
 
   const [localPreview, setLocalPreview] = useState<{
     bytes: number;
@@ -52,6 +54,7 @@ export function ResumeSection() {
   } | null>(null);
 
   const [scanningFile, setScanningFile] = useState<string | null>(null);
+  const [replaceFailed, setReplaceFailed] = useState(false);
 
   const resumeQuery = useQuery({
     queryFn: fetchCurrentResume,
@@ -76,11 +79,11 @@ export function ResumeSection() {
     [],
   );
 
-  const pw = copy.profileWorkspace;
-
   const upload = useMutation({
     mutationFn: uploadResumeFile,
     onSuccess: (saved) => {
+      failedFileRef.current = null;
+      setReplaceFailed(false);
       setLocalPreview(null);
       queryClient.setQueryData(["profile-resume"], saved);
       void queryClient.invalidateQueries({ queryKey: ["profile-facts"] });
@@ -108,6 +111,42 @@ export function ResumeSection() {
     uploadedText === "" ? null : `Uploaded ${uploadedText}`,
   ].filter((part): part is string => part !== null);
 
+  const stopScanTimer = () => {
+    if (scanTimerRef.current !== null) {
+      globalThis.clearTimeout(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
+  };
+
+  const startUpload = (file: File) => {
+    stopScanTimer();
+
+    failedFileRef.current = null;
+    setReplaceFailed(false);
+    setLocalPreview({
+      bytes: file.size,
+      filename: file.name,
+      url: URL.createObjectURL(file),
+    });
+    setScanningFile(file.name);
+
+    scanTimerRef.current = globalThis.setTimeout(() => {
+      setScanningFile(null);
+      scanTimerRef.current = null;
+    }, SCAN_MIN_MS);
+
+    upload.mutate(file, {
+      onError: () => {
+        stopScanTimer();
+        setScanningFile(null);
+        setLocalPreview(null);
+        failedFileRef.current = file;
+        setReplaceFailed(true);
+        toast.error(pw.resumeReplaceFailed);
+      },
+    });
+  };
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
 
@@ -123,36 +162,17 @@ export function ResumeSection() {
       return;
     }
 
-    if (scanTimerRef.current !== null) {
-      globalThis.clearTimeout(scanTimerRef.current);
+    startUpload(file);
+  };
+
+  const retryReplace = () => {
+    const file = failedFileRef.current;
+
+    if (file === null) {
+      return;
     }
 
-    const previewUrl = URL.createObjectURL(file);
-
-    setLocalPreview({
-      bytes: file.size,
-      filename: file.name,
-      url: previewUrl,
-    });
-    setScanningFile(file.name);
-
-    scanTimerRef.current = globalThis.setTimeout(() => {
-      setScanningFile(null);
-      scanTimerRef.current = null;
-    }, SCAN_MIN_MS);
-
-    upload.mutate(file, {
-      onError: () => {
-        if (scanTimerRef.current !== null) {
-          globalThis.clearTimeout(scanTimerRef.current);
-          scanTimerRef.current = null;
-        }
-
-        setScanningFile(null);
-        setLocalPreview(null);
-        toast.error(copy.onboarding.resumeUploadFailed);
-      },
-    });
+    startUpload(file);
   };
 
   const showScanner = upload.isPending || scanningFile !== null;
@@ -183,10 +203,10 @@ export function ResumeSection() {
   return (
     <Card
       ariaLabelledBy="profile-resume-heading"
-      className="flex h-full min-h-0 flex-col p-5"
+      className="min-w-0 p-5 md:p-6"
       id="profile-resume"
     >
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className={dsCardTitle} id="profile-resume-heading">
             {copy.profile.tabs.resume}
@@ -196,60 +216,99 @@ export function ResumeSection() {
         {statusBadge}
       </div>
 
-      <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
-        <div className="flex shrink-0 items-center gap-3">
-          <span
-            aria-hidden="true"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-foreground"
-          >
-            <FileText size={18} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-mono text-sm font-semibold text-foreground">
-              {filename ?? pw.resumeNoFileLabel}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-              {metaParts.length === 0 ? pw.resumeUploadHint : metaParts.join(" · ")}
-            </p>
+      <div className="mt-5 grid grid-cols-1 items-start gap-5 sm:grid-cols-12">
+        <div className="min-w-0 space-y-4 sm:col-span-5">
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-4">
+            <span
+              aria-hidden="true"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-foreground"
+            >
+              <FileText size={20} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-mono text-sm font-semibold text-foreground">
+                {filename ?? pw.resumeNoFileLabel}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                {metaParts.length === 0 ? pw.resumeUploadHint : metaParts.join(" · ")}
+              </p>
+            </div>
           </div>
+
+          <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-3.5">
+            <CheckCircle2 aria-hidden="true" className="mt-0.5 shrink-0 text-ok" size={16} />
+            <p className="text-xs leading-relaxed text-foreground">{copyResume.strongNote}</p>
+          </div>
+
+          {current?.unreadable === true && !showScanner ? (
+            <output className="block rounded-lg border border-need/40 bg-need-soft px-4 py-3 text-xs font-medium text-need">
+              {copy.onboarding.resumeUnreadable}
+            </output>
+          ) : null}
+
+          {replaceFailed ? (
+            <div
+              className="rounded-lg border border-need/40 bg-need-soft px-4 py-3"
+              data-testid="resume-replace-failed"
+              role="alert"
+            >
+              <p className="text-xs font-semibold text-need">{pw.resumeReplaceFailed}</p>
+              <Button
+                className="mt-2.5"
+                disabled={showScanner}
+                onClick={retryReplace}
+                size="sm"
+                variant="outline"
+              >
+                <RotateCcw aria-hidden="true" size={14} />
+                <span>{pw.resumeRetry}</span>
+              </Button>
+            </div>
+          ) : null}
+
+          <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+            <Info aria-hidden="true" className="mt-0.5 shrink-0" size={14} />
+            <span>{copyResume.newFileNote}</span>
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            <Button
+              disabled={showScanner}
+              onClick={() => {
+                fileInputRef.current?.click();
+              }}
+              size="default"
+              variant="primary"
+            >
+              <Upload aria-hidden="true" size={15} />
+              <span>{uploadButtonLabel}</span>
+            </Button>
+
+            {pdfUrl === null ? null : (
+              <Button asChild size="default" variant="outline">
+                <a download={filename ?? "resume.pdf"} href={pdfUrl}>
+                  <Download aria-hidden="true" size={15} />
+                  <span>{copyResume.download}</span>
+                </a>
+              </Button>
+            )}
+          </div>
+
+          <input
+            accept="application/pdf"
+            aria-label={pw.resumeFileInputLabel}
+            className="sr-only"
+            onChange={handleFileChange}
+            ref={fileInputRef}
+            type="file"
+          />
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-w-0 sm:col-span-7">
           {showScanner ? (
             <OnboardingResumeScan filename={activeScanName} />
           ) : (
-            <PdfPreview compact filename={filename} pages={pages} pdfUrl={pdfUrl} />
-          )}
-        </div>
-
-        <input
-          accept="application/pdf"
-          className="hidden"
-          onChange={handleFileChange}
-          ref={fileInputRef}
-          type="file"
-        />
-
-        <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <Button
-            disabled={showScanner}
-            onClick={() => {
-              fileInputRef.current?.click();
-            }}
-            size="default"
-            variant="primary"
-          >
-            <Upload aria-hidden="true" size={15} />
-            <span>{uploadButtonLabel}</span>
-          </Button>
-
-          {pdfUrl === null ? null : (
-            <Button asChild size="default" variant="outline">
-              <a download={filename ?? "resume.pdf"} href={pdfUrl}>
-                <Download aria-hidden="true" size={15} />
-                <span>{copyResume.download}</span>
-              </a>
-            </Button>
+            <PdfPreview filename={filename} pages={pages} pdfUrl={pdfUrl} />
           )}
         </div>
       </div>
