@@ -62,8 +62,6 @@ export const SCORE_OUTPUT_SCHEMA = {
     },
     reasons: {
       type: "array",
-      // Anthropic structured outputs accepts only minItems 0 or 1, so the 2–3 reason count is enforced by
-      // scoreReplySchema (and the prompt), not by the wire schema.
       items: { type: "string", maxLength: 110 },
     },
   },

@@ -1,6 +1,3 @@
-// Manual Haiku 5.5 launch gate (issue #686). Fixture:
-// src/server/matching/fixtures/eval-686/king-kong-2026-11-27.json (King Kong stand-in, 33 jobs from the #685 pull).
-// It spends cents and is never imported by CI.
 import { readFileSync } from "node:fs";
 
 import { z } from "zod";
@@ -21,6 +18,7 @@ import { scoreRequestFor } from "../src/server/matching/prompts/score-v1.ts";
 import { parseScoreReply, scoreOf } from "../src/server/matching/score-schema.ts";
 
 const OPT_IN_ENV = "OVERTURE_MATCH_EVAL";
+const DEFAULT_FIXTURE = "src/server/matching/fixtures/eval-686/king-kong-2026-11-27.json";
 
 const fixtureSchema = z.object({
   jobs: z.array(
@@ -85,7 +83,7 @@ interface ScoredCall {
   reply: ReturnType<typeof parseScoreReply>;
 }
 
-async function askOnce(llm: LlmPort, fixture: Fixture, job: FixtureJob): Promise<ScoredCall> {
+async function askOnce(llm: LlmPort, fixture: Fixture, job: FixtureJob) {
   const request = scoreRequestFor({
     candidate: { resume: fixture.resume, targets: fixture.targets },
     customId: `eval-${job.id}`,
@@ -108,8 +106,7 @@ async function askOnce(llm: LlmPort, fixture: Fixture, job: FixtureJob): Promise
   return { costMicros: call.costMicros, reply: parseScoreReply(call.text) };
 }
 
-/** An invalid reply gets one retry, exactly as `match-scoring.ts` scores a job; only two nulls are a rejection. */
-async function runOnce(llm: LlmPort, fixture: Fixture, job: FixtureJob): Promise<ScoredCall> {
+async function runOnceWithRetry(llm: LlmPort, fixture: Fixture, job: FixtureJob) {
   const first = await askOnce(llm, fixture, job);
 
   if (first.reply !== null) {
@@ -139,8 +136,8 @@ const repeatsOf: (
     return { costMicros: 0, rejected: 0, reply: null, scores };
   }
 
-  const call = await runOnce(llm, fixture, job);
-  const reply = call.reply;
+  const call = await runOnceWithRetry(llm, fixture, job);
+  const { reply } = call;
   const next = reply === null ? scores : [...scores, scoreOf(reply)];
   const rest = await repeatsOf(llm, fixture, job, run + 1, next);
 
@@ -192,11 +189,7 @@ async function main() {
     throw new Error(`Refusing to spend money: set ${OPT_IN_ENV}=1 and run this by hand.`);
   }
 
-  const fixturePath = argumentValue("--fixture");
-
-  if (fixturePath === null) {
-    throw new Error("Pass --fixture <path> with the resume, targets and jobs to score.");
-  }
+  const fixturePath = argumentValue("--fixture") ?? DEFAULT_FIXTURE;
 
   const fixture = fixtureSchema.parse(JSON.parse(readFileSync(fixturePath, "utf8")));
   const model = argumentValue("--model") ?? env.ANTHROPIC_MODEL;

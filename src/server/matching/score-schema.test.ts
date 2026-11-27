@@ -54,7 +54,7 @@ describe("the score reply schema", () => {
   });
 
   test("sends a wire schema structured outputs accepts and keeps the reason count in zod", () => {
-    const reasons = SCORE_OUTPUT_SCHEMA.properties.reasons;
+    const { reasons } = SCORE_OUTPUT_SCHEMA.properties;
 
     expect("minItems" in reasons).toBe(false);
     expect("maxItems" in reasons).toBe(false);
