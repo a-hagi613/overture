@@ -7,6 +7,7 @@ import type { SupplyTotals } from "./supply-facets.ts";
 
 import { postings } from "../platform/db/catalog-schema.ts";
 import { roleFilterCondition } from "../matching/role-targets.ts";
+import { nonJobTitleCondition } from "../jobs/non-job.ts";
 import { resolvedLocationCondition } from "./location-filter.ts";
 import { catalogRevision } from "./revision.ts";
 import { supplyFacetTotals } from "./supply-facets.ts";
@@ -37,6 +38,7 @@ function filtersCondition(db: CatalogDatabase, filters: SupplyFilters) {
     isNull(postings.closedAt),
     eq(postings.status, "open"),
     eq(postings.applySupported, true),
+    nonJobTitleCondition(postings.titleNorm),
   ];
 
   const roleValue = filters.granularRole ?? filters.role;

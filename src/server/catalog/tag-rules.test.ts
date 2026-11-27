@@ -472,6 +472,22 @@ describe("language detector", () => {
     expect(detected).toBe("fr");
   });
 
+  test("japanese text is japanese, never english", () => {
+    expect(
+      detectLanguage(
+        "私たちは急成長中のスタートアップで、バックエンドエンジニアを募集しています。チームと協力して新しいサービスを開発し、お客様に最高の体験を提供することがあなたの仕事です。経験と技術を活かして一緒に働きましょう。",
+      ),
+    ).toBe("ja");
+  });
+
+  test("german text is german", () => {
+    expect(
+      detectLanguage(
+        "Wir suchen einen Backend-Entwickler für unser Team. Sie werden mit unserem Produktteam zusammenarbeiten und Erfahrung mit verteilten Systemen haben. Die Rolle umfasst die Entwicklung von Diensten für unsere Kunden und Sie haben die Möglichkeit, sich weiterzuentwickeln.",
+      ),
+    ).toBe("de");
+  });
+
   test("text too short returns null", () => {
     expect(detectLanguage("Software Engineer")).toBeNull();
   });

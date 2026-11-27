@@ -60,3 +60,24 @@ ingest (ADR 0032, ADR 0036) as the source of every job Overture matches and appl
   key. The API plan later adds the change feed and a higher rate limit, not a different shape.
 - A freehire search can report `ignored_params`; the pull writes them to `jobs.pull.ignored` instead of trusting a
   silently broad answer.
+
+## Amendment of 2026-11-26: language and non-jobs (#685)
+
+The pull proof found two ways an unwanted row reached a pool, so both are now decided in code before any AI score.
+
+- **Language is detected and stored.** `jobs.language` holds an ISO 639-1 code from the description. Detection reads
+  the script first: kana means Japanese, Hangul Korean, Han Chinese, and Arabic/Hebrew/Thai/Devanagari/Greek/Cyrillic
+  their own languages, even in a short text, so a Japanese posting can never be stored as `en` again. Latin text then
+  needs 200 characters and at least two function words; an ambiguous answer is `null`. A `null` language means "not
+  stated" and never hides a posting. The reader and the matching pool drop a posting whose detected language is not
+  one the person reads.
+- **Non-jobs never match.** Talent pools, open/general/speculative applications, "join our talent", recruiting
+  adverts and test/placeholder rows are recognised by whole-title phrases in `src/shared/non-job.ts`. The freehire
+  reader, the matching pool, the retired catalog's match count, the public supply count and the old candidate pool
+  all apply the same list, so a count and a pool can never disagree about what is a job. A real title such as "Test Engineer" is not
+  caught by the word "test".
+- **The proof is a committed harness.** `bun run scripts/filter-proof.ts` replays a recorded freehire pull
+  (`src/server/jobs/fixtures/filter-proof/`) through the production store and reader for the 12 graded fields, King
+  Kong and the three 26 Nov walk users, then writes `docs/research/685-filter-proof.md`. It never calls freehire or a
+  paid service; the pull is a fixture and the command is offline.
+

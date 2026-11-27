@@ -24,6 +24,8 @@ export interface PullPreferences {
   placeIds: readonly string[];
   /** Free-text role targets, searched as title words. */
   titleWords: readonly string[];
+  /** The languages the person reads; a posting in another language is not a match. Empty means no language gate. */
+  languages?: readonly string[];
 }
 
 /**
@@ -78,15 +80,24 @@ export function placesForLocations(placeIds: readonly string[]) {
 /**
  * The search a user's saved targets turn into.
  * @param targets The saved targets.
+ * @param languages The languages the person reads, for the reader's language gate; empty keeps every posting.
  * @returns The freehire categories, geography and free-text title words.
  */
-export function pullPreferencesFor(targets: Pick<TargetsInput, "roles" | "locations">) {
+export function pullPreferencesFor(
+  targets: Pick<TargetsInput, "roles" | "locations">,
+  languages: readonly string[] = [],
+) {
   const places = placesForLocations(targets.locations);
 
   return {
     categories: categoriesForRoles(targets.roles),
     cities: places.cities,
     countries: places.countries,
+    languages: languages.flatMap((language) => {
+      const folded = language.trim().toLowerCase();
+
+      return folded === "" ? [] : [folded];
+    }),
     metros: places.metros,
     placeIds: places.placeIds,
     regions: places.regions,

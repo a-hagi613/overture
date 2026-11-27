@@ -105,9 +105,10 @@ export function createOnboardingRoutes(deps: {
 
   async function targetsView(userId: string) {
     const { targets } = await targetsService.read(userId);
+    const { languages } = await languagesService.read(userId);
 
     return {
-      matchedCount: countMatchingJobs(deps.db, targets),
+      matchedCount: countMatchingJobs(deps.db, targets, languages),
       places: describePlaceIds(targets.locations),
       targets,
     };

@@ -1434,6 +1434,8 @@ export const jobs = sqliteTable(
     cities: text("cities"),
     workMode: text("work_mode", { enum: ["remote", "hybrid", "onsite"] }),
     category: text("category"),
+    /** ISO 639-1 from the description; null when the text was too short or ambiguous. */
+    language: text("language"),
     seniority: text("seniority"),
     employmentType: text("employment_type"),
     experienceYearsMin: integer("experience_years_min"),

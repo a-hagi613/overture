@@ -6,6 +6,7 @@ import type { SupplyFilters } from "../../shared/supply.ts";
 
 import { supplyFacets } from "../platform/db/catalog-schema.ts";
 import { planRoleTargets, roleFilterTagValues } from "../matching/role-targets.ts";
+import { NON_JOB_TITLE_PHRASES } from "../../shared/non-job.ts";
 import { resolveLocationQuery } from "./geo.ts";
 
 /**
@@ -23,6 +24,14 @@ export interface SupplyTotals {
 interface FacetLocation {
   countryCode: string;
   regions: string[] | null;
+}
+
+function nonJobClause() {
+  return sql.raw(
+    NON_JOB_TITLE_PHRASES.map((phrase) => `instr(lower(p.title_norm), '${phrase}') = 0`).join(
+      " and ",
+    ),
+  );
 }
 
 /**
@@ -48,6 +57,7 @@ export function rebuildSupplyFacets(db: CatalogDatabase) {
              p.workplace, p.ats, count(*)
         from postings p
        where p.status = 'open' and p.apply_supported = 1 and p.closed_at is null
+         and ${nonJobClause()}
        group by coalesce(p.country_code, ''), coalesce(lower(p.region), ''), p.workplace, p.ats
     `);
 
@@ -59,6 +69,7 @@ export function rebuildSupplyFacets(db: CatalogDatabase) {
         join posting_tags pt
           on pt.posting_id = p.id and pt.dimension in ('role', 'subrole', 'granular_role')
        where p.status = 'open' and p.apply_supported = 1 and p.closed_at is null
+         and ${nonJobClause()}
        group by pt.value, coalesce(p.country_code, ''), coalesce(lower(p.region), ''), p.workplace, p.ats
     `);
   });

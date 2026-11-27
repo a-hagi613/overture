@@ -8,6 +8,7 @@ import { jobs } from "../platform/db/schema.ts";
 import { eq } from "drizzle-orm";
 import { createJobStore } from "./store.ts";
 import { createJobReader } from "./reader.ts";
+import { backfillJobLanguages } from "./backfill.ts";
 
 const NOW = 1_800_000_000_000;
 
@@ -19,30 +20,34 @@ function migrated() {
   return db;
 }
 
-const record: (overrides?: Partial<FreehireJobRecord>) => FreehireJobRecord = (overrides = {}) => ({
-  apply_url: null,
-  cities: ["Toronto"],
-  closed_at: null,
-  company: "Acme",
-  company_slug: "acme",
-  countries: ["ca"],
-  created_at: "2026-11-20T09:00:00Z",
-  description: null,
-  enrichment: { category: "backend" },
-  external_id: "acme:123",
-  location: "Toronto, Canada",
-  metros: null,
-  posted_at: "2026-11-20T00:00:00Z",
-  public_slug: "senior-go-engineer-acme",
-  reality: null,
-  regions: null,
-  skills: null,
-  source: "greenhouse",
-  title: "Senior Go Engineer",
-  url: null,
-  work_mode: null,
-  ...overrides,
-});
+const record: (overrides?: Partial<FreehireJobRecord>) => FreehireJobRecord = (overrides = {}) => {
+  const publicSlug = overrides.public_slug ?? "senior-go-engineer-acme";
+
+  return {
+    apply_url: null,
+    cities: ["Toronto"],
+    closed_at: null,
+    company: "Acme",
+    company_slug: "acme",
+    countries: ["ca"],
+    created_at: "2026-11-20T09:00:00Z",
+    description: null,
+    enrichment: { category: "backend" },
+    external_id: `acme:${publicSlug}`,
+    location: "Toronto, Canada",
+    metros: null,
+    posted_at: "2026-11-20T00:00:00Z",
+    public_slug: publicSlug,
+    reality: null,
+    regions: null,
+    skills: null,
+    source: "greenhouse",
+    title: "Senior Go Engineer",
+    url: null,
+    work_mode: null,
+    ...overrides,
+  };
+};
 
 function storeJob(db: ReturnType<typeof migrated>, job: FreehireJobRecord) {
   createJobStore({ clock: { now: () => NOW }, db }).upsert(job, {
@@ -67,6 +72,7 @@ describe("the freehire-shaped job read", () => {
       categories: ["backend"],
       cities: [],
       countries: [],
+      languages: [],
       metros: [],
       placeIds: [],
       regions: [],
@@ -108,6 +114,134 @@ describe("the freehire-shaped job read", () => {
       "bright-engineer",
       "senior-go-engineer-acme",
     ]);
+  });
+
+  test("matches a title word when the category is blank or different", () => {
+    const db = migrated();
+
+    storeJob(
+      db,
+      record({
+        enrichment: null,
+        public_slug: "backend-engineer-acme",
+        title: "Backend Engineer",
+      }),
+    );
+    storeJob(
+      db,
+      record({
+        enrichment: { category: "support" },
+        public_slug: "backend-support-acme",
+        title: "Backend Support Specialist",
+      }),
+    );
+    storeJob(
+      db,
+      record({
+        enrichment: { category: "education" },
+        public_slug: "teacher",
+        title: "Primary Teacher",
+      }),
+    );
+
+    const reader = createJobReader(db);
+
+    const rows = reader.forPreferences({
+      categories: ["education"],
+      cities: [],
+      countries: [],
+      languages: [],
+      metros: [],
+      placeIds: [],
+      regions: [],
+      titleWords: ["backend"],
+    });
+
+    expect(rows.map((row) => row.id).toSorted()).toEqual([
+      "backend-engineer-acme",
+      "backend-support-acme",
+      "teacher",
+    ]);
+  });
+
+  test("hides a posting written in a language the person does not read", () => {
+    const db = migrated();
+
+    storeJob(
+      db,
+      record({
+        description:
+          "私たちは急成長中のスタートアップで、バックエンドエンジニアを募集しています。チームと協力して新しいサービスを開発し、お客様に最高の体験を提供することがあなたの仕事です。経験と技術を活かして一緒に働きましょう。",
+        public_slug: "japanese-backend",
+      }),
+    );
+    storeJob(db, record({ public_slug: "english-backend", title: "Backend Engineer" }));
+
+    const reader = createJobReader(db);
+
+    const rows = reader.forPreferences({
+      categories: ["backend"],
+      cities: [],
+      countries: [],
+      languages: ["en"],
+      metros: [],
+      placeIds: [],
+      regions: [],
+      titleWords: [],
+    });
+
+    expect(rows.map((row) => row.id)).toEqual(["english-backend"]);
+  });
+
+  test("backfills the language on a job stored before the column existed", () => {
+    const db = migrated();
+
+    storeJob(
+      db,
+      record({
+        description:
+          "私たちは急成長中のスタートアップで、バックエンドエンジニアを募集しています。チームと協力して新しいサービスを開発し、お客様に最高の体験を提供することがあなたの仕事です。経験と技術を活かして一緒に働きましょう。",
+        public_slug: "legacy-japanese",
+      }),
+    );
+    db.update(jobs).set({ language: null }).where(eq(jobs.id, "legacy-japanese")).run();
+
+    expect(backfillJobLanguages(db)).toBe(1);
+    expect(
+      db.select({ language: jobs.language }).from(jobs).where(eq(jobs.id, "legacy-japanese")).get()
+        ?.language,
+    ).toBe("ja");
+  });
+
+  test("hides talent pools, open applications and test postings", () => {
+    const db = migrated();
+
+    for (const [slug, title] of [
+      ["talent-pool", "Talent Pool - Future Opportunities"],
+      ["open-application", "Open Application"],
+      ["test-posting", "Test Posting"],
+      ["initiativbewerbung", "Initiativbewerbung"],
+      ["candidature", "Candidature spontanée"],
+      ["real-job", "Backend Engineer"],
+      ["test-engineer", "Test Engineer"],
+    ] as const) {
+      storeJob(db, record({ public_slug: slug, title }));
+    }
+
+    const reader = createJobReader(db);
+
+    const rows = reader.forPreferences({
+      categories: ["backend"],
+      cities: [],
+      countries: [],
+      languages: [],
+      metros: [],
+      placeIds: [],
+      regions: [],
+      titleWords: [],
+    });
+
+    expect(rows.map((row) => row.id).toSorted()).toEqual(["real-job", "test-engineer"]);
   });
 
   test("never returns a job a failed pull left closed", () => {
