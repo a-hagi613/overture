@@ -91,7 +91,7 @@ export function applicationFor(db: AppDatabase, userId: string, postingId: strin
  * @returns The new Application id, or null when nothing was created.
  */
 export function createApplication(
-  deps: { db: AppDatabase; catalogDb: CatalogDatabase },
+  deps: { db: AppDatabase; catalogDb?: CatalogDatabase },
   at: number,
   input: ApplicationInput,
   snapshot?: PostingDisplay,
@@ -103,7 +103,9 @@ export function createApplication(
     return null;
   }
 
-  const display = snapshot ?? postingDisplayFor(catalogDb, input.postingId);
+  const display =
+    snapshot ??
+    (catalogDb === undefined ? undefined : postingDisplayFor(catalogDb, input.postingId));
 
   if (display === undefined) {
     return null;

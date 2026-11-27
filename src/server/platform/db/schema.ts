@@ -867,6 +867,29 @@ export const matches = sqliteTable(
 );
 
 /**
+ * The questions a freehire job's apply form asked, stored beside the job it belongs to (ADR 0036, ADR 0047).
+ * `job_id` is the freehire posting id in this database, never the retired catalog, so a freehire Application can be
+ * prepared and Reviewed after launch without mirroring jobs into the catalog.
+ */
+export const jobQuestions = sqliteTable(
+  "job_questions",
+  {
+    jobId: text("job_id").notNull(),
+    questionId: text("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    required: integer("required", { mode: "boolean" }).notNull().default(false),
+    position: integer("position").notNull(),
+    options: text("options").notNull().default("[]"),
+    fieldName: text("field_name"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.jobId, t.questionId] }),
+    index("job_questions_job").on(t.jobId, t.position),
+  ],
+);
+
+/**
  * What a user saved or hid in their Home feed. `posting_id` is a plain logical id, not a foreign key, so a catalog
  * prune never touches this row (SPEC §5.4).
  */

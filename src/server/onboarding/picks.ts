@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
-import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
+import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PostingDisplay } from "../matching/applications.ts";
 import type {
@@ -12,13 +12,9 @@ import type {
 } from "../../shared/onboarding.ts";
 
 import { applications, onboardingBatches, onboardingPicks } from "../platform/db/schema.ts";
-import { postings } from "../platform/db/catalog-schema.ts";
-import { postingDisplayFor } from "../matching/applications.ts";
-import {
-  isOnboardingPickFailureReason,
-  onboardingPickLimitFor,
-  pickStatusOfApplication,
-} from "../../shared/onboarding.ts";
+import { jobPostingsById } from "../jobs/job-posting.ts";
+import { displayFromJobPosting } from "./freehire-job.ts";
+import { onboardingPickLimitFor, pickStatusOfApplication } from "../../shared/onboarding.ts";
 
 export interface PickPreparationResult {
   applicationId: string | null;
@@ -45,6 +41,17 @@ function batchStatusAfter(results: readonly PickPreparationResult[]) {
   return "prepared" as const;
 }
 
+function isFailureReason(value: string | null): value is OnboardingPickFailureReason {
+  return (
+    value === "posting_closed" ||
+    value === "apply_unsupported" ||
+    value === "language" ||
+    value === "company_excluded" ||
+    value === "already_applied" ||
+    value === "prepare_failed"
+  );
+}
+
 /**
  * The durable onboarding picks: chosen ids, the batch lifecycle and an immutable display snapshot per pick, written
  * before Stripe and reused by every return, refresh and tab. It stores no plan-specific limit; the plan only sets how
@@ -52,12 +59,8 @@ function batchStatusAfter(results: readonly PickPreparationResult[]) {
  * @param deps The application database, the read-only catalog and the clock.
  * @returns The save, read, batch and preparation helpers the onboarding routes share.
  */
-export function createOnboardingPicks(deps: {
-  db: AppDatabase;
-  catalogDb: CatalogDatabase;
-  clock: Clock;
-}) {
-  const { db, catalogDb, clock } = deps;
+export function createOnboardingPicks(deps: { db: AppDatabase; clock: Clock }) {
+  const { db, clock } = deps;
 
   function ensureBatch(userId: string, now: number) {
     const existing = db
@@ -142,7 +145,7 @@ export function createOnboardingPicks(deps: {
         company: row.companyName,
         location: row.locationRaw,
         postingId: row.postingId,
-        reason: isOnboardingPickFailureReason(row.reason) ? row.reason : null,
+        reason: isFailureReason(row.reason) ? row.reason : null,
         status: live,
         title: row.postingTitle,
       };
@@ -166,29 +169,21 @@ export function createOnboardingPicks(deps: {
       return null;
     }
 
-    if (unique.length > 0) {
-      const open = catalogDb
-        .select({ id: postings.id })
-        .from(postings)
-        .where(and(inArray(postings.id, unique), eq(postings.status, "open")))
-        .all();
-
-      if (open.length !== unique.length) {
-        return null;
-      }
-    }
-
     const snapshots = new Map<string, PostingDisplay>();
 
     if (unique.length > 0) {
-      for (const postingId of unique) {
-        const display = postingDisplayFor(catalogDb, postingId);
+      const resolved = jobPostingsById({ catalogDb, db }, unique);
 
-        if (display === undefined) {
+      if (resolved.size !== unique.length) {
+        return null;
+      }
+
+      for (const posting of resolved.values()) {
+        if (!posting.open) {
           return null;
         }
 
-        snapshots.set(postingId, display);
+        snapshots.set(posting.postingId, displayFromJobPosting(posting));
       }
     }
 

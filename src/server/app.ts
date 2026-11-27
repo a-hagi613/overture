@@ -585,7 +585,6 @@ export function createApp(deps: AppDependencies) {
       personal,
       reviews: deps.reviews,
       spendGate: deps.spendGate,
-      matching,
     }),
   );
   app.route(

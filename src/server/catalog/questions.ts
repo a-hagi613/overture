@@ -5,7 +5,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { AnswerKind, QuestionFieldType, QuestionMapper } from "../../shared/questions.ts";
 import type { AtsQuestion } from "./greenhouse-questions.ts";
 
-import { questionVariants, questions } from "../platform/db/schema.ts";
+import { jobQuestions, questionVariants, questions } from "../platform/db/schema.ts";
 import { postingQuestions } from "../platform/db/catalog-schema.ts";
 import { bestEffortCatalogWrite } from "../platform/db/read-only-catalog.ts";
 import {
@@ -218,20 +218,15 @@ export function createQuestionCatalog(deps: {
     });
   }
 
-  function forPosting(postingId: string) {
-    const linked = catalogDb
-      .select({
-        questionId: postingQuestions.questionId,
-        required: postingQuestions.required,
-        position: postingQuestions.position,
-        options: postingQuestions.options,
-        fieldName: postingQuestions.fieldName,
-      })
-      .from(postingQuestions)
-      .where(eq(postingQuestions.postingId, postingId))
-      .orderBy(postingQuestions.position)
-      .all();
-
+  function joinedQuestions(
+    linked: readonly {
+      questionId: string;
+      required: boolean;
+      position: number;
+      options: string;
+      fieldName: string | null;
+    }[],
+  ) {
     if (linked.length === 0) {
       return [];
     }
@@ -256,12 +251,119 @@ export function createQuestionCatalog(deps: {
     });
   }
 
+  function forPosting(postingId: string) {
+    return joinedQuestions(
+      catalogDb
+        .select({
+          questionId: postingQuestions.questionId,
+          required: postingQuestions.required,
+          position: postingQuestions.position,
+          options: postingQuestions.options,
+          fieldName: postingQuestions.fieldName,
+        })
+        .from(postingQuestions)
+        .where(eq(postingQuestions.postingId, postingId))
+        .orderBy(postingQuestions.position)
+        .all(),
+    );
+  }
+
+  /**
+   * The freehire job's question list, stored in this database (issue #710). It mirrors `forPosting` for a job id that
+   * never existed in the catalog, so preparation and Review work after launch without a catalog mirror.
+   * @param jobId The freehire posting id.
+   * @returns The linked questions in form order, newest store wins.
+   */
+  function forJob(jobId: string) {
+    return joinedQuestions(
+      db
+        .select({
+          questionId: jobQuestions.questionId,
+          required: jobQuestions.required,
+          position: jobQuestions.position,
+          options: jobQuestions.options,
+          fieldName: jobQuestions.fieldName,
+        })
+        .from(jobQuestions)
+        .where(eq(jobQuestions.jobId, jobId))
+        .orderBy(jobQuestions.position)
+        .all(),
+    );
+  }
+
+  /**
+   * Replaces one freehire job's question list in this database. The list is the form as it was fetched, so a later
+   * preparation reuses it instead of asking the employer's site again.
+   * @param jobId The freehire posting id.
+   * @param entries The questions in form order.
+   */
+  function saveJobQuestions(
+    jobId: string,
+    entries: readonly {
+      questionId: string;
+      required: boolean;
+      position: number;
+      options: string[];
+      fieldName: string | null;
+    }[],
+  ) {
+    db.transaction((tx) => {
+      tx.delete(jobQuestions).where(eq(jobQuestions.jobId, jobId)).run();
+
+      for (const entry of entries) {
+        tx.insert(jobQuestions)
+          .values({
+            jobId,
+            questionId: entry.questionId,
+            required: entry.required,
+            position: entry.position,
+            options: JSON.stringify(entry.options),
+            fieldName: entry.fieldName,
+          })
+          .onConflictDoNothing()
+          .run();
+      }
+    });
+  }
+
+  /**
+   * Appends one question to a freehire job's stored list, used when an attempt finds a field preparation had not seen.
+   * @param jobId The freehire posting id.
+   * @param entry The question to add.
+   */
+  function addJobQuestion(
+    jobId: string,
+    entry: { questionId: string; required: boolean; options: string[]; fieldName: string | null },
+  ) {
+    const highest = db
+      .select({ position: jobQuestions.position })
+      .from(jobQuestions)
+      .where(eq(jobQuestions.jobId, jobId))
+      .all()
+      .reduce((max, row) => Math.max(max, row.position), -1);
+
+    db.insert(jobQuestions)
+      .values({
+        jobId,
+        questionId: entry.questionId,
+        required: entry.required,
+        position: highest + 1,
+        options: JSON.stringify(entry.options),
+        fieldName: entry.fieldName,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
   return {
+    addJobQuestion,
     addPostingQuestion,
     byId,
     byLabel,
     findOrCreate,
+    forJob,
     forPosting,
+    saveJobQuestions,
     savePostingQuestions,
     setMapping,
     unmapped,

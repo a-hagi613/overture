@@ -9,7 +9,6 @@ import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
 import type { Payments } from "../platform/ports/payments.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
-import type { MatchingService } from "../matching/score.ts";
 import type { SpendGate } from "../billing/spend.ts";
 
 import { retryWhenBusy } from "../platform/db/busy.ts";
@@ -27,9 +26,11 @@ import { createOnboardingGapsService } from "../profile/onboarding-gaps.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService } from "../profile/resume.ts";
-import { createSkipCompanyService } from "../profile/skip-companies.ts";
+import { createSkipCompanyService, normalizeCompanyName } from "../profile/skip-companies.ts";
 import { countMatchingJobs, createTargetsService } from "../profile/targets.ts";
 import { createOnboardingPicks } from "../onboarding/picks.ts";
+import { onboardingMatchesOf } from "../onboarding/freehire-matches.ts";
+import { preparePickedJobs } from "../onboarding/prepare-picks.ts";
 import type { OnboardingPicksService } from "../onboarding/picks.ts";
 import { verifyTrialCardForUser } from "../billing/trial-verify.ts";
 import { hasTrialGrant } from "../billing/card-fingerprint.ts";
@@ -37,6 +38,7 @@ import { createCheckoutCoordinator } from "../billing/checkout.ts";
 import { stripePriceId } from "../billing/index.ts";
 import { currentSubscriptionOf, subscriptionBlocksCheckout } from "../billing/subscriptions.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
+import { getSettingNumber } from "../platform/settings/index.ts";
 import { describePlaceIds } from "../places/catalog.ts";
 import { masterKeyring } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
@@ -57,24 +59,6 @@ import {
 import { targetsInputSchema } from "../../shared/targets.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 
-function displayOf(pick: ReturnType<OnboardingPicksService["forPreparation"]>[number]) {
-  return {
-    applyUrl: pick.applyUrl,
-    ats: pick.ats,
-    companyDomain: pick.companyDomain,
-    companyId: pick.companyId,
-    companyName: pick.companyName,
-    companyNameNorm: pick.companyNameNorm,
-    locationRaw: pick.locationRaw,
-    postingTitle: pick.postingTitle,
-    postingUrl: pick.postingUrl,
-    salaryCurrency: pick.salaryCurrency,
-    salaryMaxMinor: pick.salaryMaxMinor,
-    salaryMinMinor: pick.salaryMinMinor,
-    salaryPeriod: pick.salaryPeriod,
-  };
-}
-
 export function createOnboardingRoutes(deps: {
   db: AppDatabase;
   catalogDb: CatalogDatabase;
@@ -87,7 +71,6 @@ export function createOnboardingRoutes(deps: {
   cardFingerprintSecret?: string | null | undefined;
   reviews: ReviewService;
   spendGate?: SpendGate | undefined;
-  matching: MatchingService;
   appOrigin?: string | undefined;
 }) {
   const { db, clock, auth, llm, objects, reviews: reviewService } = deps;
@@ -97,7 +80,7 @@ export function createOnboardingRoutes(deps: {
   const cardFingerprintSecret = deps.cardFingerprintSecret ?? null;
   const appOrigin = (deps.appOrigin ?? "http://localhost:3000").replace(/\/+$/u, "");
   const checkout = payments === null ? null : createCheckoutCoordinator({ clock, db, payments });
-  const picks = createOnboardingPicks({ catalogDb: deps.catalogDb, clock, db });
+  const picks = createOnboardingPicks({ clock, db });
 
   const targetsService = createTargetsService({ db, clock });
   const languagesService = createLanguagesService({ db, clock });
@@ -170,17 +153,23 @@ export function createOnboardingRoutes(deps: {
   }
 
   async function matchesView(userId: string) {
-    const preview = await deps.matching.preview(userId, ONBOARDING_MAX_PICKS);
     const durable = picks.view(userId);
+    const { targets } = await targetsService.read(userId);
+    const { languages } = await languagesService.read(userId);
+    const matches = onboardingMatchesOf(
+      { db, strongThreshold: getSettingNumber(db, "match.strong") },
+      userId,
+      Math.max(durable.pickLimit, ONBOARDING_MAX_PICKS),
+    );
 
-    const selectableIds = new Set(preview.items.slice(0, durable.pickLimit).map((item) => item.id));
+    const selectableIds = new Set(matches.slice(0, durable.pickLimit).map((item) => item.id));
 
     return {
-      matches: preview.items,
+      matches,
       pickLimit: durable.pickLimit,
       picks: durable,
       planKind: durable.planKind,
-      poolCount: preview.poolCount,
+      poolCount: countMatchingJobs(db, targets, languages),
       selected: durable.selected.filter((id) => selectableIds.has(id)),
       trialAvailable: durable.planKind === "free_trial" || !hasTrialGrant(db, userId),
     };
@@ -195,10 +184,10 @@ export function createOnboardingRoutes(deps: {
 
     picks.markStatus(userId, "preparing");
 
-    const results = await deps.matching.preparePicks(
-      userId,
-      stored.map((pick) => ({ display: displayOf(pick), postingId: pick.postingId })),
+    const skipNames = new Set(
+      (await skipCompanies.list(userId)).map((company) => normalizeCompanyName(company.name)),
     );
+    const results = await preparePickedJobs({ db, clock }, userId, stored, skipNames);
 
     picks.applyPreparation(userId, results);
 

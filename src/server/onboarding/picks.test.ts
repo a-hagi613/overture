@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import { eq } from "drizzle-orm";
 
-import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
-import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
+import { openDatabase } from "../platform/db/client.ts";
+import { migrateDatabase } from "../platform/db/migrate.ts";
 import { createClock } from "../platform/ports/clock.ts";
-import { applications, onboardingPicks, users } from "../platform/db/schema.ts";
+import { applications, jobs, onboardingPicks, users } from "../platform/db/schema.ts";
 import { onboardingPickLimitFor, pickStatusOfApplication } from "../../shared/onboarding.ts";
 import { createOnboardingPicks } from "./picks.ts";
 
@@ -25,40 +25,39 @@ const TITLES = [
   "Staff Engineer",
 ];
 
-function seedCatalog() {
-  const { db: catalogDb, sqlite } = openCatalogDatabase(":memory:");
-
-  migrateCatalogDatabase(catalogDb, "drizzle-catalog");
-  sqlite.run(
-    "INSERT INTO companies (id, name, name_norm, created_at) VALUES ('co-1', 'Northwind', 'northwind', 1)",
-  );
-  sqlite.run(
-    "INSERT INTO company_boards (id, company_id, ats, board_token, region, status, source, created_at) VALUES ('board-1', 'co-1', 'greenhouse', 'northwind', 'us', 'active', 'import', 1)",
-  );
-
+function seedJobs(db: ReturnType<typeof openDatabase>["db"]) {
   for (const [index, title] of TITLES.entries()) {
-    sqlite
-      .prepare(
-        `INSERT INTO postings (id, board_id, company_id, ats, ats_job_id, url, apply_url_norm, title, title_norm,
-          location_raw, country_code, city, language, workplace, employment_type, first_seen_at, last_seen_at,
-          status, apply_supported, dedupe_key)
-         VALUES (?, 'board-1', 'co-1', 'greenhouse', ?, ?, ?, ?, ?, 'Toronto, ON', 'CA', 'Toronto', 'en', 'remote',
-           'full_time', ?, ?, 'open', 1, ?)`,
-      )
-      .run(
-        `posting-${String(index)}`,
-        String(index),
-        `https://northwind.example/${String(index)}`,
-        `https://northwind.example/${String(index)}/apply`,
-        title,
-        title.toLowerCase(),
-        NOW,
-        NOW,
-        `posting-${String(index)}`,
-      );
-  }
+    const id = `posting-${String(index)}`;
 
-  return { catalogDb, sqlite };
+    db.insert(jobs)
+      .values({
+        applyUrl: `https://northwind.example/${String(index)}/apply`,
+        applyVia: "direct",
+        atsJobId: String(index),
+        boardToken: "northwind",
+        closedAt: null,
+        company: "Northwind",
+        companyNorm: "northwind",
+        countries: '["ca"]',
+        createdAt: NOW,
+        dedupeKey: id,
+        externalId: `northwind:${String(index)}`,
+        firstSeenAt: NOW,
+        freehireSource: "greenhouse",
+        id,
+        lastSeenAt: NOW,
+        locationRaw: "Toronto, ON",
+        postedAt: NOW,
+        source: "greenhouse",
+        status: "open",
+        title,
+        titleNorm: title.toLowerCase(),
+        updatedAt: NOW,
+        url: `https://northwind.example/${String(index)}`,
+        workMode: "remote",
+      })
+      .run();
+  }
 }
 
 function seed() {
@@ -78,15 +77,16 @@ function seed() {
     })
     .run();
 
-  const { catalogDb, sqlite } = seedCatalog();
-  const picks = createOnboardingPicks({ catalogDb, clock: createClock(), db });
+  seedJobs(db);
 
-  return { catalogDb, db, picks, sqlite };
+  const picks = createOnboardingPicks({ clock: createClock(), db });
+
+  return { db, picks };
 }
 
 describe("the durable pick snapshot", () => {
   test("keeps employer and title after the posting closes during the card check", () => {
-    const { db, picks, sqlite } = seed();
+    const { db, picks } = seed();
 
     const saved = picks.save("user-1", ["posting-0", "posting-1", "posting-2"]);
 
@@ -97,7 +97,7 @@ describe("the durable pick snapshot", () => {
     ]);
     expect(saved?.picks.map((pick) => pick.title)).toEqual(TITLES.slice(0, 3));
 
-    sqlite.run(`UPDATE postings SET status = 'closed', closed_at = ${String(NOW)}`);
+    db.update(jobs).set({ closedAt: NOW, status: "closed" }).where(eq(jobs.id, "posting-0")).run();
 
     const after = picks.view("user-1");
 
