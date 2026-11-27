@@ -2,11 +2,11 @@ import type { Page } from "playwright-core";
 
 import type { SendPlanField } from "../../pipeline/send-plan.ts";
 
+import { openApplyForm } from "../forms/apply-link.ts";
 import {
   codeStepVisible,
   fillField,
   norm,
-  openForm,
   preflightForm,
   readConfirmation,
   submitButton,
@@ -26,7 +26,7 @@ const CODE_REQUIRED_STATUS = 428;
  * Greenhouse served `#application-form` for years and still serves the classic
  * `#application_form` on some boards and embed versions. Both name the same one
  * form; a page with either root is scoped identically, and a page with two
- * matching roots fails closed in `openForm`.
+ * matching roots fails closed in `openApplyForm`.
  */
 export const GREENHOUSE_FORM_SELECTOR = "form#application-form, form#application_form";
 
@@ -134,7 +134,7 @@ export const runGreenhouseAttempt: (
 
   const confirmationPath = `${new URL(plan.identity.url).pathname.replace(/\/+$/u, "")}/confirmation`;
 
-  const scope = await openForm(page, GREENHOUSE_FORM_SELECTOR);
+  const scope = await openApplyForm(page, GREENHOUSE_FORM_SELECTOR);
 
   if (scope === null) {
     return {

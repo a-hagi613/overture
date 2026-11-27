@@ -5,11 +5,11 @@ import type { Page } from "playwright-core";
 import type { FormQuestion, SendPlanField } from "../../pipeline/send-plan.ts";
 import type { QuestionFieldType } from "../../../shared/questions.ts";
 
+import { openApplyForm } from "../forms/apply-link.ts";
 import {
   APPLICATION_RESPONSE_MS,
   CONFIRMATION_SOURCES,
   CONFIRMATION_WAIT_MS,
-  openForm,
   preflightForm,
   waitForStableForm,
 } from "../forms/engine.ts";
@@ -605,7 +605,7 @@ export const runAshbyAttempt: (
     };
   }
 
-  const scope = await openForm(page, FORM_SELECTOR);
+  const scope = await openApplyForm(page, FORM_SELECTOR);
 
   if (scope === null) {
     return {

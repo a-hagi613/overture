@@ -1,6 +1,10 @@
 import type { AnswerKind } from "../../shared/questions.ts";
 
-import { classifyFieldLabel, factKeyForFieldKind } from "../dispatch/forms/field-heuristics.ts";
+import {
+  classifyFieldLabel,
+  classifyFieldName,
+  factKeyForFieldKind,
+} from "../dispatch/forms/field-heuristics.ts";
 
 export interface RuleMapping {
   answerKind: AnswerKind;
@@ -14,6 +18,48 @@ const CONSENT_MAPPING: RuleMapping = { answerKind: "consent", factKey: null };
 const OPEN_TEXT_MAPPING: RuleMapping = { answerKind: "open_text", factKey: null };
 
 export const mapQuestionByRules: (text: string) => RuleMapping | null = mapQuestionByRulesValue;
+
+const TEMPLATE_MARKERS: readonly RegExp[] = [
+  /_{2,}/u,
+  /\boptional to include\b/u,
+  /\bplaceholder\b/u,
+  /\btbd\b|\bto be (?:confirmed|determined)\b/u,
+  /\bxxx+\b/u,
+  /\{\{\s*[\p{L}\p{N}_]+\s*\}\}/u,
+  /\[\s*[\p{L}\p{N}_ ]{0,40}(?:insert|enter|company|office|location|city)\b/u,
+];
+
+/**
+ * Whether a board's question text still carries its own editing template, such
+ * as an unfilled `_____` blank or an "OPTIONAL TO INCLUDE" marker. Such a
+ * question is never asked of the person: an answer we cannot give from confirmed
+ * facts is left empty instead.
+ *
+ * @param text The question text a board printed.
+ * @returns true when the text is a template leftover rather than a real question.
+ */
+export function isTemplateLeftover(text: string) {
+  return TEMPLATE_MARKERS.some((pattern) => pattern.test(text));
+}
+
+/**
+ * Maps one control name when the board's label carried no meaning, so an
+ * identity field is still answered from its confirmed Fact on every system.
+ *
+ * @param fieldName The control name a board printed, or null when it has none.
+ * @returns The mapping, or `null` when the name is not a known identity control.
+ */
+export function mapIdentityFieldName(fieldName: string | null) {
+  const kind = classifyFieldName(fieldName);
+
+  if (kind === null) {
+    return null;
+  }
+
+  const factKey = factKeyForFieldKind(kind);
+
+  return factKey === null ? null : { answerKind: "fact" as const, factKey };
+}
 
 const SKIP_PATTERN =
   /\b(?:whatsapp|sms|text messages|marketing|newsletter|promotion|job alerts|talent pool|future opportunities|opt in|opt-in)\b/u;
@@ -65,12 +111,21 @@ const RULES: readonly { pattern: RegExp; mapping: RuleMapping }[] = [
     mapping: { answerKind: "fact", factKey: "current_job_title" },
   },
   {
+    pattern:
+      /\b(?:which|what)\b.*\b(?:role|position|job|function|field)\b.*\bcategory\b|\bcategory\b.*\b(?:match|matches|describe|describes|best)\b/u,
+    mapping: { answerKind: "derived", factKey: "role_category" },
+  },
+  {
     pattern: /\b(?:how|where) did you (?:first )?(?:hear|find out|learn) about\b/u,
     mapping: { answerKind: "fact", factKey: "how_did_you_hear" },
   },
   {
     pattern: /\blegal name\b/u,
     mapping: { answerKind: "fact", factKey: "legal_name" },
+  },
+  {
+    pattern: /\bcitizenship\b|\bare you a (?:citizen|national)\b|\bcountry are you a citizen\b/u,
+    mapping: { answerKind: "derived", factKey: "work_auth_status" },
   },
   {
     pattern:
@@ -156,7 +211,12 @@ const RULES: readonly { pattern: RegExp; mapping: RuleMapping }[] = [
   },
   {
     pattern:
-      /\b(?:current or previous employer|current employer|presently employed|who do you work for)\b/u,
+      /\b(?:current|present|most recent)\s+(?:company|employer|organisation|organization)\b|\b(?:company|employer) name\b/u,
+    mapping: { answerKind: "fact", factKey: "current_employer" },
+  },
+  {
+    pattern:
+      /\b(?:current or previous|current or most recent|current|present|previous|most recent)\s+employer\b|\bpresently employed\b|\bwho do you work for\b/u,
     mapping: { answerKind: "fact", factKey: "current_employer" },
   },
   {
@@ -188,6 +248,11 @@ const RULES: readonly { pattern: RegExp; mapping: RuleMapping }[] = [
   {
     pattern: /\b(?:highest (?:level of )?education|highest degree|education level|degree)\b/u,
     mapping: { answerKind: "fact", factKey: "degree_highest" },
+  },
+  {
+    pattern:
+      /\benglish\b.*\b(?:fluen|proficien|speak|speaking|spoken|written|read|business level)\b|\b(?:fluen|proficien)\w*\b.*\benglish\b/u,
+    mapping: { answerKind: "derived", factKey: "english_fluency" },
   },
   {
     pattern: /\b(?:spoken )?languages? (?:do you speak|spoken|fluency)\b/u,

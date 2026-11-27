@@ -1,6 +1,10 @@
 import type { FactRecord } from "../profile/facts.ts";
 import type { Targets } from "../../shared/targets.ts";
-import type { DerivationFact, PostingPlace } from "../catalog/answer-derivations.ts";
+import type {
+  DerivationFact,
+  DerivationInput,
+  PostingPlace,
+} from "../catalog/answer-derivations.ts";
 import type { AnswerKind, QuestionFieldType } from "../../shared/questions.ts";
 import type { AnswerUnit, FileFact } from "./answer-value.ts";
 
@@ -15,7 +19,9 @@ import {
   deriveAnswer,
   isDerivationKey,
   isTargetDerivationKey,
+  workAuthorizationFitsQuestion,
 } from "../catalog/answer-derivations.ts";
+import { isTemplateLeftover } from "../catalog/question-rules.ts";
 import {
   acknowledgementOption,
   answerIsValid,
@@ -386,6 +392,17 @@ function resolveConsent(input: ResolveInput) {
   return input.required ? blocked("unsupported_field") : blank("optional_unfilled");
 }
 
+function derivationInput(input: ResolveInput) {
+  return {
+    questionText: input.questionText,
+    fieldType: input.fieldType,
+    options: input.options,
+    targets: input.targets,
+    posting: input.posting,
+    facts: input.facts.details,
+  } satisfies DerivationInput;
+}
+
 function resolveDerivation(input: ResolveInput) {
   const key = input.factKey;
 
@@ -397,14 +414,7 @@ function resolveDerivation(input: ResolveInput) {
     return input.required ? blocked("missing_fact") : blank("optional_unfilled");
   }
 
-  const derived = deriveAnswer(key, {
-    questionText: input.questionText,
-    fieldType: input.fieldType,
-    options: input.options,
-    targets: input.targets,
-    posting: input.posting,
-    facts: input.facts.details,
-  });
+  const derived = deriveAnswer(key, derivationInput(input));
 
   if (derived !== null && answerIsValid(input.fieldType, input.options, derived)) {
     return answer(derived, input.answerKind === "target" ? "target" : "derived");
@@ -431,6 +441,29 @@ function scopedLookupFor(input: ResolveInput) {
   return null;
 }
 
+function workStatusFitsQuestion(input: ResolveInput, value: string) {
+  if (input.factKey !== "work_auth" && input.factKey !== "sponsorship_required") {
+    return true;
+  }
+
+  return workAuthorizationFitsQuestion(input.questionText, value);
+}
+
+function inferredWorkStatus(input: ResolveInput) {
+  const key = input.factKey;
+
+  if (key !== "work_auth" && key !== "sponsorship_required") {
+    return null;
+  }
+
+  const derivationKey = key === "work_auth" ? "work_auth_status" : "sponsorship_status";
+  const derived = deriveAnswer(derivationKey, derivationInput(input));
+
+  return derived !== null && answerIsValid(input.fieldType, input.options, derived)
+    ? derived
+    : null;
+}
+
 function resolveFact(input: ResolveInput) {
   if (input.factKey === null) {
     return input.required ? blocked("missing_fact") : blank("optional_unfilled");
@@ -439,12 +472,25 @@ function resolveFact(input: ResolveInput) {
   const scoped = scopedLookupFor(input);
 
   if (scoped?.kind === "review") {
+    const inferred = inferredWorkStatus(input);
+
+    if (inferred !== null) {
+      return answer(inferred, "derived");
+    }
+
     return input.required ? blocked("missing_fact", scoped.scope) : blank("optional_unfilled");
   }
 
-  const value = scoped?.kind === "answer" ? scoped.value : input.facts.unscoped.get(input.factKey);
+  const found = scoped?.kind === "answer" ? scoped.value : input.facts.unscoped.get(input.factKey);
+  const value = found !== undefined && workStatusFitsQuestion(input, found) ? found : undefined;
 
   if (value === undefined) {
+    const inferred = inferredWorkStatus(input);
+
+    if (inferred !== null) {
+      return answer(inferred, "derived");
+    }
+
     return input.required ? blocked("missing_fact") : blank("optional_unfilled");
   }
 
@@ -484,6 +530,16 @@ function formatBlockReason(fieldType: QuestionFieldType) {
 }
 
 export function resolveQuestion(input: ResolveInput) {
+  const resolution = resolveMappedQuestion(input);
+
+  if (resolution.kind === "blocked" && isTemplateLeftover(input.questionText)) {
+    return blank("optional_unfilled");
+  }
+
+  return resolution;
+}
+
+function resolveMappedQuestion(input: ResolveInput) {
   if (input.fieldType === "file") {
     return resolveFile(input);
   }

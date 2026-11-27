@@ -2,7 +2,7 @@ import type { Locator, Page, Response } from "playwright-core";
 
 import type { QuestionFieldType } from "../../../shared/questions.ts";
 
-import { mapQuestionByRules } from "../../catalog/question-rules.ts";
+import { isTemplateLeftover, mapQuestionByRules } from "../../catalog/question-rules.ts";
 import {
   clickComboboxOption,
   fillControlledField,
@@ -1338,6 +1338,10 @@ const checkLiveForm: (
       continue;
     }
 
+    if (isTemplateLeftover(control.label)) {
+      continue;
+    }
+
     const expectation = expectations.find((candidate) =>
       liveMatchesExpectation(candidate, control),
     );
@@ -1372,6 +1376,10 @@ const DURABLE_KINDS = new Set(["derived", "fact", "target"]);
 
 function unexpectedFieldNeedsReview(problem: LiveFormProblem) {
   if (problem.fieldType === "file") {
+    return false;
+  }
+
+  if (isTemplateLeftover(problem.label)) {
     return false;
   }
 
