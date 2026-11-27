@@ -234,6 +234,44 @@ describe("pull scheduling", () => {
     expect(db.select().from(jobPullState).all()).toHaveLength(3);
   });
 
+  test("skips a member whose account is deleted while the pull is in flight", async () => {
+    const { db, sqlite } = migrated();
+
+    seedUser(db, { id: "user-1" });
+    seedUser(db, { id: "user-2" });
+
+    const fake = createFakeJobSource({
+      pages: [{ ignoredParams: [], jobs: [], total: 0 }],
+    });
+
+    const source = {
+      ...fake,
+      search: async (query: Parameters<typeof fake.search>[0]) => {
+        sqlite.run("delete from users where id = 'user-2'");
+
+        return await fake.search(query);
+      },
+    };
+
+    const service = createPullService({
+      applyTarget: async (job) => await Promise.resolve(target(job)),
+      clock: { now: () => NOW },
+      db,
+      source,
+      store: createJobStore({ clock: { now: () => NOW }, db }),
+    });
+
+    await service.runTick(NOW);
+
+    expect(
+      db
+        .select()
+        .from(jobPullState)
+        .all()
+        .map((row) => row.userId),
+    ).toEqual(["user-1"]);
+  });
+
   test("a free-trial user gets the onboarding pull and no repeat; a paid user gets the 3-hour pull", async () => {
     const { db } = migrated();
     let now = NOW;
