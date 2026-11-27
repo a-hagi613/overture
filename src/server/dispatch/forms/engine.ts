@@ -538,7 +538,7 @@ function liveMatchesExpectation(expectation: LiveFormExpectation, control: LiveC
       return true;
     }
 
-    return wanted !== "" && live === wanted;
+    return wanted !== "" && live === wanted && !control.hidden;
   }
 
   if (wanted === "" || live === "") {
