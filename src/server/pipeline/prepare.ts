@@ -1323,8 +1323,10 @@ export function createPreparationService(deps: {
     );
 
     const fields = await Promise.all(
-      (row.origin === "jobs" ? catalog.forJob(row.postingId) : catalog.forPosting(row.postingId)).map(
-        async (question) => {
+      (row.origin === "jobs"
+        ? catalog.forJob(row.postingId)
+        : catalog.forPosting(row.postingId)
+      ).map(async (question) => {
         const options = optionsSchema.parse(JSON.parse(question.options));
 
         if (question.answerKind === "open_text" && isFreeText(question.fieldType)) {
@@ -1515,8 +1517,10 @@ export function createPreparationService(deps: {
     );
 
     return Promise.all(
-      (row.origin === "jobs" ? catalog.forJob(row.postingId) : catalog.forPosting(row.postingId)).map(
-        async (question) => {
+      (row.origin === "jobs"
+        ? catalog.forJob(row.postingId)
+        : catalog.forPosting(row.postingId)
+      ).map(async (question) => {
         const options = optionsSchema.parse(JSON.parse(question.options));
 
         if (question.answerKind === "open_text" && isFreeText(question.fieldType)) {

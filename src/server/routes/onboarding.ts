@@ -28,10 +28,10 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService } from "../profile/resume.ts";
 import { createSkipCompanyService, normalizeCompanyName } from "../profile/skip-companies.ts";
 import { countMatchingJobs, createTargetsService } from "../profile/targets.ts";
+import type { MatchingService } from "../matching/score.ts";
 import { createOnboardingPicks } from "../onboarding/picks.ts";
 import { onboardingMatchesOf } from "../onboarding/freehire-matches.ts";
 import { preparePickedJobs } from "../onboarding/prepare-picks.ts";
-import type { OnboardingPicksService } from "../onboarding/picks.ts";
 import { verifyTrialCardForUser } from "../billing/trial-verify.ts";
 import { hasTrialGrant } from "../billing/card-fingerprint.ts";
 import { createCheckoutCoordinator } from "../billing/checkout.ts";
@@ -71,6 +71,7 @@ export function createOnboardingRoutes(deps: {
   cardFingerprintSecret?: string | null | undefined;
   reviews: ReviewService;
   spendGate?: SpendGate | undefined;
+  matching: MatchingService;
   appOrigin?: string | undefined;
 }) {
   const { db, clock, auth, llm, objects, reviews: reviewService } = deps;
@@ -80,7 +81,7 @@ export function createOnboardingRoutes(deps: {
   const cardFingerprintSecret = deps.cardFingerprintSecret ?? null;
   const appOrigin = (deps.appOrigin ?? "http://localhost:3000").replace(/\/+$/u, "");
   const checkout = payments === null ? null : createCheckoutCoordinator({ clock, db, payments });
-  const picks = createOnboardingPicks({ clock, db });
+  const picks = createOnboardingPicks({ catalogDb: deps.catalogDb, clock, db });
 
   const targetsService = createTargetsService({ db, clock });
   const languagesService = createLanguagesService({ db, clock });
@@ -156,11 +157,19 @@ export function createOnboardingRoutes(deps: {
     const durable = picks.view(userId);
     const { targets } = await targetsService.read(userId);
     const { languages } = await languagesService.read(userId);
-    const matches = onboardingMatchesOf(
+
+    const freehireMatches = onboardingMatchesOf(
       { db, strongThreshold: getSettingNumber(db, "match.strong") },
       userId,
       Math.max(durable.pickLimit, ONBOARDING_MAX_PICKS),
     );
+
+    const legacy =
+      freehireMatches.length === 0
+        ? await deps.matching.preview(userId, ONBOARDING_MAX_PICKS)
+        : null;
+
+    const matches = legacy?.items ?? freehireMatches;
 
     const selectableIds = new Set(matches.slice(0, durable.pickLimit).map((item) => item.id));
 
@@ -169,7 +178,7 @@ export function createOnboardingRoutes(deps: {
       pickLimit: durable.pickLimit,
       picks: durable,
       planKind: durable.planKind,
-      poolCount: countMatchingJobs(db, targets, languages),
+      poolCount: legacy?.poolCount ?? countMatchingJobs(db, targets, languages),
       selected: durable.selected.filter((id) => selectableIds.has(id)),
       trialAvailable: durable.planKind === "free_trial" || !hasTrialGrant(db, userId),
     };
@@ -187,7 +196,8 @@ export function createOnboardingRoutes(deps: {
     const skipNames = new Set(
       (await skipCompanies.list(userId)).map((company) => normalizeCompanyName(company.name)),
     );
-    const results = await preparePickedJobs({ db, clock }, userId, stored, skipNames);
+
+    const results = preparePickedJobs({ db, clock }, userId, stored, skipNames);
 
     picks.applyPreparation(userId, results);
 

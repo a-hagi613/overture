@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PostingDisplay } from "../matching/applications.ts";
 import type {
@@ -59,8 +59,12 @@ function isFailureReason(value: string | null): value is OnboardingPickFailureRe
  * @param deps The application database, the read-only catalog and the clock.
  * @returns The save, read, batch and preparation helpers the onboarding routes share.
  */
-export function createOnboardingPicks(deps: { db: AppDatabase; clock: Clock }) {
-  const { db, clock } = deps;
+export function createOnboardingPicks(deps: {
+  db: AppDatabase;
+  catalogDb: CatalogDatabase;
+  clock: Clock;
+}) {
+  const { db, catalogDb, clock } = deps;
 
   function ensureBatch(userId: string, now: number) {
     const existing = db

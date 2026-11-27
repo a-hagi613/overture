@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { eq } from "drizzle-orm";
 
-import { openDatabase } from "../platform/db/client.ts";
-import { migrateDatabase } from "../platform/db/migrate.ts";
+import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
+import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { applications, jobs, onboardingPicks, users } from "../platform/db/schema.ts";
 import { onboardingPickLimitFor, pickStatusOfApplication } from "../../shared/onboarding.ts";
@@ -79,7 +79,11 @@ function seed() {
 
   seedJobs(db);
 
-  const picks = createOnboardingPicks({ clock: createClock(), db });
+  const catalog = openCatalogDatabase(":memory:");
+
+  migrateCatalogDatabase(catalog.db, "drizzle-catalog");
+
+  const picks = createOnboardingPicks({ catalogDb: catalog.db, clock: createClock(), db });
 
   return { db, picks };
 }

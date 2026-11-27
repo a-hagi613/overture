@@ -584,6 +584,7 @@ export function createApp(deps: AppDependencies) {
       payments: deps.payments,
       personal,
       reviews: deps.reviews,
+      matching,
       spendGate: deps.spendGate,
     }),
   );

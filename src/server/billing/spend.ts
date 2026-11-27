@@ -32,13 +32,6 @@ export interface SpendGateDeps {
   gated: boolean;
 }
 
-/**
- * True while a person is still setting up, before the plan step finishes onboarding. The owner and the demo
- * account never count, and a missing profile row is a brand-new signup that has not reached setup yet.
- * @param db The application database.
- * @param userId The account.
- * @returns Whether the onboarding allowance applies.
- */
 function isOnboarding(db: AppDatabase, userId: string) {
   const row = db
     .select({ onboardedAt: profiles.onboardedAt, role: users.role })

@@ -24,7 +24,7 @@ import { displayFromJobPosting } from "./freehire-job.ts";
  * @param excluded The normalised employer names the person asked Overture never to apply to.
  * @returns One result per pick, keyed by the freehire posting id.
  */
-export async function preparePickedJobs(
+export function preparePickedJobs(
   deps: { db: AppDatabase; clock: Clock },
   userId: string,
   picks: readonly { postingId: string }[],
@@ -49,6 +49,7 @@ export async function preparePickedJobs(
 
     const posting = jobPostingById({ db }, pick.postingId);
     const display = posting === undefined ? undefined : displayFromJobPosting(posting);
+
     const closed = (reason: "apply_unsupported" | "company_excluded" | "posting_closed") => {
       const applicationId =
         display === undefined

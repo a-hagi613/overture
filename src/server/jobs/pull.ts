@@ -653,8 +653,6 @@ export function createPullJobHandlers(db: AppDatabase, clock: Clock, service: Pu
       const result = await service.runUser(userId);
 
       if (result !== null) {
-        // Score after the pull, not beside it: a preference save queues both, and the pool may run first on an empty
-        // job set. Queueing again here means the onboarding list always gets its scores (issue #710).
         enqueueMatchScorePool(db, clock, userId);
 
         if (isPaidUser(db, userId, clock.now())) {

@@ -1,7 +1,3 @@
-/**
- * Paths a signed-in account may open before onboarding finishes. The Tracker is allowed only when it carries the
- * Stripe return parameters, because that page runs the settle that finishes onboarding (ADR 0050).
- */
 const UNONBOARDED_ALLOWED_PATHS = new Set([
   "/profile/account",
   "/profile/billing",

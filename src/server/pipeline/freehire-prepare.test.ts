@@ -15,9 +15,13 @@ import { createQuestionCatalog } from "../catalog/questions.ts";
 import { openReviewsForApplication } from "./review-store.ts";
 
 Bun.env.BETTER_AUTH_SECRET ??= "freehire-prepare-test-secret";
+
 Bun.env.MASTER_KEY_V1 ??= Buffer.from(new Uint8Array(32).fill(8)).toString("base64");
+
 Bun.env.OWNER_EMAIL ??= "owner@example.test";
+
 Bun.env.TURNSTILE_SECRET ??= "turnstile-secret";
+
 Bun.env.TURNSTILE_SITE_KEY ??= "turnstile-site";
 
 const { createPreparationService } = await import("./prepare.ts");
@@ -64,7 +68,7 @@ function questionEntries(
     fieldName: string;
     fieldType: "text" | "email" | "phone" | "file" | "select";
     label: string;
-    options?: string[];
+    options?: readonly string[];
     required: boolean;
   }[],
 ) {
@@ -73,13 +77,13 @@ function questionEntries(
       companyNames: ["Acme"],
       fieldName: question.fieldName,
       fieldType: question.fieldType,
-      options: question.options ?? [],
+      options: [...(question.options ?? [])],
       text: question.label,
     });
 
     return {
       fieldName: question.fieldName,
-      options: question.options ?? [],
+      options: [...(question.options ?? [])],
       position,
       questionId: record.id,
       required: question.required,
@@ -229,7 +233,7 @@ async function seeded(dir: string) {
 
   const facts = createFactService({ clock, db: app.db, personal });
 
-  for (const [key, value] of [
+  const factValues = [
     ["legal_name", "Maya Chen"],
     ["email", "maya@example.test"],
     ["phone", "613-555-0142"],
@@ -238,9 +242,11 @@ async function seeded(dir: string) {
     ["work_auth", "Canadian citizen"],
     ["sponsorship_required", "No"],
     ["notice_period", "30 days"],
-  ] as const) {
-    await facts.save("user-1", key, value, "");
-  }
+  ] as const;
+
+  await Promise.all(
+    factValues.map(async ([key, value]) => await facts.save("user-1", key, value, "")),
+  );
 
   const questionCatalog = createQuestionCatalog({ catalogDb, clock, db: app.db });
 
@@ -291,8 +297,8 @@ describe("a freehire application prepares without the legacy catalog", () => {
 
       app.sqlite.close();
 
-      // A fresh handle reads the stored question list rather than re-fetching the employer's form.
       const reopened = openDatabase(join(dir, "app.sqlite"));
+
       const catalogAfter = createQuestionCatalog({
         catalogDb: openCatalogDatabase(":memory:").db,
         clock: createClock(),

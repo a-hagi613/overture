@@ -7,7 +7,7 @@ import type { PostingDisplay } from "../matching/applications.ts";
  * @param posting The resolved posting.
  * @returns The display fields every pick and Application row stores.
  */
-export function displayFromJobPosting(posting: JobPosting): PostingDisplay {
+export function displayFromJobPosting(posting: JobPosting) {
   return {
     applyUrl: posting.applyUrl,
     ats: posting.ats,
@@ -17,7 +17,7 @@ export function displayFromJobPosting(posting: JobPosting): PostingDisplay {
     companyNameNorm: posting.companyNameNorm,
     locationRaw: posting.locationRaw,
     postingTitle: posting.title,
-    postingUrl: posting.url ?? posting.applyUrl,
+    postingUrl: posting.url ?? posting.applyUrl ?? "",
     salaryCurrency: posting.salaryCurrency,
     salaryMaxMinor: posting.salaryMaxMinor,
     salaryMinMinor: posting.salaryMinMinor,
@@ -27,5 +27,5 @@ export function displayFromJobPosting(posting: JobPosting): PostingDisplay {
       posting.salaryPeriod === "hour"
         ? posting.salaryPeriod
         : null,
-  };
+  } satisfies PostingDisplay;
 }

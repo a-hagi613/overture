@@ -19,6 +19,7 @@ import {
 import { createJobStore } from "./store.ts";
 import { setSetting } from "../platform/settings/index.ts";
 import { createPullJobHandlers, createPullService } from "./pull.ts";
+import type { PullService } from "./pull.ts";
 import { createFakeJobSource } from "./testing/fake-source.ts";
 import type { ApplyTarget } from "./apply-link.ts";
 
@@ -457,7 +458,9 @@ describe("resilience", () => {
 describe("a user pull scores after it finishes", () => {
   test("queues the match pool once the pull returns, so an earlier empty score run is repeated", async () => {
     const { db } = migrated();
+
     const clock = { now: () => NOW };
+
     const keys = [
       ["matching.score.pool:user-1", "matching.score.pool"],
       ["jobs.pull.user:user-1", "jobs.pull.user"],
@@ -480,11 +483,26 @@ describe("a user pull scores after it finishes", () => {
         .run();
     }
 
-    const handlers = createPullJobHandlers(db, clock, {
-      runChanges: async () => 0,
-      runTick: async () => 0,
-      runUser: async () => ({ candidates: 0, fetched: 0, kept: 0 }),
-    } as never);
+    const service: PullService = {
+      jobIsOpen: async () => await Promise.resolve(false),
+      runChanges: async () => await Promise.resolve(0),
+      runTick: async () => await Promise.resolve(0),
+      runUser: async () =>
+        await Promise.resolve({
+          counters: {
+            droppedClosed: 0,
+            droppedDuplicate: 0,
+            droppedNoLink: 0,
+            droppedUnsupported: 0,
+            fetched: 0,
+            kept: 0,
+          },
+          failed: false,
+        }),
+    };
+
+    const handlers = createPullJobHandlers(db, clock, service);
+
     const previous = Bun.env.ENABLE_TEST_ROUTES;
 
     Bun.env.ENABLE_TEST_ROUTES = "false";

@@ -20,7 +20,7 @@ function freshDb() {
 function addUser(
   db: ReturnType<typeof freshDb>["db"],
   clock: ReturnType<typeof freshDb>["clock"],
-  input: { id: string; role?: string; onboardedAt?: number | null },
+  input: { id: string; role?: "owner" | "demo" | "user"; onboardedAt?: number | null },
 ) {
   const at = new Date(clock.now());
 

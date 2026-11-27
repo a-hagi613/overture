@@ -268,12 +268,6 @@ export function createQuestionCatalog(deps: {
     );
   }
 
-  /**
-   * The freehire job's question list, stored in this database (issue #710). It mirrors `forPosting` for a job id that
-   * never existed in the catalog, so preparation and Review work after launch without a catalog mirror.
-   * @param jobId The freehire posting id.
-   * @returns The linked questions in form order, newest store wins.
-   */
   function forJob(jobId: string) {
     return joinedQuestions(
       db
@@ -291,12 +285,6 @@ export function createQuestionCatalog(deps: {
     );
   }
 
-  /**
-   * Replaces one freehire job's question list in this database. The list is the form as it was fetched, so a later
-   * preparation reuses it instead of asking the employer's site again.
-   * @param jobId The freehire posting id.
-   * @param entries The questions in form order.
-   */
   function saveJobQuestions(
     jobId: string,
     entries: readonly {
@@ -326,21 +314,19 @@ export function createQuestionCatalog(deps: {
     });
   }
 
-  /**
-   * Appends one question to a freehire job's stored list, used when an attempt finds a field preparation had not seen.
-   * @param jobId The freehire posting id.
-   * @param entry The question to add.
-   */
   function addJobQuestion(
     jobId: string,
     entry: { questionId: string; required: boolean; options: string[]; fieldName: string | null },
   ) {
-    const highest = db
+    let highest = -1;
+
+    for (const row of db
       .select({ position: jobQuestions.position })
       .from(jobQuestions)
       .where(eq(jobQuestions.jobId, jobId))
-      .all()
-      .reduce((max, row) => Math.max(max, row.position), -1);
+      .all()) {
+      highest = Math.max(highest, row.position);
+    }
 
     db.insert(jobQuestions)
       .values({

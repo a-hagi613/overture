@@ -81,7 +81,7 @@ describe("the v1 prompt", () => {
   });
 
   test("sends only the array bounds Anthropic structured output accepts", () => {
-    const reasons = SCORE_OUTPUT_SCHEMA.properties.reasons;
+    const { reasons } = SCORE_OUTPUT_SCHEMA.properties;
 
     expect(Object.hasOwn(reasons, "minItems")).toBe(false);
     expect(Object.hasOwn(reasons, "maxItems")).toBe(false);

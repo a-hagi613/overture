@@ -1,25 +1,24 @@
 import { inArray } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
-import type { OnboardingMatchView } from "../../shared/onboarding.ts";
 
 import { jobs } from "../platform/db/schema.ts";
 import { orderedMatches } from "../matching/match-sort.ts";
 import { readStoredMatches } from "../matching/match-store.ts";
 
-const EMPLOYMENT_TYPES = new Set([
-  "full_time",
-  "part_time",
-  "contract",
-  "internship",
-  "temporary",
-  "unknown",
-]);
-
 function employmentTypeOf(value: string | null) {
-  return value !== null && EMPLOYMENT_TYPES.has(value)
-    ? (value as OnboardingMatchView["employmentType"])
-    : "unknown";
+  if (
+    value === "full_time" ||
+    value === "part_time" ||
+    value === "contract" ||
+    value === "internship" ||
+    value === "temporary" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+
+  return "unknown";
 }
 
 function salaryPeriodOf(value: string | null) {
@@ -67,14 +66,18 @@ export function onboardingMatchesOf(
 
   const display = new Map(rows.map((row) => [row.id, row]));
 
-  return chosen.flatMap((match): OnboardingMatchView[] => {
+  return chosen.flatMap((match) => {
     const job = display.get(match.id);
 
     if (job === undefined) {
       return [];
     }
 
-    const score = match.score;
+    const { score } = match;
+
+    if (score === null) {
+      return [];
+    }
 
     return [
       {
@@ -87,7 +90,7 @@ export function onboardingMatchesOf(
         salaryMinMinor: job.salaryMin === null ? null : Math.round(job.salaryMin * 100),
         salaryPeriod: salaryPeriodOf(job.salaryPeriod),
         score,
-        strong: score !== null && score >= deps.strongThreshold,
+        strong: score >= deps.strongThreshold,
         title: job.title,
         why: [...match.reasons].slice(0, 3),
         workplace: job.workMode ?? "unknown",
