@@ -28,6 +28,7 @@ import { createStrengthenService } from "../profile/strengthen.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
 import { describePlaceIds } from "../places/catalog.ts";
 import { enqueueUserPull } from "../jobs/pull.ts";
+import { enqueueMatchRescore, enqueueMatchScorePool } from "../matching/match-jobs.ts";
 import { preferencesChanged } from "../jobs/preferences.ts";
 import { returnStaleApprovals } from "../pipeline/approval-invalidation.ts";
 import { TIER_2_FACT_KEYS } from "../../shared/facts.ts";
@@ -185,6 +186,7 @@ export function createProfileRoutes(deps: {
     }
 
     await returnStaleApprovals({ clock, db, personal, userId: account.id });
+    enqueueMatchRescore(db, clock, account.id);
 
     return context.json(
       { ...upload.resume, prefilledFacts: prefilled.map((fact) => fact.key) },
@@ -274,6 +276,7 @@ export function createProfileRoutes(deps: {
     ).toSorted((left, right) => left.key.localeCompare(right.key));
 
     await returnStaleApprovals({ clock, db, personal, userId: account.id });
+    enqueueMatchRescore(db, clock, account.id);
 
     return context.json({ facts: saved });
   });
@@ -371,6 +374,7 @@ export function createProfileRoutes(deps: {
 
     if (preferencesChanged(before.targets, saved.targets)) {
       enqueueUserPull(db, clock, account.id);
+      enqueueMatchScorePool(db, clock, account.id);
     }
 
     const { languages } = await languagesService.read(account.id);

@@ -95,11 +95,25 @@ function costMicrosFor(model: string, usage: TokenUsage) {
 
 function estimatedUsageFor(request: LlmRequest) {
   return {
-    input: Math.ceil((request.system.length + request.user.length) / CHARS_PER_TOKEN),
+    input: Math.ceil(
+      (request.system.length + (request.cachePrefix?.length ?? 0) + request.user.length) /
+        CHARS_PER_TOKEN,
+    ),
     cacheRead: 0,
     cacheWrite: 0,
     output: ESTIMATED_OUTPUT_TOKENS,
   };
+}
+
+function messageContent(cachePrefix: string | undefined, user: string) {
+  if (cachePrefix === undefined || cachePrefix.trim() === "") {
+    return user;
+  }
+
+  return [
+    { type: "text", text: cachePrefix, cache_control: { type: "ephemeral" } },
+    { type: "text", text: user },
+  ];
 }
 
 function parseJson(text: string) {
@@ -248,7 +262,9 @@ export function createAnthropicBatchProvider(config: AnthropicLlmConfig) {
               system: [
                 { type: "text", text: request.system, cache_control: { type: "ephemeral" } },
               ],
-              messages: [{ role: "user", content: request.user }],
+              messages: [
+                { role: "user", content: messageContent(request.cachePrefix, request.user) },
+              ],
               output_config: { format: { type: "json_schema", schema: request.schema } },
             },
           })),
@@ -385,6 +401,7 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
       costMicrosFor(config.model, {
         input:
           Math.ceil(request.system.length / CHARS_PER_TOKEN) +
+          Math.ceil((request.cachePrefix?.length ?? 0) / CHARS_PER_TOKEN) +
           Math.ceil(request.user.length / CHARS_PER_TOKEN),
         cacheRead: 0,
         cacheWrite: 0,
@@ -402,7 +419,7 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
           model: config.model,
           max_tokens: SINGLE_MAX_TOKENS,
           system: [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: request.user }],
+          messages: [{ role: "user", content: messageContent(request.cachePrefix, request.user) }],
           output_config: { format: { type: "json_schema", schema: request.schema } },
         }),
       });

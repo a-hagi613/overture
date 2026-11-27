@@ -7,7 +7,8 @@ import type { FreehireJobRecord } from "../../shared/freehire.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
-import { jobPlaces, jobs } from "../platform/db/schema.ts";
+import { jobPlaces, jobs, matches } from "../platform/db/schema.ts";
+import { enqueueMatchRescoreJob } from "../matching/match-jobs.ts";
 import type { ApplyTarget } from "./apply-link.ts";
 import { jobPlaceRows } from "../places/job-places.ts";
 
@@ -69,10 +70,15 @@ export function createJobStore(deps: { db: AppDatabase; clock: Clock }) {
     const dedupeKey = dedupeKeyOf(job);
 
     const existingById = db
-      .select({ id: jobs.id })
+      .select({ descriptionHash: jobs.descriptionHash, id: jobs.id })
       .from(jobs)
       .where(eq(jobs.id, job.public_slug))
       .get();
+
+    const nextHash = descriptionHash(job.description);
+
+    const descriptionChanged =
+      existingById !== undefined && existingById.descriptionHash !== nextHash;
 
     if (existingById === undefined) {
       const existingByKey = db
@@ -107,7 +113,7 @@ export function createJobStore(deps: { db: AppDatabase; clock: Clock }) {
       createdAt: now,
       dedupeKey,
       description: job.description,
-      descriptionHash: descriptionHash(job.description),
+      descriptionHash: nextHash,
       employmentType: enrichment?.employment_type ?? null,
       experienceYearsMin: enrichment?.experience_years_min ?? null,
       externalId: job.external_id,
@@ -152,6 +158,8 @@ export function createJobStore(deps: { db: AppDatabase; clock: Clock }) {
           applyUrl: values.applyUrl,
           applyVia: values.applyVia,
           closedAt: values.closedAt,
+          description: values.description,
+          descriptionHash: values.descriptionHash,
           lastSeenAt: now,
           status: "open",
           updatedAt: now,
@@ -162,6 +170,16 @@ export function createJobStore(deps: { db: AppDatabase; clock: Clock }) {
     const places = jobPlaceRows(job);
 
     db.delete(jobPlaces).where(eq(jobPlaces.jobId, values.id)).run();
+
+    if (descriptionChanged) {
+      for (const row of db
+        .select({ userId: matches.userId })
+        .from(matches)
+        .where(eq(matches.postingId, values.id))
+        .all()) {
+        enqueueMatchRescoreJob(db, clock, row.userId, values.id);
+      }
+    }
 
     if (places.length > 0) {
       db.insert(jobPlaces)

@@ -1,13 +1,23 @@
-export type LlmOutputSchemaType = "string" | "number" | "boolean" | "object" | "array" | "null";
+export type LlmOutputSchemaType =
+  | "string"
+  | "number"
+  | "integer"
+  | "boolean"
+  | "object"
+  | "array"
+  | "null";
 
 export interface LlmOutputSchemaProperty {
   type?: LlmOutputSchemaType | readonly LlmOutputSchemaType[];
   description?: string;
-  enum?: string[];
+  enum?: (string | number)[];
   items?: LlmOutputSchemaProperty;
   properties?: Record<string, LlmOutputSchemaProperty>;
   required?: string[];
   additionalProperties?: false;
+  maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
 }
 
 export interface LlmOutputSchema {
@@ -21,6 +31,8 @@ export interface LlmRequest {
   purpose: string;
   customId: string;
   system: string;
+  /** Text every request from the same conversation shares, cached before the per-call `user` block. */
+  cachePrefix?: string | undefined;
   user: string;
   schema: LlmOutputSchema;
 }
@@ -57,6 +69,8 @@ export interface LlmStructuredRequest {
   /** The `llm_usage` purpose the call is billed to. */
   purpose: string;
   system: string;
+  /** Text every request from the same conversation shares, cached before the per-call `user` block. */
+  cachePrefix?: string | undefined;
   user: string;
   schema: LlmOutputSchema;
 }

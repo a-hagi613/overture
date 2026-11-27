@@ -4,6 +4,8 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createApp } from "./app.ts";
+import { createMatchScoringJobHandlers } from "./matching/match-jobs.ts";
+import { createMatchScoringService } from "./matching/match-scoring.ts";
 import { CATALOG_SNAPSHOT_MAX_BYTES } from "./routes/internal-catalog.ts";
 import {
   assertMasterKeyCoverage,
@@ -594,6 +596,16 @@ const tagDeps = {
 };
 
 const personal = createPersonalCrypto(db, masterKeyring);
+
+const matchScoring = createMatchScoringService({
+  db,
+  clock,
+  llm: anthropicLlmPort,
+  personal,
+  spendGate,
+});
+
+const matchScoringJobHandlers = createMatchScoringJobHandlers(matchScoring);
 
 if (env.DEMO_LOGIN_ENABLED && catalogHotSwap === null) {
   const demo = await seedDemoAccount({ catalogDb, clock, db, objects, personal });
@@ -1190,6 +1202,7 @@ const allJobHandlers: JobHandlers = {
   ...exportJobHandlers,
   ...masterKeyRotationJobHandlers,
   ...pullJobHandlers,
+  ...matchScoringJobHandlers,
   ...testJobHandlers,
 };
 

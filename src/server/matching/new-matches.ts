@@ -1,9 +1,12 @@
-import { and, desc, eq, inArray, notExists, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 
 import { companies, postings } from "../platform/db/catalog-schema.ts";
-import { applications, matches } from "../platform/db/schema.ts";
+import { applications, jobs } from "../platform/db/schema.ts";
+import { orderedMatches } from "./match-sort.ts";
+import { readStoredMatches } from "./match-store.ts";
+import type { StoredMatch } from "./match-store.ts";
 
 /** One scored (or still scoring) job the user has not picked yet, as Home and Matches show it. */
 export interface NewMatch {
@@ -20,31 +23,79 @@ export interface NewMatchesView {
   total: number;
 }
 
-const POSTING_CHUNK = 400;
+const ID_CHUNK = 400;
 
-function openPostingIds(catalogDb: CatalogDatabase, ids: readonly string[]) {
-  const open = new Set<string>();
+interface DisplayRow {
+  company: string;
+  id: string;
+  location: string | null;
+  title: string;
+}
 
-  for (let start = 0; start < ids.length; start += POSTING_CHUNK) {
-    const chunk = ids.slice(start, start + POSTING_CHUNK);
+function displayRows(
+  deps: { db: AppDatabase; catalogDb: CatalogDatabase },
+  ids: readonly string[],
+) {
+  const byId = new Map<string, DisplayRow>();
 
-    for (const row of catalogDb
-      .select({ id: postings.id })
+  for (let start = 0; start < ids.length; start += ID_CHUNK) {
+    const chunk = ids.slice(start, start + ID_CHUNK);
+
+    for (const row of deps.db
+      .select({
+        company: jobs.company,
+        id: jobs.id,
+        location: jobs.locationRaw,
+        title: jobs.title,
+      })
+      .from(jobs)
+      .where(and(inArray(jobs.id, chunk), eq(jobs.status, "open")))
+      .all()) {
+      byId.set(row.id, row);
+    }
+
+    for (const row of deps.catalogDb
+      .select({
+        company: companies.name,
+        id: postings.id,
+        location: postings.locationRaw,
+        title: postings.title,
+      })
       .from(postings)
+      .innerJoin(companies, eq(companies.id, postings.companyId))
       .where(and(inArray(postings.id, chunk), eq(postings.status, "open")))
       .all()) {
-      open.add(row.id);
+      byId.set(row.id, row);
     }
   }
 
-  return open;
+  return byId;
+}
+
+function scoringOrder(rows: readonly StoredMatch[]) {
+  const scored = orderedMatches(rows);
+  const scoredIds = new Set(scored.map((row) => row.id));
+
+  const unscored = rows
+    .filter((row) => row.score === null && row.blockers.length === 0 && !scoredIds.has(row.id))
+    .toSorted((left, right) => {
+      if (left.codeRank !== right.codeRank) {
+        return right.codeRank - left.codeRank;
+      }
+
+      const posted = (right.postedAt ?? 0) - (left.postedAt ?? 0);
+
+      return posted === 0 ? left.id.localeCompare(right.id) : posted;
+    });
+
+  return [...scored, ...unscored];
 }
 
 /**
- * Reads the user's newest matches: the stored AI score only, ordered by the code rank that never
- * leaves the server. A row with no stored score stays `null` so the screen says "Scoring…".
+ * Reads the user's newest matches: the stored score and the ADR 0045 order, never the code rank as a number. A row
+ * with no stored score stays `null` so the screen says "Scoring…".
  *
- * @param deps The app database and the catalog the postings live in.
+ * @param deps The app database and the catalog the legacy postings live in.
  * @param userId The signed-in user.
  * @param limit How many matches the caller renders.
  * @returns The newest matches and how many unpicked, still-open matches the user has.
@@ -54,56 +105,33 @@ export function newMatchesOf(
   userId: string,
   limit: number,
 ) {
-  const picked = deps.db
-    .select({ one: sql`1` })
-    .from(applications)
-    .where(and(eq(applications.userId, userId), eq(applications.postingId, matches.postingId)));
+  const picked = new Set(
+    deps.db
+      .select({ postingId: applications.postingId })
+      .from(applications)
+      .where(eq(applications.userId, userId))
+      .all()
+      .map((row) => row.postingId),
+  );
 
-  const unpicked = deps.db
-    .select({ id: matches.postingId, score: matches.score })
-    .from(matches)
-    .where(and(eq(matches.userId, userId), notExists(picked)))
-    .orderBy(desc(matches.codeRank))
-    .all();
+  const unpicked = readStoredMatches(deps.db, userId).filter((row) => !picked.has(row.id));
 
   if (unpicked.length === 0) {
     return { items: [], total: 0 } satisfies NewMatchesView;
   }
 
-  const open = openPostingIds(
-    deps.catalogDb,
+  const visible = displayRows(
+    deps,
     unpicked.map((row) => row.id),
   );
 
-  const visible = unpicked.filter((row) => open.has(row.id));
-  const page = visible.slice(0, limit);
-
-  if (page.length === 0) {
-    return { items: [], total: 0 } satisfies NewMatchesView;
-  }
-
-  const postingRows = deps.catalogDb
-    .select({
-      company: companies.name,
-      id: postings.id,
-      location: postings.locationRaw,
-      title: postings.title,
-    })
-    .from(postings)
-    .innerJoin(companies, eq(companies.id, postings.companyId))
-    .where(
-      inArray(
-        postings.id,
-        page.map((row) => row.id),
-      ),
-    )
-    .all();
-
-  const byId = new Map(postingRows.map((row) => [row.id, row]));
+  const open = unpicked.filter((row) => visible.has(row.id));
+  const shown = scoringOrder(open);
+  const page = shown.slice(0, limit);
 
   return {
     items: page.flatMap((row) => {
-      const posting = byId.get(row.id);
+      const posting = visible.get(row.id);
 
       return posting === undefined
         ? []
@@ -112,11 +140,11 @@ export function newMatchesOf(
               company: posting.company,
               id: posting.id,
               location: posting.location,
-              score: row.score ?? null,
+              score: row.score,
               title: posting.title,
             },
           ];
     }),
-    total: visible.length,
+    total: shown.length,
   } satisfies NewMatchesView;
 }
