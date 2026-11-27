@@ -32,7 +32,6 @@ const serverNow = Date.UTC(2026, 10, 17, 11, 15, 0);
 
 const homeBoardSchema = z.object({
   applicationsLeft: z.number(),
-  nextPrepAt: z.number(),
   nextSendAt: z.number().nullable(),
   pauseReason: z.string().nullable(),
   planApplications: z.number(),
@@ -125,7 +124,7 @@ async function seedReadyApplications(
       const response = await owner.post("/__test__/applications/seed", {
         data: {
           createdAt: index + 1,
-          origin: "auto",
+          origin: "pick",
           postingId,
           status: "ready",
           userId,
@@ -288,15 +287,17 @@ test("Home reports the board ranges, the open Reviews and the recent Inbox", asy
   await moveClockTo(owner, serverNow);
   await owner.post("/__test__/home/sample", { data: { email: authTestIdentity.ownerEmail } });
 
-  const home = homeBoardSchema.parse(await (await owner.get("/api/home")).json());
+  const response = await owner.get("/api/home");
+  const body: unknown = await response.json();
+  const home = homeBoardSchema.parse(body);
 
+  expect(body).not.toHaveProperty("nextPrepAt");
   expect(home.running).toBe(true);
   expect(home.applicationsLeft).toBe(63);
   expect(home.planApplications).toBe(70);
   expect(home.sentToday).toBe(7);
   expect(home.queued).toBe(12);
   expect(home.nextSendAt).toBe(Date.UTC(2026, 10, 17, 11, 40, 0));
-  expect(home.nextPrepAt).toBe(Date.UTC(2026, 10, 18, 7, 0, 0));
   expect(home.ranges["7D"].applicationsSent).toBe(37);
   expect(home.ranges["7D"].sentDelta).toBe(6);
   expect(home.ranges["7D"].replies).toBe(9);
@@ -406,10 +407,7 @@ test("Home puts actions above the chart and the outcomes strip follows 7D, 30D a
   await Promise.all([checkWidth(1280), checkWidth(390)]);
 });
 
-test("Home shows All caught up with the next preparation run when nothing waits", async ({
-  browser,
-  homeServer,
-}) => {
+test("Home shows All caught up when nothing waits", async ({ browser, homeServer }) => {
   const request = await storeFor(homeServer.url);
 
   await moveClockTo(request, serverNow);
@@ -445,7 +443,7 @@ test("Home shows All caught up with the next preparation run when nothing waits"
 
       await expect(caughtUp).toBeVisible();
       await expect(page.getByRole("heading", { name: "All caught up" })).toBeVisible();
-      await expect(caughtUp).toContainText("Next preparation run at 07:00");
+      await expect(caughtUp).not.toContainText("Next preparation run");
       await expect(page.getByTestId("home-failures")).toHaveCount(0);
       await expect(page.locator("#home-needs-you")).toHaveCount(0);
       await expect(page.locator("#home-ready-title")).toHaveCount(0);

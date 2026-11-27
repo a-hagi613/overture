@@ -94,11 +94,6 @@ export function createSinkMailSender(clock: Clock) {
       record(mail);
       await Promise.resolve();
     },
-    sendReadyRecap: async (mail) => {
-      failIfAsked();
-      record(mail);
-      await Promise.resolve();
-    },
     sendAccountDeleted: async (mail) => {
       failIfAsked();
       record(mail);

@@ -8,7 +8,6 @@ import {
   exportReadyEmail,
   magicLinkEmail,
   notificationEmail,
-  recapEmail,
   supportReplyEmail,
   supportRequestEmail,
   waitlistInviteEmail,
@@ -25,14 +24,6 @@ describe("branded email template", () => {
       waitlistInviteEmail("https://overture.test/signin"),
       accountDeletedEmail("Ada Lovelace"),
       codeWaitEmail({ minutes: 10, subject: "Needs a verification code", url: INBOX }),
-      recapEmail({
-        needAnswer: 2,
-        ready: [{ company: "Northwind Labs", title: "Platform Engineer" }],
-        replied: [{ company: "Halden Systems" }],
-        sent: [{ company: "Larkspur Health", title: "Backend Engineer" }],
-        subject: "Overture recap: 1 ready to approve, 2 need an answer",
-        url: READY,
-      }),
       exportReadyEmail({ subject: "Your Overture export is ready", url: READY }),
       billingPauseEmail({
         copy: "A payment did not go through.",
@@ -82,19 +73,7 @@ describe("branded email template", () => {
     }
   });
 
-  test("recap and notification emails render their grouped rows in both parts", () => {
-    const recap = recapEmail({
-      needAnswer: 1,
-      ready: [{ company: "Northwind Labs", title: "Platform Engineer" }],
-      replied: [],
-      sent: [],
-      subject: "Overture recap: 1 ready to approve, 1 needs an answer",
-      url: READY,
-    });
-
-    expect(recap.html).toContain("Platform Engineer at Northwind Labs");
-    expect(recap.body).toContain("Platform Engineer at Northwind Labs");
-
+  test("notification emails render their grouped rows in both parts", () => {
     const batch = notificationEmail({
       heading: "3 applications are ready",
       items: [{ detail: "Halden Systems", title: "Site Reliability Engineer" }],

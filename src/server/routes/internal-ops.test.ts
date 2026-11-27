@@ -85,7 +85,7 @@ function startApp(secret: string) {
         companyNameNorm: "acme",
         createdAt: NOW,
         id: applicationId,
-        origin: "auto",
+        origin: "pick",
         postingId: `posting-${String(sequence)}`,
         postingTitle: "Engineer",
         postingUrl: "https://example.test/job",

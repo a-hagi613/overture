@@ -79,7 +79,7 @@ describe("claiming jobs by class", () => {
         "tag.llm_fallback",
         "billing.notice",
         "push.notify",
-        "ready.notify",
+        "export.notify",
       ],
     });
 
@@ -93,7 +93,7 @@ describe("claiming jobs by class", () => {
       enqueueAt(db, "tag.llm_fallback", NOW - 1000 + index);
     }
 
-    enqueueAt(db, "ready.notify", NOW);
+    enqueueAt(db, "export.notify", NOW);
     enqueueAt(db, "billing.notice", NOW);
 
     const claimed = claimJobsToRun(db, clock, {
@@ -103,7 +103,7 @@ describe("claiming jobs by class", () => {
 
     expect(
       claimed.map((job) => job.kind).toSorted((left, right) => left.localeCompare(right)),
-    ).toEqual(["billing.notice", "ready.notify", "tag.llm_fallback"]);
+    ).toEqual(["billing.notice", "export.notify", "tag.llm_fallback"]);
 
     const llm = db
       .select({ attempts: bgJobs.attempts, status: bgJobs.status })

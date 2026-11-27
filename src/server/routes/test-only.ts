@@ -137,7 +137,6 @@ import { normalizeFieldType, questionVariantHash } from "../catalog/question-nor
 import { mapQuestionByRules } from "../catalog/question-rules.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { CODE_WAIT_TIMEOUT_MS, createCodeWait, wakeCodeWaits } from "../inbox/waits.ts";
-import { ensurePrepQueuedForRunningUsers } from "../pipeline/daily-prep.ts";
 import { newExportKey } from "../../shared/export-crypto.ts";
 import { createMailboxService } from "../inbox/mailboxes.ts";
 import { listExportsOf } from "../export/service.ts";
@@ -498,7 +497,7 @@ const seedApplicationBody = z.object({
   sentAt: z.number().int().nullable().default(null),
   createdAt: z.number().int().nullable().default(null),
   readyAt: z.number().int().nullable().default(null),
-  origin: z.enum(["auto", "manual"]).default("auto"),
+  origin: z.enum(["pick", "manual"]).default("pick"),
   stage: z
     .enum(["queued", "ready", "applied", "screening", "interviewing", "offer", "closed"])
     .nullable()
@@ -1427,12 +1426,6 @@ export function createTestRoutes(
     const ran = await runDueJobs(db, clock, handlers, singletonJobKinds);
 
     return context.json({ ran });
-  });
-
-  routes.post("/jobs/ensure-prep", (context) => {
-    ensurePrepQueuedForRunningUsers(db, clock);
-
-    return context.json({ ok: true });
   });
 
   routes.post("/jobs/run-now", validJson(runNowBody), async (context) => {
@@ -3169,7 +3162,7 @@ export function createTestRoutes(
           closedReason: input.stage === "closed" ? "rejected" : null,
           createdAt: input.createdAt ?? now,
           id,
-          origin: "auto",
+          origin: "pick",
           postingId: input.postingId,
           scheduledFor: input.scheduledFor ?? null,
           scoreAtQueue: null,

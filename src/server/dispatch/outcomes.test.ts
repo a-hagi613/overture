@@ -134,7 +134,7 @@ function startInMemoryOutcomes() {
         companyNameNorm: input.company.name.toLowerCase(),
         createdAt: submittedAt,
         id: applicationId,
-        origin: "auto",
+        origin: "pick",
         postingId,
         postingTitle: input.title,
         postingUrl: `https://example.test/${String(sequence)}`,

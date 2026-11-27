@@ -528,7 +528,6 @@ export function createApp(deps: AppDependencies) {
   app.route(
     "/api",
     createSupplyRoutes({
-      catalogDb: deps.catalogDb,
       clientIpConfig,
       clock: deps.clock,
       db: deps.db,

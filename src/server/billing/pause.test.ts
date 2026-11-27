@@ -74,7 +74,7 @@ function seedSendingApplication(
       companyNameNorm: "acme",
       createdAt: at,
       id: applicationId,
-      origin: "auto",
+      origin: "pick",
       postingId: `posting-${applicationId}`,
       postingTitle: "Engineer",
       postingUrl: `https://example.com/jobs/${applicationId}`,

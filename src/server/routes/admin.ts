@@ -71,7 +71,6 @@ import { readAdminLlmUsage } from "../platform/llm/usage.ts";
 import { applicationsLeft, balancesPerGrant, grantApplications } from "../billing/ledger.ts";
 import { resumeAfterPayment } from "../billing/pause.ts";
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
-import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
 import { logError } from "../platform/log.ts";
 import {
   BILLING_FILTERS,
@@ -1609,7 +1608,6 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
       resumeAfterPayment(db, clock, { userId: user.id }).resumed
     ) {
       enqueuePlannerDay(db, clock, user.id);
-      ensurePrepDailyQueued(db, clock, user.id);
     }
 
     return context.json({

@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { openCatalogDatabase, openDatabase } from "./client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "./migrate.ts";
-import { rebuildSupplyFacets } from "../../catalog/supply-facets.ts";
 
 const NOW = 1_800_000_000_000;
 const ROWS = 2000;
@@ -46,7 +45,7 @@ function seeded() {
   const insertApplication = sqlite.prepare(
     `insert into applications (id, user_id, posting_id, company_id, company_name, company_name_norm, posting_title,
        posting_url, origin, status, created_at, updated_at)
-     values (?, ?, ?, ?, 'Northwind', 'northwind', 'Platform Engineer', 'https://example.test/job', 'auto', ?, ?, ?)`,
+     values (?, ?, ?, ?, 'Northwind', 'northwind', 'Platform Engineer', 'https://example.test/job', 'pick', ?, ?, ?)`,
   );
 
   const insertGrant = sqlite.prepare(
@@ -180,7 +179,7 @@ test("the messages, applications and grants hot paths search their new indexes",
   }
 });
 
-test("the retention, audit and session hot paths search their new indexes", () => {
+test("the retention, audit, session and freehire job hot paths search their new indexes", () => {
   const { db, sqlite } = seeded();
 
   try {
@@ -225,6 +224,25 @@ test("the retention, audit and session hot paths search their new indexes", () =
     );
 
     expect(jobs).toContain("bg_jobs_status_updated");
+
+    const supply = planOf(
+      sqlite,
+      `select source, count(*) from jobs
+         where status = 'open'
+           and not (instr(lower(title_norm), 'talent pool') > 0)
+         group by source`,
+    );
+
+    expect(supply).toContain("jobs_status_posted");
+    expect(supply).not.toMatch(/SCAN jobs\b/u);
+
+    const supplyByCategory = planOf(
+      sqlite,
+      "select source, count(*) from jobs where status = 'open' and category = ? group by source",
+      "backend",
+    );
+
+    expect(supplyByCategory).toContain("jobs_category_status");
   } finally {
     db.$client.close();
   }
@@ -388,18 +406,6 @@ test("the catalog candidate and requisition hot paths search their new indexes",
 
     expect(region).toContain("postings_live_region");
     expect(region).not.toMatch(/SCAN postings\b/u);
-
-    rebuildSupplyFacets(db);
-
-    const facets = planOf(
-      sqlite,
-      "select ats, sum(postings) from supply_facets where role = ? and country_code = ? group by ats",
-      "Engineer",
-      "US",
-    );
-
-    expect(facets).toContain("supply_facets");
-    expect(facets).not.toMatch(/SCAN supply_facets\b/u);
   } finally {
     db.$client.close();
   }

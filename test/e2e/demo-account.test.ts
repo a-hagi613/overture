@@ -552,9 +552,7 @@ test("the demo never sends, queues a send job or reaches a service", async ({ de
 
   const kinds = [
     { kind: "dispatch.tick", payload: "{}" },
-    { kind: "prep.daily", payload: JSON.stringify({ since: 0, userId }) },
     { kind: "checkin.sweep", payload: "{}" },
-    { kind: "ready.notify", payload: JSON.stringify({ since: 0, userId }) },
     { kind: "planner.day", payload: JSON.stringify({ userId }) },
   ];
 

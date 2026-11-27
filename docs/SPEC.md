@@ -163,10 +163,11 @@ product; where a launch switch is still off, the section says so. The earlier M1
   `jobs.pull` alert fires after repeated failures without deleting anything (§6.1).
 - **`catalog.sqlite` stays as a read-only legacy read model.** The old publication path is gone (no off-box ETL,
   snapshot relay or hot-swap), and nothing writes this file. It is opened locally on boot and still answers readers
-  for rows that predate freehire: the stored-match fallback, `/api/supply`, preparation/review/dispatch for
-  Applications created against a catalog Posting, the demo seed and the admin reports (ADR 0036, 2026-11-27
-  amendment). Every new Application comes from a freehire `jobs` row. Removing those readers, and then the file, is a
-  follow-up once no catalog-backed Application remains.
+  for rows that predate freehire: the stored-match fallback, preparation/review/dispatch for Applications created
+  against a catalog Posting, the demo seed and the admin reports (ADR 0036, 2026-11-27 amendment). The public
+  `/api/supply` count no longer reads it: it counts the freehire `jobs` rows every new match comes from (§6). Every
+  new Application comes from a freehire `jobs` row. Removing those readers, and then the file, is a follow-up once no
+  catalog-backed Application remains.
 
 ### 3.2 External services and environment
 
@@ -359,11 +360,12 @@ shared across users and are never tied to one job.
 
 **Legacy catalog (read-only).** `catalog.sqlite` keeps the pre-freehire tables read-only: `companies`,
 `company_boards`, `postings`, `posting_questions`, `posting_tags`, `posting_locations`, `supply_facets` and `geo_places`.
-No new row is written there. They answer the stored-match fallback for old Applications, `/api/supply`, preparation
-and review for an Application created against a catalog Posting, the demo seed and the admin reports. The retired role taxonomy
-survives only as the one-time boot migration of saved targets and the legacy catalog label bridge; no matching path
-reads it for new jobs. Removing these readers and the file is a follow-up once no catalog-backed Application
-remains (ADR 0036, 2026-11-27 amendment).
+No new row is written there. They answer the stored-match fallback for old Applications, preparation and review for an
+Application created against a catalog Posting, the demo seed and the admin reports; `supply_facets` is the retired
+`/api/supply` rollup, which nothing rebuilds or reads now that the public count follows freehire `jobs` (#742). The
+retired role taxonomy survives only as the one-time boot migration of saved targets and the legacy catalog label
+bridge; no matching path reads it for new jobs. Removing these readers and the file is a follow-up once no
+catalog-backed Application remains (ADR 0036, 2026-11-27 amendment).
 
 A Posting carries no role label, no tag source and no tag import: freehire supplies its category, seniority, work mode,
 places, skills and salary, and Overture never invents the ones freehire leaves blank. A job row closes on a change
@@ -1567,7 +1569,7 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 |---|---|
 | Session | `GET /api/me` (the signed-in user, the Turnstile values and the enabled social providers; `adminOrigin` is present only for `role = "owner"` and is `null` for anonymous visitors, regular users and the demo account, so the admin host is never advertised to anyone who cannot use it; on the admin host itself `adminOwnerEmail` names the owner account and `socialProviders` is empty, and neither is exposed on the app host) |
 | Health | `GET /api/health` (public, no session: `select 1` plus the cached Litestream replica reading from `backups.status()`, so Fly's check and the sentinel Worker probe answer in milliseconds and never run Litestream) |
-| Supply preview | `GET /api/supply?role&location&remote` (public, no session, read-only: the count of open, apply-supported Postings from the catalog read model (§5.3), grouped by system, optionally filtered by one category id, one place id and `remote=true`; cached per catalog revision and answered `Cache-Control: public, max-age=60, stale-while-revalidate=300`; at most 120 requests a minute per client IP → `429 rate_limited`; never returns a Company, title or any per-row field) |
+| Supply preview | `GET /api/supply?role&location&remote` (public, no session, read-only: the count of open, apply-supported freehire `jobs` in `app.sqlite` (§5.2, ADR 0047), grouped by system, optionally filtered by one freehire category id or retired category/granular role label, one canonical place id with an optional city radius and `remote=true`; the non-job exclusion is the reader's, and the count never reads the legacy catalog; cached per filter for 30 s and answered `Cache-Control: public, max-age=60, stale-while-revalidate=300`; at most 120 requests a minute per client IP → `429 rate_limited`; never returns a Company, title or any per-row field) |
 | Shell | `GET /api/nav` (the counts behind the nav badges: Applications in Ready, open Reviews, unread employer mail; a zero hides its badge) |
 | Events | `GET /api/events` (SSE; signed-in only, per user: a stream carries just that user's rows and never a row with no owner; `Last-Event-ID` replay is capped to the newest 200 rows, so a reconnect from `0` cannot dump the whole log; heartbeat 25 s) |
 | Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, ready-to-send count, queued count + next send time, `nextPrepAt`, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, activity, check-ins, and recent "Couldn't apply" rows with their plain-English reason and a safe `applyUrl`) · `POST /api/running` `{running}` |
@@ -1692,7 +1694,7 @@ site" link, at 390 and 1280 in both themes · 36. a Posting behind a login wall 
 admin support lookup shows one application's timeline, attempts and screenshots, and a screenshot older than 30 days is
 gone
 
-Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038). The landing's live supply preview is walked end to end with seeded jobs: the count follows a role, location and remote change, the fallback paragraph replaces it when the API answers 503, and the page stays axe clean at 390 and 1280 in both themes (#567).
+Plus: route reachability for every page, interactive/layout guards (`interactive-*`, `layout-guards-*`), WCAG AA `axe` checks on every route, and seeded per-screen E2E checks across 390 / 1280 px light and dark (ADR 0038). The landing's live supply preview is walked end to end with seeded freehire `jobs`: the count follows a role, location and remote change, the fallback paragraph replaces it when the API answers 503, and the page stays axe clean at 390 and 1280 in both themes (#567, #742).
 
 ### 16.2 Unit tests (`bun:test`, beside their code)
 
@@ -1721,7 +1723,6 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/matching/match-sort.test.ts` | the code sort is band-first, ties break on exact role then score then newest then posting id, blockers hide a job, a missing score never shows a number, onboarding takes the first job from each new employer, and a page never repeats or skips (#686) |
 | `src/server/matching/match-scoring.test.ts` | the score schema accepts only the anchored sub-scores and the fixed blocker list, an invalid reply is retried once and then rejected, the prompt puts the resume and rubric first, and one job per call is asserted (#686) |
 | `src/server/matching/jobs-pool.test.ts` | the pool is role (freehire category or title word), place ids and language only, a `Remote · X` pick matches only a remote posting scoped to X, a job with no work mode matches by city or country only, non-jobs are excluded, and no removed field (salary, work mode, seniority, employment type) is read (#684, #685) |
-| `src/server/catalog/supply.test.ts` | the public supply count reads only open, apply-supported catalog Postings, splits by ATS, filters by role, place id and remote, caches per catalog revision, stays bounded, and plans through the catalog indexes rather than scanning every row (#567) |
 | `src/server/matching/posting-flags.test.ts` | a login wall flags a Posting on the first failure and a broken form on the second, a flagged Posting leaves candidate matching, and the threshold is per reason (#576) |
 | `src/server/dispatch/browser/kernel.test.ts` | Kernel opens headless by default and escalates to headful stealth only after a block or CAPTCHA, and every session is deleted through the control API even when its usage read fails |
 | `src/server/dispatch/browser/proxy-trim.test.ts` | a generic image is aborted while a CAPTCHA host's image still loads, and the font, media and tracker blocks are unchanged |
@@ -1750,7 +1751,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/admin/support.test.ts` | the Support Queue lists newest-first with messages opened through the person's key (an unreadable message stays listed), the open count never counts a settled ticket, `PATCH` stamps `resolvedAt` once and clears it on reopen while writing `support.update` in the same transaction, and a reply mails the author with `[Ref: …]` and writes `support.reply` only when the send succeeded (_#513_) |
 | `src/server/platform/audit/index.test.ts` | admin audit filtering avoids wildcard injection and composite timestamp-id cursors paginate deterministically across tied timestamps (#517) |
 | `src/server/platform/crypto.test.ts` | wrap/unwrap, AAD, shred |
-| `src/server/platform/db/hot-path-indexes.test.ts` | the SSE catch-up, event retention, message-by-person, application-by-status and grant-ledger queries are planned through `events_user_seq`, `events_created_at`, `messages_user_created`, `applications_user_status` and `grants_user_starts` (#506) |
+| `src/server/platform/db/hot-path-indexes.test.ts` | the SSE catch-up, event retention, message-by-person, application-by-status, grant-ledger, candidate-board and public-supply queries are planned through `events_user_seq`, `events_created_at`, `messages_user_created`, `applications_user_status`, `grants_user_starts` and the `jobs` status/category indexes (#506, #742) |
 | `src/server/platform/db/migration-snapshot.test.ts` | migration `0056_snapshot_decouple` backfills the copied display fields onto every existing Application, including readable placeholders when the job row is already gone, and leaves `applications`, `matches`, `posting_user_state` and `skip_companies` with no foreign key into `jobs` (#422) |
 | `src/server/platform/db/restore-check.test.ts` | the restored-database check reads only, refuses outbound calls and leaves `bg_jobs` untouched (#412) |
 | `src/server/platform/event-loop-lag.test.ts` | a late timer tick reports how long the loop was blocked, once per cooldown |
@@ -1779,7 +1780,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/profile/time-zone.test.ts` | an empty timezone change takes no write (#430) |
 | `src/server/profile/v1-import.test.ts` | the v1 answer-bank and learned-answer mapping |
 | `src/server/routes/ready.test.ts` | a corrupt or non-list `changes` value degrades to an empty card list rather than a 500; generated prose is detected while saved answers stay bulk-approvable; the dwell time bound is enforced on single and batch approval and never becomes a metric label (#590) |
-| `src/server/routes/supply.test.ts` | `/api/supply` answers a signed-out visitor with a public, cacheable aggregate, filters by role, location and remote, refuses an unknown role or a one-character place with `invalid_request`, and rate limits one client IP without touching another (#567) |
+| `src/server/routes/supply.test.ts` | `/api/supply` answers a signed-out visitor with a public, cacheable aggregate of the open freehire `jobs` rows even when the legacy catalog is empty, filters by freehire or retired category, place, radius and remote, excludes closed rows and non-jobs, keeps location suggestions consistent with the counted place ids, refuses an unknown role or a one-character place with `invalid_request`, and rate limits one client IP without touching another (#567, #742) |
 | `src/shared/apply-alias.test.ts` | an apply handle is the first and last name in lowercase ASCII, never a reserved system local part or its first dot-label, and a new plan uses the alias or the sign-in email rather than the editable email Fact (#566) |
 | `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |
 | `src/shared/dossier.test.ts` | the file is sent as-is only when the sent hash equals the stored resume hash, a Fact is named only when the snapshot recorded its key, and a "did not happen" line appears only when the stored data proves it |

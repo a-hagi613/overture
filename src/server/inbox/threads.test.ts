@@ -105,7 +105,7 @@ async function addThread(
         companyNameNorm: "northwind",
         postingTitle: "Platform Engineer",
         postingUrl: `https://example.test/job-${String(input.index)}`,
-        origin: "auto",
+        origin: "pick",
         status: "sent",
         stage: "applied",
         sentAt: at,

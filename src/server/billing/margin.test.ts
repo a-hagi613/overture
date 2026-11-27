@@ -136,7 +136,7 @@ test("the margin report carries the stored breakdown per plan and overall", () =
       companyNameNorm: "engineer co",
       createdAt: NOW,
       id: "app-a",
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-a",
       postingTitle: "Engineer",
       postingUrl: "https://example.test/jobs/a",

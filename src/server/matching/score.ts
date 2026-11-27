@@ -1,4 +1,4 @@
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
@@ -8,17 +8,9 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { RankedCandidate } from "./candidates.ts";
 import type { PostingDisplay } from "./applications.ts";
 
-import {
-  applications,
-  matches,
-  postingUserState,
-  profiles,
-  resumes,
-  users,
-} from "../platform/db/schema.ts";
+import { matches, postingUserState, profiles, resumes, users } from "../platform/db/schema.ts";
 import { companies, postingTags, postings } from "../platform/db/catalog-schema.ts";
 
-import { applicationsLeft } from "../billing/ledger.ts";
 import type { SpendGate } from "../billing/spend.ts";
 import { ungatedSpend } from "../billing/spend.ts";
 import { checkLlmCaps } from "../platform/llm/caps.ts";
@@ -29,21 +21,13 @@ import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { getSettingNumber } from "../platform/settings/index.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService } from "../profile/targets.ts";
-import {
-  activeApplicationCompanies,
-  applicationFor,
-  createApplication,
-  createClosedApplication,
-} from "./applications.ts";
+import { applicationFor, createApplication, createClosedApplication } from "./applications.ts";
 import { createCandidateService } from "./candidates.ts";
 import { descriptionSummary, postingRoleName, scoreTagsLine, targetsLine } from "./judge-input.ts";
 import { pickStatusOfApplication } from "../../shared/onboarding.ts";
 
 export const SCORE_PURPOSE = "score";
 
-const WAITING_STATUSES = ["preparing", "ready", "approved"] as const;
-
-const CHUNK_SIZE = 5;
 const RESUME_DIGEST_CHARS = 1500;
 
 const OUTPUT_SCHEMA: LlmOutputSchema = {
@@ -86,7 +70,6 @@ interface ScoreContext {
   resumeDigest: string;
   targetsVersion: number;
   targetsLine: string;
-  threshold: number;
 }
 
 function truncateReason(reason: string) {
@@ -185,18 +168,7 @@ export function createMatchingService(deps: MatchDeps) {
       resumeId: resume?.id ?? null,
       targetsVersion: targets.version,
       targetsLine: targetsLine(targets.targets),
-      threshold: getSettingNumber(db, "match.auto_threshold_default"),
     };
-  }
-
-  function descriptionsFor(postingIds: readonly string[]) {
-    const rows = catalogDb
-      .select({ id: postings.id, descriptionGz: postings.descriptionGz })
-      .from(postings)
-      .where(inArray(postings.id, [...postingIds]))
-      .all();
-
-    return new Map(rows.map((row) => [row.id, row.descriptionGz]));
   }
 
   function cachedMatch(userId: string, postingId: string, context: ScoreContext) {
@@ -462,175 +434,6 @@ export function createMatchingService(deps: MatchDeps) {
     return { applicationId, created: true };
   }
 
-  async function fill(userId: string) {
-    const settings = await targetsService.read(userId);
-    const { languages } = await languagesService.read(userId);
-    const at = clock.now();
-    const createdIds: string[] = [];
-
-    const list = await candidates.ranked(userId, settings.targets, languages);
-
-    for (const candidate of list) {
-      db.insert(matches)
-        .values({ userId, postingId: candidate.id, codeRank: candidate.codeRank })
-        .onConflictDoUpdate({
-          target: [matches.userId, matches.postingId],
-          set: { codeRank: candidate.codeRank },
-        })
-        .run();
-    }
-
-    const context = await contextFor(userId);
-
-    if (list.length === 0) {
-      return {
-        applicationsCreated: 0,
-        blocked: false,
-        candidates: 0,
-        createdIds,
-        scored: 0,
-      };
-    }
-
-    const dailyCap = getSettingNumber(db, "limits.daily_cap");
-    const limit = Math.max(0, Math.min(dailyCap, applicationsLeft(db, userId, at)));
-
-    const waiting =
-      db
-        .select({ total: count() })
-        .from(applications)
-        .where(and(eq(applications.userId, userId), inArray(applications.status, WAITING_STATUSES)))
-        .get()?.total ?? 0;
-
-    let need = Math.max(0, limit - waiting);
-
-    if (need === 0) {
-      return {
-        applicationsCreated: 0,
-        blocked: false,
-        candidates: list.length,
-        createdIds,
-        scored: 0,
-      };
-    }
-
-    const companiesUsed = activeApplicationCompanies(db, userId);
-    let scored = 0;
-    let applicationsCreated = 0;
-
-    function offerApplication(candidate: RankedCandidate, score: number) {
-      if (need <= 0 || score < context.threshold || companiesUsed.has(candidate.companyId)) {
-        return;
-      }
-
-      const created = createApplication({ db, catalogDb }, clock.now(), {
-        origin: "auto",
-        postingId: candidate.id,
-        score,
-        userId,
-      });
-
-      if (created !== null) {
-        companiesUsed.add(candidate.companyId);
-        applicationsCreated += 1;
-        createdIds.push(created);
-        need -= 1;
-      }
-    }
-
-    for (const candidate of list) {
-      if (need <= 0) {
-        break;
-      }
-
-      const cached = cachedMatch(userId, candidate.id, context);
-
-      if (cached !== null) {
-        offerApplication(candidate, cached.score);
-      }
-    }
-
-    const unscored: RankedCandidate[] = [];
-    let blocked = false;
-
-    for (const candidate of list) {
-      if (need <= 0) {
-        break;
-      }
-
-      if (cachedMatch(userId, candidate.id, context) === null) {
-        unscored.push(candidate);
-      }
-    }
-
-    async function scoreNextChunk(start: number) {
-      if (start >= unscored.length || need <= 0) {
-        return;
-      }
-
-      const chunk = unscored.slice(start, start + Math.min(CHUNK_SIZE, need));
-      const descriptions = descriptionsFor(chunk.map((candidate) => candidate.id));
-
-      const requests = chunk.map((candidate, index) =>
-        scoreRequest({
-          customId: `score-${String(index)}`,
-          title: candidate.title,
-          company: candidate.companyName,
-          location: candidate.locationRaw ?? "unknown",
-          workplace: candidate.workplace,
-          employmentType: candidate.employmentType,
-          salary:
-            candidate.salaryMinMinor === null || candidate.salaryCurrency === null
-              ? "none listed"
-              : `${candidate.salaryCurrency} ${String(Math.round(candidate.salaryMinMinor / 100))} per ${candidate.salaryPeriod ?? "year"}`,
-          tags: scoreTagsLine(candidate.tags),
-          summary: descriptionSummary(descriptions.get(candidate.id) ?? null),
-          targets: context.targetsLine,
-          resumeDigest: context.resumeDigest,
-        }),
-      );
-
-      const results = await runScoreRequests(userId, requests);
-
-      if (results.size === 0) {
-        blocked = true;
-
-        return;
-      }
-
-      let scoredThisChunk = 0;
-
-      for (const [index, candidate] of chunk.entries()) {
-        const output = results.get(`score-${String(index)}`);
-
-        if (output === undefined) {
-          continue;
-        }
-
-        scoredThisChunk += 1;
-        scored += 1;
-        writeMatch(userId, candidate.id, candidate.codeRank, output, context);
-        offerApplication(candidate, output.score);
-      }
-
-      if (scoredThisChunk === 0) {
-        return;
-      }
-
-      await scoreNextChunk(start + chunk.length);
-    }
-
-    await scoreNextChunk(0);
-
-    return {
-      applicationsCreated,
-      blocked,
-      candidates: list.length,
-      createdIds,
-      scored,
-    };
-  }
-
   async function upNext(userId: string, limit: number) {
     const settings = await targetsService.read(userId);
     const { languages } = await languagesService.read(userId);
@@ -727,35 +530,6 @@ export function createMatchingService(deps: MatchDeps) {
     };
   }
 
-  async function prepareOne(userId: string, postingId: string) {
-    const existing = applicationFor(db, userId, postingId);
-
-    if (existing !== undefined) {
-      return existing.id;
-    }
-
-    const refused = await candidates.check(userId, postingId);
-
-    if (refused !== null) {
-      return null;
-    }
-
-    const applicationId = createApplication({ db, catalogDb }, clock.now(), {
-      origin: "manual",
-      postingId,
-      score: null,
-      userId,
-    });
-
-    if (applicationId === null) {
-      return null;
-    }
-
-    enqueueApplicationPrepare(db, clock, applicationId);
-
-    return applicationId;
-  }
-
   async function preparePick(userId: string, pick: { display: PostingDisplay; postingId: string }) {
     const existing = applicationFor(db, userId, pick.postingId);
 
@@ -791,7 +565,7 @@ export function createMatchingService(deps: MatchDeps) {
     const applicationId = createApplication(
       { db, catalogDb },
       clock.now(),
-      { origin: "manual", postingId: pick.postingId, score: null, userId },
+      { origin: "pick", postingId: pick.postingId, score: null, userId },
       pick.display,
     );
 
@@ -823,29 +597,7 @@ export function createMatchingService(deps: MatchDeps) {
     return new Map(results.map((result) => [result.postingId, result]));
   }
 
-  async function prepareFrom(
-    userId: string,
-    postingIds: readonly string[],
-    index: number,
-    created: readonly string[],
-  ) {
-    const postingId = postingIds.at(index);
-
-    if (postingId === undefined) {
-      return [...created];
-    }
-
-    const applicationId = await prepareOne(userId, postingId);
-    const next = applicationId === null ? created : [...created, applicationId];
-
-    return prepareFrom(userId, postingIds, index + 1, next);
-  }
-
-  async function prepareChosen(userId: string, postingIds: readonly string[]) {
-    return prepareFrom(userId, postingIds, 0, []);
-  }
-
-  return { applyManually, fill, prepareChosen, preparePicks, preview, scoreOnOpen, upNext };
+  return { applyManually, preparePicks, preview, scoreOnOpen, upNext };
 }
 
 export type MatchingService = ReturnType<typeof createMatchingService>;

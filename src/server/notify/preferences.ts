@@ -12,7 +12,7 @@ import {
 import type { NotificationPreferenceKey } from "../../shared/notifications.ts";
 import { settings } from "../platform/db/schema.ts";
 
-const storedSchema = z.partialRecord(z.enum(NOTIFICATION_PREFERENCE_KEYS), z.boolean());
+const storedSchema = z.record(z.string(), z.boolean());
 
 function storedPreferences(db: AppDatabase, userId: string) {
   const row = db
@@ -28,16 +28,29 @@ function storedPreferences(db: AppDatabase, userId: string) {
   try {
     const parsed = storedSchema.safeParse(JSON.parse(row.value));
 
-    return parsed.success ? parsed.data : {};
+    if (!parsed.success) {
+      return {};
+    }
+
+    const stored: Partial<Record<NotificationPreferenceKey, boolean>> = {};
+
+    for (const key of NOTIFICATION_PREFERENCE_KEYS) {
+      const value = parsed.data[key];
+
+      if (value !== undefined) {
+        stored[key] = value;
+      }
+    }
+
+    return stored;
   } catch {
     return {};
   }
 }
 
 /**
- * Every notification kind and the Recap email switch for one user. A kind with
- * no stored row is on, so a new user hears about everything until they turn it
- * off (SPEC §15.1).
+ * Every notification kind for one user. A kind with no stored row is on, so a
+ * new user hears about everything until they turn it off (SPEC §15.1).
  * @param db The application database.
  * @param userId The signed-in user.
  * @returns The user's preferences, keyed by preference kind.
@@ -52,7 +65,7 @@ export function readNotificationPreferences(db: AppDatabase, userId: string) {
  * Whether one kind of push or list row may be delivered to the user.
  * @param db The application database.
  * @param userId The user the notification is for.
- * @param key The notification kind, or `recap_email`.
+ * @param key The notification kind.
  * @returns True unless the user turned that kind off.
  */
 export function notificationPreferenceEnabled(

@@ -284,7 +284,7 @@ export function HomePage() {
             <HomeMatches items={home.newMatches.items} total={home.newMatches.total} />
           </div>
 
-          {caughtUp ? <HomeCaughtUp nextPrepAt={home.nextPrepAt} zone={home.timeZone} /> : null}
+          {caughtUp ? <HomeCaughtUp /> : null}
 
           {showFailures ? (
             <div className="mt-3">

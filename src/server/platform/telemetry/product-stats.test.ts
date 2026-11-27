@@ -89,7 +89,7 @@ function seed() {
     companyName: "Ferro",
     companyNameNorm: "ferro",
     createdAt: NOW,
-    origin: "auto" as const,
+    origin: "pick" as const,
     postingTitle: "Nurse",
     postingUrl: "https://boards.example/1",
     updatedAt: NOW,

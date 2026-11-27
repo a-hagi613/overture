@@ -41,7 +41,7 @@ function seeded() {
       companyNameNorm: "northwind",
       postingTitle: "Platform Engineer",
       postingUrl: "https://example.test/job-1",
-      origin: "auto",
+      origin: "pick",
       status: "sent",
       stage: "applied",
       sentAt: NOW,
