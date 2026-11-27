@@ -17,7 +17,7 @@ export function backfillJobLanguages(db: AppDatabase) {
     .select({ description: jobs.description, id: jobs.id })
     .from(jobs)
     .where(isNull(jobs.language))
-    .limit(5_000)
+    .limit(5000)
     .all();
 
   let updated = 0;
