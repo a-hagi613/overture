@@ -28,17 +28,29 @@ answer steps, not the browser session.
 
 ## `jobs.pull`
 
-**Means:** three pulls in a row failed. The alert detail carries `error` (the
-source's message, capped at 300 characters), `mode` (`full`, `fresh` or
-`changes`), `userCount` and the current `failures` count.
+**Means:** three pulls in a row failed, or a successful pull skipped a posting
+whose store step threw. A failure alert carries `error` (capped at 300
+characters), `mode` (`full`, `fresh` or `changes`), `userCount` and the current
+`failures` count. A skipped-posting alert carries `failedJob`, `error`,
+`failed`, `groupKey`, `mode` and `userCount`.
 
 **First check:** read `jobs.pull_last_error` and the `jobs.pull.failed` events,
 or run the `pull-error` action in the Ops live workflow, which prints the ten
 latest failed `job_pull_runs` rows and both settings from the live database.
-A freehire 429 or 5xx is usually transient; a 4xx or a shape error means the
-source changed. A still-failing pull pages at most every six hours (or every 24
-more failures), so a repeat page means it has not recovered. No job is deleted
-or closed while the pull fails.
+Then read the latest `job_pull_runs` rows (`error`, `first_error`, `failed`,
+`group_key`, `mode`). A freehire 429 or 5xx is usually transient; a 4xx or a
+shape error means the source changed. A still-failing pull pages at most every
+six hours (or every 24 more failures), so a repeat page means it has not
+recovered. No job is deleted or closed while the pull fails.
+
+A single poisoned posting no longer fails the group: the run is recorded with
+`failed > 0`, a null `error`, the first skip in `first_error`, and the
+`jobs.pull` event's `firstSkipped` object; the remaining postings are stored and
+the pull counts as successful. Read `first_error` for the posting's public slug,
+source, external id and message. The skip alert is raised once per distinct
+posting, so it does not page on every tick. A page that fails the source shape
+still appears as a failed run (`error` set, `first_error` null) and is never
+treated as a skipped row.
 
 ## `match.unscored`
 

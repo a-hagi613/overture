@@ -48,6 +48,7 @@ const SETTING_DEFAULTS = {
   "jobs.pull_last_error": "",
   "jobs.pull_last_alert_at": "0",
   "jobs.pull_alerted_failures": "0",
+  "jobs.pull_last_skipped": "",
   "jobs.pull_enabled": "true",
   "catalog.sweep_max_boards": "20",
   "backups.replica_read_interval_ms": "30000",
