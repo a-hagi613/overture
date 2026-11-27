@@ -1,0 +1,99 @@
+name: Ops volume
+
+# Guarded, manual volume maintenance for overture-web. Fly bills a volume by its provisioned size and volumes
+# cannot shrink in place, so the only way to replace the 10 GB volume is: create a smaller one, point [mounts] at
+# it in fly.toml, deploy (the entrypoint restores app.sqlite from Litestream), verify, then destroy the old one.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        required: true
+        type: choice
+        options:
+          - list
+          - create
+          - destroy
+      name:
+        description: "Volume name (must start with data)"
+        required: true
+        type: string
+      size:
+        description: "Size in GB for create"
+        required: false
+        default: "2"
+        type: string
+      confirm:
+        description: "Type the volume name again to allow destroy"
+        required: false
+        type: string
+
+concurrency:
+  group: ops-volume
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  volume:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      ACTION: ${{ inputs.action }}
+      NAME: ${{ inputs.name }}
+      SIZE: ${{ inputs.size }}
+      CONFIRM: ${{ inputs.confirm }}
+      APP: overture-web
+      REGION: yyz
+    steps:
+      - name: Refuse without FLY_API_TOKEN
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::FLY_API_TOKEN is not set; nothing ran."
+            exit 1
+          fi
+      - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Run the volume action
+        run: |
+          set -euo pipefail
+          case "$NAME" in
+            data*) ;;
+            *)
+              echo "::error::Refusing a volume name outside the data volumes."
+              exit 1
+              ;;
+          esac
+          case "$ACTION" in
+            list)
+              flyctl volumes list -a "$APP"
+              ;;
+            create)
+              if flyctl volumes list -a "$APP" --json | jq -e --arg name "$NAME" '.[] | select(.name == $name)' >/dev/null; then
+                echo "volume $NAME already exists"
+              else
+                flyctl volumes create "$NAME" --size "$SIZE" --region "$REGION" -a "$APP" --yes
+              fi
+              flyctl volumes list -a "$APP"
+              ;;
+            destroy)
+              if [ "$CONFIRM" != "$NAME" ]; then
+                echo "::error::Set confirm to the volume name to allow a destroy."
+                exit 1
+              fi
+              id="$(flyctl volumes list -a "$APP" --json | jq -r --arg name "$NAME" '.[] | select(.name == $name) | .id')"
+              if [ -z "$id" ]; then
+                echo "volume $NAME does not exist"
+                exit 0
+              fi
+              flyctl volumes destroy "$id" -a "$APP" --yes
+              flyctl volumes list -a "$APP"
+              ;;
+            *)
+              echo "::error::Unknown action $ACTION."
+              exit 1
+              ;;
+          esac
