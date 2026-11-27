@@ -26,6 +26,7 @@ import {
 } from "./preferences.ts";
 import type { JobStore } from "./store.ts";
 import { enqueueMatchScoreNew, enqueueMatchScorePool } from "../matching/match-jobs.ts";
+import { redactPullError } from "./pull-error.ts";
 
 export const JOBS_PULL_JOB_KIND = "jobs.pull";
 export const JOBS_PULL_USER_JOB_KIND = "jobs.pull.user";
@@ -36,13 +37,11 @@ const MAX_OFFSET = 10_000;
 const ALERT_AFTER_FAILURES = 3;
 const ALERT_REPEAT_AFTER_MS = 6 * 60 * 60_000;
 const ALERT_REPEAT_AFTER_FAILURES = 24;
-const ALERT_ERROR_MAX_CHARS = 300;
 const FAILURE_SETTING = "jobs.pull_failures";
 const LAST_ERROR_SETTING = "jobs.pull_last_error";
 const LAST_ALERT_AT_SETTING = "jobs.pull_last_alert_at";
 const ALERTED_FAILURES_SETTING = "jobs.pull_alerted_failures";
 const CURSOR_SETTING = "jobs.changes_cursor";
-const URL_CREDENTIALS = /\/\/[^/@\s]+@/gu;
 
 const stringArray = z.array(z.string());
 
@@ -58,10 +57,6 @@ const MEMBER_COLUMNS = {
 
 function stringArrayFromColumn(value: string) {
   return stringArray.parse(JSON.parse(value));
-}
-
-function alertErrorText(message: string) {
-  return message.replaceAll(URL_CREDENTIALS, "//[redacted]@").slice(0, ALERT_ERROR_MAX_CHARS);
 }
 
 /** One grouped pull's tally, also written to the event log and to `job_pull_runs`. */
@@ -271,7 +266,7 @@ export function createPullService(deps: PullDeps) {
     error: Error,
   ) {
     const failures = storedNumber(FAILURE_SETTING) + 1;
-    const errorText = alertErrorText(error.message);
+    const errorText = redactPullError(error.message);
     const now = clock.now();
 
     setSetting(db, clock, FAILURE_SETTING, String(failures), "system:jobs.pull");

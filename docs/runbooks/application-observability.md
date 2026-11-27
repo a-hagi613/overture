@@ -33,11 +33,12 @@ source's message, capped at 300 characters), `mode` (`full`, `fresh` or
 `changes`), `userCount` and the current `failures` count.
 
 **First check:** read `jobs.pull_last_error` and the `jobs.pull.failed` events,
-then the latest `job_pull_runs` rows (`error`, `group_key`, `mode`). A freehire
-429 or 5xx is usually transient; a 4xx or a shape error means the source
-changed. A still-failing pull pages at most every six hours (or every 24 more
-failures), so a repeat page means it has not recovered. No job is deleted or
-closed while the pull fails.
+or run the `pull-error` action in the Ops live workflow, which prints the ten
+latest failed `job_pull_runs` rows and both settings from the live database.
+A freehire 429 or 5xx is usually transient; a 4xx or a shape error means the
+source changed. A still-failing pull pages at most every six hours (or every 24
+more failures), so a repeat page means it has not recovered. No job is deleted
+or closed while the pull fails.
 
 ## `match.unscored`
 
