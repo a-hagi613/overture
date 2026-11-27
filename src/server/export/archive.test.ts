@@ -61,7 +61,7 @@ function seededDatabase() {
         companyNameNorm: "ferro cloud",
         createdAt: NOW + index,
         id: `application-${String(index).padStart(3, "0")}`,
-        origin: "auto",
+        origin: "pick",
         postingId: `posting-${String(index)}`,
         postingTitle: "Senior Platform Engineer",
         postingUrl: "https://boards.example/jobs/1",
@@ -156,7 +156,7 @@ describe("the account export's pagination", () => {
               `insert into applications (id, user_id, posting_id, company_id, company_name, company_name_norm,
                  posting_title, posting_url, origin, status, created_at, updated_at)
                values (?, ?, 'posting-late', 'company-late', 'Late Cloud', 'late cloud',
-                 'Staff Engineer', 'https://boards.example/jobs/late', 'auto', 'ready', ?, ?)`,
+                 'Staff Engineer', 'https://boards.example/jobs/late', 'pick', 'ready', ?, ?)`,
             )
             .run(LATE_APPLICATION_ID, USER_ID, NOW + 999, NOW + 999);
         } finally {

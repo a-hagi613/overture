@@ -923,7 +923,7 @@ export const applications = sqliteTable(
     salaryMinMinor: integer("salary_min_minor"),
     salaryMaxMinor: integer("salary_max_minor"),
     salaryPeriod: text("salary_period", { enum: ["year", "month", "hour"] }),
-    origin: text("origin", { enum: ["auto", "manual"] }).notNull(),
+    origin: text("origin", { enum: ["pick", "manual"] }).notNull(),
     status: text("status", {
       enum: [
         "preparing",

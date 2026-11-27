@@ -212,7 +212,7 @@ async function seedApplication(
   });
 
   const seeded = await catalog.post(`${appUrl}/__test__/applications/seed`, {
-    data: { origin: "auto", postingId, status, userId },
+    data: { origin: "pick", postingId, status, userId },
   });
 
   const applicationId = z.object({ id: z.string() }).parse(await seeded.json()).id;

@@ -83,9 +83,6 @@ export function createMeteredMailSender(db: AppDatabase, clock: Clock, adapter: 
     sendAccountDeleted: async (mail) => {
       await metered("system", async () => adapter.sendAccountDeleted(mail));
     },
-    sendReadyRecap: async (mail) => {
-      await metered("notice", async () => adapter.sendReadyRecap(mail));
-    },
     sendExportReady: async (mail) => {
       await metered("notice", async () => adapter.sendExportReady(mail));
     },

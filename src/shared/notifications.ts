@@ -1,7 +1,6 @@
 /**
  * What the app tells a user about, in the order Settings lists it (#228). One
- * entry per kind of push and in-app list row; `recap_email` is the separate
- * switch for the one Recap email (SPEC §15.1).
+ * entry per kind of push and in-app list row (SPEC §15.1).
  */
 export const NOTIFICATION_KINDS = [
   "ready",
@@ -17,12 +16,7 @@ export const NOTIFICATION_KINDS = [
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
-export const RECAP_EMAIL_PREFERENCE = "recap_email";
-
-export const NOTIFICATION_PREFERENCE_KEYS = [
-  ...NOTIFICATION_KINDS,
-  RECAP_EMAIL_PREFERENCE,
-] as const;
+export const NOTIFICATION_PREFERENCE_KEYS = NOTIFICATION_KINDS;
 
 export type NotificationPreferenceKey = (typeof NOTIFICATION_PREFERENCE_KEYS)[number];
 
@@ -46,7 +40,6 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   offer: true,
   paused: true,
   ready: true,
-  recap_email: true,
   reply: true,
   review: true,
   stage_move: true,

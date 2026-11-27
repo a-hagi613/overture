@@ -117,7 +117,6 @@
     "test/e2e/pacing-and-gates.test.ts": 47.7,
     "test/e2e/passwordless-auth.test.ts": 19.7,
     "test/e2e/plan-changes.test.ts": 14,
-    "test/e2e/prep-daily.test.ts": 23.5,
     "test/e2e/profile-resume-r2.test.ts": 3.5,
     "test/e2e/profile-resume.test.ts": 17.8,
     "test/e2e/profile-strengthen.test.ts": 5.1,

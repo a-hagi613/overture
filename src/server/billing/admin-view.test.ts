@@ -156,7 +156,7 @@ function sentApplication(
       companyNameNorm: "engineer co",
       createdAt: input.at,
       id: input.id,
-      origin: "auto",
+      origin: "pick",
       postingId: `posting-${input.id}`,
       postingTitle: "Engineer",
       postingUrl: `https://example.test/jobs/${input.id}`,

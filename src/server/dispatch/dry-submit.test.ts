@@ -229,7 +229,7 @@ describe("a dry submit never looks like a provider result", () => {
         companyNameNorm: "engineer co",
         createdAt: 1,
         id: "app-dry",
-        origin: "auto",
+        origin: "pick",
         postingId: "posting-dry",
         postingTitle: "Engineer",
         postingUrl: "https://example.test/jobs/dry",

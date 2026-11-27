@@ -12,12 +12,9 @@ import { startGreenhouseQuestionsFixture } from "./greenhouse-questions.fixture.
 import {
   clearCatalog,
   clockNow,
-  clockState,
   configureMatching,
   grantApplications,
-  moveClockTo,
   ownerContextFor,
-  runPrepDaily,
   seedApplication,
   seedBoard,
   seedCompany,
@@ -51,19 +48,10 @@ const test = appTest.extend<{
   ],
 });
 
-const matchRowSchema = z.object({
-  postingId: z.string(),
-  codeRank: z.number(),
-  score: z.number().nullable(),
-  reason: z.string().nullable(),
-});
-
-const matchesSchema = z.object({ matches: z.array(matchRowSchema) });
-
 const applicationRowSchema = z.object({
   id: z.string(),
   postingId: z.string(),
-  origin: z.enum(["auto", "manual"]),
+  origin: z.enum(["pick", "manual"]),
   status: z.string(),
 });
 
@@ -78,58 +66,6 @@ const postingSchema = z.object({
 
 const appliedSchema = z.object({ applicationId: z.string(), created: z.boolean() });
 
-const notificationsSchema = z.object({
-  notifications: z.array(z.object({ body: z.string(), kind: z.string(), title: z.string() })),
-});
-
-const llmUsageSchema = z.object({
-  totals: z.object({ calls: z.number(), costMicros: z.number() }),
-});
-
-const jobSchema = z.object({
-  id: z.string(),
-  kind: z.string(),
-  runAt: z.number(),
-  status: z.string(),
-  dedupeKey: z.string().nullable(),
-});
-
-const jobsSchema = z.object({ jobs: z.array(jobSchema) });
-
-async function seedCompanies(
-  owner: APIRequestContext,
-  prefix: string,
-  count: number,
-  extra: { salaryMinMinor: number | null; postedAt?: number },
-) {
-  return Promise.all(
-    Array.from({ length: count }, async (_, index) => {
-      const name = `${prefix} ${String(index)}`;
-      const companyId = await seedCompany(owner, name, `${prefix}-${String(index)}.example`);
-      const boardId = await seedBoard(owner, companyId, "greenhouse", `${prefix}-${String(index)}`);
-
-      return seedPosting(owner, {
-        atsJobId: `${prefix}-${String(index)}`,
-        boardId,
-        companyId,
-        postedAt: extra.postedAt === undefined ? null : extra.postedAt - index * 1000,
-        salaryMinMinor: extra.salaryMinMinor,
-        salaryCurrency: extra.salaryMinMinor === null ? null : "CAD",
-        title: "Senior Backend Engineer",
-        url: `https://${prefix}-${String(index)}.example/1`,
-      });
-    }),
-  );
-}
-
-async function matchesFor(owner: APIRequestContext, userId: string) {
-  const body: unknown = await (
-    await owner.get(`/__test__/matches?userId=${encodeURIComponent(userId)}`)
-  ).json();
-
-  return matchesSchema.parse(body).matches;
-}
-
 async function applicationsFor(owner: APIRequestContext, userId: string) {
   const body: unknown = await (
     await owner.get(`/__test__/applications?userId=${encodeURIComponent(userId)}`)
@@ -137,148 +73,6 @@ async function applicationsFor(owner: APIRequestContext, userId: string) {
 
   return applicationsSchema.parse(body).applications;
 }
-
-async function alertsFor(owner: APIRequestContext, userId: string) {
-  const body: unknown = await (
-    await owner.get(`/__test__/notifications?userId=${encodeURIComponent(userId)}`)
-  ).json();
-
-  return notificationsSchema.parse(body).notifications.filter((note) => note.kind === "alert");
-}
-
-async function scoreSpendMicros(owner: APIRequestContext) {
-  return llmUsageSchema.parse(await (await owner.get("/__test__/llm/usage?purpose=score")).json())
-    .totals.costMicros;
-}
-
-test("the daily run fills the free Ready slots in rank order and never scores twice", async ({
-  matching,
-}) => {
-  const { owner, userId } = await ownerContextFor(matching.server.url);
-
-  await clearCatalog(owner);
-  await grantApplications(owner, 70);
-  await configureMatching(owner);
-
-  const now = await clockNow(owner);
-
-  const paid = await seedCompanies(owner, "paid", 10, {
-    postedAt: now - 20 * 86_400_000,
-    salaryMinMinor: 15_000_000,
-  });
-
-  const unpaid = await seedCompanies(owner, "unpaid", 10, {
-    postedAt: now - 15 * 86_400_000,
-    salaryMinMinor: null,
-  });
-
-  await runPrepDaily(owner, userId);
-
-  const applications = await applicationsFor(owner, userId);
-  const matches = await matchesFor(owner, userId);
-  const scored = matches.filter((row) => row.score !== null);
-
-  expect(applications).toHaveLength(10);
-  expect(scored).toHaveLength(10);
-  expect(matching.anthropic.requests()).toHaveLength(10);
-
-  for (const id of unpaid) {
-    expect(scored.some((row) => row.postingId === id)).toBe(true);
-  }
-
-  for (const id of paid) {
-    expect(scored.some((row) => row.postingId === id)).toBe(false);
-  }
-
-  const reasons = scored.map((row) => row.reason);
-
-  expect(reasons.every((reason) => reason !== null && reason.length <= 140)).toBe(true);
-
-  await runPrepDaily(owner, userId);
-
-  expect(await applicationsFor(owner, userId)).toHaveLength(10);
-  expect((await matchesFor(owner, userId)).filter((row) => row.score !== null)).toHaveLength(10);
-  expect(matching.anthropic.requests()).toHaveLength(10);
-
-  const alerts = await alertsFor(owner, userId);
-
-  expect(
-    alerts.filter((alert) => alert.title === "Overture alert: match.score_bound"),
-  ).toHaveLength(0);
-
-  await owner.dispose();
-});
-
-test("a strict threshold scores the whole pool without a scoring bound or a tripped LLM cap", async ({
-  matching,
-}) => {
-  const { owner, userId } = await ownerContextFor(matching.server.url);
-
-  await clearCatalog(owner);
-  await grantApplications(owner, 70);
-  await configureMatching(owner);
-
-  await owner.put("/__test__/settings/match.auto_threshold_default", { data: { value: "95" } });
-  await owner.put("/__test__/settings/llm.cap_user_day_usd", { data: { value: "0.05" } });
-
-  await seedCompanies(owner, "bound", 40, { salaryMinMinor: 15_000_000 });
-
-  await runPrepDaily(owner, userId);
-
-  const scored = (await matchesFor(owner, userId)).filter((row) => row.score !== null);
-  const alerts = await alertsFor(owner, userId);
-
-  expect(scored).toHaveLength(40);
-  expect(matching.anthropic.requests()).toHaveLength(40);
-  expect(await applicationsFor(owner, userId)).toHaveLength(0);
-  expect(alerts.filter((alert) => alert.title === "Overture alert: llm.cap")).toHaveLength(0);
-
-  const spendMicros = await scoreSpendMicros(owner);
-
-  expect(spendMicros).toBeGreaterThan(0);
-  expect(spendMicros).toBeLessThan(50_000);
-
-  await owner.dispose();
-});
-
-test("a run after the daily time schedules only tomorrow, never a second run today", async ({
-  matching,
-}) => {
-  const { owner, userId } = await ownerContextFor(matching.server.url);
-
-  await clearCatalog(owner);
-  await grantApplications(owner, 70);
-  await configureMatching(owner);
-
-  await owner.put("/__test__/settings/match.auto_threshold_default", { data: { value: "95" } });
-  await owner.put("/__test__/settings/prep.run_local_time", { data: { value: "07:00" } });
-
-  const { now: before } = await clockState(owner);
-  const dayMs = 86_400_000;
-  const todayStart = Math.floor(before / dayMs) * dayMs;
-  const todayRunAt = todayStart + 9 * 3_600_000;
-
-  if (before < todayRunAt) {
-    await moveClockTo(owner, todayRunAt);
-  }
-
-  await seedCompanies(owner, "late", 40, { salaryMinMinor: 15_000_000 });
-
-  await runPrepDaily(owner, userId);
-
-  const now = await clockNow(owner);
-  const tomorrowRunAt = todayStart + dayMs + 7 * 3_600_000;
-  const { jobs } = jobsSchema.parse(await (await owner.get("/__test__/jobs")).json());
-  const scheduled = jobs.filter((job) => job.kind === "prep.daily" && job.dedupeKey !== null);
-
-  expect(matching.anthropic.requests()).toHaveLength(40);
-  expect(scheduled.filter((job) => job.runAt <= now)).toHaveLength(0);
-  expect(
-    scheduled.filter((job) => job.runAt === tomorrowRunAt && job.status === "queued"),
-  ).toHaveLength(1);
-
-  await owner.dispose();
-});
 
 test("opening a posting scores it once, and manual apply works below the threshold", async ({
   matching,
@@ -369,49 +163,6 @@ test("opening a posting scores it once, and manual apply works below the thresho
 
   expect(reopenedAgain.score).toBe(87);
   expect(matching.anthropic.requests()).toHaveLength(3);
-
-  await owner.dispose();
-});
-
-test("an application is created only for a score at or above the threshold", async ({
-  matching,
-}) => {
-  const { owner, userId } = await ownerContextFor(matching.server.url);
-
-  await clearCatalog(owner);
-  await grantApplications(owner, 70);
-  await configureMatching(owner);
-
-  async function seededPosting(title: string) {
-    const name = title.replaceAll(" ", "");
-    const companyId = await seedCompany(owner, `${name} Co`, `${name.toLowerCase()}.example`);
-    const boardId = await seedBoard(owner, companyId, "greenhouse", name.toLowerCase());
-
-    const id = await seedPosting(owner, {
-      atsJobId: name,
-      boardId,
-      companyId,
-      title,
-      url: `https://${name.toLowerCase()}.example/1`,
-    });
-
-    return { id, title };
-  }
-
-  const seeded = await Promise.all(
-    ["Senior Backend Engineer", "Backend Engineer", "Junior Backend Engineer"].map(async (title) =>
-      seededPosting(title),
-    ),
-  );
-
-  await runPrepDaily(owner, userId);
-
-  const applications = await applicationsFor(owner, userId);
-  const matches = await matchesFor(owner, userId);
-
-  expect(matches.filter((row) => row.score !== null)).toHaveLength(3);
-  expect(applications).toHaveLength(1);
-  expect(applications.at(0)?.postingId).toBe(seeded.at(0)?.id);
 
   await owner.dispose();
 });
@@ -549,45 +300,6 @@ test("manual Apply refuses every hard filter and scores only what it may apply t
 
   expect(applications.some((row) => refusedIds.has(row.postingId))).toBe(false);
   expect(applications.find((row) => row.postingId === allowed[0])?.origin).toBe("manual");
-
-  await owner.dispose();
-});
-
-test("ready and approved Applications reduce the daily run", async ({ matching }) => {
-  const { owner, userId } = await ownerContextFor(matching.server.url);
-
-  await clearCatalog(owner);
-  await grantApplications(owner, 70);
-  await configureMatching(owner);
-
-  const now = await clockNow(owner);
-
-  const paid = await seedCompanies(owner, "buffer-paid", 10, {
-    postedAt: now - 20 * 86_400_000,
-    salaryMinMinor: 15_000_000,
-  });
-
-  await seedCompanies(owner, "buffer-unpaid", 10, {
-    postedAt: now - 15 * 86_400_000,
-    salaryMinMinor: null,
-  });
-
-  const approved = paid.slice(0, 3);
-
-  await Promise.all(
-    approved.map(async (postingId) => {
-      await seedApplication(owner, { postingId, status: "approved", userId });
-    }),
-  );
-
-  await runPrepDaily(owner, userId);
-
-  const applications = await applicationsFor(owner, userId);
-  const approvedIds = new Set(approved);
-
-  expect(applications).toHaveLength(10);
-  expect(applications.filter((row) => !approvedIds.has(row.postingId))).toHaveLength(7);
-  expect(matching.anthropic.requests()).toHaveLength(7);
 
   await owner.dispose();
 });

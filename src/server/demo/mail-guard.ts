@@ -5,7 +5,7 @@ import { isDemoUserEmail } from "./role.ts";
 
 /**
  * Wrap a mail sender so nothing is ever sent to the demo account, whatever
- * asked for it (a magic link, a recap, a live check). The demo signs in by
+ * asked for it (a magic link, an export notice, a live check). The demo signs in by
  * one click and never receives mail (#278).
  * @param db The application database, read for the recipient's role.
  * @param sender The real mail sender.
@@ -43,11 +43,6 @@ export function createDemoSafeMailSender(db: AppDatabase, sender: MailSender) {
     sendExportReady: async (mail) => {
       if (allowed(mail.to)) {
         await sender.sendExportReady(mail);
-      }
-    },
-    sendReadyRecap: async (mail) => {
-      if (allowed(mail.to)) {
-        await sender.sendReadyRecap(mail);
       }
     },
     sendBillingNotice: async (mail) => {

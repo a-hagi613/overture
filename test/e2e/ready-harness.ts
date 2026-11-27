@@ -269,7 +269,7 @@ async function seedCard(request: APIRequestContext, userId: string, card: CardSe
         data: {
           boardPosition: index,
           createdAt: referenceNow - (cards.length - index) * 60 * 60_000,
-          origin: "auto",
+          origin: "pick",
           postingId,
           stage: "ready",
           status: "ready",

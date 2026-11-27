@@ -159,49 +159,6 @@ export function codeWaitEmail(input: { minutes: number; subject: string; url: st
 }
 
 /**
- * The one daily Recap email for a finished preparation run.
- * @param input The run's counts, the applications and the Ready page link.
- * @returns The subject, text and HTML for the mail.
- */
-export function recapEmail(input: {
-  needAnswer: number;
-  ready: readonly { company: string; title: string }[];
-  replied: readonly { company: string }[];
-  sent: readonly { company: string; title: string }[];
-  subject: string;
-  url: string;
-}) {
-  return build(
-    withPreferences({
-      action: { label: "Open in Overture", url: input.url },
-      heading: "Good morning.",
-      note: "Opening this email or its link never sends anything.",
-      paragraphs: paragraphsOf(
-        copy.mail.recapBody({
-          needAnswer: input.needAnswer,
-          ready: input.ready.map((application) => ({
-            company: application.company,
-            title: application.title,
-          })),
-          replied: input.replied.map((reply) => ({ company: reply.company })),
-          sent: input.sent.map((application) => ({
-            company: application.company,
-            title: application.title,
-          })),
-          url: input.url,
-        }),
-        input.url,
-        [`Review them at ${input.url}`],
-      ),
-      preheader: "What Overture prepared and sent while you were away.",
-      subject: input.subject,
-      url: input.url,
-      why: "You are getting this because the ready-to-approve email is on in your Overture settings. At most one a day, when new applications are ready.",
-    }),
-  );
-}
-
-/**
  * The notice that a data export is ready to download.
  * @param input The subject and the Profile link that starts the download.
  * @returns The subject, text and HTML for the mail.

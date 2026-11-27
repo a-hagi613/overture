@@ -102,10 +102,6 @@ const pushRequestsSchema = z.object({
   requests: z.array(z.object({ body: z.string(), method: z.string(), url: z.string() })),
 });
 
-const mailSchema = z.object({
-  messages: z.array(z.object({ body: z.string(), subject: z.string(), to: z.string() })),
-});
-
 const preferencesSchema = z.object({
   preferences: z.object({
     code_wait: z.boolean(),
@@ -114,7 +110,6 @@ const preferencesSchema = z.object({
     offer: z.boolean(),
     paused: z.boolean(),
     ready: z.boolean(),
-    recap_email: z.boolean(),
     reply: z.boolean(),
     review: z.boolean(),
     stage_move: z.boolean(),
@@ -269,10 +264,6 @@ async function runMailJobs(owner: APIRequestContext) {
     .toBe(0);
 }
 
-async function mailFor(owner: APIRequestContext) {
-  return mailSchema.parse(await (await owner.get("/__test__/mail")).json()).messages;
-}
-
 async function runJob(owner: APIRequestContext, kind: string, payload: string) {
   const response = await owner.post("/__test__/jobs/run-now", {
     data: { kind, payload },
@@ -311,20 +302,6 @@ async function seedSentApplication(
     postingId,
     sentAt: input.sentAt,
     status: "sent",
-    userId: input.userId,
-  });
-}
-
-async function seedReadyApplication(
-  owner: APIRequestContext,
-  input: JobPosting & { userId: string; readyAt: number },
-) {
-  const postingId = await seedPostingFor(owner, input);
-
-  return seedApplication(owner, {
-    postingId,
-    readyAt: input.readyAt,
-    status: "ready",
     userId: input.userId,
   });
 }
@@ -700,147 +677,6 @@ test("a boot inside the boundary margin leaves a pinned pass alone and the ended
   await owner.dispose();
 });
 
-test("the recap sends one push and one email per run, lists yesterday's sends and replies, and respects the email switch", async ({
-  notify,
-}) => {
-  const { owner, userId } = await ownerContextFor(notify.server.url);
-  const keys = await subscribe(owner, "https://push.example.test/send/recap");
-
-  await owner.post("/__test__/mail/clear", { data: {} });
-  await owner.put("/api/profile/settings", { data: { languages: ["en"], timezone: "UTC" } });
-
-  const runAt = Date.UTC(2026, 10, 19, 7, 10, 0);
-
-  await moveClockTo(owner, runAt);
-
-  const ready = await seedReadyApplication(owner, {
-    company: "Recap Direct",
-    domain: "recap-direct.example",
-    readyAt: runAt,
-    title: "Staff Platform Engineer",
-    userId,
-  });
-
-  const sentYesterday = await seedSentApplication(owner, {
-    company: "Northwind Labs",
-    domain: "northwind.example",
-    sentAt: runAt - 19 * 60 * 60_000,
-    title: "Platform Engineer",
-    userId,
-  });
-
-  const receipted = await seedSentApplication(owner, {
-    company: "Halden Systems",
-    domain: "halden.example",
-    sentAt: runAt - 20 * 60 * 60_000,
-    title: "Site Reliability Engineer",
-    userId,
-  });
-
-  await owner.post("/__test__/mail/seed", {
-    data: {
-      applicationId: sentYesterday,
-      at: runAt - 18 * 60 * 60_000,
-      auth: "pass",
-      classification: "other",
-      direction: "in",
-      from: "Talent <talent@northwind.example>",
-      senderDomain: "northwind.example",
-      subject: "A quick note",
-      text: "Thanks for your note. The team will write again soon.",
-      userId,
-    },
-  });
-
-  await Promise.all(
-    (["ack", "code"] as const).map(async (classification) =>
-      owner.post("/__test__/mail/seed", {
-        data: {
-          applicationId: receipted,
-          at: runAt - 17 * 60 * 60_000,
-          auth: "pass",
-          classification,
-          direction: "in",
-          from: "Greenhouse <no-reply@us.greenhouse-mail.io>",
-          senderDomain: "us.greenhouse-mail.io",
-          subject: classification === "ack" ? "We received your application" : "Your code",
-          text: classification === "ack" ? "Thank you for applying to Halden Systems." : "12345678",
-          userId,
-        },
-      }),
-    ),
-  );
-  await owner.post("/__test__/reviews/open", {
-    data: {
-      applicationIds: [ready],
-      fieldType: "select",
-      options: ["Yes", "No"],
-      prompt: "Are you authorised to work in Canada?",
-      reason: "unknown_required",
-      scope: "CA",
-      userId,
-    },
-  });
-
-  await runJob(owner, "ready.notify", JSON.stringify({ since: runAt - 60_000, userId }));
-
-  await expect.poll(async () => (await mailFor(owner)).length, { timeout: 20_000 }).toBe(1);
-
-  const [recap] = await mailFor(owner);
-
-  expect(recap?.subject).toBe("Overture recap: 1 ready to approve, 1 need an answer");
-  expect(recap?.body).toContain("Staff Platform Engineer at Recap Direct");
-  expect(recap?.body).toContain("Sent yesterday:");
-  expect(recap?.body).toContain("Platform Engineer at Northwind Labs");
-  expect(recap?.body).toContain("1 employer replied yesterday:");
-  expect(recap?.body).toContain("- Northwind Labs");
-  expect(recap?.body).not.toContain("- Halden Systems");
-  expect(recap?.body).toContain("Site Reliability Engineer at Halden Systems");
-  expect(recap?.body.match(/\/ready/gu)).toHaveLength(1);
-
-  const recapRows = await notificationsOfKind(owner, userId, "ready");
-
-  expect(recapRows).toHaveLength(1);
-  expect(recapRows[0]?.url).toContain("/ready");
-  expect(recapRows[0]?.emailedAt).not.toBeNull();
-
-  await waitForPushTitle(owner, keys, recap?.subject ?? "");
-
-  await runJob(owner, "ready.notify", JSON.stringify({ since: runAt - 60_000, userId }));
-
-  expect(await mailFor(owner)).toHaveLength(1);
-  expect(await notificationsOfKind(owner, userId, "ready")).toHaveLength(1);
-
-  const saved = await owner.put("/api/notifications/preferences", {
-    data: { enabled: false, kind: "recap_email" },
-  });
-
-  expect(preferencesSchema.parse(await saved.json()).preferences.recap_email).toBe(false);
-
-  await owner.post("/__test__/mail/clear", { data: {} });
-  await owner.post("/__test__/push/clear", { data: {} });
-
-  const nextRun = runAt + 24 * 60 * 60_000;
-
-  await moveClockTo(owner, nextRun);
-  await seedReadyApplication(owner, {
-    company: "Recap Direct",
-    domain: "recap-direct.example",
-    readyAt: nextRun,
-    title: "Backend Engineer",
-    userId,
-  });
-
-  await runJob(owner, "ready.notify", JSON.stringify({ since: nextRun - 60_000, userId }));
-
-  await waitForPushTitle(owner, keys, "Overture recap: 1 ready to approve, 1 need an answer");
-
-  expect(await mailFor(owner)).toHaveLength(0);
-  expect(await notificationsOfKind(owner, userId, "ready")).toHaveLength(2);
-
-  await owner.dispose();
-});
-
 test("a kind turned off stops its row and its push, and the routes are private", async ({
   notify,
 }) => {
@@ -855,7 +691,6 @@ test("a kind turned off stops its row and its push, and the routes are private",
   const initial = preferencesSchema.parse(await preferences.json()).preferences;
 
   expect(initial.review).toBe(true);
-  expect(initial.recap_email).toBe(true);
 
   const app = await seedSentApplication(owner, {
     company: "Halden Systems",

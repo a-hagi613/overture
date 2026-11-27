@@ -37,10 +37,6 @@ export interface OutboundCodeWaitMail extends OutboundMailContent {
   to: string;
 }
 
-export interface OutboundReadyRecapMail extends OutboundMailContent {
-  to: string;
-}
-
 export interface OutboundAccountDeletedMail extends OutboundMailContent {
   to: string;
 }
@@ -94,7 +90,6 @@ export interface MailSender {
   sendWaitlistInvite: (mail: OutboundWaitlistInviteMail) => Promise<void>;
   sendCheck: (mail: OutboundCheckMail) => Promise<void>;
   sendCodeWait: (mail: OutboundCodeWaitMail) => Promise<void>;
-  sendReadyRecap: (mail: OutboundReadyRecapMail) => Promise<void>;
   sendAccountDeleted: (mail: OutboundAccountDeletedMail) => Promise<void>;
   sendExportReady: (mail: OutboundExportReadyMail) => Promise<void>;
   sendBillingNotice: (mail: OutboundBillingNoticeMail) => Promise<void>;
