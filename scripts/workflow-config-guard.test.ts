@@ -1513,3 +1513,134 @@ test("an unmerged pull request stops waiting at its bounded deadline", () => {
   expect(dispatches(calls)).toStrictEqual([]);
   expect(output).toContain("did not land within 0 seconds");
 });
+
+function withDeployCondition(source: string, line: string) {
+  const at = source.indexOf("\n  deploy:");
+  const tail = source.slice(at).replace("    if: |\n", `    if: |\n      ${line}\n`);
+
+  return source.slice(0, at) + tail;
+}
+
+test("a workflow-level concurrency group in auto-merge is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    "\npermissions:",
+    "\nconcurrency:\n  group: auto-merge-test\n  cancel-in-progress: true\n\npermissions:",
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("workflow-level concurrency group"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy job without its own concurrency group is reported", () => {
+  const autoMerge = autoMergeWorkflow()
+    .split("\n")
+    .filter(
+      (line) =>
+        !line.includes("auto-merge-deploy-") &&
+        !line.includes("cancel-in-progress: false") &&
+        line.trim() !== "concurrency:",
+    )
+    .join("\n");
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("no concurrency group of its own"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy job that cancels its waiting run is reported", () => {
+  const autoMerge = autoMergeWorkflow().replaceAll(
+    "cancel-in-progress: false",
+    "cancel-in-progress: true",
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("cancels a waiting dispatch"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy job that shares one group across pull requests is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    `      group: auto-merge-deploy-\${{ github.event.pull_request.number }}`,
+    "      group: auto-merge-deploy-all",
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("per-pull-request concurrency group"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy job that waits on the arm job is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    "    concurrency:\n      group: auto-merge-deploy-",
+    "    needs: arm\n    concurrency:\n      group: auto-merge-deploy-",
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) => problem.includes("waits on another job")),
+  ).toBe(true);
+});
+
+test("a deploy job that requires an open pull request is reported", () => {
+  const autoMerge = withDeployCondition(
+    autoMergeWorkflow(),
+    "github.event.pull_request.state == 'open' &&",
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("requires an open pull request"),
+    ),
+  ).toBe(true);
+});
+
+test("an arm job that no longer cancels superseded runs is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    `    concurrency:
+      group: auto-merge-arm-\${{ github.event.pull_request.number }}
+      cancel-in-progress: true`,
+    `    concurrency:
+      group: auto-merge-arm-\${{ github.event.pull_request.number }}
+      cancel-in-progress: false`,
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("no longer cancels a superseded run"),
+    ),
+  ).toBe(true);
+});
+
+test("a merge completed by a person is left to the push CI path", () => {
+  const { calls, output, status } = runDispatch({
+    mainSha: "abc1234",
+    mergeSha: "abc1234",
+    mergedBy: "a-hagi613",
+    states: ["MERGED"],
+  });
+
+  expect(status).toBe(0);
+  expect(dispatches(calls)).toStrictEqual([]);
+  expect(output).toContain("Merged by a-hagi613");
+});
+
+test("a dispatch that also deploys a person's merge is reported", () => {
+  const autoMerge = autoMergeWorkflow()
+    .split("\n")
+    .filter((line) => !line.includes("mergedBy") && !line.includes("app/github-actions"))
+    .join("\n");
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("does not leave a person's merge"),
+    ),
+  ).toBe(true);
+});

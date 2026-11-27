@@ -1104,8 +1104,8 @@ export interface DeployTriggerInput {
   readonly autoMerge: string;
 }
 
-function jobPermissionsBlock(job: string) {
-  const at = job.indexOf("\n    permissions:");
+function jobKeyBlock(job: string, key: string) {
+  const at = job.indexOf(`\n    ${key}:`);
 
   if (at === -1) {
     return null;
@@ -1199,6 +1199,12 @@ export function findDeployTriggerProblems(input: DeployTriggerInput) {
     );
   }
 
+  if (/^concurrency:/mu.test(input.autoMerge)) {
+    problems.push(
+      "auto-merge.yml sets a workflow-level concurrency group; its cancel-in-progress cancels the job that waits for the merge, so the groups belong on the jobs",
+    );
+  }
+
   if (armJob?.includes("gh workflow run")) {
     problems.push(
       "auto-merge.yml dispatches Deploy from the arm job; `gh pr merge --auto` returns before the merge, so the merge must be observed first",
@@ -1213,11 +1219,53 @@ export function findDeployTriggerProblems(input: DeployTriggerInput) {
     return problems;
   }
 
-  if (!/^ {4}needs:\s*arm\s*$/mu.test(dispatchJob)) {
-    problems.push("auto-merge.yml's deploy job does not wait for the arm job");
+  if (/^ {4}needs:/mu.test(dispatchJob)) {
+    problems.push(
+      "auto-merge.yml's deploy job waits on another job; a run created by an event on an already-merged pull request skips the arm job, and the dispatch would be skipped with it",
+    );
   }
 
-  const permissions = jobPermissionsBlock(dispatchJob);
+  if (/state\s*==\s*'open'/u.test(dispatchJob)) {
+    problems.push(
+      "auto-merge.yml's deploy job requires an open pull request, so the dispatch never runs for a run created after the merge",
+    );
+  }
+
+  const deployConcurrency = jobKeyBlock(dispatchJob, "concurrency");
+
+  if (deployConcurrency === null) {
+    problems.push(
+      "auto-merge.yml's deploy job has no concurrency group of its own, so a newer run cancels the job that waits for the merge",
+    );
+  } else {
+    if (
+      !/^\s+group:\s*auto-merge-deploy-\$\{\{\s*github\.event\.pull_request\.number\s*\}\}\s*$/mu.test(
+        deployConcurrency,
+      )
+    ) {
+      problems.push(
+        "auto-merge.yml's deploy job does not use a per-pull-request concurrency group, so waiters for different pull requests cancel each other",
+      );
+    }
+
+    if (!/^\s+cancel-in-progress:\s*false\s*$/mu.test(deployConcurrency)) {
+      problems.push(
+        "auto-merge.yml's deploy job cancels a waiting dispatch when a newer run starts, so the merge it waits for is never dispatched",
+      );
+    }
+  }
+
+  if (armJob !== null) {
+    const armConcurrency = jobKeyBlock(armJob, "concurrency");
+
+    if (armConcurrency === null || !/^\s+cancel-in-progress:\s*true\s*$/mu.test(armConcurrency)) {
+      problems.push(
+        "auto-merge.yml's arm job no longer cancels a superseded run, so a stale arm can finish after a newer one",
+      );
+    }
+  }
+
+  const permissions = jobKeyBlock(dispatchJob, "permissions");
 
   if (permissions === null) {
     problems.push(
@@ -1258,6 +1306,7 @@ export function findDeployTriggerProblems(input: DeployTriggerInput) {
       `GH_REPO: \${{ github.repository }}`,
       "does not name the repository for `gh` without a checkout",
     ],
+    ["mergedBy", "does not leave a person's merge to the push CI path"],
     ["gh run list", "does not skip a tree that already has a Deploy run"],
     ["gh workflow run", "does not dispatch a workflow"],
     ["--ref main", "does not dispatch Deploy for main"],

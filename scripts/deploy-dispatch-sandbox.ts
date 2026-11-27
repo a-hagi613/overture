@@ -20,6 +20,11 @@ if (log !== undefined) {
 }
 
 if (args[0] === "pr" && args[1] === "view") {
+  if (args.includes("mergedBy")) {
+    process.stdout.write((process.env["FIXTURE_MERGED_BY"] ?? "") + "\n");
+    process.exit(0);
+  }
+
   if (args.includes("mergeCommit")) {
     process.stdout.write((process.env["FIXTURE_MERGE_SHA"] ?? "") + "\n");
     process.exit(0);
@@ -91,6 +96,8 @@ export interface DispatchRunInput {
   readonly states?: readonly string[];
   /** The squash commit the merged pull request points at. */
   readonly mergeSha?: string;
+  /** Who completed the merge, as `gh pr view --json mergedBy` reports it. */
+  readonly mergedBy?: string;
   /** `main`'s HEAD when the step reads it. */
   readonly mainSha?: string;
   /** The commit SHAs Deploy already has a run for. */
@@ -132,6 +139,7 @@ export function deployDispatchSandbox() {
           FIXTURE_DEPLOY_RUNS: (input.deployRuns ?? []).join(" "),
           FIXTURE_GH_LOG: logPath,
           FIXTURE_MAIN_SHA: input.mainSha ?? "main-sha",
+          FIXTURE_MERGED_BY: input.mergedBy ?? "app/github-actions",
           FIXTURE_MERGE_SHA: input.mergeSha ?? "",
           FIXTURE_PR_STATES: (input.states ?? ["OPEN"]).join(","),
           FIXTURE_STATE_COUNTER: counterPath,

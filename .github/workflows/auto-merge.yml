@@ -6,9 +6,9 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
 
-concurrency:
-  group: auto-merge-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+# No workflow-level concurrency: a run-level `cancel-in-progress` cancels every job in the run, including the one that
+# waits for the merge, and a pull request receives many events (pushes, label changes) while its CI runs. Each job sets
+# its own group instead: arming may be superseded, the merge watcher may not.
 
 permissions:
   contents: write
@@ -17,6 +17,9 @@ permissions:
 jobs:
   arm:
     # Only an open, non-draft pull request on main may arm auto-merge, and never one labelled do-not-auto-merge.
+    concurrency:
+      group: auto-merge-arm-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     if: |
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.base.ref == 'main' &&
@@ -41,10 +44,18 @@ jobs:
     # GitHub completes an armed auto-merge later, as `app/github-actions`, and starts no workflow for an event caused
     # by `GITHUB_TOKEN`: the merge creates no push CI run on `main`, so Deploy's `workflow_run` trigger never fires and
     # the merge never reaches production. `workflow_dispatch` is the event `GITHUB_TOKEN` may always trigger, so this
-    # job waits for the merge and dispatches Deploy for `main`. Deploy's `deploy-main` concurrency group serializes it
-    # with the `workflow_run` path. Cancel-on-new-run above means only the newest run waits, and the
-    # already-dispatched check below keeps a second merge in the same window from deploying one tree twice.
-    needs: arm
+    # job waits for the merge and dispatches Deploy for `main`. It does not wait on `arm` (a run created by an event on
+    # an already-merged pull request skips `arm`, and a dependent job would be skipped with it), and its own group is
+    # never cancelled in progress, so a push or label event cannot kill the waiter. A superseded waiter is replaced by
+    # the next pending one, and the already-dispatched check keeps a second merge in the same window from deploying one
+    # tree twice. Deploy's `deploy-main` concurrency group serializes the dispatch with the `workflow_run` path.
+    concurrency:
+      group: auto-merge-deploy-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    if: |
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.draft == false &&
+      !contains(github.event.pull_request.labels.*.name, 'do-not-auto-merge')
     runs-on: ubuntu-latest
     # The wait is bounded: a pull request that never merges (checks red, or behind `main`) must not hold a runner for
     # six hours. GitHub's job limit is 6 h; 75 min covers the full e2e suite plus a slow queue.
@@ -88,6 +99,15 @@ jobs:
             sleep 30
           done
 
+          # A merge by a person or a user token starts a push CI run on `main`, and that run's success fires Deploy
+          # through `workflow_run`; dispatching here too would deploy the same tree twice. Only an auto-merge,
+          # completed by `app/github-actions` with the repository token, starts no run and needs this dispatch.
+          merged_by="$(gh pr view "$PR_URL" --json mergedBy --jq '.mergedBy.login // empty')"
+          if [ -n "$merged_by" ] && [ "$merged_by" != "app/github-actions" ]; then
+            echo "::notice::Merged by ${merged_by}; the push started CI, whose success deploys through workflow_run, so this job does not dispatch."
+            exit 0
+          fi
+
           main_sha="$(gh api "repos/${GH_REPO}/commits/main" --jq .sha)"
           merged_sha="$(gh pr view "$PR_URL" --json mergeCommit --jq '.mergeCommit.oid // empty')"
           if [ -n "$merged_sha" ] && [ "$merged_sha" != "$main_sha" ]; then
@@ -110,6 +130,9 @@ jobs:
 
   disarm:
     # A PR labelled do-not-auto-merge never merges on its own, even when it was armed before the label arrived.
+    concurrency:
+      group: auto-merge-disarm-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     if: |
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.base.ref == 'main' &&
