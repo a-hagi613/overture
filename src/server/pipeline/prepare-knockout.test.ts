@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 
 import type { LlmPort } from "../platform/ports/llm.ts";
 
+import type { PlainFormReader } from "./form-read.ts";
 import { createFactService } from "../profile/facts.ts";
 import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
@@ -85,7 +86,13 @@ function countedLlm() {
   return { calls: () => calls, llm };
 }
 
-function freshApplication(postingDescription: string) {
+function freshApplication(
+  postingDescription: string,
+  options: {
+    plainFormReader?: PlainFormReader;
+    questionsFetchedAt?: number | null;
+  } = {},
+) {
   const app = openDatabase(":memory:");
   const catalog = openCatalogDatabase(":memory:");
 
@@ -139,7 +146,8 @@ function freshApplication(postingDescription: string) {
       firstSeenAt: NOW,
       id: "posting-1",
       lastSeenAt: NOW,
-      questionsFetchedAt: NOW,
+      questionsFetchedAt:
+        options.questionsFetchedAt === undefined ? NOW : options.questionsFetchedAt,
       title: "Staff Engineer",
       titleNorm: "staff engineer",
       url: "https://jobs.lever.co/northwind/j/1",
@@ -173,17 +181,23 @@ function freshApplication(postingDescription: string) {
 
   const counted = countedLlm();
 
-  const preparation = createPreparationService({
+  const dependencies = {
     catalogDb: catalog.db,
     clock,
     db: app.db,
     llm: counted.llm,
     personal,
     source: null,
-  });
+  };
+
+  const preparation =
+    options.plainFormReader === undefined
+      ? createPreparationService(dependencies)
+      : createPreparationService({ ...dependencies, plainFormReader: options.plainFormReader });
 
   return {
     app: app.db,
+    catalog: catalog.db,
     clocks: clock,
     facts,
     llmCalls: counted.calls,
@@ -361,5 +375,78 @@ describe("the knock-out pre-scan in preparation", () => {
       blocked: 0,
     });
     expect(applicationRow(setup.app, "application-1")?.statusReason).toBe("knockout_sponsorship");
+  });
+});
+
+describe("form availability in preparation", () => {
+  test("moves to ready when the form genuinely loads with no questions", async () => {
+    const emptyReader: PlainFormReader = {
+      read: async () => {
+        await Promise.resolve();
+
+        return {
+          formLoaded: true,
+          formSignature: "bf5d9b0a9d5b1f10",
+          path: "bamboohr_html" as const,
+          questions: [],
+          unhandled: [],
+        };
+      },
+    };
+
+    const setup = freshApplication("A normal teaching post.", {
+      plainFormReader: emptyReader,
+      questionsFetchedAt: null,
+    });
+
+    const result = await setup.preparation.prepare("application-1");
+
+    expect(result).toMatchObject({ status: "ready", blocked: 0 });
+    expect(applicationRow(setup.app, "application-1")?.status).toBe("ready");
+    expect(
+      setup.catalog
+        .select({ questionsFetchedAt: postings.questionsFetchedAt })
+        .from(postings)
+        .where(eq(postings.id, "posting-1"))
+        .get()?.questionsFetchedAt,
+    ).not.toBeNull();
+  });
+
+  test("keeps the application preparing when the form cannot be read at all", async () => {
+    const unreadableReader: PlainFormReader = {
+      read: async () => {
+        await Promise.resolve();
+
+        return null;
+      },
+    };
+
+    const setup = freshApplication("A normal teaching post.", {
+      plainFormReader: unreadableReader,
+      questionsFetchedAt: null,
+    });
+
+    let failure: Error | null = null;
+
+    try {
+      await setup.preparation.prepare("application-1");
+    } catch (error) {
+      if (error instanceof Error) {
+        failure = error;
+      }
+    }
+
+    expect(failure?.message).toBe(
+      "form_unreadable: lever job-1 returned no questions; the Application stays in preparation",
+    );
+
+    expect(applicationRow(setup.app, "application-1")?.status).toBe("preparing");
+    expect(
+      setup.catalog
+        .select({ questionsFetchedAt: postings.questionsFetchedAt })
+        .from(postings)
+        .where(eq(postings.id, "posting-1"))
+        .get()?.questionsFetchedAt,
+    ).toBeNull();
   });
 });

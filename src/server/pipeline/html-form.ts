@@ -41,6 +41,12 @@ export interface HtmlFormRead<P extends HtmlFormPath = HtmlFormPath> {
   formSignature: string;
   path: P;
   unhandled: string[];
+  /**
+   * True when the page carried a recognisable application form, even when it has
+   * no fillable questions. Preparation uses this to tell an empty form apart from
+   * a page it could not read (issue #758).
+   */
+  formLoaded?: boolean;
 }
 
 const DEFAULT_SKIPPED_NAMES: ReadonlySet<string> = new Set([
@@ -628,6 +634,7 @@ export async function readHtmlForm<P extends HtmlFormPath>(
 
   if (chosen === null) {
     return {
+      formLoaded: false,
       questions: [],
       formSignature: "",
       path: options.path,
@@ -653,6 +660,7 @@ export async function readHtmlForm<P extends HtmlFormPath>(
   );
 
   return {
+    formLoaded: true,
     questions,
     formSignature:
       questions.length === 0 ? "" : formSignatureForHtmlQuestions(options.path, questions),

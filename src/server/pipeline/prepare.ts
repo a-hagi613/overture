@@ -513,13 +513,18 @@ export function createPreparationService(deps: {
     let questions: FormQuestion[] = [];
     let formSignature = "";
     let readPath: FormReadPath = "browser";
+    let formLoaded = false;
     let loginWall: LoginWallEvidence | null = null;
     const plain = await plainFormReader.read(target);
 
     if (isLoginWallRead(plain)) {
       loginWall = plain.evidence;
-    } else if (plain !== null && plain.questions.length > 0) {
+    } else if (
+      plain !== null &&
+      (plain.questions.length > 0 || ("formLoaded" in plain && plain.formLoaded))
+    ) {
       ({ questions, formSignature, path: readPath } = plain);
+      formLoaded = true;
     } else {
       const captured = captureForm === undefined ? null : await captureForm(target);
 
@@ -528,6 +533,7 @@ export function createPreparationService(deps: {
       } else if (captured !== null && captured.questions.length > 0) {
         ({ formSignature, questions } = captured);
         readPath = "browser";
+        formLoaded = true;
       }
     }
 
@@ -535,10 +541,18 @@ export function createPreparationService(deps: {
       return loginWall;
     }
 
-    if (questions.length === 0 || formSignature === "") {
+    if (!formLoaded || (questions.length > 0 && formSignature === "")) {
       throw new Error(
         `form_unreadable: ${posting.ats} ${posting.atsJobId} returned no questions; the Application stays in preparation`,
       );
+    }
+
+    if (questions.length === 0) {
+      await recordQuestions([]);
+
+      markQuestionsFetched(posting.postingId);
+
+      return null;
     }
 
     const cached = planCache.get(posting.ats, formSignature);
