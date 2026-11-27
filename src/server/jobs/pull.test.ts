@@ -451,9 +451,17 @@ describe("resilience", () => {
       store: createJobStore({ clock: { now: () => NOW }, db }),
     });
 
-    for (let tick = 0; tick < 26; tick += 1) {
+    const failOneTick: (remaining: number) => Promise<void> = async (remaining) => {
+      if (remaining === 0) {
+        return;
+      }
+
       await service.runTick(NOW);
-    }
+
+      return failOneTick(remaining - 1);
+    };
+
+    await failOneTick(26);
 
     expect(alerts).toHaveLength(1);
 

@@ -34,7 +34,6 @@ const PULL_DEDUPE_KEY = JOBS_PULL_JOB_KIND;
 const PAGE_SIZE = 100;
 const MAX_OFFSET = 10_000;
 const ALERT_AFTER_FAILURES = 3;
-/** A still-failing pull pages again after this long, or after this many more consecutive failures. */
 const ALERT_REPEAT_AFTER_MS = 6 * 60 * 60_000;
 const ALERT_REPEAT_AFTER_FAILURES = 24;
 const ALERT_ERROR_MAX_CHARS = 300;
@@ -43,7 +42,7 @@ const LAST_ERROR_SETTING = "jobs.pull_last_error";
 const LAST_ALERT_AT_SETTING = "jobs.pull_last_alert_at";
 const ALERTED_FAILURES_SETTING = "jobs.pull_alerted_failures";
 const CURSOR_SETTING = "jobs.changes_cursor";
-const URL_CREDENTIALS = /\/\/[^/@\s]+@/g;
+const URL_CREDENTIALS = /\/\/[^/@\s]+@/gu;
 
 const stringArray = z.array(z.string());
 
@@ -61,9 +60,8 @@ function stringArrayFromColumn(value: string) {
   return stringArray.parse(JSON.parse(value));
 }
 
-/** Keeps an alert small and strips any credentials a URL in the message might carry. */
 function alertErrorText(message: string) {
-  return message.replace(URL_CREDENTIALS, "//[redacted]@").slice(0, ALERT_ERROR_MAX_CHARS);
+  return message.replaceAll(URL_CREDENTIALS, "//[redacted]@").slice(0, ALERT_ERROR_MAX_CHARS);
 }
 
 /** One grouped pull's tally, also written to the event log and to `job_pull_runs`. */
@@ -294,6 +292,7 @@ export function createPullService(deps: PullDeps) {
 
     const lastAlertAt = storedNumber(LAST_ALERT_AT_SETTING);
     const alertedFailures = storedNumber(ALERTED_FAILURES_SETTING);
+
     const alertDue =
       failures >= ALERT_AFTER_FAILURES &&
       (alertedFailures < ALERT_AFTER_FAILURES ||
