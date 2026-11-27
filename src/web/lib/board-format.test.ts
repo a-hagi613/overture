@@ -22,6 +22,9 @@ describe("the drawer's timeline reasons", () => {
     expect(timelineReasonText("confirm_wait_elapsed")).toBe(
       "The employer's confirmation did not arrive in time, so it was not sent again.",
     );
+    expect(timelineReasonText("dry_submit")).toBe(
+      "This was a local dry run: the form was filled and the proof kept, nothing was sent.",
+    );
   });
 
   test("keeps a check-in's answer and a mail move readable", () => {

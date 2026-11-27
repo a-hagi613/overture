@@ -1091,6 +1091,7 @@ export const attempts = sqliteTable(
         "timeout",
         "crash",
         "interrupted",
+        "dry_submit",
       ],
     }),
     browserMs: integer("browser_ms"),

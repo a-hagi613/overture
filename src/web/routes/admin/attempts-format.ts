@@ -17,6 +17,7 @@ const OUTCOME_DISPLAY: Record<AttemptOutcome, { label: string; tone: AttemptTone
   code_timeout: { label: copy.admin.attemptsOutcomeCodeTimeout, tone: "need" },
   crash: { label: copy.admin.attemptsOutcomeCrash, tone: "need" },
   duplicate: { label: copy.admin.attemptsOutcomeDuplicate, tone: "muted" },
+  dry_submit: { label: copy.admin.attemptsOutcomeDrySubmit, tone: "muted" },
   form_changed: { label: copy.admin.attemptsOutcomeFormChanged, tone: "need" },
   identity_mismatch: { label: copy.admin.attemptsOutcomeIdentityMismatch, tone: "need" },
   interrupted: { label: copy.admin.attemptsOutcomeInterrupted, tone: "muted" },

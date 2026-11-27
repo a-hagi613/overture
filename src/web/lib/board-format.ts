@@ -156,6 +156,7 @@ const TIMELINE_REASONS = new Map<string, string>([
   ["confirmation_email", copy.board.timeline.reasons.confirmation_email],
   ["confirmation_page", copy.board.timeline.reasons.confirmation_page],
   ["confirm_wait_elapsed", copy.board.timeline.reasons.confirm_wait_elapsed],
+  ["dry_submit", copy.board.timeline.reasons.dry_submit],
   ["form_changed", copy.board.timeline.reasons.form_changed],
   ["login_wall", copy.board.timeline.reasons.login_wall],
   ["mail", copy.board.timeline.reasons.mail],

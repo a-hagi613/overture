@@ -2598,6 +2598,8 @@ export const copy = {
         confirmation_page: "The employer's confirmation page was seen.",
         confirm_wait_elapsed:
           "The employer's confirmation did not arrive in time, so it was not sent again.",
+        dry_submit:
+          "This was a local dry run: the form was filled and the proof kept, nothing was sent.",
         form_changed: "The form changed after it was filled in, so nothing was sent.",
         login_wall: "The employer asked for an account before the form, so nothing was sent.",
         mail: "An employer reply moved this application.",
@@ -3767,6 +3769,7 @@ export const copy = {
     attemptsOutcomeFormChanged: "Form changed",
     attemptsOutcomePostingClosed: "Posting closed",
     attemptsOutcomeDuplicate: "Duplicate",
+    attemptsOutcomeDrySubmit: "Dry submit",
     attemptsOutcomeIdentityMismatch: "Identity mismatch",
     attemptsOutcomeNeedsReview: "Needs review",
     attemptsOutcomeInterrupted: "Interrupted",

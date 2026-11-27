@@ -79,6 +79,10 @@ _Avoid_: reject, dismiss
 **Confirming**:
 The Status after the employer may have received the Application and before its confirmation was seen. Shown as "Checking with the employer".
 
+**Dry submit**:
+A local-only send run (`OVERTURE_DRY_SUBMIT=1`) that fills a real form, keeps the pre-Submit screenshot and stops
+before the Submit click, leaving the Application Ready with its credit returned. Refused in production (ADR 0049).
+
 **Couldn't apply**:
 An Application that was not sent, or whose sending could not be confirmed (surfaced concisely as **Not sent** on Home). It never uses one of the user's applications.
 _Avoid_: failed (in copy), error

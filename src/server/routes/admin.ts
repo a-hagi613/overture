@@ -269,6 +269,7 @@ const ATTEMPT_OUTCOME_GROUPS = {
     "needs_review",
     "unconfirmed",
     "interrupted",
+    "dry_submit",
   ],
   timeout: ["timeout", "code_timeout"],
 } as const;

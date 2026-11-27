@@ -102,6 +102,7 @@ import { createPlanCache } from "../pipeline/plan-cache.ts";
 import { createFormSelfHealer, planFieldSignature } from "./forms/self-heal.ts";
 import { recordPostingFailure } from "../matching/posting-flags.ts";
 import { captureSubmitScreenshot } from "../applications/screenshots.ts";
+import { DrySubmitStoppedError, beforeSubmitStep } from "./dry-submit.ts";
 
 class ReservationRefusedError extends Error {
   constructor() {
@@ -142,6 +143,8 @@ export interface DispatcherDeps {
   objects?: ObjectStore;
   appOrigin: string;
   proxyCountry: string;
+  /** Resolved from `OVERTURE_DRY_SUBMIT`; production can never reach here with it on (ADR 0049). */
+  drySubmit: boolean;
   signal?: AbortSignal;
   codeWaitSignal?: AbortSignal;
 }
@@ -289,6 +292,7 @@ export function createDispatcher(deps: DispatcherDeps) {
     objects,
     appOrigin,
     proxyCountry,
+    drySubmit,
     signal,
   } = deps;
 
@@ -549,6 +553,44 @@ export function createDispatcher(deps: DispatcherDeps) {
     announce(applicationId, userId, "failed");
 
     return "failed" as const;
+  }
+
+  function recordDrySubmitStop(applicationId: string, userId: string, attemptId: string) {
+    releaseAttempt(applicationId, userId, attemptId);
+
+    db.update(applications)
+      .set({
+        approvedAt: null,
+        approvedPlanEnc: null,
+        approvedPlanSha256: null,
+        attempts: sql`max(${applications.attempts} - 1, 0)`,
+        scheduledFor: null,
+        stage: stageForStatus("ready"),
+        status: "ready",
+        statusReason: null,
+        updatedAt: clock.now(),
+      })
+      .where(eq(applications.id, applicationId))
+      .run();
+
+    recordApplicationEvent(db, clock, {
+      applicationId,
+      attemptId,
+      userId,
+      kind: "status",
+      fromValue: "sending",
+      toValue: "ready",
+      reason: "dry_submit",
+      source: "system",
+    });
+
+    announce(applicationId, userId, "ready");
+
+    updateAttempt(attemptId, {
+      endedAt: clock.now(),
+      errorCode: "dry_submit",
+      outcome: "dry_submit",
+    });
   }
 
   function switchedOffAtSend(applicationId: string, providerId: string) {
@@ -884,20 +926,28 @@ export function createDispatcher(deps: DispatcherDeps) {
           }
         },
         onWillSubmit: async () => {
-          updateAttempt(attemptId, { submitClickedAt: clock.now() });
+          await beforeSubmitStep({
+            captureEvidence: async () => {
+              if (objects === undefined) {
+                return;
+              }
 
-          if (objects !== undefined) {
-            await captureSubmitScreenshot(
-              { clock, objects },
-              {
-                applicationId,
-                attemptId,
-                page,
-                phase: "before_submit",
-                userId: claimed.userId,
-              },
-            );
-          }
+              await captureSubmitScreenshot(
+                { clock, objects },
+                {
+                  applicationId,
+                  attemptId,
+                  page,
+                  phase: "before_submit",
+                  userId: claimed.userId,
+                },
+              );
+            },
+            drySubmit,
+            markSubmitClicked: () => {
+              updateAttempt(attemptId, { submitClickedAt: clock.now() });
+            },
+          });
         },
         requestCode: async () => {
           const mailbox = await mailboxes.ensureFor(claimed.userId);
@@ -1289,6 +1339,12 @@ export function createDispatcher(deps: DispatcherDeps) {
         }
       }
     } catch (error) {
+      if (error instanceof DrySubmitStoppedError) {
+        recordDrySubmitStop(applicationId, claimed.userId, attemptId);
+
+        return true;
+      }
+
       if (error instanceof ProviderUnavailableError) {
         pauseProvider(error.providerId, error.reason);
       }
