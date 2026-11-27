@@ -80,6 +80,7 @@ const onboardingPickSchema = z.object({
 
 const onboardingPicksSchema = z.object({
   batchStatus: z.enum(["picking", "awaiting_card", "preparing", "prepared", "failed"]),
+  droppedPicks: z.number().default(0),
   pickLimit: z.number(),
   planKind: z.enum(ONBOARDING_PLAN_KINDS).nullable(),
   picks: z.array(onboardingPickSchema),

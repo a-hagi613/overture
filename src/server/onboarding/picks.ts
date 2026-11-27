@@ -1,8 +1,10 @@
 import { and, asc, eq } from "drizzle-orm";
 
+import type { JobPosting } from "../jobs/job-posting.ts";
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PostingDisplay } from "../matching/applications.ts";
+import type { SortableMatch } from "../matching/match-sort.ts";
 import type {
   OnboardingBatchStatus,
   OnboardingPickFailureReason,
@@ -11,8 +13,11 @@ import type {
   OnboardingPlanKind,
 } from "../../shared/onboarding.ts";
 
+import { ACTIVE_APPLICATION_STATUSES } from "../matching/applications.ts";
 import { applications, onboardingBatches, onboardingPicks } from "../platform/db/schema.ts";
 import { jobPostingsById } from "../jobs/job-posting.ts";
+import { orderedByMatchOrder } from "../matching/match-sort.ts";
+import { readStoredMatches } from "../matching/match-store.ts";
 import { displayFromJobPosting } from "./freehire-job.ts";
 import { onboardingPickLimitFor, pickStatusOfApplication } from "../../shared/onboarding.ts";
 
@@ -39,6 +44,10 @@ function batchStatusAfter(results: readonly PickPreparationResult[]) {
   }
 
   return "prepared" as const;
+}
+
+function employerKeyOf(posting: Pick<JobPosting, "companyId">) {
+  return posting.companyId.trim().toLowerCase();
 }
 
 function isFailureReason(value: string | null): value is OnboardingPickFailureReason {
@@ -134,7 +143,7 @@ export function createOnboardingPicks(deps: {
       .all();
   }
 
-  function view(userId: string) {
+  function view(userId: string, droppedPicks = 0) {
     const batch = readBatch(userId);
 
     const picks: OnboardingPickView[] = pickRows(userId).map((row) => {
@@ -157,6 +166,7 @@ export function createOnboardingPicks(deps: {
 
     return {
       batchStatus: batch?.status ?? "picking",
+      droppedPicks,
       pickLimit: onboardingPickLimitFor(batch?.planKind ?? null),
       planKind: batch?.planKind ?? null,
       picks,
@@ -175,22 +185,81 @@ export function createOnboardingPicks(deps: {
 
     const snapshots = new Map<string, PostingDisplay>();
 
-    if (unique.length > 0) {
-      const resolved = jobPostingsById({ catalogDb, db }, unique);
+    const resolved =
+      unique.length === 0
+        ? new Map<string, JobPosting>()
+        : jobPostingsById({ catalogDb, db }, unique);
 
-      if (resolved.size !== unique.length) {
+    if (resolved.size !== unique.length) {
+      return null;
+    }
+
+    for (const posting of resolved.values()) {
+      if (!posting.open) {
         return null;
       }
 
-      for (const posting of resolved.values()) {
-        if (!posting.open) {
-          return null;
-        }
-
-        snapshots.set(posting.postingId, displayFromJobPosting(posting));
-      }
+      snapshots.set(posting.postingId, displayFromJobPosting(posting));
     }
 
+    const stored = new Map(readStoredMatches(db, userId).map((row) => [row.id, row]));
+
+    const candidates: SortableMatch[] = unique.flatMap((postingId) => {
+      const posting = resolved.get(postingId);
+
+      if (posting === undefined) {
+        return [];
+      }
+
+      const match = stored.get(postingId);
+
+      return [
+        {
+          blockers: [],
+          companyKey: employerKeyOf(posting),
+          exactRole: match?.exactRole ?? false,
+          id: postingId,
+          postedAt: posting.postedAt,
+          score: match?.score ?? null,
+        },
+      ];
+    });
+
+    const applicationRows = db
+      .select({
+        companyId: applications.companyId,
+        postingId: applications.postingId,
+        status: applications.status,
+      })
+      .from(applications)
+      .where(eq(applications.userId, userId))
+      .all();
+
+    const appliedPostings = new Set(applicationRows.map((row) => row.postingId));
+
+    const openEmployers = new Set(
+      applicationRows
+        .filter((row) => ACTIVE_APPLICATION_STATUSES.some((status) => status === row.status))
+        .map((row) => employerKeyOf(row)),
+    );
+
+    const kept: string[] = [];
+    const keptEmployers = new Set<string>();
+
+    for (const candidate of orderedByMatchOrder(candidates)) {
+      if (keptEmployers.has(candidate.companyKey)) {
+        continue;
+      }
+
+      if (openEmployers.has(candidate.companyKey) && !appliedPostings.has(candidate.id)) {
+        continue;
+      }
+
+      keptEmployers.add(candidate.companyKey);
+      kept.push(candidate.id);
+    }
+
+    const droppedPicks = unique.length - kept.length;
     const now = clock.now();
 
     db.transaction((tx) => {
@@ -204,7 +273,7 @@ export function createOnboardingPicks(deps: {
 
       for (const row of existing) {
         if (
-          !unique.includes(row.postingId) &&
+          !kept.includes(row.postingId) &&
           row.applicationId === null &&
           row.status === "picked"
         ) {
@@ -216,7 +285,7 @@ export function createOnboardingPicks(deps: {
         }
       }
 
-      for (const postingId of unique) {
+      for (const postingId of kept) {
         const display = snapshots.get(postingId);
 
         if (display === undefined) {
@@ -253,7 +322,7 @@ export function createOnboardingPicks(deps: {
         .run();
     });
 
-    return view(userId);
+    return view(userId, droppedPicks);
   }
 
   function markStatus(userId: string, status: OnboardingBatchStatus, failureReason?: string) {

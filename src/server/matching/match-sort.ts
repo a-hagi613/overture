@@ -87,6 +87,17 @@ export function orderedMatches<T extends SortableMatch>(matches: readonly T[]) {
   return matches.filter((match) => matchIsVisible(match)).toSorted(compareMatches);
 }
 
+/**
+ * Orders rows by the same ADR 0045 rule without the list's visibility floor. The onboarding save boundary uses it to
+ * decide which picked posting keeps an employer, and a posting the person already chose must never vanish because it
+ * sits below the floor or carries a blocker.
+ * @param matches The rows to order.
+ * @returns The rows, best first.
+ */
+export function orderedByMatchOrder<T extends SortableMatch>(matches: readonly T[]) {
+  return matches.toSorted(compareMatches);
+}
+
 /** A match that may still be scoring: its code rank orders it until a stored score exists. */
 export type PendingSortableMatch = SortableMatch & { codeRank: number };
 

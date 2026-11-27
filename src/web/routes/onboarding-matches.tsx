@@ -333,6 +333,23 @@ export function OnboardingMatchesPage() {
 
   const selectedMatches = topMatches.filter((match) => picks.includes(match.id));
   const busy = save.isPending || openingModal || savePlan.isPending;
+  const text = copy.onboarding.matches;
+
+  const syncSelection = (
+    view: OnboardingMatches,
+    options: { ids?: string[]; signature?: string } = {},
+  ) => {
+    setSelectionState({
+      ids: options.ids ?? view.selected.filter((id) => topMatchIds.has(id)),
+      signature: options.signature ?? matchesSignature,
+    });
+
+    const dropped = view.picks?.droppedPicks ?? 0;
+
+    if (dropped > 0) {
+      toast.info(text.droppedForEmployer(dropped));
+    }
+  };
 
   const selectPlan = async (next: OnboardingPlanKind) => {
     if (next === planKind || preview) {
@@ -346,8 +363,7 @@ export function OnboardingMatchesPage() {
       if (next === "free_trial" && picks.length > 3) {
         const trimmed = picks.slice(0, 3);
 
-        setSelectionState({ ids: trimmed, signature: matchesSignature });
-        await save.mutateAsync(trimmed);
+        syncSelection(await save.mutateAsync(trimmed));
       }
 
       const view = await savePlan.mutateAsync(next);
@@ -356,8 +372,9 @@ export function OnboardingMatchesPage() {
         const topIds = view.matches.slice(0, view.pickLimit).map((match) => match.id);
 
         if (picks.length < topIds.length) {
-          setSelectionState({ ids: topIds, signature: topIds.join(",") });
-          await save.mutateAsync(topIds);
+          const saved = await save.mutateAsync(topIds);
+
+          syncSelection(saved, { ids: saved.selected, signature: topIds.join(",") });
         }
       }
     } catch {
@@ -375,7 +392,11 @@ export function OnboardingMatchesPage() {
     setSelectionState({ ids: next, signature: matchesSignature });
 
     if (!preview) {
-      save.mutate(next);
+      save.mutate(next, {
+        onSuccess: (view) => {
+          syncSelection(view);
+        },
+      });
     }
   };
 
@@ -393,7 +414,7 @@ export function OnboardingMatchesPage() {
 
     try {
       if (!preview && picks.length > 0) {
-        await save.mutateAsync(picks);
+        syncSelection(await save.mutateAsync(picks));
       }
 
       setModalDismissed(false);

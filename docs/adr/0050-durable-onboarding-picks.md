@@ -38,6 +38,12 @@ the Stripe card check returned. Three things followed from that:
 6. **Send all uses the same approval as Ready.** `POST /api/ready/send-all` approves every ready Application whose
    plan is all the user's own answers, holds plans with newly drafted prose for individual review, and leaves the send
    timing to ADR 0046 (the trial's three at once, paid sends five minutes apart).
+7. **The save boundary keeps one pick per employer.** A batch can hold several postings from one employer, so
+   `PUT /api/onboarding/matches` groups them by the job's canonical employer key (`company_slug`, falling back to the
+   normalised company name; the same `company_key` match ordering stores), keeps the best posting under the ADR 0045
+   order and drops the rest. A posting whose employer already has an open Application is dropped unless that posting
+   is the Application itself. The saved picks view reports `droppedPicks`, and the matches screen follows the saved
+   selection so it never claims more picks than the Tracker will hold (issue #759).
 
 ## Consequences
 
