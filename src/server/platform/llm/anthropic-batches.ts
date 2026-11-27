@@ -8,6 +8,14 @@ import type { BatchProvider, DurableBatches, ProviderBatch } from "./durable-bat
 import { batchPricesFor } from "./models.ts";
 import { BatchGoneError } from "./durable-batches.ts";
 import { defaultMetrics } from "../telemetry/metrics.ts";
+import { logError } from "../log.ts";
+import {
+  DEFAULT_LLM_MAX_ATTEMPTS,
+  DEFAULT_LLM_TIMEOUT_MS,
+  llmFetch,
+  LlmHttpError,
+  LLM_RETRY_BASE_MS,
+} from "./http.ts";
 
 const API_VERSION = "2023-06-01";
 const MAX_TOKENS = 1024;
@@ -80,9 +88,28 @@ interface TokenUsage {
   output: number;
 }
 
-function costMicrosFor(model: string, usage: TokenUsage) {
-  const prices = batchPricesFor(model);
+const unpricedModels = new Set<string>();
 
+function priceFor(model: string) {
+  try {
+    return batchPricesFor(model);
+  } catch {
+    if (!unpricedModels.has(model)) {
+      unpricedModels.add(model);
+
+      logError(
+        "llm.cost",
+        new Error(
+          `no batch pricing is known for model ${model}; recording its calls with zero cost until the rate card lists it`,
+        ),
+      );
+    }
+
+    return null;
+  }
+}
+
+function microsFor(prices: ReturnType<typeof batchPricesFor>, usage: TokenUsage) {
   const micros =
     (usage.input * prices.inputPerMillionTokens +
       usage.cacheRead * prices.cacheReadPerMillionTokens +
@@ -91,6 +118,20 @@ function costMicrosFor(model: string, usage: TokenUsage) {
     1_000_000;
 
   return Math.ceil(micros);
+}
+
+function strictCostMicrosFor(model: string, usage: TokenUsage) {
+  return microsFor(batchPricesFor(model), usage);
+}
+
+function costMicrosFor(model: string, usage: TokenUsage) {
+  const prices = priceFor(model);
+
+  if (prices === null) {
+    return 0;
+  }
+
+  return microsFor(prices, usage);
 }
 
 function estimatedUsageFor(request: LlmRequest) {
@@ -125,7 +166,21 @@ function parseJson(text: string) {
 export interface AnthropicLlmConfig {
   baseUrl: string;
   apiKey: string | undefined;
+  /** How long one HTTP attempt may take before it aborts; defaults to `DEFAULT_LLM_TIMEOUT_MS`. */
+  timeoutMs?: number | undefined;
+  /** The total attempts per request, including the first; defaults to `DEFAULT_LLM_MAX_ATTEMPTS`. */
+  maxAttempts?: number | undefined;
+  /** The base of the jittered retry backoff; defaults to `LLM_RETRY_BASE_MS`. */
+  retryBaseMs?: number | undefined;
   model: string;
+}
+
+function retryPolicy(config: AnthropicLlmConfig) {
+  return {
+    maxAttempts: config.maxAttempts ?? DEFAULT_LLM_MAX_ATTEMPTS,
+    retryBaseMs: config.retryBaseMs ?? LLM_RETRY_BASE_MS,
+    timeoutMs: config.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS,
+  };
 }
 
 function providerBatch(batch: z.infer<typeof batchSchema>) {
@@ -148,19 +203,7 @@ function createClient(config: AnthropicLlmConfig) {
     "content-type": "application/json",
   });
 
-  async function call(path: string, init: RequestInit) {
-    const response = await fetch(`${root}${path}`, init);
-
-    if (!response.ok) {
-      const body = await response.text();
-
-      throw new Error(`Anthropic API ${String(response.status)} on ${path}: ${body.slice(0, 500)}`);
-    }
-
-    return response;
-  }
-
-  return { root, headers, call };
+  return { headers, root };
 }
 
 function sameOrigin(root: string, target: string) {
@@ -196,8 +239,21 @@ function recordedMessageCall(message: z.infer<typeof messageSchema>, purpose: st
   return result;
 }
 
+function recordFailedCall(purpose: string, model: string) {
+  defaultMetrics().recordLlmCall({
+    cacheWriteTokens: 0,
+    cachedTokens: 0,
+    costMicros: 0,
+    inputTokens: 0,
+    model,
+    outputTokens: 0,
+    purpose,
+    status: "error",
+  });
+}
+
 export function createAnthropicBatchProvider(config: AnthropicLlmConfig) {
-  const { root, headers, call } = createClient(config);
+  const { root, headers } = createClient(config);
 
   function resultsHeaders(resultsUrl: string) {
     return sameOrigin(root, resultsUrl) ? headers() : {};
@@ -250,9 +306,7 @@ export function createAnthropicBatchProvider(config: AnthropicLlmConfig) {
 
   return {
     create: async (requests, idempotencyKey) => {
-      const response = await call("/v1/messages/batches", {
-        method: "POST",
-        headers: { ...headers(), "idempotency-key": idempotencyKey },
+      const response = await llmFetch(`${root}/v1/messages/batches`, {
         body: JSON.stringify({
           requests: requests.map((request) => ({
             custom_id: request.customId,
@@ -269,6 +323,11 @@ export function createAnthropicBatchProvider(config: AnthropicLlmConfig) {
             },
           })),
         }),
+        headers: { ...headers(), "idempotency-key": idempotencyKey },
+        idempotent: true,
+        label: "/v1/messages/batches",
+        method: "POST",
+        ...retryPolicy(config),
       });
 
       const body: unknown = await response.json();
@@ -276,20 +335,22 @@ export function createAnthropicBatchProvider(config: AnthropicLlmConfig) {
       return providerBatch(batchSchema.parse(body));
     },
     retrieve: async (batchId) => {
-      const response = await fetch(`${root}/v1/messages/batches/${batchId}`, {
-        headers: headers(),
-      });
+      let response: Response;
 
-      if (response.status === 404) {
-        throw new BatchGoneError(`the Anthropic batch ${batchId} is gone`);
-      }
+      try {
+        response = await llmFetch(`${root}/v1/messages/batches/${batchId}`, {
+          headers: headers(),
+          idempotent: true,
+          label: "batch status",
+          method: "GET",
+          ...retryPolicy(config),
+        });
+      } catch (error) {
+        if (error instanceof LlmHttpError && error.status === 404) {
+          throw new BatchGoneError(`the Anthropic batch ${batchId} is gone`);
+        }
 
-      if (!response.ok) {
-        const body = await response.text();
-
-        throw new Error(
-          `Anthropic API ${String(response.status)} on the batch ${batchId}: ${body.slice(0, 500)}`,
-        );
+        throw error;
       }
 
       const body: unknown = await response.json();
@@ -297,13 +358,13 @@ export function createAnthropicBatchProvider(config: AnthropicLlmConfig) {
       return providerBatch(batchSchema.parse(body));
     },
     results: async (resultsUrl) => {
-      const response = await fetch(resultsUrl, { headers: resultsHeaders(resultsUrl) });
-
-      if (!response.ok) {
-        throw new Error(
-          `Anthropic API ${String(response.status)} on the batch results: ${resultsUrl}`,
-        );
-      }
+      const response = await llmFetch(resultsUrl, {
+        headers: resultsHeaders(resultsUrl),
+        idempotent: true,
+        label: "batch results",
+        method: "GET",
+        ...retryPolicy(config),
+      });
 
       const body = await response.text();
 
@@ -316,12 +377,12 @@ export function createAnthropicBatchProvider(config: AnthropicLlmConfig) {
 }
 
 export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: DurableBatches) {
-  const { headers, call } = createClient(config);
+  const { headers, root } = createClient(config);
 
   const port: LlmPort = {
     estimateBatchCostMicros: (requests) =>
       requests.reduce(
-        (total, request) => total + costMicrosFor(config.model, estimatedUsageFor(request)),
+        (total, request) => total + strictCostMicrosFor(config.model, estimatedUsageFor(request)),
         0,
       ),
     runBatch: async (requests) => {
@@ -333,7 +394,16 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
         return [];
       }
 
-      const calls = await batches.run(requests);
+      let calls: LlmBatchCall[];
+
+      try {
+        calls = await batches.run(requests);
+      } catch (error) {
+        recordFailedCall("batch", config.model);
+        logError("llm.batch", error);
+
+        throw error;
+      }
 
       const purposeByCustomId = new Map(
         requests.map((request) => [request.customId, request.purpose]),
@@ -355,7 +425,7 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
       return calls;
     },
     estimateSingleCostMicros: (request) =>
-      costMicrosFor(config.model, {
+      strictCostMicrosFor(config.model, {
         input:
           Math.ceil(request.user.length / CHARS_PER_TOKEN) +
           Math.ceil(request.pdf.byteLength / PDF_BYTES_PER_TOKEN),
@@ -368,37 +438,47 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
         throw new Error("the Anthropic adapter has no api key configured");
       }
 
-      const response = await call("/v1/messages", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          model: config.model,
-          max_tokens: SINGLE_MAX_TOKENS,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "document",
-                  source: {
-                    type: "base64",
-                    media_type: "application/pdf",
-                    data: Buffer.from(request.pdf).toString("base64"),
+      try {
+        const response = await llmFetch(`${root}/v1/messages`, {
+          body: JSON.stringify({
+            model: config.model,
+            max_tokens: SINGLE_MAX_TOKENS,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "document",
+                    source: {
+                      type: "base64",
+                      media_type: "application/pdf",
+                      data: Buffer.from(request.pdf).toString("base64"),
+                    },
                   },
-                },
-                { type: "text", text: request.user },
-              ],
-            },
-          ],
-        }),
-      });
+                  { type: "text", text: request.user },
+                ],
+              },
+            ],
+          }),
+          headers: headers(),
+          idempotent: false,
+          label: "/v1/messages",
+          method: "POST",
+          ...retryPolicy(config),
+        });
 
-      const body: unknown = await response.json();
+        const body: unknown = await response.json();
 
-      return recordedMessageCall(messageSchema.parse(body), "resume");
+        return recordedMessageCall(messageSchema.parse(body), "resume");
+      } catch (error) {
+        recordFailedCall("resume", config.model);
+        logError("llm.resume", error);
+
+        throw error;
+      }
     },
     estimateStructuredCostMicros: (request) =>
-      costMicrosFor(config.model, {
+      strictCostMicrosFor(config.model, {
         input:
           Math.ceil(request.system.length / CHARS_PER_TOKEN) +
           Math.ceil((request.cachePrefix?.length ?? 0) / CHARS_PER_TOKEN) +
@@ -412,21 +492,33 @@ export function createAnthropicLlmPort(config: AnthropicLlmConfig, batches: Dura
         throw new Error("the Anthropic adapter has no api key configured");
       }
 
-      const response = await call("/v1/messages", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          model: config.model,
-          max_tokens: SINGLE_MAX_TOKENS,
-          system: [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: messageContent(request.cachePrefix, request.user) }],
-          output_config: { format: { type: "json_schema", schema: request.schema } },
-        }),
-      });
+      try {
+        const response = await llmFetch(`${root}/v1/messages`, {
+          body: JSON.stringify({
+            model: config.model,
+            max_tokens: SINGLE_MAX_TOKENS,
+            system: [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
+            messages: [
+              { role: "user", content: messageContent(request.cachePrefix, request.user) },
+            ],
+            output_config: { format: { type: "json_schema", schema: request.schema } },
+          }),
+          headers: headers(),
+          idempotent: false,
+          label: "/v1/messages",
+          method: "POST",
+          ...retryPolicy(config),
+        });
 
-      const body: unknown = await response.json();
+        const body: unknown = await response.json();
 
-      return recordedMessageCall(messageSchema.parse(body), request.purpose);
+        return recordedMessageCall(messageSchema.parse(body), request.purpose);
+      } catch (error) {
+        recordFailedCall(request.purpose, config.model);
+        logError("llm.structured", error);
+
+        throw error;
+      }
     },
   };
 

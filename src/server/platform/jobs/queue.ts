@@ -123,6 +123,10 @@ async function runJob(
 
     record(isDead ? "dead" : "failed");
 
+    if (isDead) {
+      logError("jobs.dead", new Error(`${job.kind} (${job.id}): ${errorMessage}`));
+    }
+
     return false;
   }
 }
@@ -334,11 +338,14 @@ export function claimJobsToRun(db: AppDatabase, clock: Clock, options: ClaimJobs
   return startable;
 }
 
+export const STALE_LOCK_RECOVERY_LIMIT = 500;
+
 export function recoverStaleLocks(
   db: AppDatabase,
   clock: Clock,
   singletonKinds: readonly string[] = [],
   skipIds: readonly string[] = [],
+  limit = STALE_LOCK_RECOVERY_LIMIT,
 ) {
   const now = clock.now();
   const conditions = [eq(bgJobs.status, "running"), lt(bgJobs.lockedUntil, now)];
@@ -351,14 +358,26 @@ export function recoverStaleLocks(
     conditions.push(notInArray(bgJobs.id, [...skipIds]));
   }
 
+  const bounded = Math.max(1, Math.trunc(limit));
+
   const stale = db
     .select({ id: bgJobs.id })
     .from(bgJobs)
     .where(and(...conditions))
+    .limit(bounded)
     .all();
 
   for (const job of stale) {
     queueAgain(db, clock, job.id, {});
+  }
+
+  if (stale.length >= bounded) {
+    logError(
+      "jobs.recover",
+      new Error(
+        `requeued ${String(stale.length)} stale locks and stopped at the bound; the next poll continues`,
+      ),
+    );
   }
 
   return stale.length;

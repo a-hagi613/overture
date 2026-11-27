@@ -205,4 +205,20 @@ describe("recovering locks", () => {
     expect(recoverStaleLocks(db, clock)).toBe(0);
     expect(db.select().from(bgJobs).where(eq(bgJobs.id, fresh.id)).get()?.status).toBe("running");
   });
+
+  test("a sweep stops at its bound so a stale backlog cannot stall one poll", () => {
+    const { db } = migrated();
+
+    for (let index = 0; index < 3; index += 1) {
+      const job = enqueueAt(db, "fixtures.capture", NOW);
+
+      db.update(bgJobs)
+        .set({ attempts: 1, lockedUntil: NOW - 1, status: "running" })
+        .where(eq(bgJobs.id, job.id))
+        .run();
+    }
+
+    expect(recoverStaleLocks(db, clock, [], [], 2)).toBe(2);
+    expect(runningKinds(db).length).toBe(1);
+  });
 });
