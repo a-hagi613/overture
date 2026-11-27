@@ -208,37 +208,37 @@ describe("freehire retry", () => {
   });
 });
 
+async function requestFreehireHeaders(apiKey?: string) {
+  let sent: Headers | undefined;
+
+  const options = {
+    clock,
+    fetchImpl: async (_input: string, init?: RequestInit) => {
+      sent = new Headers(init?.headers);
+
+      return await Promise.resolve(jsonResponse(searchFixture));
+    },
+    minIntervalMs: 0,
+    sleep: async () => await Promise.resolve(),
+  };
+
+  const source = createFreehireJobSource(apiKey === undefined ? options : { ...options, apiKey });
+
+  await source.search({});
+
+  return sent;
+}
+
 describe("freehire API key", () => {
-  async function requestHeaders(apiKey?: string) {
-    let sent: Headers | undefined;
-
-    const options = {
-      clock,
-      fetchImpl: async (_input: string, init?: RequestInit) => {
-        sent = new Headers(init?.headers);
-
-        return await Promise.resolve(jsonResponse(searchFixture));
-      },
-      minIntervalMs: 0,
-      sleep: async () => await Promise.resolve(),
-    };
-
-    const source = createFreehireJobSource(apiKey === undefined ? options : { ...options, apiKey });
-
-    await source.search({});
-
-    return sent;
-  }
-
   test("sends the API plan key as a Bearer token", async () => {
-    expect((await requestHeaders("fh_live_test_key"))?.get("authorization")).toBe(
+    expect((await requestFreehireHeaders("fh_live_test_key"))?.get("authorization")).toBe(
       "Bearer fh_live_test_key",
     );
   });
 
   test("sends no authorization header on the free plan", async () => {
-    expect((await requestHeaders())?.get("authorization")).toBeNull();
-    expect((await requestHeaders(""))?.get("authorization")).toBeNull();
+    expect((await requestFreehireHeaders())?.get("authorization")).toBeNull();
+    expect((await requestFreehireHeaders(""))?.get("authorization")).toBeNull();
   });
 });
 

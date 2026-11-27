@@ -404,6 +404,7 @@ const RESET_DIAGNOSTICS_STEP =
 const RESET_DELETE_STEP = "Delete only the catalog database files on the overture-web volume";
 const RESET_RESTART_STEP = "Restart overture-web onto an empty catalog database";
 const RESET_WAIT_STEP = "Wait for overture-web to serve health after the catalog reset";
+
 /** The manual step that reads a repository secret and imports it onto `overture-web`. */
 export const SYNC_OPS_SECRETS_STEP = "Sync the ops secrets and flags to overture-web";
 
@@ -989,8 +990,8 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
 export const DEPLOY_SECRET_GATE_STEP =
   "Refuse to deploy while a required Fly secret is missing (docs/DEPLOY.md, step 5)";
 
-const FREEHIRE_OPT_IN_CONDITION = 'if [ "${REQUIRE_FREEHIRE_API_KEY:-}" = "true" ]; then';
-const FREEHIRE_PRESENT_CONDITION = 'if [ -n "${FREEHIRE_API_KEY:-}" ]; then';
+const FREEHIRE_OPT_IN_CONDITION = /if \[ "\$\{REQUIRE_FREEHIRE_API_KEY:-\}" = "true" \]; then/u;
+const FREEHIRE_PRESENT_CONDITION = /if \[ -n "\$\{FREEHIRE_API_KEY:-\}" \]; then/u;
 
 /**
  * The `run:` body of one workflow step, with the YAML block indentation removed, so a test can execute it with bash
@@ -1012,14 +1013,14 @@ export function readStepScript(step: string) {
     .join("\n");
 }
 
-function shellBlockAfter(script: string, condition: string) {
-  const start = script.indexOf(condition);
+function shellBlockAfter(script: string, condition: RegExp) {
+  const match = condition.exec(script);
 
-  if (start === -1) {
+  if (match === null) {
     return null;
   }
 
-  const rest = script.slice(start);
+  const rest = script.slice(match.index);
   const end = rest.indexOf("\nfi");
 
   return end === -1 ? rest : rest.slice(0, end);

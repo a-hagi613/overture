@@ -9,11 +9,6 @@ import {
   SYNC_OPS_SECRETS_STEP,
 } from "./workflow-config-guard.ts";
 
-/**
- * A stand-in for `flyctl`: `secrets list` answers with the names the test passes in `FIXTURE_FLY_SECRETS`, and
- * `secrets import` writes the stdin it receives to `FIXTURE_FLY_IMPORT_OUT`. Nothing reaches Fly, and the stub
- * never prints a value it was given.
- */
 const FLYCTL_STUB = String.raw`#!/usr/bin/env bun
 import { readFileSync, writeFileSync } from "node:fs";
 
@@ -38,10 +33,17 @@ process.exit(64);
 
 const sandboxes: string[] = [];
 
+function readTextOrEmpty(path: string) {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return "";
+  }
+}
+
 const REQUIRED_TOOLS = ["bash", "jq"] as const;
 
-/** Names the workflow steps read, cleared from the inherited environment so a host value cannot change a test. */
-const STEP_ENV_NAMES = [
+const STEP_ENVIRONMENT_NAMES: ReadonlySet<string> = new Set([
   "ALERT_NTFY_URL",
   "BETTER_AUTH_SECRET",
   "BETTER_AUTH_SECRETS",
@@ -64,7 +66,7 @@ const STEP_ENV_NAMES = [
   "REQUIRE_FREEHIRE_API_KEY",
   "TURNSTILE_SECRET",
   "TURNSTILE_SITE_KEY",
-] as const;
+]);
 
 /**
  * Fails the test when a shell tool the launch-secret steps need is missing, instead of skipping the check.
@@ -114,7 +116,9 @@ export interface LaunchSecretRunInput {
 
 /**
  * A sandbox with the `flyctl` stub on `PATH`, an empty step summary and a file the captured import lands in.
- * `run` executes a step's script with bash exactly as GitHub Actions does.
+ * `run` executes a step's script with bash exactly as GitHub Actions does, with every name the steps read
+ * (`FREEHIRE_API_KEY`, `REQUIRE_FREEHIRE_API_KEY`, the R2 set, …) cleared from the inherited environment so a
+ * host value cannot change a test; pass the ones a case needs through `vars`.
  * @returns The sandbox's `run`, which reports the exit status, combined output, step summary and imported text.
  */
 export function launchSecretSandbox() {
@@ -135,7 +139,7 @@ export function launchSecretSandbox() {
   const baseEnv: Record<string, string> = {};
 
   for (const [name, value] of Object.entries(Bun.env)) {
-    if (value !== undefined && !STEP_ENV_NAMES.includes(name as (typeof STEP_ENV_NAMES)[number])) {
+    if (value !== undefined && !STEP_ENVIRONMENT_NAMES.has(name)) {
       baseEnv[name] = value;
     }
   }
@@ -159,13 +163,7 @@ export function launchSecretSandbox() {
         stdout: "pipe",
       });
 
-      let imported = "";
-
-      try {
-        imported = readFileSync(importPath, "utf8");
-      } catch {
-        imported = "";
-      }
+      const imported = readTextOrEmpty(importPath);
 
       return {
         imported,

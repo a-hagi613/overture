@@ -717,6 +717,16 @@ function workersDeployWorkflow() {
   return readFileSync(".github/workflows/deploy.yml", "utf8");
 }
 
+const DOLLAR_SIGN = "$";
+
+function variableReference(name: string) {
+  return `${name}: ${DOLLAR_SIGN}{{ vars.${name} }}`;
+}
+
+function secretReference(name: string) {
+  return `${name}: ${DOLLAR_SIGN}{{ secrets.${name} }}`;
+}
+
 function workersStepBlock(source: string, name: string) {
   const marker = `      - name: ${name}`;
   const start = source.indexOf(marker);
@@ -1126,7 +1136,7 @@ test("a deploy gate that requires FREEHIRE_API_KEY on every deploy is reported",
 
 test("a deploy gate without the REQUIRE_FREEHIRE_API_KEY variable is reported", () => {
   const deploy = readFileSync(".github/workflows/deploy.yml", "utf8").replace(
-    "          REQUIRE_FREEHIRE_API_KEY: ${{ vars.REQUIRE_FREEHIRE_API_KEY }}\n",
+    `          ${variableReference("REQUIRE_FREEHIRE_API_KEY")}\n`,
     "",
   );
 
@@ -1139,8 +1149,8 @@ test("a deploy gate without the REQUIRE_FREEHIRE_API_KEY variable is reported", 
 
 test("a deploy gate that reads the FREEHIRE_API_KEY value is reported", () => {
   const deploy = readFileSync(".github/workflows/deploy.yml", "utf8").replace(
-    "REQUIRE_FREEHIRE_API_KEY: ${{ vars.REQUIRE_FREEHIRE_API_KEY }}",
-    "FREEHIRE_API_KEY: ${{ secrets.FREEHIRE_API_KEY }}",
+    variableReference("REQUIRE_FREEHIRE_API_KEY"),
+    secretReference("FREEHIRE_API_KEY"),
   );
 
   expect(
@@ -1151,7 +1161,7 @@ test("a deploy gate that reads the FREEHIRE_API_KEY value is reported", () => {
 });
 
 test("an ops sync that does not mask FREEHIRE_API_KEY is reported", () => {
-  const opsLive = recoveryWorkflow().replace('echo "::add-mask::$FREEHIRE_API_KEY"\n', "");
+  const opsLive = recoveryWorkflow().replace(/echo "::add-mask::\$FREEHIRE_API_KEY"\n/u, "");
 
   expect(
     findFreehireLaunchSecretProblems({
@@ -1163,7 +1173,7 @@ test("an ops sync that does not mask FREEHIRE_API_KEY is reported", () => {
 
 test("an ops sync that would send an empty FREEHIRE_API_KEY is reported", () => {
   const opsLive = recoveryWorkflow().replace(
-    '          if [ -n "${FREEHIRE_API_KEY:-}" ]; then',
+    / {10}if \[ -n "\$\{FREEHIRE_API_KEY:-\}" \]; then/u,
     "          if true; then",
   );
 
