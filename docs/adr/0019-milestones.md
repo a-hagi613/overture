@@ -9,3 +9,8 @@ M1: the owner applies from the cloud end to end, gated on at least 60 real appli
 ## Considered Options
 
 - Billing live from day one: spends effort where the risk is not.
+
+*Amendment of 2026-11-26 (#678, #679): the milestones above are history. The rebuild supersedes them with one product:
+freehire as the only job source, role and place filters, Claude Haiku 5.5 for every AI task, the user's picks and
+approval before every send. Public sign-up replaces the invite-only beta step, and the launch gate is the acceptance
+walk in #710 plus the freehire API plan in #708. SPEC §2 and §17 describe what exists now.*

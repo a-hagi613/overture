@@ -194,3 +194,7 @@ same rule as the lint rules above: they are on, and an allowlist entry needs a w
 |---|---|---|---|
 | gitleaks | `security-and-restore` job in `.github/workflows/ci.yml` | Pinned gitleaks 8.30.1, sha256 verified in the step. Scans the full history of `main` on push (`--log-opts=HEAD`) and the pull request's commit range on pull_request. Fails on any finding; `ci-ok` requires it. | A secret in history stays public after a later commit removes it. Allowlist: `.gitleaks.toml` (default rules plus three narrow allowlists). |
 | private-files guard | `security-and-restore` job, `scripts/check-private-files.ts` | Fails when git tracks anything under `profile/` other than `profile/README.md`, any `.env*` file other than `.env.example`, or any `*.pdf`, `*.docx`, `*.tex` outside `test/e2e/fixtures/`. Reads `git ls-files`. | Owner profile files and env files hold personal data and secrets; the guard catches them before a commit reaches main. `profile/*` is ignored in `.gitignore`. |
+
+*Amendment of 2026-11-26 (#700, #706): the `taxonomy-tags.ts` architecture exception above is retired with the role
+taxonomy. The freehire job tables live in `app.sqlite`, so the catalog writer exception is gone; no replacement module
+needs the old path.*
