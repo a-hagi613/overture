@@ -33,6 +33,7 @@ async function openPage(
     storageState,
     viewport: { height, width },
   });
+
   const page = await context.newPage();
 
   if (theme === "dark") {
@@ -99,8 +100,12 @@ appTest("capture the unified Preferences card", async ({ browser, identityServer
       },
     });
 
-    for (const { width, height } of SIZES) {
-      for (const theme of THEMES) {
+    const captures = SIZES.flatMap(({ width, height }) =>
+      THEMES.map((theme) => ({ height, theme, width })),
+    );
+
+    await Promise.all(
+      captures.map(async ({ width, height, theme }) => {
         const { context, page } = await openPage(
           browser,
           server.url,
@@ -131,6 +136,7 @@ appTest("capture the unified Preferences card", async ({ browser, identityServer
             .first()
             .click();
         }
+
         await expect(page.getByTestId("onboarding-targets-status")).toHaveText(
           "2 open roles match",
         );
@@ -153,8 +159,8 @@ appTest("capture the unified Preferences card", async ({ browser, identityServer
           profile.page.locator("#profile-targets"),
         );
         await profile.context.close();
-      }
-    }
+      }),
+    );
   } finally {
     await request.dispose();
     await server.stop();
