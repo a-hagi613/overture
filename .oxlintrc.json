@@ -286,6 +286,7 @@
           "src/server/pipeline/answer-plan.test.ts",
           "src/server/pipeline/application-answers.test.ts",
           "src/server/pipeline/approved-plan.test.ts",
+          "src/server/pipeline/ats-json-forms.test.ts",
           "src/server/pipeline/batch4-forms.test.ts",
           "src/server/pipeline/checkins.test.ts",
           "src/server/pipeline/email-notes.test.ts",

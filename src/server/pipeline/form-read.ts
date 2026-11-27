@@ -43,6 +43,15 @@ import {
 } from "./wave1a-forms.ts";
 import type { Batch1Ats } from "./hosted-form.ts";
 import { isHostedFormAts, readHostedFormHtml } from "./hosted-form.ts";
+import {
+  bamboohrDetailUrl,
+  manatalApplyUrl,
+  manatalJobIdFromPage,
+  readBambooHRFormJson,
+  readManatalFormJson,
+  readZohoRecruitFormJson,
+  zohoRecruitApplyFormUrl,
+} from "./ats-json-forms.ts";
 
 export const FORM_READ_PATHS = [
   "lever_html",
@@ -79,6 +88,8 @@ export interface PlainFormReadResult {
   formSignature: string;
   path: PlainFormReadPath;
   unhandled?: string[];
+  /** True when the page or API carried a recognisable form, even with no questions. */
+  formLoaded?: boolean;
 }
 
 export type FormReadResult = PlainFormReadResult | LoginWallFormRead;
@@ -937,12 +948,82 @@ export function createPlainFormReader(
     return await fetchFormPage(url, readTeamtailorFormHtml);
   }
 
+  async function fetchJson(url: string, parse: (json: string) => PlainFormReadResult | null) {
+    const response = await guardedFetch(url, {
+      headers: { accept: "application/json", "user-agent": USER_AGENT },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    return response.ok ? parse(await response.text()) : null;
+  }
+
   async function zohoRecruit(input: FormReadTarget) {
-    return await fetchFormPage(input.applyUrl ?? input.url, readZohoRecruitFormHtml);
+    const posting = input.applyUrl ?? input.url;
+
+    return await fetchFormPage(posting, async (html) => {
+      const webform = zohoRecruitApplyFormUrl(html, posting);
+
+      if (webform !== null) {
+        const read = await fetchJson(webform.url, readZohoRecruitFormJson);
+
+        if (read !== null) {
+          return read;
+        }
+      }
+
+      return await readZohoRecruitFormHtml(html);
+    });
   }
 
   async function bambooHr(input: FormReadTarget) {
-    return await fetchFormPage(input.applyUrl ?? input.url, readBambooHRFormHtml);
+    const posting = input.applyUrl ?? input.url;
+    const detail = bamboohrDetailUrl(posting);
+
+    if (detail !== null) {
+      const read = await fetchJson(detail, readBambooHRFormJson);
+
+      if (read !== null) {
+        return read;
+      }
+    }
+
+    return await fetchFormPage(posting, readBambooHRFormHtml);
+  }
+
+  async function manatal(input: FormReadTarget) {
+    const posting = input.applyUrl ?? input.url;
+    const applyUrl = manatalApplyUrl(posting) ?? posting;
+
+    const read = await fetchFormPage(applyUrl, async (html) => {
+      const jobId = manatalJobIdFromPage(html);
+
+      if (jobId !== null) {
+        const { origin } = new URL(applyUrl);
+
+        const form = await fetchJson(
+          `${origin}/api/v1.0/jobs/${jobId}/application-form/`,
+          readManatalFormJson,
+        );
+
+        if (form !== null) {
+          return form;
+        }
+      }
+
+      return await readHostedFormHtml("manatal", html);
+    });
+
+    const reachedApplyPage =
+      read !== null &&
+      (isLoginWallRead(read) ||
+        read.questions.length > 0 ||
+        ("formLoaded" in read && read.formLoaded));
+
+    if (reachedApplyPage || applyUrl === posting) {
+      return read;
+    }
+
+    return await fetchFormPage(posting, async (html) => await readHostedFormHtml("manatal", html));
   }
 
   async function recruitee(input: FormReadTarget) {
@@ -1023,6 +1104,10 @@ export function createPlainFormReader(
 
         if (input.ats === "personio") {
           return await personio(input);
+        }
+
+        if (input.ats === "manatal") {
+          return await manatal(input);
         }
 
         if (isHostedFormAts(input.ats)) {

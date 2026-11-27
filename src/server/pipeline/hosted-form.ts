@@ -218,6 +218,8 @@ export interface HostedFormRead {
   formSignature: string;
   path: HostedFormPath;
   unhandled: string[];
+  /** True when the page carried a recognisable form, even with no questions. */
+  formLoaded?: boolean;
 }
 
 const pathFor: (ats: Batch1Ats) => HostedFormPath = (ats) => `${ats}_html`;
@@ -514,6 +516,7 @@ export const readHostedFormHtml: (
 
   if (chosen === null) {
     return {
+      formLoaded: false,
       questions: [],
       formSignature: "",
       path: pathFor(ats),
@@ -527,6 +530,7 @@ export const readHostedFormHtml: (
   );
 
   return {
+    formLoaded: true,
     questions,
     formSignature: questions.length === 0 ? "" : formSignatureForHostedQuestions(ats, questions),
     path: pathFor(ats),
