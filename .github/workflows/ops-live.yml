@@ -496,7 +496,10 @@ jobs:
           set -uo pipefail
           # The catalog is rebuildable from the feeds (ADR 0036), so deleting it is ordinary recovery work. The
           # application database is never touched: it holds every account, application and message.
-          remote_command="rm -f /data/catalog.sqlite /data/catalog.sqlite-wal /data/catalog.sqlite-shm /data/catalog.sqlite-journal /data/catalog-*.sqlite* && ls -lh /data"
+          # The live catalog may be a symlink to a timestamped snapshot (catalog.<stamp>.sqlite), so the glob must
+          # match both the dot-stamped snapshots and the legacy hyphenated names; a missed snapshot leaves the whole
+          # 600 MB+ file behind after the symlink is removed.
+          remote_command="rm -f /data/catalog.sqlite /data/catalog.sqlite-wal /data/catalog.sqlite-shm /data/catalog.sqlite-journal /data/catalog.*.sqlite* /data/catalog-*.sqlite* /data/catalog.sqlite.active.json* && ls -lh /data"
           case "$remote_command" in
             *app.sqlite*)
               echo "::error::Refusing to run a catalog reset that names app.sqlite; the application database is never touched."
