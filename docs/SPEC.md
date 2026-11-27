@@ -70,10 +70,10 @@ before/after Submit screenshots and a timeline.
 | Plans | Free trial (3, card check only), Weekly $9.99 (50), Monthly $29.99 (250), regular Stripe Billing, grants and the ledger (ADR 0018) |
 | Proof | per-application timeline, before/after Submit screenshots kept 30 days, and the admin support lookup (§16.5) |
 
-Before public launch (Epic #678, Wave 5): #706 deletes the last dead code, #710 walks three people through the three
-plans and stops at Submit, and #708 buys the freehire API plan and turns public sign-up on. This file describes the
-built product; where a launch switch is still off, the section says so. The earlier M1–M3 scope lives in ADRs 0019,
-0026, 0030 and 0031 as history; it does not describe the product.
+Two launch gates remain (Epic #678, Wave 5): #710 walks three people through the three plans with `OVERTURE_DRY_SUBMIT`
+and stops at Submit, and #708 buys the freehire API plan and turns public sign-up on. This file describes the built
+product; where a launch switch is still off, the section says so. The earlier M1–M3 scope lives in ADRs 0019, 0026,
+0030 and 0031 as history; it does not describe the product.
 
 ---
 
@@ -94,6 +94,7 @@ built product; where a launch switch is still off, the section says so. The earl
                      │  /data/app.sqlite (WAL, synchronous=FULL)     │
                      │  users · applications · mail · billing        │
                      │  shared jobs · job_places from freehire       │
+                     │  catalog.sqlite (legacy, read-only)           │
                      └───────────────────────────────────────────────┘
         │CDP/WSS        │HTTPS            │HTTPS          │OTLP           │S3 API
         ▼               ▼                 ▼               ▼               ▼
@@ -111,7 +112,7 @@ built product; where a launch switch is still off, the section says so. The earl
   to the Bun server, waits for it to exit, then bounds its final WAL sync to R2. The app's graceful budget
   (`KILL_TIMEOUT_MS`, 240 s) fits inside that, leaving Fly ~60 s for Litestream. On `SIGINT`/`SIGTERM` it stops
   claiming new jobs, stops accepting, ends every open `/api/events` stream, waits for in-flight jobs, requeues what
-  is left, flushes OTel, closes the SQLite handle, logs `shutdown: stopped in <ms>` and exits 0, with a SIGKILL
+  is left, flushes OTel, closes both SQLite handles, logs `shutdown: stopped in <ms>` and exits 0, with a SIGKILL
   backstop one second past the budget. An active browser send is drained rather than aborted: its browser stays open
   until the budget runs out, so a 60–180 s submission can finish and commit its ledger state. Only at the end of the
   budget does a last-resort abort close the browser, and the shutdown waits for that handler to record its
@@ -154,12 +155,18 @@ built product; where a launch switch is still off, the section says so. The earl
   replication recovers; the volume alerts (§16.5) surface it. `bun run dev`, `bun run start` and a
   `LITESTREAM_ENABLED=false` image run `main.ts` without a replicator, so they keep SQLite's automatic checkpoint
   (1000 pages) and cannot grow the WAL.
-- **One database.** The shared freehire `jobs` and `job_places` rows live in `app.sqlite` beside the user rows, in the
-  same `drizzle/` migration chain (ADR 0036 amendment, ADR 0047). They are public data written only by the pull and
-  the scorer's jobs, never owned by a user: user tables keep a Posting's id as a plain logical id with no foreign key,
-  and an Application copies the display fields it shows (§5.4). A job row closes; it is not deleted, so an
-  Application's stored link keeps resolving. The pull's counters are written to `job_pull_runs` and the event log,
-  and the `jobs.pull` alert fires after repeated failures without deleting anything (§6.1).
+- **Two files during the transition.** The shared freehire `jobs` and `job_places` rows live in `app.sqlite` beside
+  the user rows, in the same `drizzle/` migration chain (ADR 0036, ADR 0047). They are public data written only by the
+  pull and the scorer's jobs, never owned by a user: user tables keep a Posting's id as a plain logical id with no
+  foreign key, and an Application copies the display fields it shows (§5.4). A job row closes; it is not deleted, so
+  an Application's stored link keeps resolving. The pull's counters go to `job_pull_runs` and the event log, and the
+  `jobs.pull` alert fires after repeated failures without deleting anything (§6.1).
+- **`catalog.sqlite` stays as a read-only legacy read model.** The old publication path is gone (no off-box ETL,
+  snapshot relay or hot-swap), and nothing writes this file. It is opened locally on boot and still answers readers
+  for rows that predate freehire: the stored-match fallback, `/api/supply`, preparation/review/dispatch for
+  Applications created against a catalog Posting, the demo seed and the admin reports (ADR 0036, 2026-11-27
+  amendment). Every new Application comes from a freehire `jobs` row. Removing those readers, and then the file, is a
+  follow-up once no catalog-backed Application remains.
 
 ### 3.2 External services and environment
 
@@ -184,7 +191,7 @@ built product; where a launch switch is still off, the section says so. The earl
 | Master key | envelope encryption | `MASTER_KEY_V1..V<n>` (each 32 bytes base64) and `MASTER_KEY_CURRENT=n`; the chain is contiguous and rotation re-wraps every user key (ADR 0039, `docs/DEPLOY.md`) | fixed test key |
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET` (single secret) or `BETTER_AUTH_SECRETS` (`"2:<new>,1:<old>"`, current first) for non-destructive rotation, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
-| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com`, `ALIAS_EMAIL_DOMAIN` (the apply alias every account gets at creation; defaults to `MAIL_DOMAIN`), `NOTIFY_MAIL_DOMAIN=notify.tryoverture.com` (outbound transactional mail), `OWNER_EMAIL`, `FREEHIRE_API_BASE_URL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `SUPPORT_EMAIL`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `ALERT_NTFY_URL` (optional), `OVERTURE_DRY_SUBMIT` (local acceptance walk only: fills a real form, keeps the pre-Submit screenshot and stops before the click; refused in production) | |
+| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com`, `ALIAS_EMAIL_DOMAIN` (the apply alias every account gets at creation; defaults to `MAIL_DOMAIN`), `NOTIFY_MAIL_DOMAIN=notify.tryoverture.com` (outbound transactional mail), `OWNER_EMAIL`, `FREEHIRE_API_BASE_URL`, `DATABASE_PATH=/data/app.sqlite`, `CATALOG_DATABASE_PATH=/data/catalog.sqlite` (defaults beside the application file; legacy read-only), `MAIL_FROM`, `SUPPORT_EMAIL`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `ALERT_NTFY_URL` (optional), `OVERTURE_DRY_SUBMIT` (local acceptance walk only: fills a real form, keeps the pre-Submit screenshot and stops before the click; refused in production) | |
 
 Inbound mail is buffered on the `overture-inbound-mail` Queue (100 retries, 14-day retention) and its dead-letter queue
 `overture-inbound-mail-dlq`; spilled messages live in the separate R2 bucket `overture-inbound-mail-spill` under
@@ -236,7 +243,7 @@ Billing is on only when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both
 |---|---|
 | Runtime | Bun 1.4.5 (pinned in `package.json`, CI and the Dockerfile), strict TypeScript (`bun check` for typecheck) |
 | HTTP | Hono + `@hono/zod-validator`; Zod on every input, webhook and env var |
-| DB | One SQLite file, `/data/app.sqlite` (ADR 0036 amendment, ADR 0047): user, job-queue and shared freehire job data in `jobs`/`job_places` (WAL, `synchronous=FULL`, Litestream; `wal_autocheckpoint=0` only while the container runs it, so Litestream owns the checkpoints), `foreign_keys=ON` and STRICT; Drizzle ORM + drizzle-kit with `drizzle/` migrations; no SQLite-only SQL outside `server/platform/search` |
+| DB | `/data/app.sqlite` (ADR 0036, ADR 0047): user, job-queue and shared freehire job data in `jobs`/`job_places` (WAL, `synchronous=FULL`, Litestream; `wal_autocheckpoint=0` only while the container runs it, so Litestream owns the checkpoints), `foreign_keys=ON` and STRICT; plus `/data/catalog.sqlite`, the read-only legacy read model, with its own `drizzle-catalog/` migrations and SQLite's checkpointing, never replicated. Drizzle ORM + drizzle-kit with `drizzle/` and `drizzle-catalog/`; no SQLite-only SQL outside `server/platform/search` |
 | Auth | better-auth (Google, LinkedIn OIDC and magic link; no passwords, ADR 0035; passkey for admin) with Drizzle adapter |
 | Web | Vite 8, React 19, React Router 8 (library mode, Zod-typed search params), TanStack Query, `fetch` + Zod response schemas, Tailwind v4, shadcn/ui, 21st.dev, dnd-kit, lucide |
 | Browser control | `playwright-core` `chromium.connectOverCDP` |
@@ -252,7 +259,8 @@ src/
   server/
     platform/        db, migrations, queue, sse, crypto, telemetry, settings, kill-switches, ports/*
     auth/            better-auth config, invites/allowlist, sessions
-    jobs/            the JobSource port, freehire client, pulls, store, reader, places, language, filter proof
+    jobs/            the JobSource port, freehire client, pulls, store, reader, language, filter proof
+    catalog/         legacy read-only catalog readers and shared question/geo helpers
     places/          canonical place ids, resolvers, autocomplete
     profile/         facts, resume, targets, excluded employers, apply alias
     pipeline/        preparation, reviews, check-ins, applications, stages
@@ -307,7 +315,8 @@ keep `posting_id` / `company_id` as plain logical ids with no foreign key into `
 its own copy of the posting and company display fields (§5.4). Tracker, Ready, Home, Inbox, Calendar, Notifications,
 the cost report and the account export therefore never change when a job closes or freehire rewrites it. Preparing a
 form, sending an Application, scoring and review attachment read the live `jobs` row, because they act on a Posting
-that must still be open; `bun run db:verify` fails if a user table ever grows a foreign key into `jobs`.
+that must still be open; an Application created before the freehire switch reads its retained catalog Posting the same
+way. `bun run db:verify` fails if a user table ever grows a foreign key into `jobs`.
 
 ### 5.1 Auth (better-auth managed)
 
@@ -334,8 +343,8 @@ other address only lowered and trimmed) · `session` · `account` (provider: goo
 ### 5.3 Jobs
 
 Every row in `jobs` is one **freehire job record** (§6): the table, its columns, its categories and its places follow
-freehire's shape, not the retired feed shape, and everything that reads a job reads it from here (ADR 0047). Jobs are
-public data, shared by every user, and written only by the freehire pull and the scorer. `job_places` holds the
+freehire's shape, not the retired feed shape, and every new job is read from here (ADR 0047). Jobs are public data,
+shared by every user, and written only by the freehire pull and the scorer. `job_places` holds the
 canonical place ids both a saved target and a job speak (§6.4, ADR 0048). `questions` and `question_variants` stay
 shared across users and are never tied to one job.
 
@@ -347,6 +356,14 @@ shared across users and are never tied to one job.
 | `job_pull_runs` | id, group_key, mode, user_count, fetched, kept, dropped_closed, dropped_duplicate, dropped_no_link, dropped_unsupported, error NULL, started_at, finished_at NULL; INDEX(group_key, started_at). One grouped pull's counters (§6.1) |
 | `questions` | id, text_display, text_norm_hash UNIQUE, field_type CHECK IN ('text','textarea','select','multiselect','radio','checkbox','file','date','number','email','phone','url'), options_hash NULL, fact_key NULL (a fact key, or a derivation key for `target`/`derived`), answer_kind CHECK IN ('fact','target','derived','open_text','consent','skip','unknown'), mapped_by CHECK IN ('rules','llm','owner'), seen_count, created_at |
 | `question_variants` | variant_hash PK, question_id |
+
+**Legacy catalog (read-only).** `catalog.sqlite` keeps the pre-freehire tables read-only: `companies`,
+`company_boards`, `postings`, `posting_questions`, `posting_tags`, `posting_locations`, `supply_facets` and `geo_places`.
+No new row is written there. They answer the stored-match fallback for old Applications, `/api/supply`, preparation
+and review for an Application created against a catalog Posting, the demo seed and the admin reports. The retired role taxonomy
+survives only as the one-time boot migration of saved targets and the legacy catalog label bridge; no matching path
+reads it for new jobs. Removing these readers and the file is a follow-up once no catalog-backed Application
+remains (ADR 0036, 2026-11-27 amendment).
 
 A Posting carries no role label, no tag source and no tag import: freehire supplies its category, seniority, work mode,
 places, skills and salary, and Overture never invents the ones freehire leaves blank. A job row closes on a change
@@ -483,7 +500,9 @@ audit is only useful across a search). Job rows close and are never deleted (ADR
 ### 6.1 One source
 
 **freehire is the only job source** (#700). Overture reads jobs from freehire's search API and nowhere else: it does
-not discover boards or poll an ATS job feed, and the old catalog snapshot is gone. The ATS list in `src/shared/ats.ts`
+not discover boards or poll an ATS job feed, and the old catalog publication path (off-box ETL, snapshot relay,
+hot-swap) is gone. `catalog.sqlite` remains only as the read-only legacy read model for rows that predate freehire
+(§3.1, §5.3); no new job comes from it. The ATS list in `src/shared/ats.ts`
 is kept for one thing only: the 28 job systems Overture can actually fill, and per-system apply adapters (§10).
 
 | Concern | Rule |
@@ -1482,20 +1501,20 @@ body, sender or attachment, so the admin never sees message content.
   entries on Profile → Account → "Support access" through `GET /api/support-access`.
 - Every admin action on `admin_audit`: `at`, `actor_id`, `action`, `target_user_id` (null), `reason`, `detail`
   JSON; an OTel span carries the action.
-- `/admin/api/catalog` returns `{ lastPullAt, ats }`, where `ats` holds one entry per apply system (the 28 keys in
-  `src/shared/ats.ts`) with `hourlyLimit` (from `limits.ats_hourly.<ats>`), `killSwitchEnabled` (null until a kill
-  switch for that ATS is set) and the last pull's counters (fetched, kept, dropped per reason, §6.1). It never counts
-  favorites or jobs; freehire is the source.
+- `/admin/api/catalog` returns `{ discoveredAt: null, ats }`, where `ats` holds one entry per apply system (the 28
+  keys in `src/shared/ats.ts`) with `hourlyLimit` (from `limits.ats_hourly.<ats>`) and `killSwitchEnabled` (null until
+  a kill switch for that ATS is set). The page also runs the manual Personio form probe. It never counts
+  favorites or jobs.
 - `GET /admin/api/applications/:id` is the **support lookup** (#695): selection, picks, queue slot, attempts, any deploy
   interruption, confirmation and balance/mail state for one application, with no message content and no answer values.
 
 - `GET /admin/api/storage-report` attributes what consumes disk and R2 space without any personal content:
-  `app.sqlite` with its `-wal`/`-shm` sidecars, the volume's total and
+  `app.sqlite` with its `-wal`/`-shm` sidecars and `catalog.sqlite` when that file exists, the volume's total and
   free bytes, job counts by ATS with open and closed, object counts and bytes grouped by `files/`, `mail/`,
   `exports/` and the rest, and Litestream backup totals when `R2_BUCKET_BACKUPS` is configured. It returns sizes,
   counts and source/table/prefix names only: never an email, name, user id, answer, resume, message or job URL.
   `?dbstat=1` adds a table and index byte breakdown read from an isolated `VACUUM INTO` snapshot opened read-only, so
-  it never blocks live WAL writes; without it the route copies nothing. An unconfigured R2 bucket is reported as absent,
+  it never blocks live WAL writes; without it the route copies nothing. A missing `catalog.sqlite` or an unconfigured R2 bucket is reported as absent,
   never as an error. `bun run scripts/storage-report.ts --db <path>
   [--objects-root <dir>] [--tables]` prints the same report as JSON and opens the database read-only.
 - `GET /admin/api/jobs?status=queued|running|failed|dead|completed|all&kind=…&limit=1…200` (default 50)
@@ -1549,7 +1568,7 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 |---|---|
 | Session | `GET /api/me` (the signed-in user, the Turnstile values and the enabled social providers; `adminOrigin` is present only for `role = "owner"` and is `null` for anonymous visitors, regular users and the demo account, so the admin host is never advertised to anyone who cannot use it; on the admin host itself `adminOwnerEmail` names the owner account and `socialProviders` is empty, and neither is exposed on the app host) |
 | Health | `GET /api/health` (public, no session: `select 1` plus the cached Litestream replica reading from `backups.status()`, so Fly's check and the sentinel Worker probe answer in milliseconds and never run Litestream) |
-| Supply preview | `GET /api/supply?role&location&remote` (public, no session, read-only: the count of open jobs, grouped by system, optionally filtered by one freehire category id, one place id and `remote=true`; cached per job revision and answered `Cache-Control: public, max-age=60, stale-while-revalidate=300`; at most 120 requests a minute per client IP → `429 rate_limited`; never returns a Company, title or any per-row field) |
+| Supply preview | `GET /api/supply?role&location&remote` (public, no session, read-only: the count of open, apply-supported Postings from the catalog read model (§5.3), grouped by system, optionally filtered by one category id, one place id and `remote=true`; cached per catalog revision and answered `Cache-Control: public, max-age=60, stale-while-revalidate=300`; at most 120 requests a minute per client IP → `429 rate_limited`; never returns a Company, title or any per-row field) |
 | Shell | `GET /api/nav` (the counts behind the nav badges: Applications in Ready, open Reviews, unread employer mail; a zero hides its badge) |
 | Events | `GET /api/events` (SSE; signed-in only, per user: a stream carries just that user's rows and never a row with no owner; `Last-Event-ID` replay is capped to the newest 200 rows, so a reconnect from `0` cannot dump the whole log; heartbeat 25 s) |
 | Home | `GET /api/home` (running and pause reason, applications left, today's sent/remaining, ready-to-send count, queued count + next send time, `nextPrepAt`, sent/replies/interviews and a per-day or per-week series for 7D/30D/90D, open Reviews grouped by jobs unlocked, recent authenticated Inbox items, activity, check-ins, and recent "Couldn't apply" rows with their plain-English reason and a safe `applyUrl`) · `POST /api/running` `{running}` |
@@ -1566,14 +1585,14 @@ hand-written typed clients under `src/web/lib/`; there is no Hono RPC client. A 
 | Calendar feed | `GET /calendar/<token>.ics` (no session: the token in the path is the credential; `text/calendar; charset=utf-8`, `Cache-Control: private, no-store`; 404 for any unknown, rotated or turned-off token, with no other difference; the user's custom calendar events (`calendar_custom_events`) are written beside the Application items) · `GET /api/calendar/feed` (signed in: `{enabled, createdAt, rotatedAt}`, never the token) · `POST /api/calendar/feed/token` (signed in: turns the feed on or rotates it; returns `{path}` once, and the previous token stops working at once) · `DELETE /api/calendar/feed` (signed in: turns it off) |
 | Profile | `GET/PUT /api/profile/facts` · `POST /api/profile/resume` · `GET /api/profile/resume` (the current resume and its history) · `GET /api/profile/resume/:id/file` (streams the resume PDF) · `GET/PUT /api/profile/targets` (roles = freehire categories plus title words, places = place ids, and excluded employers; returns the live matching count) · `POST /api/profile/targets/match-count` (draft count) · `GET /api/profile/places?q` (place autocomplete from freehire's lists, keyboard-accessible, stale requests cancelled) · `GET/PUT /api/profile/skip-companies` · `GET/PUT /api/profile/languages` · `GET/PUT /api/profile/settings` (timezone and languages) · `GET /api/profile/mailbox` (the apply alias read-only and `copiesTo`, the current verified login email) · `GET/PUT /api/profile/strengthen` (the Tier 2 Facts that would unlock queued Applications, each with its count; answering saves the Fact and resolves the Reviews it answers) |
 | Consent | `GET /api/consent` (public current version and text; the signed-in user's accepted version and date) · `GET /api/consent/versions` (every published version, newest first) · `POST /api/consent/accept` `{version}` (refuses `version_changed` when a newer version is published) |
-| Onboarding | `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, current employer, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records a finished step and returns the state; the resume step refuses a non-PDF, the gaps step requires a resume, the preferences step refuses without at least one role and one place, and the plan step requires saved picks; the plan step records the choice: `trial`, `weekly` or `monthly`) · `GET/PUT /api/onboarding/gaps` (the fill-the-gaps fields, pre-filled from the resume reader and saved as confirmed facts, §7.2) · `GET/PUT /api/onboarding/matches` (the ordered match preview, `planKind`, `trialAvailable` and `pickLimit`, and the saved picks; a PUT with an unknown or closed posting is 404 and a pick past the plan's limit is 409 `pick_limit`) · `POST /api/onboarding/prepare` `{postingIds}` (requires the current consent and Applications left; saves the picks, then starts preparation for them; 402 `trial_required` with none) · `POST /api/onboarding/settle` (verifies a card or paid Checkout once, prepares the saved picks, switches the account on and returns one outcome per pick; a refresh, second tab or repeated webhook reuses the same Application) · `POST /api/onboarding/current-employer` `{name}` (the blocked current employer) · `GET/PUT /api/onboarding/targets` (the preferences step: the saved roles, title words and places, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `PUT /api/onboarding/plan` `{planKind: free_trial|week|month}` (stores the choice on the durable batch; the trial refuses a second trial with 409 `trial_used`, and a plan that allows fewer picks than are saved is 409 `pick_limit`) · `POST /api/onboarding/checkout` `{plan: week|month}` (Checkout in subscription mode, returning to `/tracker?billing=success&plan=…`; a subscription that has not ended is 409 `plan_active`; the picks are already saved, so a cancel returns to this step with them kept) · `POST /api/onboarding/start` (finishes onboarding with no card: requires the current consent, sets `running = 1`, clears the `onboarding` pause reason, and queues the onboarding search; used by tests and the no-card path) · `GET/PUT /api/onboarding/facts` (the old Tier 1 form, still mounted for tests; it is no longer a wizard step) |
+| Onboarding | `GET /api/onboarding` (the step, `onboarded_at`, pause reason, current resume, current employer, skip list and whether an invited user must onboard) · `POST /api/onboarding/:step` (records finished steps 1–4 and returns the state; the resume step refuses a non-PDF, the gaps step requires a resume, the preferences step refuses without at least one role and one place; step 5 answers 409 `start_required` and finishes through `settle` or `start`) · `GET/PUT /api/onboarding/gaps` (the fill-the-gaps fields, pre-filled from the resume reader and saved as confirmed facts, §7.2) · `GET/PUT /api/onboarding/matches` (the ordered match preview, `planKind`, `trialAvailable` and `pickLimit`, and the saved picks; a PUT with an unknown or closed posting is 404 and a pick past the plan's limit is 409 `pick_limit`) · `POST /api/onboarding/prepare` `{postingIds}` (requires the current consent and Applications left; saves the picks, then starts preparation for them; 402 `trial_required` with none) · `POST /api/onboarding/settle` (verifies a card or paid Checkout once, prepares the saved picks, switches the account on and returns one outcome per pick; a refresh, second tab or repeated webhook reuses the same Application) · `POST /api/onboarding/current-employer` `{name}` (the blocked current employer) · `GET/PUT /api/onboarding/targets` (the preferences step: the saved roles, title words and places, the choices that have open Postings, and the live count) · `PUT /api/onboarding/timezone` (the browser's zone through the seven-day rule) · `PUT /api/onboarding/plan` `{planKind: free_trial|week|month}` (stores the choice on the durable batch; the trial refuses a second trial with 409 `trial_used`, and a plan that allows fewer picks than are saved is 409 `pick_limit`) · `POST /api/onboarding/checkout` `{plan: week|month}` (Checkout in subscription mode, returning to `/tracker?billing=success&plan=…`; a subscription that has not ended is 409 `plan_active`; the picks are already saved, so a cancel returns to this step with them kept) · `POST /api/onboarding/start` (finishes onboarding with no card: requires the current consent, sets `running = 1`, clears the `onboarding` pause reason, and queues the onboarding search; used by tests and the no-card path) · `GET/PUT /api/onboarding/facts` (the old Tier 1 form, still mounted for tests; it is no longer a wizard step) |
 
 | Notifications | `GET /api/notifications` (the newest 100 rows in reading order, with `unread` and the server's `now`) · `POST /api/notifications/read` `{id}` · `POST /api/notifications/read-all` · `GET/PUT /api/notifications/preferences` · `GET /api/push` (the VAPID public key, or null when push is off) · `POST /api/push/subscribe` · `POST /api/push/unsubscribe` `{endpoint}` |
 | Settings (ADR 0037) | `GET/PUT /api/profile/settings` (timezone, languages, notification switches) · `GET /api/account/export` · `POST /api/account/export` · `GET /api/account/export/:id/download` · `GET /api/account/deletion` (email, re-authenticated) · `POST /api/account/reauth/link` (a fresh sign-in link) · `POST /api/account/delete` `{confirm: true}` · `GET /api/support-access` |
 | Support (Profile → Support) | `POST /api/support` `{category, subject, message}` (signed in, never the demo account; sealed into `support_tickets` for the Support Queue, mailed to `SUPPORT_EMAIL` with the sender as `Reply-To`; 201 `{ok, referenceId}`, 429 `rate_limited` past ten an hour, 502 `mail_send_failed` when the mail fails while the ticket stays recorded) |
 | Billing | `GET /api/billing` (`enabled`, `customer`, the subscription's `plan`, `status`, `currentPeriodEnd`, `cancelAtPeriodEnd`, `applicationsLeft` and `planApplications`; the demo account reads it too, so its Billing screen renders) · `POST /api/billing/checkout` `{plan}` (Checkout returns to `/profile/billing?billing=success|cancelled`; a subscription that has not ended answers 409 `plan_active` with its `plan` and `status`, before any Stripe call) · `POST /api/billing/portal` (returns to `/profile/billing`; plan switches, cancel at period end, payment method and invoices happen there, in Stripe) |
 | Webhooks and internal | `POST /webhooks/stripe` · `POST /internal/mail/inbound` · `POST /internal/mail/dead-letter` · `GET /internal/mail/code-waits` |
-| Admin | `/admin/api/session`, `/overview`, `/users` (filtered list), `/users/:id`, `/users/:id/reveal` (POST open, GET current, DELETE close), `/users/:id/suspend`, `/users/:id/reinstate`, `/act-as/:userId`, `/attempts`, `/attempts/:id/replay`, `/applications/:id` (support lookup, §13.3), `/fixtures/capture`, `/kill-switches` (`PUT /kill-switches/:scope/:key`), `/settings` (`PUT /settings/:key`), `/grants`, `/billing/users`, `/billing/users/:id`, `/billing/refunds`, `/billing/reconciliation`, `/margin`, `/catalog`, `/jobs` (`POST /jobs/:id/retry`, `POST /jobs/:id/cancel`), `/llm-usage`, `/invites` (`POST /invites/:id/revoke`), `/mail-health`, `/storage-report`, `/audit`, `/alerts` (the owner's readiness report and unread alerts), `/alerts/ack` `{id?}` (POST: acknowledges one alert, or every unread one when `id` is absent), `/system` (the runtime, volume, database and integration snapshot), `/system/checkpoint` (POST: runs a passive WAL checkpoint on `app.sqlite`; Litestream still owns the checkpoints), `/support` (the Support Queue: `GET /support?status=open|in_progress|resolved|closed|all&limit` lists newest-first with the author's address and the opened message, `total` counts the filtered tickets, `openCount` counts the tickets still `open`, and a message that cannot be opened is marked unreadable rather than failing the list; `PATCH /support/:id` moves the status, saves the internal note, sets `resolvedAt` and records `support.update`; `POST /support/:id/reply` mails the author quoting `[Ref: referenceId]` and records `support.reply`; `/overview` carries `openSupportTickets`) |
+| Admin | `/admin/api/session`, `/overview`, `/users` (filtered list), `/users/:id`, `/users/:id/reveal` (POST open, GET current, DELETE close), `/users/:id/suspend`, `/users/:id/reinstate`, `/act-as/:userId`, `/attempts`, `/attempts/:id/replay`, `/applications/:id` (support lookup, §13.3), `/fixtures/capture`, `/kill-switches` (`PUT /kill-switches/:scope/:key`), `/settings` (`PUT /settings/:key`), `/grants`, `/billing/users`, `/billing/users/:id`, `/billing/refunds`, `/billing/reconciliation`, `/margin`, `/catalog`, `/jobs` (`POST /jobs/:id/retry`, `POST /jobs/:id/cancel`), `/llm-usage`, `/invites` (`POST /invites/:id/revoke`), `/mail-health`, `/storage-report`, `/audit`, `/alerts` (the owner's readiness report and unread alerts), `/alerts/ack` `{id?}` (POST: acknowledges one alert, or every unread one when `id` is absent), `/system` (the runtime, volume, database and integration snapshot), `/system/checkpoint` (POST: truncates the catalog database WAL only; Litestream owns `app.sqlite`), `/support` (the Support Queue: `GET /support?status=open|in_progress|resolved|closed|all&limit` lists newest-first with the author's address and the opened message, `total` counts the filtered tickets, `openCount` counts the tickets still `open`, and a message that cannot be opened is marked unreadable rather than failing the list; `PATCH /support/:id` moves the status, saves the internal note, sets `resolvedAt` and records `support.update`; `POST /support/:id/reply` mails the author quoting `[Ref: referenceId]` and records `support.reply`; `/overview` carries `openSupportTickets`) |
 
 SSE topics: `application.updated`, `board.moved`, `review.created`, `review.resolved`, `message.received`,
 `home.updated`, `notification`, `calendar.updated`, `billing.updated`, `mailbox.updated`, `profile.updated`.
@@ -1601,7 +1620,7 @@ Visual design: Ember v0.2 palette, typography, and component primitives governed
 | Profile | A hub at `/profile` with five pages. Resume & Cover Letter: the resume and the cover-letter template. Saved answers: the same fields as the fill-the-gaps step, in the same order, with "Strengthen your profile". Preferences: roles (freehire categories plus optional title words) and places with a live job count, and employers to exclude; there is no "Your targets" summary card and no salary, work-mode, seniority or job-type field (#684). Billing: the plan, Applications left, renewal, Choose a plan for a user with no subscription, and Manage in Stripe for one with a subscription (a subscribed user never starts a second Checkout). Account: the apply alias and the "Use my personal email instead" switch, export, the fixed limits, the support access log, sign out (this device), sign out all devices and delete. Settings: timezone, languages, notification switches and the Calendar feed | missing saved answers, no matches → the limiting field with a real revised count |
 | Support | A form (category, subject, message) sent to `SUPPORT_EMAIL`, ten an hour per user; the reference id is shown after sending | sent, rate limited, failed |
 | Onboarding | Five resumable steps (#687, #702, #709): 1 Sign in (an invite or public sign-up, recorded automatically) · 2 Resume (one PDF) · 3 Fill the gaps (one screen, pre-filled from the Haiku 5.5 resume reader; only the missing fields are asked) · 4 Preferences (roles = freehire categories plus optional title words, places = freehire place ids, employers to exclude, the current employer; a live count and browser timezone saved without asking) · 5 Matches and plan (the ordered match list with "Scoring…" until a score exists; up to 3 picks on Free trial or 10 on Weekly/Monthly; the plan choice side by side: Free trial — 3 applications, card check only; Weekly — $9.99, 50 a week; Monthly — $29.99, 250 a month; then "Start my 3 free applications" / "Start Weekly and apply to N jobs" / "Start Monthly and apply to N jobs"). Picks are saved **before** Stripe, and the Stripe return lands on the **Tracker** with each pick's status. Cancelled or failed Checkout returns to the plan step with the picks kept. A card that already used the trial is told so, with Weekly and Monthly offered. No forwarding step; the apply alias is created at sign-up and shown in the Inbox and Profile | resume unreadable → manual entry, no matches → adjust preferences, card declined → another card or a plan, trial already used → Weekly or Monthly |
-| Admin | Same design system: Overview (success per platform, cost per sent application, queue, spend, and an alert linking to the Support queue while tickets are open), Support (tickets newest-first, status filter tabs, the author with a link to their user page, the opened message, an internal note, status transitions and a reply by email), **the application support lookup** (`/admin/applications/:id`, §13.3), Users, Applications/Attempts (attempt record and the before/after Submit screenshots), Reviews, Kill switches & Settings, Job pulls (the last freehire pull's counters), System health (database, WAL, storage, backups, alerts), Jobs (retry/cancel), LLM spend, Mail health, Fixture capture, Grants/Refunds, Audit | |
+| Admin | Same design system: Overview (success per platform, cost per sent application, queue, spend, and an alert linking to the Support queue while tickets are open), Support (tickets newest-first, status filter tabs, the author with a link to their user page, the opened message, an internal note, status transitions and a reply by email), **the application support lookup** (`/admin/applications/:id`, §13.3), Users, Applications/Attempts (attempt record and the before/after Submit screenshots), Reviews, Kill switches & Settings, Hiring systems (per-ATS limits, kill switches and the Personio probe), System health (database, WAL, storage, backups, alerts), Jobs (retry/cancel), LLM spend, Mail health, Fixture capture, Grants/Refunds, Audit | |
 | Public | Landing (prerendered static HTML on the marketing Worker), sign-in, sign-up, privacy, terms; prices are shown on the landing and on Profile → Billing, and there is no `/pricing` page (ADR 0037; `/pricing` redirects to the landing's Pricing section); the landing says Overture prepares every application and sends it when you approve, names the hiring systems it applies through (Greenhouse, Lever, Ashby, SmartRecruiters, Personio, Workable, Recruitee and BambooHR), and every number and employer it shows is real or plainly an example. The landing's live supply preview asks the public `GET /api/supply` for the count of open roles and filters it by role, location and remote; with JavaScript off, on the static Worker with the app unreachable, or when the API fails or is slow, the card shows a sentence in the same reserved space and never a broken number, a console error or a layout shift (#567) | |
 
 User-facing copy never uses the banned words (see the Words rule at the top; ADR 0020).
@@ -1703,7 +1722,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/matching/match-sort.test.ts` | the code sort is band-first, ties break on exact role then score then newest then posting id, blockers hide a job, a missing score never shows a number, onboarding takes the first job from each new employer, and a page never repeats or skips (#686) |
 | `src/server/matching/match-scoring.test.ts` | the score schema accepts only the anchored sub-scores and the fixed blocker list, an invalid reply is retried once and then rejected, the prompt puts the resume and rubric first, and one job per call is asserted (#686) |
 | `src/server/matching/jobs-pool.test.ts` | the pool is role (freehire category or title word), place ids and language only, a `Remote · X` pick matches only a remote posting scoped to X, a job with no work mode matches by city or country only, non-jobs are excluded, and no removed field (salary, work mode, seniority, employment type) is read (#684, #685) |
-| `src/server/catalog/supply.test.ts` | the public supply count reads only open jobs, splits by ATS, filters by freehire category, place id and remote, caches per job revision, stays bounded, and plans through the job and place indexes rather than scanning every row (#567) |
+| `src/server/catalog/supply.test.ts` | the public supply count reads only open, apply-supported catalog Postings, splits by ATS, filters by role, place id and remote, caches per catalog revision, stays bounded, and plans through the catalog indexes rather than scanning every row (#567) |
 | `src/server/matching/posting-flags.test.ts` | a login wall flags a Posting on the first failure and a broken form on the second, a flagged Posting leaves candidate matching, and the threshold is per reason (#576) |
 | `src/server/dispatch/browser/kernel.test.ts` | Kernel opens headless by default and escalates to headful stealth only after a block or CAPTCHA, and every session is deleted through the control API even when its usage read fails |
 | `src/server/dispatch/browser/proxy-trim.test.ts` | a generic image is aborted while a CAPTCHA host's image still loads, and the font, media and tracker blocks are unchanged |
@@ -1804,9 +1823,13 @@ user's approved send or a real user's matching spends.
 ### 16.4 What proves the product
 
 The e2e suite on fixtures (ADR 0013) is the regression gate, and the record of a real send proves production: the
-before/after Submit screenshots and the per-application timeline (§16.5). Nothing scheduled touches a real employer
-form, a real model or a real mailbox, and no test, CI job or scheduled job spends money (#680). `scripts/pull-forms.ts`
-brings refreshed fixtures into `test/e2e/` through a pull request when a form genuinely changes.
+before/after Submit screenshots and the per-application timeline (§16.5).
+
+One scheduled self-check remains: the nightly `live.check` runs only its **mail, R2 and alerts** groups against
+Overture's own infrastructure and the reserved `live-check@` address. The **forms** and **llm** groups are manual-only
+through the admin and are never scheduled (#680), so no job opens a real employer form or makes a model call. No test,
+CI job or scheduled job spends real money, and no user's mailbox is touched. `scripts/pull-forms.ts` brings refreshed
+fixtures into `test/e2e/` through a pull request when a form genuinely changes.
 
 ### 16.5 Observability (#695)
 
