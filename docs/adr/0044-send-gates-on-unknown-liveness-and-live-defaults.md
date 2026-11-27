@@ -23,7 +23,7 @@ The first real walk reached Ready and approval on two ATS families but never sta
 ## Decision
 
 **Only a confirmed closed posting blocks a send.** A board with no liveness source is `unknown`, which is recorded in
-the dispatch log and the tick summary and then sent. `closed` still skips the Application and closes the catalog row.
+the dispatch log and then sent. `closed` still skips the Application and closes the catalog row.
 The liveness checker answers for the boards that have a source (Greenhouse, Lever, Ashby) and says `open` for Workable
 from its daily snapshot; it never falls through to another board's API, because another board's 404 is not evidence
 that this posting closed.
@@ -47,8 +47,8 @@ different value is never overwritten and still stops the send.
 - An Application on Personio, JazzHR, BambooHR, Zoho Recruit, Manatal, Workable, Recruitee, SmartRecruiters or any
   other shipped adapter can now be claimed and sent; the send may be the first signal that its posting closed, and a
   form that is gone ends as a form change rather than a silent `approved` row.
-- Dispatch logs `posting liveness unknown; sending anyway` for each such claim and counts it in the tick summary, so
-  the gap in liveness coverage stays visible.
+- Dispatch logs `posting liveness unknown; sending anyway` for each such claim, so the gap in liveness coverage
+  stays visible.
 - ATS adapters no longer abort on a single failed field fill before preflight has seen the form. Personio, Ashby and
   the hosted batch adapters keep their own fill-failure handling; Greenhouse and Lever let preflight decide, and Lever
   still stops when its location suggestion never committed the backing id the form needs.
