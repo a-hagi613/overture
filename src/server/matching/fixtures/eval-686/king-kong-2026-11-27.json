@@ -1,0 +1,337 @@
+{
+  "repeats": 2,
+  "resume": "Alex Morgan — Toronto, Ontario, Canada. English. Canadian citizen, no sponsorship needed.\n\nSUMMARY\nBackend engineer with five years of experience building payment and subscription services in Go, PostgreSQL and TypeScript/Node.js on AWS.\n\nEXPERIENCE\nSenior Backend Engineer, Northwind Payments (Toronto), 2023–present\n- Led a team of four engineers rebuilding the merchant payouts API in Go and PostgreSQL.\n- Cut payout latency from 900 ms to 240 ms and reduced failed payouts by 18%.\n- Owned service reliability: Kubernetes deployments, OpenTelemetry tracing, on-call runbooks.\n\nBackend Engineer, Cardstack (Toronto), 2021–2023\n- Built REST and gRPC services in Go for card authorization and ledger reconciliation.\n- Added PostgreSQL partitioning and Redis caching for a 12,000 req/s authorization path.\n- Wrote the TypeScript/Node.js internal admin API used by support and finance.\n\nEDUCATION\nB.Sc. Computer Science, University of Toronto, 2021.\n\nSKILLS\nGo, PostgreSQL, TypeScript, Node.js, Python, Docker, Kubernetes, AWS, REST, gRPC, Redis, CI/CD.",
+  "targets": "roles: Backend, Full-Stack; places: Toronto, Ontario, Canada; Remote · Canada",
+  "jobs": [
+    {
+      "category": "backend",
+      "company": "HelloFresh",
+      "description": "<p><strong>S'more about the team</strong></p> <p>We're looking for a Senior Backend Developer who will contribute to the Consumer Mega Alliance, specifically anchoring the technical direction within the Menu Personalization squad. This individual will be focused on defining and driving the technical strategy to maximize the retention of millions of active customers by architecting optimized, scalable solutions for subscription management and product ordering. You will drive the service delivery for critical customer-facing systems, transitioning the platform towards complex, data-driven personalization, including the global expansion of the food profile and the development of an implicit food profile based on user behaviour.</p> <p>We own the Experience pillar of Menu Personalization. We collect the food signals that tell us what each customer likes — dietary needs, tastes, household, goals, primarily via the Food Profile — and we make sure customers feel known when they see their",
+      "expectedWrongField": false,
+      "id": "senior-backend-product-engineer-consumer-hellofresh-l5ets47q",
+      "location": "Toronto, Ontario, Canada",
+      "postedAt": 1795716606000,
+      "title": "Senior Backend Product Engineer, Menu Personalization"
+    },
+    {
+      "category": "backend",
+      "company": "Wisedocs AI",
+      "description": "<p><strong>About Wisedocs</strong></p><p>Wisedocs is transforming how organizations make claims decisions. Our platform combines AI with expert human review to analyze millions of documents, giving insurers, legal teams, and healthcare providers the speed, accuracy, and oversight they need to close claims with confidence.</p><p>Our engineering organization is what makes that trust possible, from the AI pipeline and models that extract the data, to the labeling tools, to the customer-facing product our clients use every day.</p><p>Transforming this industry takes the right people. If you want to build the engineering behind AI, expert human review, and customer trust, we’d love to meet you.</p><p><strong>About you and the role</strong></p><p>You build the systems that power our AI pipeline. Every document our clients upload passes through services you design and maintain, and the reliability and speed of those services determine how quickly our customers can move claims",
+      "expectedWrongField": false,
+      "id": "backend-engineer-wisedocs-ai-yw2ttghz",
+      "location": "Toronto, Ontario, Canada",
+      "postedAt": 1795132800000,
+      "title": "Backend Engineer"
+    },
+    {
+      "category": "backend",
+      "company": "Plooto",
+      "description": "<div> <h2>About Plooto</h2> <p>Plooto is an all-in-one payment automation platform that helps businesses and accounting firms manage payables and receivables. More than 14,000 companies use Plooto to automate financial workflows, move money, and reconcile with their accounting systems.</p> <p>We are building the financial operations platform small and medium-sized businesses can rely on to run with greater control, efficiency, and confidence.</p> </div><div> <h2>Why Become a Plootonian?</h2> <p>If you're looking to make a meaningful impact, look no further. We're transforming the payments space in North America by delivering an unrivalled product experience that solves a real and pressing problem for SMBs.</p> <p>One of the biggest challenges small businesses face is managing their finances and cash flow—and Plooto helps address that. We have strong product-market fit, a significant opportunity ahead, and the backing of experienced fintech leaders.</p> <p>You'll join a team that cares",
+      "expectedWrongField": false,
+      "id": "senior-backend-engineer-plooto-b6spmozi",
+      "location": "Remote - Canada",
+      "postedAt": 1793654162000,
+      "title": "Senior Backend Engineer"
+    },
+    {
+      "category": "backend",
+      "company": "Grafana Labs",
+      "description": "<div><p>Grafana Labs is the company behind Grafana Cloud, the fully managed observability platform trusted by more than 10,000 organizations to ensure reliability, resolve incidents faster, and optimize telemetry at scale. Built on open source and open standards and designed for interoperability across any stack, Grafana Cloud brings AI to observability and observability to AI, giving teams (and their agents) unified visibility so they can see, understand, and act on all their disparate data, wherever it lives, and move at the speed of their ambitions. Customers, including Anthropic, Bloomberg, NVIDIA, Microsoft, and Salesforce, rely on Grafana Labs. We are a 100% remote company with team members across 40+ countries, backed by leading investors including Lightspeed Venture Partners, Sequoia Capital, GIC, Coatue, J.P. Morgan, CapitalG, and Lead Edge Capital. Learn more at <u><span></span></u> and follow us on <u><span>LinkedIn</span></u> and <u><span>X</span></u><u>.</u></p> <p>We’re",
+      "expectedWrongField": false,
+      "id": "senior-backend-software-engineer-loki-nasa-remote-grafana-labs-dcrpozyy",
+      "location": "Canada (Remote)",
+      "postedAt": 1795003746000,
+      "title": "Senior Backend Software Engineer - Loki | NASA | Remote"
+    },
+    {
+      "category": "backend",
+      "company": "hireVouch",
+      "description": "<h2>About the role</h2> <p>We're looking for an API engineer to join our core API team and help scale our platform serving millions of users and handling thousands of requests per second. You'll work on the critical infrastructure that powers both our public API (used by external developers) and internal tools, managing user data, task orchestration, billing, permissions, and asset management.</p> <p>This is a high-impact role on a mature, production system. You'll build enterprise features, optimize database performance, design async workflows, and ensure reliability at scale. If you're passionate about API development, love TypeScript, and want to own systems end-to-end, this is the role for you.</p> <h3>A peek at our technical stack</h3> <p>Our API endpoints for real-time collaboration and media asset management is written in <strong>TypeScript</strong>, and runs in ECS containers on AWS Fargate. We leverage multiple AWS-native components, such as S3, CloudFront, Lambda,",
+      "expectedWrongField": false,
+      "id": "backend-engineer-api-hirevouch-bjfhz6gh",
+      "location": "Remote, Canada",
+      "postedAt": 1792010229000,
+      "title": "Backend Engineer, API"
+    },
+    {
+      "category": "fullstack",
+      "company": "Jobgether",
+      "description": "<p><strong>This position is listed on behalf of a partner company, who manages all applications and next steps. Our partner is looking for a Full-Stack Software Engineer, Integrations based in Canada.</strong></p> <p>Join a growing engineering team building modern, automated software solutions that help businesses manage vehicle reimbursement programs. As a Full-Stack Software Engineer focused on integrations, you will take ownership of connecting third-party platforms to customer-facing products, from initial technical design through deployment and ongoing production support. Working closely with Product, Design, QA, external partners, and subject-matter experts, you will turn complex requirements into reliable, scalable solutions. You will contribute across backend services, APIs, data synchronization, and user interfaces while helping establish reusable integration architecture. The role offers the opportunity to shape a developing integrations function, use AI coding agents as",
+      "expectedWrongField": false,
+      "id": "full-stack-software-engineer-integrations-jobgether-62djxfdi",
+      "location": "Canada",
+      "postedAt": 1795614894000,
+      "title": "Full-Stack Software Engineer, Integrations"
+    },
+    {
+      "category": "backend",
+      "company": "USMobile",
+      "description": "<div> <h3>About US Mobile</h3> <p>US Mobile is redefining what it means to be a connectivity company. Help us reimagine what a modern carrier can be through world-class technology, thoughtful design and an obsession with creating products people genuinely love.</p> <h3>The role</h3> <p>US Mobile is building the future of wireless communication. The goal: one unified network open to any person and any device, worldwide. Connection without walls.</p> <p>We're getting there by empowering customers. All three major networks on one phone and one plan, plus home internet from Starlink. No lock-in. No commitments. Custom fit plans at every price point. 24/7 customer support with real people, empowered to help. We get real-time feedback from Reddit, surveys, and customer support informing product roadmaps and everything we do. It's working: Consumer Reports named us the top-rated mobile carrier two years in a row.*</p> <p>And we're building innovative systems that scale. A network agnostic",
+      "expectedWrongField": false,
+      "id": "backend-engineer-usmobile-24jifshz",
+      "location": "Toronto",
+      "postedAt": 1795545844000,
+      "title": "Backend Engineer"
+    },
+    {
+      "category": "backend",
+      "company": "Affirm",
+      "description": "<div><p>At Affirm, we exist for the moments that matter—giving people a clear, predictable way to pay over time, with no hidden fees, no surprises, and no tradeoffs on what matters most.</p></div><p>Our team sits within Developer Productivity, whose mission is to make software development at Affirm simpler and faster across the company. The broader org owns much of the path between a developer’s laptop and production, including developer environments, CI/CD pipelines, test automation, dependency management, and release engineering, all in service of helping engineers ship code quickly, safely, and with confidence.</p> <p>The Continuous Delivery team’s charter is centered on enabling engineering teams to release independently through strong automation, standard patterns, predictable rollouts, resilient recovery mechanisms, and less manual toil. This role is uniquely positioned to help solve one of Affirm’s most important engineering challenges: scaling developer productivity in an era",
+      "expectedWrongField": false,
+      "id": "senior-software-engineer-backend-continuous-delivery-affirm-cvgfrurx",
+      "location": "Remote Canada",
+      "postedAt": 1794941320000,
+      "title": "Senior Software Engineer, Backend (Continuous Delivery)"
+    },
+    {
+      "category": "backend",
+      "company": "GitLab",
+      "description": "<div><p>GitLab is the intelligent orchestration platform for DevSecOps. GitLab enables organizations to increase developer productivity, improve operational efficiency, reduce security and compliance risk, and accelerate digital transformation. More than 50 million registered users and more than 50% of the Fortune 100* trust GitLab to ship better, more secure software faster.</p> <p>The same principles built into our products are reflected in how our team works: we embrace AI as a core productivity multiplier, with all team members expected to incorporate AI into their daily workflows to drive efficiency, innovation, and impact. GitLab is where careers accelerate, innovation flourishes, and every voice is valued. Our high-performance culture is driven by our values and continuous knowledge exchange, enabling our team members to reach their full potential while collaborating with industry leaders to solve complex problems. Co-create the future with us as we build technology that",
+      "expectedWrongField": false,
+      "id": "backend-engineer-knowledge-graph-rust-gitlab-h4lkippx",
+      "location": "Remote, Canada; Remote, United States",
+      "postedAt": 1795193344000,
+      "title": "Backend Engineer, GitLab Orbit"
+    },
+    {
+      "category": "backend",
+      "company": "Affirm",
+      "description": "<div><p>At Affirm, we exist for the moments that matter—giving people a clear, predictable way to pay over time, with no hidden fees, no surprises, and no tradeoffs on what matters most.</p></div><h3><span><strong>About the Engineering team </strong></span></h3> <p><span>The Engineering team builds systems that power Affirm’s mission. We take pride in our craft, building reliable, performant, and scalable solutions that touch every part of the business. Whether we’re enabling new ways to pay, ensuring our platforms can scale to the most demanding levels in the industry, or developing seamless servicing experiences, our focus is on solving complex problems through exceptional engineering.</span></p> <h3><span><strong>About the team</strong></span></h3> <p><span>ML Feature Platform is one of the two teams that compose the ML Platform at Affirm, the other team being ML Training &amp; Serving Platform. The two platform teams work closely together to create the ML + Data flywheel that",
+      "expectedWrongField": false,
+      "id": "senior-software-engineer-backend-ml-feature-platform-affirm-dzszmfrd",
+      "location": "Remote Canada",
+      "postedAt": 1794492895000,
+      "title": "Senior Software Engineer, Backend (ML Feature Platform) "
+    },
+    {
+      "category": "backend",
+      "company": "Jobgether",
+      "description": "<div> <p><strong>This position is listed on behalf of a partner company, who manages all applications and next steps. Our partner is looking for a Backend Engineer based in Canada.</strong></p> <p>As a Backend Engineer, you will design, build, and maintain scalable backend systems that power interactive gaming experiences across PC, console, and mobile platforms. You will work at the intersection of server-side services and game client integration, ensuring reliable communication, efficient data exchange, and strong performance. Using Java and C++, you will contribute to service architecture, REST APIs, cloud infrastructure, and JSON-based data processing. You will also help optimize system performance through caching, batching, throttling, and other techniques that reduce latency and unnecessary database operations. Working closely with client engineers and cross-functional teams, you will take ownership of production reliability, security, and engineering quality in a globally",
+      "expectedWrongField": false,
+      "id": "backend-engineer-jobgether-gfqrrvw4",
+      "location": "Canada",
+      "postedAt": 1795422129000,
+      "title": "Backend Engineer"
+    },
+    {
+      "category": "backend",
+      "company": "Micromart",
+      "description": "<p><em>Location: Toronto (Hybrid preferred, remote possible for strong candidates)</em></p><p><em>This is a full-stack role with a strong backend focus.</em></p><div> </div><h2><strong>About Micromart</strong></h2><p>Micromart is building the platform for unattended retail. We empower entrepreneurs to turn any location into a retail opportunity, from offices and condos to gyms, hotels, and other shared spaces. Our focus is on giving entrepreneurs powerful tools that are simple to use, while delivering a fast, intuitive shopping experience for shoppers.</p><div> </div><p>Often described as Shopify for physical commerce, Micromart provides the infrastructure that powers unattended retail in the real world.</p><div> </div><h2><strong>Our Team</strong></h2><p>Micromart launched just over a year ago and is now used in thousands of locations across North America. We’re a small and growing team working closely across product, platform, and smart store systems, from design through",
+      "expectedWrongField": false,
+      "id": "software-engineer-backend-systems-micromart-wyufiuyj",
+      "location": "Toronto",
+      "postedAt": 1792451860000,
+      "title": "Software Engineer, Backend Systems"
+    },
+    {
+      "category": "backend",
+      "company": "Fig",
+      "description": "<div> <h2><strong>Build a better way to borrow</strong></h2> <p>Fig is a Canadian fintech making personal lending simpler, faster, and more accessible for Canadians. We offer fully digital personal loans, helping customers apply in minutes and receive decisions quickly, without paperwork, branch visits, or long delays .</p> <p>Since launching in 2023, we’ve grown quickly and earned recognition including Consumer Lender of the Year and FinTech Startup of the Year. We’re proud to be consistently ranked among Canada’s Best Workplaces, with a 4.8/5 Trustpilot rating from our customers.</p> <p>Supported by Fairstone Bank of Canada and Ontario Teachers’ Pension Plan, we combine deep lending expertise with the agility of a startup.</p> </div><h3>About the role</h3><div> <p>Fig is expanding beyond lending and building a new generation of digital banking products. We're hiring a Senior Backend Engineer, reporting to the Engineering Manager of our digital banking team, to build the backend of",
+      "expectedWrongField": false,
+      "id": "senior-backend-engineer-typescript-fig-yz5zzmyi",
+      "location": "Toronto, Ontario",
+      "postedAt": 1793989780000,
+      "title": "Senior Backend Engineer (TypeScript)"
+    },
+    {
+      "category": "software_engineering",
+      "company": "Loopio Inc.",
+      "description": "<h1><strong>Take your career to new heights with Loopio! 🚀✨</strong></h1><p></p><p>Loopio is a workplace that unleashes learning &amp; growth opportunities for our Loopers. We provide autonomous, challenging work that allows each employee to master their craft. We attract and retain people who are naturally curious, have grit and are eager to grow and build their careers. At Loopio, we genuinely support each other, because true success comes from working as #oneteam.</p><p>Loopio is on the hunt for a <strong>Senior Software Developer </strong>with an AI engineering background who thrives on solving complex problems and is driven by curiosity. If you have taken LLM-based systems from idea to production and want your work to help leading organizations respond to RFPs faster and with more confidence, this is the role for you.</p><p>You’ll join a team of Engineers, ML practitioners, Product Managers, and Designers to design and ship AI-powered features, from agentic workflows that reason",
+      "expectedWrongField": false,
+      "id": "senior-software-developer-loopio-inc-6sdvlrk4",
+      "location": "Toronto, ON Hub",
+      "postedAt": 1795723412000,
+      "title": "Senior Software Developer"
+    },
+    {
+      "category": "backend",
+      "company": "Guidepoint",
+      "description": "<h4><span><strong>Overview:</strong></span></h4> <p><span>Frontier models have already absorbed most of the public internet and generalist tasks, but they still lack the tacit judgment of experts who do complex professional work for a living. Bridging this gap requires identifying, verifying, and engaging a significant number of experts across many, often niche, domains over an extended period of time. And the specificity matters: not a physician, but an investigator who has actually run a Phase III oncology trial; not a generalist consultant, but a reimbursement lead who has negotiated with payers.</span></p> <p><span>Guidepoint Labs is a new human data team leading the way to solve exactly that problem for frontier model builders and researchers. Providing access on day one to millions of vetted experts across effectively every industry and deep into the sub-specialties, along with mature governance, compliance, and confidentiality infrastructure.</span></p> <p><span>We are seeking",
+      "expectedWrongField": false,
+      "id": "senior-software-engineer-backend-guidepoint-agla3ckt",
+      "location": "Toronto, Ontario, Canada",
+      "postedAt": 1795097519000,
+      "title": "Senior Software Engineer - Backend, Guidepoint Labs"
+    },
+    {
+      "category": "data_analytics",
+      "company": "Loblaw Digital",
+      "description": "<p>You’ve heard this before: With rapid growth and a laser-focus on shipping, data and insights were capabilities that fell off the priority list. This is natural when you’re focused on building a product, especially with tight timelines and commitments. Fast-forward to today, we’ve grown a lot and created three businesses in three years! We’ve got data in multiple spots - e-commerce platforms; web analytics platforms; order management systems; customer survey platforms and more; but we haven’t tied them together.</p><p>Our business teams have made great efforts to gather, cleanse and organize this data in order to gain insights into how our customers are using our products. Naturally this doesn’t scale. We’re at a point in our journey where there’s a focus on organizing our data and getting the cross-system view of what our customers are doing.</p><p>To this end, we’re looking for an expert at building and maintaining data pipelines to help expand our BI platform by integrating data",
+      "expectedWrongField": false,
+      "id": "business-intelligence-developer-loblaw-digital-stfcby3h",
+      "location": "Toronto, ON, ca",
+      "postedAt": 1542247096000,
+      "title": "Business Intelligence Developer"
+    },
+    {
+      "category": "data_engineering",
+      "company": "Robinhood",
+      "description": "<div><h2>Join us in building the future of finance.</h2> <p>Our mission is to democratize finance for all. An estimated $124 trillion of assets will be inherited by younger generations in the next two decades. The largest transfer of wealth in human history. If you’re ready to be at the epicenter of this historic cultural and financial shift, keep reading.</p></div><h2><strong>About the team + role </strong></h2> <p>We’re thrilled to be expanding this year as Robinhood is hiring world-class engineering talent in Toronto. Our Hoodies in Canada will enable Robinhood to continue creating great financial products on our journey towards democratizing finance for all. </p> <p>Robinhood is a metrics driven company and data is foundational to all key decisions from growth strategy to product optimization to our day-to-day operations. We are looking for a Senior Data Engineer to build and maintain foundational datasets that will allow us to reliably and efficiently power decision making at",
+      "expectedWrongField": false,
+      "id": "software-developer-data-engineering-robinhood-sbbfq3lw",
+      "location": "Toronto, Canada",
+      "postedAt": 1793752652000,
+      "title": "Software Developer, Data Engineering"
+    },
+    {
+      "category": "healthcare",
+      "company": "William Osler Health System",
+      "description": "<p>The Registered Practical Nurse (RPN) is a regulated health care professional who is accountable and responsible for providing quality patient focused nursing care to patients who are identified as less complex, demonstrate more predictable outcomes and are at lower risk for negative outcomes in the Cardiology Unit. As part of the inter-professional health care team, the RPN will practice according to the nursing practice expectations set by Osler, the regulatory practice standards of the College of Nurses and the legislative requirements set by the Regulated Health Professions Act.</p><p>Accountabilities:</p><ul><li>Safe nursing practice in all aspects of the nursing process: assessment, planning, implementation and evaluation of patient care</li><li>Professional, patient-centred care to ensure patient safety and physiological and psychological well-being</li><li>Providing care in a compassionate and caring manner within a diverse cultural environment</li><li>Practicing according",
+      "expectedWrongField": true,
+      "id": "registered-practical-nurse-medicine-cardiology-william-osler-health-system-hylpceo3",
+      "location": "Brampton, ON, ca",
+      "postedAt": 1795724622000,
+      "title": "Registered Practical Nurse - Medicine Cardiology"
+    },
+    {
+      "category": "finance",
+      "company": "centurion",
+      "description": "<p><u><span>Who We Are</span></u></p> <p>Centurion Asset Management Inc. is a recognized leader in the Investment and Property Management industries. Providing quality investments and housing for all its clients, our experienced team comprised of more than 435 Employees is a core component of Centurion’s success since 2003. Centurion Apartment Real Estate Investment Trust (“REIT”) owns more than 22,000 multi-family apartment units and student housing beds across 46 cities in Canada and the United States. Since day one, our goal has been to provide Residents and their families with clean, safe, and comfortable homes. The REIT provides investors an opportunity to invest in a diversified portfolio of rental apartments and student housing properties, as well as mortgage and equity investments in property developments, across Canada and the United States and participate in the profits derived from them.<br></p> <p><br></p> <p><u><span>Our Mission</span></u></p> <p><span>Our mission is",
+      "expectedWrongField": true,
+      "id": "revenue-accountant-centurion-txuhhu4n",
+      "location": "Toronto, Ontario, Canada",
+      "postedAt": 1795564800000,
+      "title": "Revenue Accountant"
+    },
+    {
+      "category": "marketing",
+      "company": "Momentum Financial Services Group",
+      "description": "<p><strong>Who We Are</strong></p> <p>At Momentum Financial Services Group, we help people move forward by reimagining how money works for those who need it most. With more than 40 years of experience, we’re the team behind Money Mart—Canada’s largest non-bank branch network—and a leader in financial solutions for underserved communities.</p> <p>From short-term loans to money transfers and prepaid cards, we power the products, technology, and operations that connect over a million customers a year to the money they need, when they need it.</p> <p>At MFSG, we come together across teams and departments to create something bigger than ourselves: solutions that remove barriers and give people access to money they might not get anywhere else. Whether you're solving problems, building systems, or shaping strategy, your work fuels real support for real people.<strong> </strong></p> <p><strong>We’ve Got You Covered</strong></p> <p><strong>Compensation Philosophy:</strong> Our strategy is",
+      "expectedWrongField": true,
+      "id": "social-media-specialist-momentum-financial-services-group-lsv7d5a3",
+      "location": "Toronto, Canada",
+      "postedAt": 1795717499000,
+      "title": "Social Media Specialist"
+    },
+    {
+      "category": "logistics",
+      "company": "YORK1",
+      "description": "<p><span>Travel Required:</span> Yes, Regional, no overnights</p> <p><span>Status:</span> Full-time, Permanent</p> <p><span>Schedule:</span> Monday to Friday – 10-12 hour shifts, alternating Saturday, early morning starts 6:00 am</p> <p> </p> <p><span>About YORK1:</span></p> <p>YORK1 is a leader in environmental and industrial services, providing sustainable waste management solutions across Ontario. With a growing fleet and a strong presence in the region, we are committed to safety, operational excellence, and continuous improvement.<br><br></p> <p><span>Compensation &amp; Benefits:</span></p> <ul> <li>Competitive hourly wage based upon experience</li> <li>Health and dental benefits</li> <li>RRSP matching</li> <li>Annual Safety Boot Allowance</li> <li>Paid training and development opportunities</li> <li>Steady year-round work</li> </ul> <p><br></p> <p><span>Position Overview:</span></p> <ul> <li>As a Roll-Off Driver, your primary responsibility is the safe and efficient operation of",
+      "expectedWrongField": true,
+      "id": "roll-off-driver-york1-lb36h3wa",
+      "location": "Hamilton, Ontario, Canada",
+      "postedAt": 1795478400000,
+      "title": "Roll-Off Driver "
+    },
+    {
+      "category": "skilled_trades",
+      "company": "William Osler Health System",
+      "description": "<p>Reporting to the Manager, Facilities, the incumbent will work as a part of the Engineering and Maintenance team in a complex electrical systems environment to maintain, repair, install, replace and test electrical/electronic circuits, equipment and appliances in support of ongoing operations.</p><p>Accountabilities:</p><ul><li>Carry out routine inspections, repairs and maintenance for all electrical equipment and systems throughout the facility in accordance with applicable codes</li><li>Regularly inspect, test and repair as required: fire alarm systems (if certified), lighting systems, door access systems and alarms, paging systems, call bell systems, safety equipment, HVAC systems and computers, other building equipment and machinery</li><li>Installs electrical systems and equipment as part of normal maintenance and minor renovation projects</li><li>Create and maintain accurate records according to legislative requirements and departmental policies</li><li>As part of the fire",
+      "expectedWrongField": true,
+      "id": "electrician-etobicoke-plant-maintenance-william-osler-health-system-gimrrxsx",
+      "location": "Brampton, ON, ca",
+      "postedAt": 1795625547000,
+      "title": "Electrician - Etobicoke - Plant Maintenance"
+    },
+    {
+      "category": "education",
+      "company": "childrensvillage",
+      "description": "<p><span>Employment Type:<span> </span></span><span>Part-Time Contract - 5 hours/day, 5 days/week until April 26, 2027</span></p> <p><span>Location: </span><span>Children's Village at Knoxdale/Arlington Woods - 170 Greenbank Road, Ottawa, ON K2H 5V2</span></p> <p><span>Age Group: </span><span>Toddler</span></p> <p><br></p> <p><span>Who We Are</span></p> <p>For over 160 years, Children’s Village of Ottawa-Carleton has been an integral part of our community, supporting children, families, and caregivers through generations of change. Founded in 1864 as a home for orphaned and vulnerable children, we’ve evolved into a leader in high-quality, inclusive early learning and care. Throughout every chapter, one principle has remained constant: creating environments that feel like “the next best thing to home.” Today, as one of Ottawa’s longest-standing charities, we serve families through a network of licensed childcare centres, home childcare programs, and community-based services that reach",
+      "expectedWrongField": true,
+      "id": "child-care-program-assistant-childrensvillage-zmzvjjdp",
+      "location": "Ottawa, Ontario, Canada",
+      "postedAt": 1795392000000,
+      "title": "Child Care Program Assistant"
+    },
+    {
+      "category": "retail",
+      "company": "Charlotte Tilbury",
+      "description": "<p>Beauty Advisor Job Description </p><p>OVERALL PURPOSE OF THE ROLE: An ambassador for the Charlotte Tilbury brand, the Beauty Advisor will reflect the brand values and customer base. Responsible for achieving optimal financial results by maximizing top line sales potential and ensuring superior service to our customers. </p><p>MAIN DUTIES AND RESPONSIBILITIES: </p><ul><li>Sales </li></ul><ul><li>Drive financial results in store to meet and exceed plan. Including Key Performance Indicators (KPI’s) – examples; Average Unit Sales (AUS) and Items Per Transaction (IPT) </li></ul><ul><li>Communicate and manage agreed goals. </li></ul><ul><li>Responsible for being specialist amongst the retail artistry brands, demonstrating entrepreneurial spirit within the parameters of the Company guidelines. </li></ul><ul><li>Customer Service </li></ul><ul><li>Manage customer queries, through the use of sound judgement and achieving positive outcomes </li></ul><ul><li>Build partnership with the Account",
+      "expectedWrongField": true,
+      "id": "beauty-advisor-charlotte-tilbury-holt-renfrew-yorkdale-full-time-charlotte-tilbury-7g7dhx5p",
+      "location": "Toronto, Ontario, Canada",
+      "postedAt": 1794960000000,
+      "title": "Beauty Advisor-Charlotte Tilbury-Holt Renfrew Yorkdale- Full-time"
+    },
+    {
+      "category": "healthcare",
+      "company": "Qualicare, Lethbridge",
+      "description": "<div> <div><strong>Benefits:</strong></div> <ul> <li>Flexible schedule</li> </ul> </div> <div> <div><strong>Company Overview</strong></div><div>Qualicare Homecare is seeking compassionate, caring, and reliable individuals to join our team as Health Care Aides. Qualicare Lethbridge offers home care services that focus on enhancing our clients' quality of life and providing peace of mind for their families.</div><div> <br><strong>Job Summary </strong> </div><div>The Health Care Aide is a member of the home care team who works under the supervision of a care manager and performs various personal care services as necessary to meet the client’s needs. The Health Care Aide is responsible for observing clients, reporting these observations and documenting observations and care performed. <br><br> </div><div>The Health Care Aide will be assigned in a manner that promotes quality, continuity and safety of a client’s",
+      "expectedWrongField": true,
+      "id": "certified-health-care-aide-lethbridge-casual-qualicare-lethbridge-kmdipk5p",
+      "location": "Lethbridge, AB, CA",
+      "postedAt": 1795712202000,
+      "title": "Certified Health Care Aide - Lethbridge - Casual"
+    },
+    {
+      "category": "backend",
+      "company": "Dropbox",
+      "description": "<h2><span><strong>Role Description</strong></span></h2> <p><span>As a Product Engineer at Dropbox, you will play a pivotal role in shaping the future of collaboration and file sharing. Your responsibilities will revolve around developing and enhancing our suite of Dropbox Products to deliver exceptional user experiences. You will work closely with cross-functional teams, turning innovative ideas into robust, scalable, and user-friendly features.</span></p> <p><span>This year, Dropbox is on a mission to expedite the creation and implementation of AI-enable products by providing a comprehensive AI technology stack that facilitates speedy prototyping and reliable deployment of AI-driven functionalities.</span></p> <p><span><span>Our Engineering Career Framework is </span><span><u>viewable by anyone outside the company</u></span><span> and describes what’s expected for our engineers at each of our career levels. Check out our blog post on this topic and more",
+      "expectedWrongField": false,
+      "id": "backend-product-software-engineer-dropbox-7nsqvfqd",
+      "location": "Remote - Mexico",
+      "postedAt": 1795633705000,
+      "title": "Backend Product Software Engineer"
+    },
+    {
+      "category": "backend",
+      "company": "Domaine",
+      "description": "<div><p><b><strong>What you'll do</strong></b></p><ul><li><span>Build and maintain backend services, integrations and APIs, including large project components, in PHP/Laravel or JS/Node.</span></li><li><span>Break work down into clear, actionable tasks and deliver it on time to a high standard.</span></li><li><span>Work with the Shopify Admin and Storefront APIs, webhooks and Shopify apps, and with clients' third-party systems such as ERP, OMS, PIM and POS.</span></li><li><span>Write clear software documentation and test steps, and use AI to check your build against ticket scope and acceptance criteria before QA, so your work passes first time.</span></li><li><span>Own the security of what you build: spot risks in your own work and propose how to fix them.</span></li><li><span>Take part in peer code reviews, give and take feedback well, and help teammates when they're stuck.</span></li><li><span>Manage your own work week to week with your Technical Lead, and flag blockers and gaps",
+      "expectedWrongField": false,
+      "id": "backend-engineer-domaine-7xe7sm26",
+      "location": "Remote (United States)",
+      "postedAt": 1795127890000,
+      "title": "Backend Engineer"
+    },
+    {
+      "category": "backend",
+      "company": "Affirm",
+      "description": "<div><p>At Affirm, we exist for the moments that matter—giving people a clear, predictable way to pay over time, with no hidden fees, no surprises, and no tradeoffs on what matters most.</p></div><p>The Engineering team builds systems that power Affirm’s mission. We take pride in our craft, building reliable, performant, and scalable solutions that touch every part of the business. Whether we’re enabling new ways to pay, ensuring our platforms can scale to the most demanding levels in the industry, or developing seamless servicing experiences, our focus is on solving complex problems through exceptional engineering.</p> <p>You will be matched with a team after completing the interview evaluation process. Your recruiter will work closely with you throughout the process to understand your interests and experience to find the strongest team fit. </p> <h3><strong>What you’ll do</strong></h3> <ul> <li>With the support of your team’s tech lead and manager, you will break down larger",
+      "expectedWrongField": false,
+      "id": "software-engineer-ii-backend-affirm-7yjif742",
+      "location": "Remote US",
+      "postedAt": 1794954677000,
+      "title": "Software Engineer II, Backend"
+    },
+    {
+      "category": "backend",
+      "company": "Affirm",
+      "description": "<div><p>At Affirm, we exist for the moments that matter—giving people a clear, predictable way to pay over time, with no hidden fees, no surprises, and no tradeoffs on what matters most.</p></div><p>Trust &amp; Safety Engineering protects Affirm’s consumers, merchants, and network from fraud and abuse. We build the real-time systems, risk signals, and tools that stop bad actors without adding friction for the people we serve. Our engineers work with data science, risk, and operations to stay ahead of evolving threats at scale</p> <p>You will be matched with a role after completing the interview evaluation process. Your recruiter will work closely with you throughout the process to understand your interests and experience to find the strongest role fit.</p> <h3><strong>What you’ll do</strong></h3> <ul> <li>You will be responsible for owning and delivering quarterly goals for your team, leading engineers on your team through ambiguity to solve open-ended problems, and ensuring that",
+      "expectedWrongField": false,
+      "id": "senior-software-engineer-backend-trust-safety-affirm-jc3hoe2t",
+      "location": "Remote US",
+      "postedAt": 1794532309000,
+      "title": "Senior Software Engineer, Backend (Trust & Safety)"
+    },
+    {
+      "category": "backend",
+      "company": "Spotify",
+      "description": "<div> <p>The Platform team creates the technology that enables Spotify to learn quickly and scale easily, enabling rapid growth in our users and our business around the globe. Spanning many disciplines, we work to make the business work; creating the infrastructure, tooling, frameworks, and capabilities needed to welcome a billion customers.</p> <p>We're looking for a Backend Engineer to join Babka, a team within Spotify's Data Infrastructure organization. Babka powers the analytics behind experiences like Spotify for Artists and Spotify for Creators, helping artists, creators, and music labels explore how their content performs through fast, interactive data insights.</p> <p>Originally built to support music analytics, our platform now serves podcasts, audiobooks, and internal Spotify tools. As we expand our capabilities across Spotify, you'll join us at an exciting stage, with opportunities to shape our technical direction, improve our infrastructure, and make analytics easier for",
+      "expectedWrongField": false,
+      "id": "backend-engineer-data-infrastructure-spotify-4lb5rl3c",
+      "location": "New York, NY",
+      "postedAt": 1793899678000,
+      "title": "Backend Engineer - Data Infrastructure"
+    },
+    {
+      "category": "software_engineering",
+      "company": "Warner Music Group",
+      "description": "<div><span>At Warner Music Group, we’re a global collective of music makers and music lovers, tech innovators and inspired entrepreneurs, game-changing creatives and passionate team members. Here, we turn dreams into stardom and audiences into fans. We are guided by three core values that underpin everything we do across all our diverse businesses: </span></div> <div><span> </span></div> <div><span>• <strong>Curiosity</strong>: We do our best work when we’re immersing ourselves in culture and breaking through barriers. Curiosity is the driving force behind creativity and ingenuity. It fuels innovation, and innovation is the key to our future. </span></div> <div> </div> <div><span>• <strong>Collaboration</strong>: Making music and bringing it to the world is all about the power of originality amplified by teamwork. A great idea, like a great song, travels globally. We ignite passions and build connections across our diverse community of artists, songwriters, partners, and",
+      "expectedWrongField": false,
+      "id": "director-of-software-engineering-warner-music-group-3kktjjgg",
+      "location": "Ontario",
+      "postedAt": 1795458312000,
+      "title": "Director of Software Engineering"
+    },
+    {
+      "category": "software_engineering",
+      "company": "NMI",
+      "description": "<p>We are looking for a Staff Engineer to provide technical leadership across our Partner Activation and Partner Administration teams. You will help shape and deliver scalable, secure and cohesive partner-facing platform capabilities, working closely with Engineering Managers, Product Managers, Designers and fellow Staff+ engineers so that partners can integrate with NMI efficiently and confidently.</p> <p>This role balances hands-on engineering with technical strategy, with a focus on improving partner onboarding, integration experiences and the long-term health of the partner platform.</p> <h3>About NMI</h3> <p>NMI, a global leader in payment technologies, allows software and sales professionals to deliver payment innovations to their clients without having to build payment expertise in house. NMI enables our partners with choice, and challenges the one-size-fits-all approach to payments. You've probably used NMI in the last 24 hours without even realizing it. We're the platform",
+      "expectedWrongField": false,
+      "id": "senior-staff-software-engineer-nmi-shrws4i6",
+      "location": "Remote, Canada",
+      "postedAt": 1795618463000,
+      "title": "Senior Staff Software Engineer"
+    },
+    {
+      "category": "other",
+      "company": "Nomad",
+      "description": "<div><p><b><strong>General Application – Future Opportunities</strong></b></p><p><b><strong>About Nomad</strong></b></p><p><span>Nomad is building an enterprise SaaS platform for the transportation industry, bringing fraud review and cross-carrier information together through fuel and factoring. We operate across multiple entities in Canada and the US. Nomad was named one of Great Place to Work Canada's 2026 Best Workplaces for Start-ups.</span></p><p><br></p><p><b><strong>About This Posting</strong></b></p><p><span>This posting is for future opportunities at Nomad and is not connected to a current vacancy.</span></p><p><span>We're always interested in meeting talented people who are excited about what we are building. If you don't see a current opening that matches your experience, we'd still love to hear from you.</span></p><p><span>When you apply, please tell us about your background and the type of work you're interested in. As our team grows, we may reach out if an opportunity",
+      "expectedWrongField": false,
+      "id": "general-application-future-opportunities-nomad-2af3uxli",
+      "location": "Toronto, Canada",
+      "postedAt": 1795624672000,
+      "title": "General Application – Future Opportunities"
+    }
+  ]
+}

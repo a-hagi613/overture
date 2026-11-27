@@ -264,6 +264,7 @@
           "src/server/live-checks/alerts.test.ts",
           "src/server/matching/applications.test.ts",
           "src/server/matching/candidates.test.ts",
+          "src/server/matching/eval-fixture.test.ts",
           "src/server/matching/eval-gate.test.ts",
           "src/server/matching/jobs-pool.test.ts",
           "src/server/matching/judge-input.test.ts",

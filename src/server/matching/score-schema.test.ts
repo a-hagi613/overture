@@ -52,6 +52,21 @@ describe("the score reply schema", () => {
       "reasons",
     ]);
   });
+
+  test("sends a wire schema structured outputs accepts and keeps the reason count in zod", () => {
+    const { reasons } = SCORE_OUTPUT_SCHEMA.properties;
+
+    expect("minItems" in reasons).toBe(false);
+    expect("maxItems" in reasons).toBe(false);
+    expect(
+      parseScoreReply(
+        JSON.stringify({
+          ...valid,
+          reasons: [...valid.reasons, "A third reason.", "A fourth reason."],
+        }),
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("the v1 prompt", () => {
