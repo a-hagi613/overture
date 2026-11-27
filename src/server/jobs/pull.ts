@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
-import { jobPullRuns, jobPullState, profiles, targets } from "../platform/db/schema.ts";
+import { jobPullRuns, jobPullState, profiles, targets, users } from "../platform/db/schema.ts";
 import { atsForFreehireSource, timestampOf } from "../../shared/freehire.ts";
 import type { FreehireJobRecord } from "../../shared/freehire.ts";
 import { getSetting, getSettingNumber, setSetting } from "../platform/settings/index.ts";
@@ -408,6 +408,16 @@ export function createPullService(deps: PullDeps) {
       const finishedAt = clock.now();
 
       for (const member of group.members) {
+        const account = db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.id, member.userId))
+          .get();
+
+        if (account === undefined) {
+          continue;
+        }
+
         const set = {
           lastFreshPullAt: finishedAt,
           lastQueryKey: member.queryKey,
@@ -623,6 +633,7 @@ export function createPullService(deps: PullDeps) {
       .select(MEMBER_COLUMNS)
       .from(targets)
       .innerJoin(profiles, eq(profiles.userId, targets.userId))
+      .innerJoin(users, eq(users.id, targets.userId))
       .leftJoin(jobPullState, eq(jobPullState.userId, targets.userId))
       .where(isNotNull(profiles.onboardedAt))
       .all();

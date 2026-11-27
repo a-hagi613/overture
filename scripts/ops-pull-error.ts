@@ -83,7 +83,9 @@ if (apiKey !== "") {
   ]);
 }
 
-const diagnostics = sqlite
+const countsHandle = openReadOnlyDatabase(databasePath);
+
+const diagnostics = countsHandle.sqlite
   .query(
     `select
        (select count(*) from targets t left join users u on u.id = t.user_id where u.id is null) as orphan_targets,
@@ -94,6 +96,8 @@ const diagnostics = sqlite
        (select count(*) from llm_usage where purpose = 'resume_pdf') as resume_pdf_calls`,
   )
   .get();
+
+countsHandle.sqlite.close();
 
 write(JSON.stringify({ diagnostics }, null, 2));
 
