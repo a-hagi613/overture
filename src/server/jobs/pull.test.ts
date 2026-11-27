@@ -17,7 +17,7 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { createJobStore } from "./store.ts";
-import { setSetting } from "../platform/settings/index.ts";
+import { getSetting, setSetting } from "../platform/settings/index.ts";
 import { createPullJobHandlers, createPullService } from "./pull.ts";
 import type { PullService } from "./pull.ts";
 import { createFakeJobSource } from "./testing/fake-source.ts";
@@ -344,7 +344,7 @@ describe("the test-routes switch", () => {
 });
 
 describe("resilience", () => {
-  test("a failed pull keeps the last good jobs, records the failure and alerts after three in a row", async () => {
+  test("a failed pull keeps the last good jobs, and the third in a row alerts once with the error", async () => {
     const { db } = migrated();
     const alerts: Record<string, string | number | boolean | null>[] = [];
 
@@ -375,9 +375,175 @@ describe("resilience", () => {
     await service.runTick(NOW);
 
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]?.failures).toBe(3);
+    expect(alerts[0]).toMatchObject({
+      error: "freehire is down",
+      failures: 3,
+      mode: "full",
+      userCount: 1,
+    });
+    expect(getSetting(db, "jobs.pull_last_error")).toBe("freehire is down");
     expect(db.select().from(jobs).where(eq(jobs.id, good.public_slug)).get()?.status).toBe("open");
     expect(db.select().from(jobPullState).all()).toHaveLength(0);
+
+    await service.runTick(NOW);
+
+    expect(alerts).toHaveLength(1);
+  });
+
+  test("a still-failing pull alerts again after six hours with the current failure count", async () => {
+    const { db } = migrated();
+    const alerts: Record<string, string | number | boolean | null>[] = [];
+    let now = NOW;
+
+    seedUser(db, { id: "user-1" });
+
+    const source = createFakeJobSource({
+      search: async () => await Promise.reject(new Error("freehire is down")),
+    });
+
+    const service = createPullService({
+      applyTarget: async (job) => await Promise.resolve(target(job)),
+      clock: { now: () => now },
+      db,
+      onAlert: (detail) => {
+        alerts.push(detail);
+      },
+      source,
+      store: createJobStore({ clock: { now: () => now }, db }),
+    });
+
+    await service.runTick(now);
+    await service.runTick(now);
+    await service.runTick(now);
+
+    expect(alerts).toHaveLength(1);
+
+    now = NOW + 5 * 60 * 60_000;
+    await service.runTick(now);
+
+    expect(alerts).toHaveLength(1);
+
+    now = NOW + 6 * 60 * 60_000;
+    await service.runTick(now);
+
+    expect(alerts).toHaveLength(2);
+    expect(alerts[1]).toMatchObject({ error: "freehire is down", failures: 5 });
+  });
+
+  test("a still-failing pull alerts again after 24 more failures without waiting six hours", async () => {
+    const { db } = migrated();
+    const alerts: Record<string, string | number | boolean | null>[] = [];
+
+    seedUser(db, { id: "user-1" });
+
+    const source = createFakeJobSource({
+      search: async () => await Promise.reject(new Error("freehire is down")),
+    });
+
+    const service = createPullService({
+      applyTarget: async (job) => await Promise.resolve(target(job)),
+      clock: { now: () => NOW },
+      db,
+      onAlert: (detail) => {
+        alerts.push(detail);
+      },
+      source,
+      store: createJobStore({ clock: { now: () => NOW }, db }),
+    });
+
+    for (let tick = 0; tick < 26; tick += 1) {
+      await service.runTick(NOW);
+    }
+
+    expect(alerts).toHaveLength(1);
+
+    await service.runTick(NOW);
+
+    expect(alerts).toHaveLength(2);
+    expect(alerts[1]?.failures).toBe(27);
+  });
+
+  test("a successful pull resets the counter, so the next streak alerts again", async () => {
+    const { db } = migrated();
+    const alerts: Record<string, string | number | boolean | null>[] = [];
+    let broken = true;
+
+    seedUser(db, { id: "user-1" });
+
+    const source = createFakeJobSource({
+      pages: [{ ignoredParams: [], jobs: [], total: 0 }],
+      search: async () =>
+        broken
+          ? await Promise.reject(new Error("freehire is down"))
+          : await Promise.resolve({ ignoredParams: [], jobs: [], total: 0 }),
+    });
+
+    const service = createPullService({
+      applyTarget: async (job) => await Promise.resolve(target(job)),
+      clock: { now: () => NOW },
+      db,
+      onAlert: (detail) => {
+        alerts.push(detail);
+      },
+      source,
+      store: createJobStore({ clock: { now: () => NOW }, db }),
+    });
+
+    await service.runTick(NOW);
+    await service.runTick(NOW);
+    await service.runTick(NOW);
+
+    expect(alerts).toHaveLength(1);
+
+    broken = false;
+    await service.runUser("user-1");
+
+    expect(getSetting(db, "jobs.pull_failures")).toBe("0");
+    expect(getSetting(db, "jobs.pull_alerted_failures")).toBe("0");
+
+    broken = true;
+    await service.runUser("user-1");
+    await service.runUser("user-1");
+    await service.runUser("user-1");
+
+    expect(alerts).toHaveLength(2);
+    expect(alerts[1]).toMatchObject({ failures: 3 });
+  });
+
+  test("the alert carries a truncated error with no URL credentials", async () => {
+    const { db } = migrated();
+    const alerts: Record<string, string | number | boolean | null>[] = [];
+
+    seedUser(db, { id: "user-1" });
+
+    const source = createFakeJobSource({
+      search: async () =>
+        await Promise.reject(
+          new Error(`fetch https://user:secret@freehire.me/jobs failed: ${"x".repeat(400)}`),
+        ),
+    });
+
+    const service = createPullService({
+      applyTarget: async (job) => await Promise.resolve(target(job)),
+      clock: { now: () => NOW },
+      db,
+      onAlert: (detail) => {
+        alerts.push(detail);
+      },
+      source,
+      store: createJobStore({ clock: { now: () => NOW }, db }),
+    });
+
+    await service.runTick(NOW);
+    await service.runTick(NOW);
+    await service.runTick(NOW);
+
+    const error = String(alerts[0]?.error ?? "");
+
+    expect(error).toHaveLength(300);
+    expect(error).toContain("https://[redacted]@freehire.me/jobs failed");
+    expect(error).not.toContain("secret");
+    expect(getSetting(db, "jobs.pull_last_error")).toBe(error);
   });
 
   test("with an API key the change feed closes jobs that left the board", async () => {

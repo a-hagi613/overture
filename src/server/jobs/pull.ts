@@ -34,8 +34,16 @@ const PULL_DEDUPE_KEY = JOBS_PULL_JOB_KIND;
 const PAGE_SIZE = 100;
 const MAX_OFFSET = 10_000;
 const ALERT_AFTER_FAILURES = 3;
+/** A still-failing pull pages again after this long, or after this many more consecutive failures. */
+const ALERT_REPEAT_AFTER_MS = 6 * 60 * 60_000;
+const ALERT_REPEAT_AFTER_FAILURES = 24;
+const ALERT_ERROR_MAX_CHARS = 300;
 const FAILURE_SETTING = "jobs.pull_failures";
+const LAST_ERROR_SETTING = "jobs.pull_last_error";
+const LAST_ALERT_AT_SETTING = "jobs.pull_last_alert_at";
+const ALERTED_FAILURES_SETTING = "jobs.pull_alerted_failures";
 const CURSOR_SETTING = "jobs.changes_cursor";
+const URL_CREDENTIALS = /\/\/[^/@\s]+@/g;
 
 const stringArray = z.array(z.string());
 
@@ -51,6 +59,11 @@ const MEMBER_COLUMNS = {
 
 function stringArrayFromColumn(value: string) {
   return stringArray.parse(JSON.parse(value));
+}
+
+/** Keeps an alert small and strips any credentials a URL in the message might carry. */
+function alertErrorText(message: string) {
+  return message.replace(URL_CREDENTIALS, "//[redacted]@").slice(0, ALERT_ERROR_MAX_CHARS);
 }
 
 /** One grouped pull's tally, also written to the event log and to `job_pull_runs`. */
@@ -247,16 +260,24 @@ export function createPullService(deps: PullDeps) {
       .run();
   }
 
+  function storedNumber(key: string) {
+    const value = Number(getSetting(db, key) ?? "0");
+
+    return Number.isFinite(value) ? value : 0;
+  }
+
   function noteFailure(
     groupKey: string,
     userCount: number,
     mode: "full" | "fresh" | "changes",
     error: Error,
   ) {
-    const previous = Number(getSetting(db, FAILURE_SETTING) ?? "0");
-    const failures = Number.isFinite(previous) ? previous + 1 : 1;
+    const failures = storedNumber(FAILURE_SETTING) + 1;
+    const errorText = alertErrorText(error.message);
+    const now = clock.now();
 
     setSetting(db, clock, FAILURE_SETTING, String(failures), "system:jobs.pull");
+    setSetting(db, clock, LAST_ERROR_SETTING, errorText, "system:jobs.pull");
 
     publishEvent(
       db,
@@ -271,14 +292,33 @@ export function createPullService(deps: PullDeps) {
       }),
     );
 
-    if (failures >= ALERT_AFTER_FAILURES) {
-      deps.onAlert?.({ failures, groupKey });
+    const lastAlertAt = storedNumber(LAST_ALERT_AT_SETTING);
+    const alertedFailures = storedNumber(ALERTED_FAILURES_SETTING);
+    const alertDue =
+      failures >= ALERT_AFTER_FAILURES &&
+      (alertedFailures < ALERT_AFTER_FAILURES ||
+        now - lastAlertAt >= ALERT_REPEAT_AFTER_MS ||
+        failures - alertedFailures >= ALERT_REPEAT_AFTER_FAILURES);
+
+    if (!alertDue) {
+      return;
     }
+
+    setSetting(db, clock, LAST_ALERT_AT_SETTING, String(now), "system:jobs.pull");
+    setSetting(db, clock, ALERTED_FAILURES_SETTING, String(failures), "system:jobs.pull");
+
+    deps.onAlert?.({ error: errorText, failures, groupKey, mode, userCount });
   }
 
   function noteSuccess() {
-    if (Number(getSetting(db, FAILURE_SETTING) ?? "0") !== 0) {
+    if (
+      storedNumber(FAILURE_SETTING) !== 0 ||
+      storedNumber(LAST_ALERT_AT_SETTING) !== 0 ||
+      storedNumber(ALERTED_FAILURES_SETTING) !== 0
+    ) {
       setSetting(db, clock, FAILURE_SETTING, "0", "system:jobs.pull");
+      setSetting(db, clock, LAST_ALERT_AT_SETTING, "0", "system:jobs.pull");
+      setSetting(db, clock, ALERTED_FAILURES_SETTING, "0", "system:jobs.pull");
     }
   }
 

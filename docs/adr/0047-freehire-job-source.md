@@ -41,9 +41,11 @@ ingest (ADR 0032, ADR 0036) as the source of every job Overture matches and appl
 8. **The change feed drops closed jobs.** With `FREEHIRE_API_KEY` set, `/api/v1/jobs/changes` is walked from a stored
    cursor and `closed` changes mark rows closed. Without a key, a job is re-read by slug just before preparing it.
 9. **A failure keeps the last good matches.** A pull that errors records its counters, increments a failure counter,
-   writes `jobs.pull.failed` to the event log, and raises the `jobs.pull` alert only after three consecutive failures.
-   No job is deleted or marked closed because a pull failed. Every successful group writes `fetched`, `kept` and the
-   drops by reason to `job_pull_runs` and the `jobs.pull` event.
+   saves the truncated error to `jobs.pull_last_error`, writes `jobs.pull.failed` to the event log, and raises the
+   `jobs.pull` alert on the third consecutive failure with the error, mode, user count and failure count. While the
+   streak continues the alert repeats at most every six hours (or every 24 more failures), always carrying the current
+   count, and a successful pull resets the streak. No job is deleted or marked closed because a pull failed. Every
+   successful group writes `fetched`, `kept` and the drops by reason to `job_pull_runs` and the `jobs.pull` event.
 10. **Cut-over is read-only on the old catalog.** Existing Applications keep their employer, title and link snapshot
     and stay readable in the Tracker. `postings`, `posting_tags`, `company_boards` and `catalog.sqlite` remain for
     their readers until issue #706 removes them; this PR does not write to them.
