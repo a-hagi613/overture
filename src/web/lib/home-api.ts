@@ -93,7 +93,6 @@ const homeResponseSchema = z.object({
   endingGrant: z.object({ applicationsLeft: z.number(), expiresAt: z.number() }).nullable(),
   inProgress: z.object({ items: z.array(inProgressRowSchema), total: z.number() }),
   newMatches: z.object({ items: z.array(newMatchRowSchema), total: z.number() }),
-  nextPrepAt: z.number(),
   nextSendAt: z.number().nullable(),
   now: z.number(),
   pauseReason: z.enum(PAUSE_REASONS).nullable(),

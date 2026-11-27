@@ -21,9 +21,7 @@ const SETTING_DEFAULTS = {
   "limits.confirm_wait_hours": "24",
   "limits.reply_per_day": "20",
   "limits.timezone_change_days": "7",
-  "match.auto_threshold_default": "60",
   "match.strong": "80",
-  "prep.run_local_time": "07:00",
   "llm.cap_user_day_usd": "0.10",
   "llm.cap_onboarding_usd": "0.50",
   "llm.cap_global_day_usd": "50",
@@ -65,18 +63,6 @@ export function getSetting(db: Pick<AppDatabase, "select">, key: string) {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
 
   return row?.value ?? DEFAULT_LOOKUP.get(key) ?? null;
-}
-
-/**
- * The stored value of a setting, without its registry default. It separates an
- * admin override from an unset key, which `getSetting` cannot: prep staggering
- * must apply only when `prep.run_local_time` was set explicitly.
- * @param db The application database.
- * @param key The setting key.
- * @returns The stored value, or null when nothing was ever saved.
- */
-export function getStoredSetting(db: Pick<AppDatabase, "select">, key: string) {
-  return db.select().from(settings).where(eq(settings.key, key)).get()?.value ?? null;
 }
 
 export interface SettingNumberOptions {

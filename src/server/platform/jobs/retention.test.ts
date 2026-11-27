@@ -149,7 +149,7 @@ function seedApplication(
       createdAt: NOW,
       id: application.id,
       locationRaw: "Remote — Canada",
-      origin: "auto",
+      origin: "pick",
       postingId: application.postingId,
       postingTitle: `Engineer ${application.postingId}`,
       postingUrl: `https://boards.example/jobs/${application.postingId}`,

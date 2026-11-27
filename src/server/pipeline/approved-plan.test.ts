@@ -76,7 +76,7 @@ async function addApproved(
       companyNameNorm: "northwind",
       postingTitle: `Platform Engineer ${String(index)}`,
       postingUrl: `https://example.test/job-${String(index)}`,
-      origin: "auto",
+      origin: "pick",
       status: "approved",
       stage: "ready",
       approvedAt: NOW - index,

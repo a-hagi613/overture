@@ -754,7 +754,7 @@ async function recordedFormStack(form: RecordedForm) {
       companyNameNorm: form.company.toLowerCase(),
       createdAt: NOW,
       id: "application-1",
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-1",
       postingTitle: "Senior Software Engineer",
       postingUrl: "https://example.test/job-1",

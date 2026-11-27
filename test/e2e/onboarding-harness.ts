@@ -145,7 +145,7 @@ export async function seedOnboardingBoard(request: APIRequestContext, appServerU
       created(request, "/__test__/applications/seed", {
         boardPosition: index,
         createdAt: index + 1,
-        origin: "auto",
+        origin: "pick",
         postingId,
         sentAt: null,
         stage: "queued",

@@ -64,7 +64,7 @@ function seedApp(app: ReturnType<typeof openDatabase>) {
       companyNameNorm: "ferro cloud",
       createdAt: NOW,
       id: "application-1",
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-1",
       postingTitle: "Senior Platform Engineer",
       postingUrl: "https://boards.example/jobs/1",

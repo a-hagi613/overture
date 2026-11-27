@@ -475,8 +475,6 @@ const jobHandlerByKind = new Map<string, string[]>([
   ["application.prepare", ["preparationJobHandlers"]],
   ["planner.", ["planningJobHandlers"]],
   ["llm.", ["llmJobHandlers"]],
-  ["prep.daily", ["prepDailyJobHandlers"]],
-  ["ready.", ["readyNotifyJobHandlers"]],
   ["push.", ["pushNotifyJobHandlers"]],
   ["mail.", ["mailJobHandlers"]],
   ["application.send", ["dispatchJobHandlers"]],

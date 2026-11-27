@@ -155,7 +155,7 @@ function freshApplication(postingDescription: string) {
       companyNameNorm: "northwind",
       createdAt: NOW,
       id: "application-1",
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-1",
       postingTitle: "Staff Engineer",
       postingUrl: "https://jobs.lever.co/northwind/j/1",

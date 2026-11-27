@@ -86,7 +86,7 @@ function addApplication(db: AppDatabase, index: number) {
       companyNameNorm: "northwind",
       postingTitle: `Engineer ${String(index)}`,
       postingUrl: `https://example.test/job-${String(index)}`,
-      origin: "auto",
+      origin: "pick",
       status: "preparing",
       createdAt: NOW,
       updatedAt: NOW,

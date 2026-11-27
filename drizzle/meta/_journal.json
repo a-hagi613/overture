@@ -519,6 +519,13 @@
       "when": 1795749600000,
       "tag": "0074_onboarding_picks",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1795766400000,
+      "tag": "0075_retire_daily_prep",
+      "breakpoints": true
     }
   ]
 }

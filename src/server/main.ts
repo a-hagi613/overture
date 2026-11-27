@@ -114,19 +114,7 @@ import { createDegradedFlag } from "./platform/degraded.ts";
 import { createPersonalCrypto } from "./profile/personal-crypto.ts";
 import { createGreenhouseQuestionSource } from "./catalog/greenhouse-questions.ts";
 import { createPreparationService } from "./pipeline/prepare.ts";
-import {
-  PREP_DAILY_JOB_KIND,
-  ensurePrepNextQueued,
-  ensurePrepQueuedForRunningUsers,
-  parsePrepDailyPayload,
-  runPrepDailyJob,
-} from "./pipeline/daily-prep.ts";
 import { createPlainFormReader } from "./pipeline/form-read.ts";
-import {
-  READY_NOTIFY_JOB_KIND,
-  parseReadyNotifyPayload,
-  runReadyNotifyJob,
-} from "./notify/ready-recap.ts";
 import {
   PUSH_NOTIFY_JOB_KIND,
   parsePushNotifyPayload,
@@ -631,46 +619,6 @@ const llmJobHandlers: JobHandlers =
         },
       };
 
-const prepDailyJobHandlers: JobHandlers = {
-  [PREP_DAILY_JOB_KIND]: async (payload) => {
-    const { since, userId } = parsePrepDailyPayload(payload);
-
-    if (isDemoUser(db, userId)) {
-      return;
-    }
-
-    try {
-      if (env.ANTHROPIC_API_KEY === undefined) {
-        return;
-      }
-
-      await runPrepDailyJob(
-        {
-          catalogDb,
-          clock,
-          db,
-          llm: anthropicLlmPort,
-          personal,
-          preparation,
-          spendGate,
-        },
-        userId,
-        since ?? clock.now(),
-      );
-    } finally {
-      ensurePrepNextQueued(db, clock, userId);
-    }
-  },
-};
-
-const readyNotifyJobHandlers: JobHandlers = {
-  [READY_NOTIFY_JOB_KIND]: async (payload) => {
-    const { since, userId } = parseReadyNotifyPayload(payload);
-
-    await runReadyNotifyJob({ appOrigin, clock, db, mail: mailSender }, userId, since);
-  },
-};
-
 const pushNotifyJobHandlers: JobHandlers = {
   [PUSH_NOTIFY_JOB_KIND]: async (payload) => {
     const { notificationId } = parsePushNotifyPayload(payload);
@@ -1111,8 +1059,6 @@ const allJobHandlers: JobHandlers = {
   ...preparationJobHandlers,
   ...planningJobHandlers,
   ...llmJobHandlers,
-  ...prepDailyJobHandlers,
-  ...readyNotifyJobHandlers,
   ...pushNotifyJobHandlers,
   ...billingNoticeJobHandlers,
   ...mailJobHandlers,
@@ -1165,8 +1111,6 @@ if (env.NODE_ENV === "production") {
 
 if (env.ANTHROPIC_API_KEY !== undefined) {
   ensureTagFallbackQueued(db, clock);
-
-  ensurePrepQueuedForRunningUsers(db, clock);
 }
 
 function requestWithAbsoluteUrl(request: Request) {

@@ -71,10 +71,13 @@ different stack), not label errors. Labelling the week cost $6.59 with the Batch
 - **Scorer.** The Haiku scorer now reads the first 200 words of the description (the build stores 2,000 characters
   of plain text) and a `targets:` line (role names, levels, places, workplaces, pay floor), in the format measured
   above. The auto threshold stays 60.
-- **Counts and search.** `/api/supply` and catalog search read a role filter the same way (ids, names or retired
-  names). They also accept the value as given, so a catalog built before this change still answers while it is
-  rebuilt. Role conditions read `posting_tags` through one indexed lookup per tag clause, joined by `union` (on
-  150,000 Postings a live count fell from about 420 ms to 1–26 ms, a role-target pool from 100–260 ms to 1–2 ms).
+- **Counts and search.** Catalog search reads a role filter as taxonomy ids (ids, names or retired names), and also
+  accepts the value as given, so a catalog built before this change still answers while it is rebuilt. Role conditions
+  read `posting_tags` through one indexed lookup per tag clause, joined by `union` (on 150,000 Postings a live count
+  fell from about 420 ms to 1–26 ms, a role-target pool from 100–260 ms to 1–2 ms). Amended by #742: `/api/supply`
+  now counts freehire `jobs`, so it reads the same label through the target migration's freehire-category mapping
+  (a category label expands to its whole freehire family; a label that names none falls back to its title words)
+  instead of `posting_tags`.
 - **Window.** The daily build keeps jobs posted in the last 7 days (`freshness_days`); undated jobs (Manatal, Personio,
   Pinpoint, ClearCompany feeds carry no `posted_at`) are left out unless `include_undated` is set, because their
   freshness cannot be shown and most of their titles have no label yet.

@@ -476,7 +476,7 @@ async function seedApplications(input: {
         createdAt,
         id: app.id,
         locationRaw: "Remote — Canada",
-        origin: "auto",
+        origin: "pick",
         postingId,
         postingTitle: app.title,
         postingUrl: url,

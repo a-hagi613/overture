@@ -75,7 +75,7 @@ function seedLiveDatabase(livePath: string) {
   );
 
   dueJob.run("drill-send", "application.send", dueAt, timestamp, timestamp);
-  dueJob.run("drill-ready", "ready.notify", dueAt, timestamp, timestamp);
+  dueJob.run("drill-export", "export.notify", dueAt, timestamp, timestamp);
   dueJob.run("drill-billing", "billing.notice", dueAt, timestamp, timestamp);
 
   const counts = countTableRows(sqlite);
