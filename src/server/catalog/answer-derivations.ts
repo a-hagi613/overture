@@ -12,11 +12,7 @@ import { countryCodesOfPlaceIds } from "../places/catalog.ts";
 import { factPolarity, matchOption, normalizeOptionText } from "./question-normalize.ts";
 import { normalizeCompanyName } from "../profile/skip-companies.ts";
 
-export const TARGET_DERIVATION_KEYS = [
-  "target_countries",
-  "target_workplace",
-  "target_relocation",
-] as const;
+export const TARGET_DERIVATION_KEYS = ["target_countries", "target_relocation"] as const;
 
 export const DERIVED_ANSWER_KEYS = [
   "employed_by_company",
@@ -145,28 +141,6 @@ function deriveTargetCountries(input: DerivationInput) {
   }
 
   return matched.length === 1 ? (matched[0] ?? null) : null;
-}
-
-function deriveTargetWorkplace(input: DerivationInput) {
-  const workplaces = new Set(input.targets.workplaces);
-
-  if (workplaces.size === 0) {
-    return null;
-  }
-
-  const question = normalizeOptionText(input.questionText);
-  const remote = /\b(?:remote|remotely)\b/u.test(question);
-  const office = /\b(?:office|on site|onsite|hybrid|in person)\b/u.test(question);
-
-  if (!remote && !office) {
-    return null;
-  }
-
-  const affirmative = remote
-    ? workplaces.has("remote")
-    : workplaces.has("hybrid") || workplaces.has("onsite");
-
-  return optionWithPolarity(input.options, affirmative);
 }
 
 const CURRENT_LOCATION_OPTION = /\b(?:currently live|currently located|i live in)\b/u;
@@ -639,7 +613,6 @@ function deriveRoleCategory(input: DerivationInput) {
 
 const DERIVATIONS: Record<DerivationKey, (input: DerivationInput) => string | null> = {
   target_countries: deriveTargetCountries,
-  target_workplace: deriveTargetWorkplace,
   target_relocation: deriveTargetRelocation,
   employed_by_company: deriveEmployedByCompany,
   us_state_residence: deriveUsStateResidence,

@@ -53,23 +53,13 @@ async function expectOnboardingMatchesBoard(
     page.getByRole("heading", { level: 1, name: /Set up your workspace/u }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
-  await expect(
-    page.getByRole("button", { exact: true, name: "Platform Engineer" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { exact: true, name: "Backend Engineer" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(
-    page.getByRole("button", { exact: true, name: "Site Reliability Engineer" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    page.getByRole("button", { exact: true, name: "Software Engineer (general)" }),
-  ).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Remove Software engineering" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Platform" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Backend" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Reliability" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove London" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove Remote · United Kingdom" })).toBeVisible();
-  await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
-  await expect(page.getByLabel("Minimum salary")).toHaveValue("140,000");
+  await expect(page.getByText("Employers to exclude")).toBeVisible();
 
   await page.evaluate(async () => {
     await document.fonts.ready;

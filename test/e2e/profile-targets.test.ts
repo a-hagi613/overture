@@ -30,13 +30,9 @@ const test = appTest.extend<{ resumeServer: AppServer }>({
 
 const targetsSchema = z.object({
   roles: z.array(z.string()),
-  seniorities: z.array(z.string()),
-  workplaces: z.array(z.string()),
+  unresolvedRoles: z.array(z.string()),
   locations: z.array(z.string()),
-  employmentTypes: z.array(z.string()),
-  salaryFloorMinor: z.number().nullable(),
-  salaryCurrency: z.string().nullable(),
-  salaryPeriod: z.string(),
+  unresolvedLocations: z.array(z.string()),
 });
 
 const targetsResponseSchema = z.object({
@@ -75,18 +71,11 @@ const factsSchema = z.object({
   ),
 });
 
-const createdSchema = z.object({ id: z.string() });
-const bulkSchema = z.object({ created: z.number() });
-
 const baseTargets = {
-  roles: ["Backend"],
-  seniorities: ["senior"],
-  workplaces: ["onsite"],
+  roles: ["backend"],
+  unresolvedRoles: [],
   locations: ["city:ca:ottawa"],
-  employmentTypes: ["full_time"],
-  salaryFloorMinor: 14_000_000,
-  salaryCurrency: "CAD",
-  salaryPeriod: "year",
+  unresolvedLocations: [],
 };
 
 async function ownerContextFor(appServerUrl: string) {
@@ -106,210 +95,135 @@ async function ownerContextFor(appServerUrl: string) {
   return owner;
 }
 
-async function seedPostings(appServerUrl: string) {
-  const company = createdSchema.parse(
-    await (
-      await fetch(`${appServerUrl}/__test__/catalog/companies`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Target Co", domain: "targetco.example" }),
-      })
-    ).json(),
-  );
-
-  const board = createdSchema.parse(
-    await (
-      await fetch(`${appServerUrl}/__test__/catalog/boards`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          companyId: company.id,
-          ats: "greenhouse",
-          boardToken: "target-co",
-        }),
-      })
-    ).json(),
-  );
-
-  const common = {
-    boardId: board.id,
-    companyId: company.id,
-    ats: "greenhouse",
-    workplace: "onsite",
-    employmentType: "full_time",
-    language: "fr",
-    countryCode: "CA",
-    region: "Ontario",
-    city: "Ottawa",
-  };
-
-  const postings = [
-    {
-      ...common,
-      atsJobId: "target-1",
-      url: "https://targetco.example/1",
-      title: "Senior Backend Engineer",
-      salaryMinMinor: 15_000_000,
-      salaryCurrency: "CAD",
-      tags: [
-        { dimension: "subrole", value: "Backend" },
-        { dimension: "seniority", value: "senior" },
-      ],
-    },
-    {
-      ...common,
-      atsJobId: "target-2",
-      url: "https://targetco.example/2",
-      title: "Backend Engineer",
-      region: "British Columbia",
-      city: "Vancouver",
-      salaryMinMinor: 10_000_000,
-      salaryCurrency: "CAD",
-      tags: [
-        { dimension: "subrole", value: "Backend" },
-        { dimension: "seniority", value: "mid" },
-      ],
-    },
-    {
-      ...common,
-      atsJobId: "target-3",
-      url: "https://targetco.example/3",
-      title: "Frontend Engineer",
-      employmentType: "contract",
-      tags: [
-        { dimension: "subrole", value: "Frontend" },
-        { dimension: "seniority", value: "senior" },
-      ],
-    },
-    {
-      ...common,
-      atsJobId: "target-4",
-      url: "https://targetco.example/4",
-      title: "Platform Backend Engineer",
-      tags: [
-        { dimension: "subrole", value: "Backend" },
-        { dimension: "seniority", value: "senior" },
-      ],
-    },
-    {
-      ...common,
-      atsJobId: "target-5",
-      url: "https://targetco.example/5",
-      title: "Infrastructure Backend Engineer",
-      salaryMinMinor: 9_000_000,
-      salaryCurrency: "CAD",
-      tags: [
-        { dimension: "subrole", value: "Backend" },
-        { dimension: "seniority", value: "senior" },
-      ],
-    },
-  ];
-
-  const seeded = await fetch(`${appServerUrl}/__test__/catalog/postings/bulk`, {
+async function seedJobs(appServerUrl: string) {
+  const response = await fetch(`${appServerUrl}/__test__/jobs/seed`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ postings }),
+    body: JSON.stringify({
+      jobs: [
+        {
+          category: "backend",
+          cities: ["Ottawa"],
+          company: "Target Co",
+          countries: ["ca"],
+          public_slug: "senior-backend-ottawa",
+          title: "Senior Backend Engineer",
+        },
+        {
+          category: "backend",
+          cities: ["Vancouver"],
+          company: "Target Co",
+          countries: ["ca"],
+          public_slug: "backend-vancouver",
+          title: "Backend Engineer",
+        },
+        {
+          category: "frontend",
+          cities: ["Ottawa"],
+          company: "Target Co",
+          countries: ["ca"],
+          public_slug: "frontend-ottawa",
+          title: "Frontend Engineer",
+        },
+        {
+          category: "backend",
+          cities: ["Ottawa"],
+          company: "Target Co",
+          countries: ["ca"],
+          public_slug: "platform-backend-ottawa",
+          title: "Platform Backend Engineer",
+        },
+        {
+          category: "backend",
+          cities: ["Ottawa"],
+          company: "Target Co",
+          countries: ["ca"],
+          public_slug: "infrastructure-backend-ottawa",
+          title: "Infrastructure Backend Engineer",
+        },
+      ],
+    }),
   });
 
-  expect(bulkSchema.parse(await seeded.json()).created).toBe(postings.length);
+  expect(response.status).toBe(200);
+  expect(z.object({ kept: z.number() }).parse(await response.json()).kept).toBe(5);
 }
 
-test("the live count changes as targets change, and a draft count stores nothing", async ({
+test("role category plus place is the whole filter, and a draft count stores nothing", async ({
   isolatedAppServer: { url: appServerUrl },
 }) => {
   const owner = await ownerContextFor(appServerUrl);
 
-  await seedPostings(appServerUrl);
-
-  const languages = await owner.put("/api/profile/languages", {
-    data: { languages: ["fr"] },
-  });
-
-  expect(languagesSchema.parse(await languages.json()).languages).toEqual(["fr"]);
+  await seedJobs(appServerUrl);
 
   const saved = targetsResponseSchema.parse(
-    await (
-      await owner.put("/api/profile/targets", {
-        data: baseTargets,
-      })
-    ).json(),
+    await (await owner.put("/api/profile/targets", { data: baseTargets })).json(),
   );
 
-  expect(saved.matchedCount).toBe(2);
-  expect(saved.targets.roles).toEqual(["Backend"]);
-  expect(saved.targets.salaryFloorMinor).toBe(14_000_000);
-  expect(saved.targets.salaryCurrency).toBe("CAD");
+  expect(saved.matchedCount).toBe(3);
+  expect(saved.targets.roles).toEqual(["backend"]);
+  expect(saved.targets.locations).toEqual(["city:ca:ottawa"]);
 
-  const internDraft = matchCountSchema.parse(
+  const draft = matchCountSchema.parse(
     await (
       await owner.post("/api/profile/targets/match-count", {
-        data: { ...baseTargets, seniorities: ["intern"] },
+        data: { ...baseTargets, roles: ["frontend"] },
       })
     ).json(),
   );
 
-  expect(internDraft.matchedCount).toBe(0);
+  expect(draft.matchedCount).toBe(1);
 
   const unchanged = targetsResponseSchema.parse(
     await (await owner.get("/api/profile/targets")).json(),
   );
 
-  expect(unchanged.matchedCount).toBe(2);
-  expect(unchanged.targets.seniorities).toEqual(["senior"]);
+  expect(unchanged.matchedCount).toBe(3);
+  expect(unchanged.targets.roles).toEqual(["backend"]);
 
-  const noFloor = targetsResponseSchema.parse(
+  const bothPlaces = targetsResponseSchema.parse(
     await (
       await owner.put("/api/profile/targets", {
-        data: { ...baseTargets, salaryFloorMinor: null, salaryCurrency: null },
+        data: { ...baseTargets, locations: ["city:ca:ottawa", "city:ca:vancouver"] },
       })
     ).json(),
   );
 
-  expect(noFloor.matchedCount).toBe(3);
+  expect(bothPlaces.matchedCount).toBe(4);
 
-  const remote = targetsResponseSchema.parse(
+  const titleWord = targetsResponseSchema.parse(
     await (
       await owner.put("/api/profile/targets", {
-        data: { ...noFloor.targets, workplaces: ["remote"] },
+        data: { ...baseTargets, roles: ["frontend", "platform"] },
       })
     ).json(),
   );
 
-  expect(remote.matchedCount).toBe(0);
+  expect(titleWord.matchedCount).toBe(2);
 
-  const frontend = targetsResponseSchema.parse(
+  const noRoles = matchCountSchema.parse(
     await (
-      await owner.put("/api/profile/targets", {
-        data: {
-          ...baseTargets,
-          roles: ["Frontend"],
-          employmentTypes: ["contract"],
-          salaryFloorMinor: null,
-          salaryCurrency: null,
-        },
+      await owner.post("/api/profile/targets/match-count", { data: { ...baseTargets, roles: [] } })
+    ).json(),
+  );
+
+  expect(noRoles.matchedCount).toBe(0);
+
+  const noPlaces = matchCountSchema.parse(
+    await (
+      await owner.post("/api/profile/targets/match-count", {
+        data: { ...baseTargets, locations: [] },
       })
     ).json(),
   );
 
-  expect(frontend.matchedCount).toBe(1);
+  expect(noPlaces.matchedCount).toBe(0);
 
-  await owner.put("/api/profile/languages", { data: { languages: ["en"] } });
-
-  const englishOnly = targetsResponseSchema.parse(
-    await (
-      await owner.put("/api/profile/targets", {
-        data: { ...noFloor.targets, roles: ["Backend"] },
-      })
-    ).json(),
-  );
-
-  expect(englishOnly.matchedCount).toBe(0);
-
-  const rejected = await owner.put("/api/profile/targets", {
-    data: { ...baseTargets, salaryFloorMinor: 14_000_000, salaryCurrency: null },
+  const removedField = await owner.put("/api/profile/targets", {
+    data: { ...baseTargets, workplaces: ["remote"] },
   });
 
-  expect(rejected.status()).toBe(400);
+  expect(removedField.status()).toBe(400);
 
   const anonymous = await apiRequest.newContext({ baseURL: appServerUrl });
 

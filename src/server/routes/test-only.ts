@@ -68,6 +68,7 @@ import {
   postings,
 } from "../platform/db/catalog-schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
+import { createJobStore } from "../jobs/store.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { stageForStatus } from "../pipeline/stage.ts";
 import { postingDisplayFor } from "../matching/applications.ts";
@@ -1358,6 +1359,68 @@ export function createTestRoutes(
       }),
     );
   }
+
+  const seedJobsBody = z.object({
+    jobs: z
+      .array(
+        z.object({
+          category: z.string().nullable().default(null),
+          cities: z.array(z.string()).default([]),
+          company: z.string().default("Seed Co"),
+          countries: z.array(z.string()).default([]),
+          public_slug: z.string().min(1),
+          title: z.string().min(1),
+          work_mode: z.enum(["remote", "hybrid", "onsite"]).nullable().default(null),
+        }),
+      )
+      .max(200),
+  });
+
+  routes.post("/jobs/seed", validJson(seedJobsBody), (context) => {
+    const store = createJobStore({ clock, db });
+    let kept = 0;
+
+    for (const job of context.req.valid("json").jobs) {
+      const outcome = store.upsert(
+        {
+          apply_url: `https://seed.example/${job.public_slug}`,
+          cities: job.cities,
+          closed_at: null,
+          company: job.company,
+          company_slug: job.company.toLowerCase().replaceAll(/\s+/gu, "-"),
+          countries: job.countries,
+          created_at: null,
+          description: null,
+          enrichment: { category: job.category },
+          external_id: `seed:${job.public_slug}`,
+          location: job.cities[0] ?? null,
+          metros: null,
+          posted_at: null,
+          public_slug: job.public_slug,
+          reality: null,
+          regions: null,
+          skills: null,
+          source: "greenhouse",
+          title: job.title,
+          url: null,
+          work_mode: job.work_mode,
+        },
+        {
+          applyUrl: `https://seed.example/${job.public_slug}`,
+          ats: "greenhouse",
+          atsJobId: job.public_slug,
+          boardToken: "seed",
+          via: "direct",
+        },
+      );
+
+      if (outcome.status === "kept") {
+        kept += 1;
+      }
+    }
+
+    return context.json({ kept });
+  });
 
   routes.post("/jobs/run-due", async (context) => {
     const ran = await runDueJobs(db, clock, handlers, singletonJobKinds);

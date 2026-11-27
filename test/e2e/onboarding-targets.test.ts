@@ -4,11 +4,11 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { request as apiRequest } from "@playwright/test";
 import { z } from "zod";
 
-import type { APIRequestContext } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 import type { AppServer } from "./app-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
-import { seedOnboardingTargetsFlow, seedOnsitePosting } from "./onboarding-targets-harness.ts";
+import { seedOnboardingTargetsFlow } from "./onboarding-targets-harness.ts";
 import { completeOnboardingGaps } from "./onboarding-walk.ts";
 
 const test = appTest.extend<{ onboardingServer: AppServer }>({
@@ -33,13 +33,10 @@ const settingsSchema = z.object({
 
 const targetsSchema = z.object({
   targets: z.object({
-    employmentTypes: z.array(z.string()),
-    locations: z.array(z.string()),
     roles: z.array(z.string()),
-    salaryCurrency: z.string().nullable(),
-    salaryFloorMinor: z.number().nullable(),
-    seniorities: z.array(z.string()),
-    workplaces: z.array(z.string()),
+    unresolvedRoles: z.array(z.string()),
+    locations: z.array(z.string()),
+    unresolvedLocations: z.array(z.string()),
   }),
 });
 
@@ -49,12 +46,65 @@ async function storageStateFor(request: APIRequestContext, appServerUrl: string)
   return request.storageState();
 }
 
-test("the category-first role chips, multi-select locations, and optional settings save cleanly", async ({
+async function seedJobs(request: APIRequestContext) {
+  const response = await request.post("/__test__/jobs/seed", {
+    data: {
+      jobs: [
+        {
+          category: "healthcare",
+          cities: ["London"],
+          company: "Oak Clinic",
+          countries: ["gb"],
+          public_slug: "registered-nurse-london",
+          title: "Registered Nurse",
+        },
+        {
+          category: "healthcare",
+          cities: ["London"],
+          company: "Oak Clinic",
+          countries: ["gb"],
+          public_slug: "nurse-practitioner-london",
+          title: "Nurse Practitioner",
+        },
+        {
+          category: "backend",
+          cities: ["London"],
+          company: "CloudBridge",
+          countries: ["gb"],
+          public_slug: "backend-engineer-london",
+          title: "Backend Engineer",
+        },
+      ],
+    },
+  });
+
+  expect(response.status()).toBe(200);
+}
+
+async function addCategory(page: Page, name: string) {
+  await page.getByRole("button", { name: /^Add a role category/u }).click();
+  await page.getByRole("option", { exact: true, name }).click();
+}
+
+async function addTitleWord(page: Page, word: string) {
+  await page.getByRole("textbox", { name: "Title words" }).fill(word);
+  await page.getByRole("button", { name: "Add word" }).click();
+}
+
+async function addPlace(page: Page, search: string, label: RegExp) {
+  await page.getByRole("button", { name: "Locations" }).click();
+  await page.getByPlaceholder("Search cities or remote regions...").fill(search);
+  await page.getByRole("option", { name: label }).first().click();
+}
+
+test("a fresh user picks a role category and a place, sees a real count, and removing the last title word widens it", async ({
   browser,
   onboardingServer,
 }) => {
   const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
   const storageState = await storageStateFor(request, onboardingServer.url);
+
+  await seedJobs(request);
 
   const context = await browser.newContext({
     storageState,
@@ -65,38 +115,25 @@ test("the category-first role chips, multi-select locations, and optional settin
 
   await page.goto(`${onboardingServer.url}/onboarding/targets`);
 
-  const backend = page.getByRole("button", { exact: true, name: "Backend Engineer" });
-  const remote = page.getByRole("button", { exact: true, name: "Remote" });
-  const hybrid = page.getByRole("button", { exact: true, name: "Hybrid" });
-  const senior = page.getByRole("button", { name: "Senior" });
+  const status = page.getByTestId("onboarding-targets-status");
+  const seeMatches = page.getByRole("button", { name: "See my matches" });
 
-  await backend.click();
-  await expect(backend).toHaveAttribute("aria-pressed", "true");
+  await expect(status).toHaveText("Pick at least one role and one location to see your matches.");
+  await expect(seeMatches).toBeDisabled();
 
-  await page.getByLabel("Locations").click();
-  await page.getByPlaceholder("Search cities or remote regions...").fill("London");
-  await page
-    .getByRole("option", { name: /^London/u })
-    .first()
-    .click();
-  await expect(page.getByRole("button", { name: "Remove London" })).toBeVisible();
+  await addCategory(page, "Backend");
+  await expect(page.getByRole("button", { name: "Remove Backend" })).toBeVisible();
 
-  await remote.click();
-  await expect(remote).toHaveAttribute("aria-pressed", "true");
-  await hybrid.click();
-  await expect(hybrid).toHaveAttribute("aria-pressed", "true");
-  await senior.click();
-  await expect(senior).toHaveAttribute("aria-pressed", "true");
+  await addTitleWord(page, "registered");
+  await addPlace(page, "London", /^London/u);
 
-  await page.getByLabel("Category").click();
-  await page.getByRole("option", { exact: true, name: "Healthcare" }).click();
+  await expect(status).toHaveText("2 open roles match");
+  await expect(seeMatches).toBeEnabled();
 
-  await page.getByRole("button", { name: "Registered Nurse" }).click();
-  await expect(page.getByRole("button", { name: "Registered Nurse" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(page.getByText("Also selected (1)")).toBeVisible();
+  await page.getByRole("button", { name: "Remove registered" }).click();
+
+  await expect(status).toHaveText("1 open role match");
+  await expect(page.getByText("All roles in this category")).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 1000 });
 
@@ -106,28 +143,24 @@ test("the category-first role chips, multi-select locations, and optional settin
   }));
 
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
-
-  const results = await new AxeBuilder({ page }).analyze();
-
-  expect(results.violations).toEqual([]);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
   await page.setViewportSize({ width: 1280, height: 1100 });
-  await page.getByRole("button", { name: "Registered Nurse" }).click();
-  await expect(page.getByRole("button", { name: "Registered Nurse" })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
+  await page.getByRole("button", { name: "Remove Backend" }).click();
+  await expect(status).toHaveText("Pick at least one role and one location to see your matches.");
 
   await context.close();
   await request.dispose();
 });
 
-test("choices persist across reload, optional salary saves, and browser zone is captured", async ({
+test("choices persist across reload, the browser zone is captured, and an employer can be excluded", async ({
   browser,
   onboardingServer,
 }) => {
   const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
   const storageState = await storageStateFor(request, onboardingServer.url);
+
+  await seedJobs(request);
 
   const context = await browser.newContext({
     storageState,
@@ -140,37 +173,17 @@ test("choices persist across reload, optional salary saves, and browser zone is 
   await page.goto(`${onboardingServer.url}/onboarding/targets`);
 
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
-  await expect(page.getByRole("button", { exact: true, name: "Backend Engineer" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ghost Role" })).toHaveCount(0);
 
-  await page.getByRole("button", { exact: true, name: "Backend Engineer" }).click();
+  await addCategory(page, "Healthcare");
+  await addTitleWord(page, "nurse");
+  await addPlace(page, "London", /^London/u);
+  await expect(page.getByRole("button", { name: "Remove London" })).toBeVisible();
+  await addPlace(page, "Berlin", /^Berlin/u);
+  await expect(page.getByRole("button", { name: "Remove Berlin" })).toBeVisible();
 
-  await page.getByLabel("Category").click();
-  await page.getByRole("option", { exact: true, name: "Product & Design" }).click();
-  await page.getByRole("button", { exact: true, name: "Product Manager" }).click();
-
-  await page.getByLabel("Locations").click();
-  await page.getByPlaceholder("Search cities or remote regions...").fill("London");
-  await page
-    .getByRole("option", { name: /^London/u })
-    .first()
-    .click();
-  await page.getByLabel("Locations").click();
-  await page.getByPlaceholder("Search cities or remote regions...").fill("Berlin");
-  await page
-    .getByRole("option", { name: /^Berlin/u })
-    .first()
-    .click();
-
-  await page.getByRole("button", { exact: true, name: "Remote" }).click();
-  await page.getByRole("button", { name: "Hybrid" }).click();
-  await page.getByRole("button", { name: "Senior" }).click();
-
-  await page.getByRole("button", { exact: true, name: "Backend Engineer" }).click();
-
-  await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
-  await page.getByLabel("Minimum salary").fill("120,000");
-  await page.getByLabel("Minimum salary").blur();
+  await page.getByLabel("Add an employer to exclude").fill("Harbor Clinic Group");
+  await page.getByRole("button", { name: "Add", exact: true }).last().click();
+  await expect(page.getByRole("button", { name: "Remove Harbor Clinic Group" })).toBeVisible();
 
   const uploaded = await request.post("/api/profile/resume", {
     multipart: {
@@ -192,24 +205,15 @@ test("choices persist across reload, optional salary saves, and browser zone is 
 
   const saved = targetsSchema.parse(await (await request.get("/api/profile/targets")).json());
 
-  expect(saved.targets.roles).toEqual(["Product Manager"]);
-  expect(saved.targets.locations).toEqual(["city:de:berlin", "city:gb:london"]);
-  expect(saved.targets.workplaces).toEqual(["remote", "hybrid"]);
-  expect(saved.targets.seniorities).toEqual(["senior"]);
-  expect(saved.targets.employmentTypes).toEqual(["full_time"]);
-  expect(saved.targets.salaryFloorMinor).toBe(12_000_000);
-  expect(saved.targets.salaryCurrency).toBe("CAD");
+  expect(saved.targets.roles).toEqual(["healthcare", "nurse"]);
+  expect([...saved.targets.locations].toSorted()).toEqual(["city:de:berlin", "city:gb:london"]);
 
   await page.reload();
 
-  await expect(page.getByRole("button", { exact: true, name: "Product Manager" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("button", { name: "Remove Healthcare" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove nurse" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove London" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove Berlin" })).toBeVisible();
-  await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
-  await expect(page.getByLabel("Minimum salary")).toHaveValue("120,000");
 
   await page.getByRole("button", { name: "See my matches" }).click();
 
@@ -223,14 +227,14 @@ test("choices persist across reload, optional salary saves, and browser zone is 
   await request.dispose();
 });
 
-test("a fresh user is offered on-site work and sees matches only once every group has a pick", async ({
+test("a brand-new user sees matches only once a role category and a place are picked", async ({
   browser,
   onboardingServer,
 }) => {
   const request = await apiRequest.newContext({ baseURL: onboardingServer.url });
   const storageState = await storageStateFor(request, onboardingServer.url);
 
-  await seedOnsitePosting(request);
+  await seedJobs(request);
 
   const context = await browser.newContext({
     storageState,
@@ -247,56 +251,16 @@ test("a fresh user is offered on-site work and sees matches only once every grou
   await page.getByRole("button", { name: "Continue" }).click();
   await completeOnboardingGaps(page);
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
-  await expect(page.getByRole("button", { exact: true, name: "On-site" })).toBeVisible();
+
   await expect(seeMatches).toBeDisabled();
-  await expect(status).toHaveText(
-    "Pick at least one role, location, workplace and seniority to see your matches.",
-  );
+  await expect(status).toHaveText("Pick at least one role and one location to see your matches.");
 
-  await page.getByRole("button", { exact: true, name: "DevOps / SRE / Platform Engineer" }).click();
-  await page.getByLabel("Locations").click();
-  await page.getByPlaceholder("Search cities or remote regions...").fill("London");
-  await page
-    .getByRole("option", { name: /^London/u })
-    .first()
-    .click();
-  const held = Promise.withResolvers<undefined>();
-
-  await page.route("**/api/onboarding/targets", async (route) => {
-    const body = route.request().postData() ?? "";
-
-    if (route.request().method() === "PUT" && !body.includes('"senior"')) {
-      await held.promise;
-    }
-
-    await route.fallback();
-  });
-
-  await page.getByRole("button", { exact: true, name: "Remote" }).click();
+  await addCategory(page, "Healthcare");
   await expect(seeMatches).toBeDisabled();
 
-  await page.getByRole("button", { exact: true, name: "Senior" }).click();
+  await addPlace(page, "London", /^London/u);
   await expect(seeMatches).toBeEnabled();
-  await expect(status).toHaveText("3 open roles match");
-
-  const late = page.waitForResponse(
-    (response) => response.request().method() === "PUT" && response.url().endsWith("/targets"),
-  );
-
-  held.resolve(undefined);
-  await late;
-  await page.unroute("**/api/onboarding/targets");
-  await expect(status).toHaveText("3 open roles match");
-
-  await page.getByRole("button", { exact: true, name: "On-site" }).click();
-  await expect(status).toHaveText("4 open roles match");
-
-  const saved = targetsSchema.parse(await (await request.get("/api/profile/targets")).json());
-
-  expect(saved.targets.workplaces).toEqual(["remote", "onsite"]);
-
-  await seeMatches.click();
-  await expect(page).toHaveURL(/\/onboarding\/matches$/u);
+  await expect(status).toHaveText("2 open roles match");
 
   await context.close();
   await request.dispose();

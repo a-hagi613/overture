@@ -332,18 +332,18 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   await completeOnboardingGaps(page);
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
 
-  await page.getByLabel("Category").click();
-  await page.getByRole("option", { exact: true, name: "Healthcare" }).click();
+  await page.getByRole("button", { name: /^Add a role category/u }).click();
+  await page.getByRole("option", { exact: true, name: "Software engineering" }).click();
 
-  const chipGroup = page.getByRole("group", { name: /Roles in/u });
-  const chips = chipGroup.getByRole("button");
+  await page.getByRole("textbox", { name: "Title words" }).fill("Platform");
+  await page.getByRole("button", { name: "Add word" }).click();
+  await page.getByRole("textbox", { name: "Title words" }).fill("SRE");
+  await page.getByRole("button", { name: "Add word" }).click();
+  await page.getByRole("textbox", { name: "Title words" }).fill("Infrastructure");
+  await page.getByRole("button", { name: "Add word" }).click();
 
-  await expect(chips).toHaveCount(8);
-  await expect(chips.first()).toHaveText("Physical Therapist");
-
-  const moreBtn = page.getByRole("button", { name: "More roles (21)" });
-
-  await expect(moreBtn).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "Remove Software engineering" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Platform" })).toBeVisible();
 
   const mobileOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -352,49 +352,17 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   expect(mobileOverflow).toBeLessThanOrEqual(0);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
-  await moreBtn.click();
-  await expect(chips).toHaveCount(29);
-
-  const fewerBtn = page.getByRole("button", { name: "Show fewer roles" });
-
-  await expect(fewerBtn).toHaveAttribute("aria-expanded", "true");
-
-  const slpChip = page.getByRole("button", { exact: true, name: "Speech-Language Pathologist" });
-
-  await slpChip.click();
-  await expect(slpChip).toHaveAttribute("aria-pressed", "true");
-  await fewerBtn.click();
-  await expect(slpChip).toBeVisible();
-  await expect(page.getByRole("button", { name: "More roles (20)" })).toBeVisible();
-  await slpChip.click();
-
-  await page.getByLabel("Category").click();
-  await page.getByRole("option", { exact: true, name: "Product & Design" }).click();
-  await expect(chips).toHaveCount(7);
-  await expect(page.getByRole("button", { name: /More roles/u })).toHaveCount(0);
-
-  await page.getByLabel("Category").click();
-  await page.getByRole("option", { exact: true, name: "Software & IT" }).click();
-
-  await page.getByRole("button", { exact: true, name: "DevOps / SRE / Platform Engineer" }).click();
-  await page.getByLabel("Locations").click();
+  await page.getByRole("button", { name: "Locations" }).click();
+  await page.getByPlaceholder("Search cities or remote regions...").fill("Worldwide");
   await page
-    .getByRole("option", { name: /^Remote · Worldwide/u })
+    .getByRole("option", { name: /Worldwide/u })
     .first()
     .click();
-
-  const workplaceChipGroup = page.getByRole("group", { name: /Workplace/u });
-
-  await workplaceChipGroup.getByRole("button", { exact: true, name: "Remote" }).click();
-  await page.getByRole("button", { exact: true, name: "Senior" }).click();
-
-  await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
-  await page.getByLabel("Minimum salary").fill("95,000");
-  await page.getByLabel("Minimum salary").blur();
+  await expect(page.getByRole("button", { name: /^Remove Remote/u })).toBeVisible();
 
   const status = page.getByTestId("onboarding-targets-status");
 
-  await expect(status).toHaveText("4 open roles match");
+  await expect(status).toContainText("open roles match");
 
   await page.getByRole("button", { name: "See my matches" }).click();
   await expect(page).toHaveURL(/\/onboarding\/matches$/u);
@@ -422,30 +390,33 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
 
   await page.getByRole("button", { name: "Save and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
-  await expect(status).toHaveText("4 open roles match");
+  await expect(status).toContainText("open roles match");
 
-  await page.getByRole("button", { exact: true, name: "DevOps / SRE / Platform Engineer" }).click();
-  await page
-    .getByRole("group", { name: /Workplace/u })
-    .getByRole("button", { exact: true, name: "Remote" })
-    .click();
+  await page.getByRole("button", { name: "Remove Platform" }).click();
+  await page.getByRole("button", { name: "Remove SRE" }).click();
+  await page.getByRole("button", { name: "Remove Infrastructure" }).click();
 
-  await page.getByLabel("Category").click();
+  await page.getByRole("button", { name: "Remove Software engineering" }).click();
+
+  const remoteChip = page.getByRole("button", { name: /^Remove Remote/u });
+
+  if ((await remoteChip.count()) > 0) {
+    await remoteChip.click();
+  }
+
+  await page.getByRole("button", { name: /^Add a role category/u }).click();
   await page.getByRole("option", { exact: true, name: "Healthcare" }).click();
-  await page.getByRole("button", { exact: true, name: "Physical Therapist" }).click();
+  await page.getByRole("textbox", { name: "Title words" }).fill("Physical Therapist");
+  await page.getByRole("button", { name: "Add word" }).click();
 
-  await page.getByLabel("Locations").click();
+  await page.getByRole("button", { name: "Locations" }).click();
   await page.getByPlaceholder("Search cities or remote regions...").fill("Toronto");
   await page
     .getByRole("option", { name: /^Toronto/u })
     .first()
     .click();
 
-  await page
-    .getByRole("group", { name: /Workplace/u })
-    .getByRole("button", { exact: true, name: "Hybrid" })
-    .click();
-  await expect(status).toHaveText("4 open roles match");
+  await expect(status).toContainText("open roles match");
 
   await page.getByRole("button", { name: "See my matches" }).click();
   await expect(page).toHaveURL(/\/onboarding\/matches$/u);

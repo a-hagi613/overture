@@ -91,7 +91,7 @@ test("a brand-new user picks three matches and the trial prepares them", async (
 
   const saved = targetsSchema.parse(await (await request.get("/api/profile/targets")).json());
 
-  expect(saved.targets.roles).toEqual(["DevOps / SRE / Platform Engineer"]);
+  expect(saved.targets.roles).toEqual(["software_engineering", "Platform"]);
   expect(saved.targets.locations).toEqual(["city:gb:london"]);
 
   await context.close();
@@ -99,26 +99,13 @@ test("a brand-new user picks three matches and the trial prepares them", async (
 });
 
 const emptyChoices = {
-  choices: {
-    employmentTypes: [],
-    locations: [],
-    roleCounts: {},
-    roles: [],
-    seniorities: [],
-    workplaces: [],
-  },
-  currencies: [],
   matchedCount: 0,
   places: [],
   targets: {
-    employmentTypes: [],
-    locations: [],
     roles: [],
-    salaryCurrency: null,
-    salaryFloorMinor: null,
-    salaryPeriod: "year",
-    seniorities: [],
-    workplaces: [],
+    unresolvedRoles: [],
+    locations: [],
+    unresolvedLocations: [],
   },
 };
 
@@ -169,8 +156,8 @@ test("the What you want step shows a loading, error or empty state, never nothin
   });
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Nothing to choose from yet" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(heading).toBeVisible();
+  await expect(page.getByText("Pick at least one role category.")).toBeVisible();
 
   await page.unroute("**/api/onboarding/targets");
   await page.route("**/api/onboarding", async (route) => {

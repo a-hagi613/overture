@@ -64,14 +64,9 @@ const facts: FactRecord[] = [
 
 const targets: Targets = {
   roles: ["Software Engineer"],
-  seniorities: [],
-  workplaces: ["remote", "hybrid", "onsite"],
   locations: ["city:ca:toronto", "city:ca:vancouver", "city:de:berlin"],
   unresolvedLocations: [],
-  employmentTypes: [],
-  salaryFloorMinor: 15_000_000,
-  salaryCurrency: "CAD",
-  salaryPeriod: "year",
+  unresolvedRoles: [],
 };
 
 interface Fixture {

@@ -29,14 +29,10 @@ import { createPersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService } from "../profile/resume.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
-import type { TargetChoices } from "../profile/target-choices.ts";
-
-import { createTargetChoicesCache } from "../profile/target-choices.ts";
-import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
+import { countMatchingJobs, createTargetsService } from "../profile/targets.ts";
 import { describePlaceIds } from "../places/catalog.ts";
-import { env, masterKeyring } from "../config/env.ts";
+import { masterKeyring } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
-import { isDemoRole } from "../../shared/demo.ts";
 import {
   ONBOARDING_MATCH_PICK_LIMIT,
   ONBOARDING_STEP_COUNT,
@@ -49,14 +45,6 @@ import {
 } from "../../shared/onboarding.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
-
-const CHOICES_STALE_MS = 10 * 60_000;
-
-function defaultEmploymentTypes(choices: TargetChoices) {
-  const fullTime = choices.employmentTypes.filter((value) => value === "full_time");
-
-  return fullTime.length > 0 ? fullTime : choices.employmentTypes.slice(0, 1);
-}
 
 export function createOnboardingRoutes(deps: {
   db: AppDatabase;
@@ -92,16 +80,6 @@ export function createOnboardingRoutes(deps: {
 
   const gaps = createOnboardingGapsService({ db, clock, personal, skipCompanies });
 
-  const choicesCache = createTargetChoicesCache({
-    catalogDb: deps.catalogDb,
-    now: () => clock.now(),
-    staleMs: env.ENABLE_TEST_ROUTES ? 0 : CHOICES_STALE_MS,
-  });
-
-  if (!env.ENABLE_TEST_ROUTES) {
-    choicesCache.warm();
-  }
-
   const step = createOnboardingStepService({
     db,
     catalogDb: deps.catalogDb,
@@ -125,31 +103,11 @@ export function createOnboardingRoutes(deps: {
     return languagesService.saveLanguages(userId, { languages: ["en"] });
   }
 
-  async function targetsView(userId: string, readOnly: boolean) {
-    const languages = await ensureLanguages(userId, readOnly);
-    const choices = choicesCache.read();
-    const saved = await targetsService.read(userId);
-    const employmentTypes = defaultEmploymentTypes(choices);
-
-    let { targets } = saved;
-
-    if (saved.targets.employmentTypes.length === 0 && employmentTypes.length > 0) {
-      if (readOnly) {
-        targets = { ...saved.targets, employmentTypes };
-      } else {
-        const { targets: stored } = await targetsService.save(userId, {
-          ...saved.targets,
-          employmentTypes,
-        });
-
-        targets = stored;
-      }
-    }
+  async function targetsView(userId: string) {
+    const { targets } = await targetsService.read(userId);
 
     return {
-      choices,
-      currencies: (await step.read(userId, { inferCountries: false })).currencies,
-      matchedCount: countMatchingPostings(deps.catalogDb, targets, languages),
+      matchedCount: countMatchingJobs(deps.db, targets),
       places: describePlaceIds(targets.locations),
       targets,
     };
@@ -413,7 +371,7 @@ export function createOnboardingRoutes(deps: {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
-    return context.json(await targetsView(account.id, isDemoRole(account.role)));
+    return context.json(await targetsView(account.id));
   });
 
   routes.put("/onboarding/targets", validJson(targetsInputSchema), async (context) => {
@@ -431,7 +389,7 @@ export function createOnboardingRoutes(deps: {
       enqueueMatchScorePool(db, clock, account.id);
     }
 
-    return context.json(await targetsView(account.id, false));
+    return context.json(await targetsView(account.id));
   });
 
   routes.put("/onboarding/timezone", validJson(onboardingTimezoneInputSchema), async (context) => {

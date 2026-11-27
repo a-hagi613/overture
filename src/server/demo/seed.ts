@@ -308,17 +308,11 @@ function seedTargets(input: { db: AppDatabase; now: number; userId: string }) {
 
   db.insert(targets)
     .values({
-      employmentTypes: JSON.stringify(["full_time"]),
-      locations: JSON.stringify(["Toronto, Ontario, Canada", "Remote — Canada"]),
-      roles: JSON.stringify(["Backend Engineer", "Platform Engineer"]),
-      salaryCurrency: "CAD",
-      salaryFloorMinor: 14_000_000,
-      salaryPeriod: "year",
-      seniorities: JSON.stringify(["senior", "staff"]),
+      locations: JSON.stringify(["city:ca:toronto", "remote:country:ca"]),
+      roles: JSON.stringify(["backend", "software_engineering"]),
       updatedAt: new Date(now - 30 * DAY_MS),
       userId,
       version: 1,
-      workplaces: JSON.stringify(["remote", "hybrid"]),
     })
     .onConflictDoNothing()
     .run();

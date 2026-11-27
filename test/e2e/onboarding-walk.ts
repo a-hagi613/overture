@@ -73,33 +73,24 @@ export async function walkOnboardingSteps1To4(page: Page, baseUrl: string) {
   await expect(page).toHaveURL(/\/onboarding\/targets$/u);
   await expect(page.getByRole("heading", { level: 2, name: /Job preferences/u })).toBeVisible();
 
-  const roles = page.getByRole("button", { exact: true, name: "DevOps / SRE / Platform Engineer" });
-
-  if ((await roles.getAttribute("aria-pressed")) === "false") {
-    await roles.click();
+  if ((await page.getByRole("button", { name: "Remove Software engineering" }).count()) === 0) {
+    await page.getByRole("button", { name: /^Add a role category/u }).click();
+    await page.getByRole("option", { exact: true, name: "Software engineering" }).click();
   }
 
-  await page.getByLabel("Locations").click();
-  await page.getByPlaceholder("Search cities or remote regions...").fill("London");
-  await page
-    .getByRole("option", { name: /^London/u })
-    .first()
-    .click();
-
-  const remote = page.getByRole("button", { exact: true, name: "Remote" });
-  const senior = page.getByRole("button", { name: "Senior" });
-
-  if ((await remote.getAttribute("aria-pressed")) === "false") {
-    await remote.click();
+  if ((await page.getByRole("button", { name: "Remove Platform" }).count()) === 0) {
+    await page.getByRole("textbox", { name: "Title words" }).fill("Platform");
+    await page.getByRole("button", { name: "Add word" }).click();
   }
 
-  if ((await senior.getAttribute("aria-pressed")) === "false") {
-    await senior.click();
+  if ((await page.getByRole("button", { name: "Remove London" }).count()) === 0) {
+    await page.getByRole("button", { name: "Locations" }).click();
+    await page.getByPlaceholder("Search cities or remote regions...").fill("London");
+    await page
+      .getByRole("option", { name: /^London/u })
+      .first()
+      .click();
   }
-
-  await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
-  await page.getByLabel("Minimum salary").fill("120,000");
-  await page.getByLabel("Minimum salary").blur();
 
   await page.getByRole("button", { name: "See my matches" }).click();
   await expect(page).toHaveURL(/\/onboarding\/matches$/u);

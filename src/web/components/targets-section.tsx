@@ -1,65 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import type { PlaceSuggestion } from "../../shared/places.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
-import type { RoleCategoryId } from "../../shared/role-taxonomy.ts";
-
 import { copy } from "../../shared/copy.ts";
 import { placeFallbackLabel } from "../../shared/places.ts";
-import { ROLE_CATEGORIES, pickableRoles, roleCategoryById } from "../../shared/role-taxonomy.ts";
-import { fetchTargets, previewTargetsCount, saveTargets } from "../lib/profile-api.ts";
+import {
+  fetchSkipCompanies,
+  fetchTargets,
+  previewTargetsCount,
+  saveSkipCompanies,
+  saveTargets,
+} from "../lib/profile-api.ts";
+import { RoleTargetsEditor } from "./role-targets-editor.tsx";
+import { SectionSkeleton } from "./section-skeleton.tsx";
+import { SourceChip } from "./source-chip.tsx";
+import { UnresolvedPlaceRow } from "./unresolved-place-row.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow, dsMetric } from "./ui/ds.ts";
 import { Input } from "./ui/input.tsx";
 import { PlacePicker } from "./ui/place-picker.tsx";
-import { RolePicker } from "./ui/role-picker.tsx";
-import { Select } from "./ui/select.tsx";
-import { SectionSkeleton } from "./section-skeleton.tsx";
-import { UnresolvedPlaceRow } from "./unresolved-place-row.tsx";
 
-const moneyFormat = new Intl.NumberFormat("en-US");
-
-const workplaceChips = [
-  { label: copy.profile.targets.remote, value: "remote" },
-  { label: copy.profile.targets.hybrid, value: "hybrid" },
-  { label: copy.profile.targets.onSite, value: "onsite" },
-] as const;
-
-const seniorityChips = [
-  { label: copy.profile.targets.mid, value: "mid" },
-  { label: copy.profile.targets.senior, value: "senior" },
-  { label: copy.profile.targets.staff, value: "staff" },
-  { label: copy.profile.targets.lead, value: "principal" },
-] as const;
-
-const employmentChips = [
-  { label: copy.profile.targets.fullTime, value: "full_time" },
-  { label: copy.profile.targets.partTime, value: "part_time" },
-  { label: copy.profile.targets.contract, value: "contract" },
-] as const;
-
-const currencyOptions = ["CAD", "USD"] as const;
-
-function toggleValue<T extends string>(values: readonly T[], value: T) {
-  if (values.includes(value)) {
-    return values.filter((candidate) => candidate !== value);
-  }
-
-  return [...values, value];
-}
-
-function salaryValue(floorMinor: number | null) {
-  return floorMinor === null ? "" : moneyFormat.format(floorMinor / 100);
-}
-
-function floorFromInput(raw: string) {
-  const digits = raw.replaceAll(/[^0-9]/gu, "");
-
-  return digits === "" ? null : Number(digits) * 100;
+function toggleCategory(roles: readonly string[], categoryId: string) {
+  return roles.includes(categoryId)
+    ? roles.filter((role) => role !== categoryId)
+    : [...roles, categoryId];
 }
 
 export function TargetsSection() {
@@ -71,7 +39,14 @@ export function TargetsSection() {
     queryKey: ["profile-targets"],
   });
 
+  const companiesQuery = useQuery({
+    queryFn: fetchSkipCompanies,
+    queryKey: ["profile-skip-companies"],
+  });
+
   const [savedDraft, setSavedDraft] = useState<TargetsInput | null>(null);
+  const [pickedPlaces, setPickedPlaces] = useState<PlaceSuggestion[]>([]);
+  const [companyName, setCompanyName] = useState("");
   const draft = savedDraft ?? targetsQuery.data?.targets ?? null;
 
   const countQuery = useQuery({
@@ -96,8 +71,14 @@ export function TargetsSection() {
     },
   });
 
-  const [roleCategory, setRoleCategory] = useState<RoleCategoryId | null>(null);
-  const [pickedPlaces, setPickedPlaces] = useState<PlaceSuggestion[]>([]);
+  const saveSkip = useMutation({
+    mutationFn: saveSkipCompanies,
+    onSuccess: (saved) => {
+      queryClient.setQueryData(["profile-skip-companies"], saved);
+      toast.success(copy.profileWorkspace.skipListSavedToast);
+    },
+  });
+
   const matchedCount = countQuery.data?.matchedCount ?? targetsQuery.data?.matchedCount ?? 0;
 
   const placeById = new Map(
@@ -106,10 +87,36 @@ export function TargetsSection() {
 
   const labelOf = (id: string) => placeById.get(id)?.label ?? placeFallbackLabel(id);
 
+  const companies = companiesQuery.data?.companies ?? [];
+  const currentEmployer = companies.find((company) => company.reason === "current_employer");
+  const userCompanies = companies.filter((company) => company.reason === "user");
+
   function update(patch: Partial<TargetsInput>) {
     if (draft !== null) {
       setSavedDraft({ ...draft, ...patch });
     }
+  }
+
+  function persistEmployers(names: string[]) {
+    saveSkip.mutate(
+      names.map((name) => ({ domain: null, name })),
+      {
+        onError: () => {
+          toast.error(copy.profile.saveFailed);
+        },
+      },
+    );
+  }
+
+  function addCompany() {
+    const name = companyName.trim();
+
+    if (name === "" || saveSkip.isPending) {
+      return;
+    }
+
+    persistEmployers([...userCompanies.map((company) => company.name), name]);
+    setCompanyName("");
   }
 
   function rememberPlace(place: PlaceSuggestion) {
@@ -144,6 +151,11 @@ export function TargetsSection() {
     });
   }
 
+  const limiting =
+    (draft?.roles.length ?? 0) === 0
+      ? { href: "#profile-target-roles", text: targets.countZeroRoles }
+      : { href: "#profile-target-locations", text: targets.countZeroLocations };
+
   if (targetsQuery.isPending) {
     return <SectionSkeleton />;
   }
@@ -168,260 +180,202 @@ export function TargetsSection() {
         </div>
       </div>
 
-      <div className="mt-5 border-t border-border py-5">
-        <h3 className={dsEyebrow}>{targets.roles}</h3>
+      {matchedCount === 0 && draft !== null ? (
+        <output className="mt-3 block rounded-lg border border-border bg-card p-3">
+          <p className="text-sm font-semibold text-foreground">{targets.countZero}</p>
+          <a
+            className="mt-1 inline-block text-sm font-semibold text-signal-text underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+            href={limiting.href}
+          >
+            {limiting.text}
+          </a>
+        </output>
+      ) : null}
+
+      <section className="mt-5 border-t border-border py-5" id="profile-target-roles">
+        <RoleTargetsEditor
+          idPrefix="profile"
+          onAddCategory={(categoryId) => {
+            if (draft !== null) {
+              update({ roles: toggleCategory(draft.roles, categoryId) });
+            }
+          }}
+          onAddTitleWord={(word) => {
+            if (draft !== null && !draft.roles.includes(word)) {
+              update({ roles: [...draft.roles, word] });
+            }
+          }}
+          onDismissRole={(role) => {
+            if (draft !== null) {
+              update({
+                unresolvedRoles: draft.unresolvedRoles.filter((candidate) => candidate !== role),
+              });
+            }
+          }}
+          onRemoveCategory={(categoryId) => {
+            if (draft !== null) {
+              update({ roles: draft.roles.filter((role) => role !== categoryId) });
+            }
+          }}
+          onRemoveTitleWord={(word) => {
+            if (draft !== null) {
+              update({ roles: draft.roles.filter((role) => role !== word) });
+            }
+          }}
+          onResolveRole={(role, categoryId) => {
+            if (draft === null) {
+              return;
+            }
+
+            update({
+              roles: draft.roles.includes(categoryId) ? draft.roles : [...draft.roles, categoryId],
+              unresolvedRoles: draft.unresolvedRoles.filter((candidate) => candidate !== role),
+            });
+          }}
+          roles={draft?.roles ?? []}
+          unresolvedRoles={draft?.unresolvedRoles ?? []}
+        />
+      </section>
+
+      <section className="border-t border-border py-5" id="profile-target-locations">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className={dsEyebrow} id="profile-target-locations-heading">
+            {targets.locations}
+          </h3>
+          <span className="text-xs font-semibold text-muted-foreground">{targets.required}</span>
+        </div>
+        <p className="mt-2 max-w-2xl text-xs text-muted-foreground">{targets.locationsNote}</p>
+
+        <ul
+          aria-labelledby="profile-target-locations-heading"
+          className="mt-3 flex flex-wrap items-center gap-2"
+        >
+          {(draft?.locations ?? []).map((location) => (
+            <li key={location}>
+              <Button
+                ariaLabel={targets.removeLocation(labelOf(location))}
+                className="rounded-full"
+                onClick={() => {
+                  update({
+                    locations: (draft?.locations ?? []).filter(
+                      (candidate) => candidate !== location,
+                    ),
+                  });
+                }}
+                size="sm"
+                variant="secondary"
+              >
+                <span>{labelOf(location)}</span>
+                <X aria-hidden="true" size={13} />
+              </Button>
+            </li>
+          ))}
+          <li>
+            <PlacePicker
+              excludeIds={draft?.locations ?? []}
+              id="profile-target-location"
+              noResults={targets.locationNoResults}
+              onPick={addPickedPlace}
+              placeholder={targets.pickLocationPlaceholder}
+              triggerLabel={targets.addLocation}
+            />
+          </li>
+        </ul>
+
+        {(draft?.unresolvedLocations ?? []).length === 0 ? null : (
+          <section
+            aria-labelledby="profile-target-unresolved"
+            className="mt-4 rounded-lg border border-border bg-muted/40 p-3"
+          >
+            <p className={dsEyebrow} id="profile-target-unresolved">
+              {targets.unresolvedTitle}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{targets.unresolvedNote}</p>
+            <ul className="mt-3 space-y-2">
+              {(draft?.unresolvedLocations ?? []).map((raw, index) => (
+                <UnresolvedPlaceRow
+                  dismissLabel={targets.dismissLocation(raw)}
+                  id={`profile-unresolved-${String(index)}`}
+                  key={raw}
+                  noResults={targets.locationNoResults}
+                  onDismiss={() => {
+                    update({
+                      unresolvedLocations: (draft?.unresolvedLocations ?? []).filter(
+                        (candidate) => candidate !== raw,
+                      ),
+                    });
+                  }}
+                  onPick={(place) => {
+                    resolveUnresolved(raw, place);
+                  }}
+                  placeholder={targets.pickLocationPlaceholder}
+                  raw={raw}
+                  triggerLabel={targets.pickUnresolved}
+                />
+              ))}
+            </ul>
+          </section>
+        )}
+      </section>
+
+      <section className="border-t border-border py-5">
+        <h3 className={dsEyebrow}>{targets.employers}</h3>
+        <p className="mt-2 max-w-2xl text-xs text-muted-foreground">{targets.employersNote}</p>
+
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {(draft?.roles ?? []).map((role) => (
+          {currentEmployer === undefined ? null : (
+            <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border bg-muted px-3.5 text-xs font-semibold text-foreground">
+              <span>{currentEmployer.name}</span>
+              <SourceChip variant="dashed">{targets.currentEmployer}</SourceChip>
+            </span>
+          )}
+          {userCompanies.map((company) => (
             <Button
-              ariaLabel={copy.profile.facts.remove(role)}
+              ariaLabel={copy.profile.facts.remove(company.name)}
               className="rounded-full"
-              key={role}
+              disabled={saveSkip.isPending}
+              key={company.id}
               onClick={() => {
-                update({ roles: (draft?.roles ?? []).filter((candidate) => candidate !== role) });
+                persistEmployers(
+                  userCompanies
+                    .filter((candidate) => candidate.id !== company.id)
+                    .map((candidate) => candidate.name),
+                );
               }}
               size="sm"
               variant="secondary"
             >
-              <span>{role}</span>
+              <span>{company.name}</span>
               <X aria-hidden="true" size={13} />
             </Button>
           ))}
+          {currentEmployer === undefined && userCompanies.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{targets.noExcludedEmployers}</p>
+          ) : null}
         </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className={`${dsEyebrow} block`} htmlFor="target-category">
-              {targets.categoryLabel}
-            </label>
-            <Select
-              className="mt-2"
-              id="target-category"
-              onChange={(event) => {
-                const next = event.currentTarget.value;
 
-                setRoleCategory(roleCategoryById(next)?.id ?? null);
-              }}
-              selectClassName="h-12 pl-3.5 pr-10"
-              value={roleCategory ?? ""}
-            >
-              <option value="">{targets.categoryAny}</option>
-              {ROLE_CATEGORIES.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <RolePicker
-            allowFreeText
-            clearLabel={targets.pickRoleClear}
-            id="target-role"
-            label={targets.pickRoleLabel}
-            onChange={(role) => {
-              if (draft !== null && role !== null && !draft.roles.includes(role)) {
-                update({ roles: [...draft.roles, role] });
-              }
+        <form
+          className="mt-3 flex max-w-md flex-wrap items-center gap-2.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            addCompany();
+          }}
+        >
+          <Input
+            ariaLabel={targets.addCompanyLabel}
+            className="min-w-44 flex-1"
+            onChange={(event) => {
+              setCompanyName(event.currentTarget.value);
             }}
-            options={pickableRoles(roleCategory)
-              .filter((role) => !(draft?.roles ?? []).includes(role.name))
-              .map((role) => ({
-                hint: roleCategoryById(role.categoryId)?.name ?? "",
-                value: role.name,
-              }))}
-            placeholder={targets.pickRolePlaceholder}
-            value={null}
+            placeholder={targets.addCompanyLabel}
+            value={companyName}
           />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
-        <div className="border-t border-border py-5">
-          <h3 className={dsEyebrow} id="profile-target-locations">
-            {targets.locations}
-          </h3>
-          <ul
-            aria-labelledby="profile-target-locations"
-            className="mt-3 flex flex-wrap items-center gap-2"
-          >
-            {(draft?.locations ?? []).map((location) => (
-              <li key={location}>
-                <Button
-                  ariaLabel={targets.removeLocation(labelOf(location))}
-                  className="rounded-full"
-                  onClick={() => {
-                    update({
-                      locations: (draft?.locations ?? []).filter(
-                        (candidate) => candidate !== location,
-                      ),
-                    });
-                  }}
-                  size="sm"
-                  variant="secondary"
-                >
-                  <span>{labelOf(location)}</span>
-                  <X aria-hidden="true" size={13} />
-                </Button>
-              </li>
-            ))}
-            <li>
-              <PlacePicker
-                excludeIds={draft?.locations ?? []}
-                id="profile-target-location"
-                noResults={targets.locationNoResults}
-                onPick={addPickedPlace}
-                placeholder={targets.pickLocationPlaceholder}
-                triggerLabel={targets.addLocation}
-              />
-            </li>
-          </ul>
-
-          {(draft?.unresolvedLocations ?? []).length === 0 ? null : (
-            <section
-              aria-labelledby="profile-target-unresolved"
-              className="mt-4 rounded-lg border border-border bg-muted/40 p-3"
-            >
-              <p className={dsEyebrow} id="profile-target-unresolved">
-                {targets.unresolvedTitle}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">{targets.unresolvedNote}</p>
-              <ul className="mt-3 space-y-2">
-                {(draft?.unresolvedLocations ?? []).map((raw, index) => (
-                  <UnresolvedPlaceRow
-                    dismissLabel={targets.dismissLocation(raw)}
-                    id={`profile-unresolved-${String(index)}`}
-                    key={raw}
-                    noResults={targets.locationNoResults}
-                    onDismiss={() => {
-                      update({
-                        unresolvedLocations: (draft?.unresolvedLocations ?? []).filter(
-                          (candidate) => candidate !== raw,
-                        ),
-                      });
-                    }}
-                    onPick={(place) => {
-                      resolveUnresolved(raw, place);
-                    }}
-                    placeholder={targets.pickLocationPlaceholder}
-                    raw={raw}
-                    triggerLabel={targets.pickUnresolved}
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
-        </div>
-
-        <div className="border-t border-border py-5">
-          <h3 className={dsEyebrow}>{targets.workplace}</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {workplaceChips.map((chip) => {
-              const active = (draft?.workplaces ?? []).includes(chip.value);
-
-              return (
-                <Button
-                  ariaPressed={active}
-                  className="rounded-full"
-                  key={chip.value}
-                  onClick={() => {
-                    if (draft !== null) {
-                      update({ workplaces: toggleValue(draft.workplaces, chip.value) });
-                    }
-                  }}
-                  size="sm"
-                  variant={active ? "primary" : "outline"}
-                >
-                  {chip.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="border-t border-border py-5">
-          <h3 className={dsEyebrow}>{targets.seniority}</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {seniorityChips.map((chip) => {
-              const active = (draft?.seniorities ?? []).includes(chip.value);
-
-              return (
-                <Button
-                  ariaPressed={active}
-                  className="rounded-full"
-                  key={chip.value}
-                  onClick={() => {
-                    if (draft !== null) {
-                      update({ seniorities: toggleValue(draft.seniorities, chip.value) });
-                    }
-                  }}
-                  size="sm"
-                  variant={active ? "primary" : "outline"}
-                >
-                  {chip.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="border-t border-border py-5">
-          <h3 className={dsEyebrow}>{targets.employmentType}</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {employmentChips.map((chip) => {
-              const active = (draft?.employmentTypes ?? []).includes(chip.value);
-
-              return (
-                <Button
-                  ariaPressed={active}
-                  className="rounded-full"
-                  key={chip.value}
-                  onClick={() => {
-                    if (draft !== null) {
-                      update({ employmentTypes: toggleValue(draft.employmentTypes, chip.value) });
-                    }
-                  }}
-                  size="sm"
-                  variant={active ? "primary" : "outline"}
-                >
-                  {chip.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="border-t border-border py-5 md:col-span-2">
-          <label className={`${dsEyebrow} block`} htmlFor="ovt-salary">
-            {targets.salaryFloor}
-          </label>
-          <div className="mt-3 flex max-w-md flex-wrap items-center gap-2.5">
-            <Select
-              ariaLabel={targets.currencyLabel}
-              className="w-24 shrink-0"
-              onChange={(event) => {
-                update({ salaryCurrency: event.currentTarget.value });
-              }}
-              value={draft?.salaryCurrency ?? "CAD"}
-            >
-              {currencyOptions.map((currency) => (
-                <option key={currency} value={currency}>
-                  {currency === "CAD" ? targets.currencyCad : targets.currencyUsd}
-                </option>
-              ))}
-            </Select>
-            <Input
-              className="h-10 min-w-32 flex-1 tabular-nums"
-              id="ovt-salary"
-              onChange={(event) => {
-                update({ salaryFloorMinor: floorFromInput(event.currentTarget.value) });
-              }}
-              value={salaryValue(draft?.salaryFloorMinor ?? null)}
-            />
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {targets.salaryFloorUnit}
-            </span>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">{targets.salaryFloorNote}</p>
-        </div>
-      </div>
+          <Button disabled={saveSkip.isPending} size="default" submit variant="secondary">
+            <Plus aria-hidden="true" size={15} />
+            <span>{targets.addCompany}</span>
+          </Button>
+        </form>
+      </section>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
         <Button

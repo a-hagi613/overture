@@ -5,7 +5,6 @@ import { z } from "zod";
 import type { OnboardingTargetsView } from "../../shared/onboarding.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 
-import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
 import { KEY_DETAIL_FACT_KEYS } from "../../shared/key-details.ts";
 import { placeSuggestionSchema } from "../../shared/places.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
@@ -39,15 +38,6 @@ const onboardingStateSchema = z.object({
 });
 
 const onboardingTargetsSchema: z.ZodType<OnboardingTargetsView> = z.object({
-  choices: z.object({
-    employmentTypes: z.array(z.enum(EMPLOYMENT_TYPES)),
-    locations: z.array(z.string()),
-    roleCounts: z.record(z.string(), z.number()).default({}),
-    roles: z.array(z.string()),
-    seniorities: z.array(z.enum(SENIORITIES)),
-    workplaces: z.array(z.enum(WORKPLACES)),
-  }),
-  currencies: z.array(z.string()),
   matchedCount: z.number(),
   places: z.array(placeSuggestionSchema),
   targets: targetsInputSchema,

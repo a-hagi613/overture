@@ -195,12 +195,11 @@ test.describe("WS-17b review screenshots", () => {
       );
 
       await page.goto(`${isolatedAppServer.url}/onboarding/targets`);
-      await page.getByLabel("Category").click();
+      await page.getByRole("button", { name: /^Add a role category/u }).click();
       await page.getByRole("option", { exact: true, name: "Healthcare" }).click();
-      await page.getByRole("button", { exact: true, name: "Registered Nurse" }).click();
-      await expect(
-        page.getByRole("button", { exact: true, name: "Registered Nurse" }),
-      ).toHaveAttribute("aria-pressed", "true");
+      await page.getByLabel("Title words (optional)").fill("nurse");
+      await page.getByRole("button", { name: "Add word" }).click();
+      await expect(page.getByRole("button", { name: "Remove nurse" })).toBeVisible();
 
       await shoot(
         page,
@@ -221,10 +220,11 @@ test.describe("WS-17b review screenshots", () => {
       );
 
       await page.goto(`${isolatedAppServer.url}/profile/preferences`);
-      await page.getByLabel("Category", { exact: true }).selectOption("Healthcare");
-      await page.getByLabel("Add a specific role", { exact: true }).fill("Registered Nurse");
-      await page.getByLabel("Add a specific role", { exact: true }).press("Enter");
-      await expect(page.getByRole("button", { name: "Registered Nurse" })).toBeVisible();
+      await page.getByRole("button", { name: /^Add a role category/u }).click();
+      await page.getByRole("option", { exact: true, name: "Healthcare" }).click();
+      await page.getByLabel("Title words").fill("nurse");
+      await page.getByRole("button", { name: "Add word" }).click();
+      await expect(page.getByRole("button", { name: "Remove nurse" })).toBeVisible();
 
       await shoot(
         page,

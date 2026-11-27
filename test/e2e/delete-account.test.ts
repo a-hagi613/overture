@@ -95,14 +95,8 @@ async function seedPersonalData(request: APIRequestContext, server: DeleteHarnes
   });
   await request.put("/api/profile/targets", {
     data: {
-      employmentTypes: ["full_time"],
       locations: ["city:ca:toronto"],
       roles: ["Senior Backend Engineer"],
-      salaryCurrency: "CAD",
-      salaryFloorMinor: 1_000_000,
-      salaryPeriod: "year",
-      seniorities: ["senior"],
-      workplaces: ["remote"],
     },
   });
   await request.post("/api/profile/resume", {

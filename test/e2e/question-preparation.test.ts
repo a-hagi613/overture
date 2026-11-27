@@ -1412,14 +1412,8 @@ test("the recorded Greenhouse forms lose the derivable Review families", async (
 
   const targets = await owner.put("/api/profile/targets", {
     data: {
-      employmentTypes: ["full_time"],
       locations: ["city:ca:toronto", "country:us", "country:gb", "country:de", "country:au"],
       roles: ["Backend"],
-      salaryCurrency: null,
-      salaryFloorMinor: null,
-      salaryPeriod: "year",
-      seniorities: ["senior"],
-      workplaces: ["remote", "hybrid", "onsite"],
     },
   });
 
@@ -1643,15 +1637,14 @@ test("the recorded Greenhouse forms lose the derivable Review families", async (
   expect(prompts).toEqual([
     "Are you authorized to work in the UK?",
     "How did you hear about this job?",
+    "If this role offers the option to work from a remote location, do you plan to work remotely?",
+    "This role is Sydney based. Are you willing to work out of our Sydney office on a hybrid schedule, 3 days a week?",
     "What is your current or previous job title?",
     "Where did you first hear about this role?",
   ]);
 
   const removedFamilies = [
     "country or countries you anticipate working in",
-    "work from a remote location",
-    "South San Francisco office",
-    "Sydney office",
     "live in one of the following states",
     "employed by Stripe",
     "Legal Name (if different than above)",
@@ -1670,21 +1663,10 @@ test("the recorded Greenhouse forms lose the derivable Review families", async (
   expect(stripeAnswer("Please select the country or countries you anticipate working in")).toBe(
     "US",
   );
-  expect(stripeAnswer("If this role offers the option to work from a remote location")).toBe(
-    "Yes, I intend to work remotely.",
-  );
   expect(stripeAnswer("Have you ever been employed by Stripe")).toBe("No");
   expect(stripeAnswer("If located in the US, in what city and state do you reside?")).toBe(
     "Toronto, Ontario",
   );
-
-  const officeAnswers = await answersFor(owner, applications.get("8238731") ?? "");
-
-  expect(
-    officeAnswers.find((answer) =>
-      answer.text.startsWith("Are you open to working from the South San Francisco office"),
-    )?.answer,
-  ).toBe("Yes");
 
   const cloudflareAnswers = await answersFor(owner, applications.get("8097321") ?? "");
 
@@ -1704,7 +1686,6 @@ test("the recorded Greenhouse forms lose the derivable Review families", async (
   const sydneyAnswer = (prefix: string) =>
     sydneyAnswers.find((answer) => answer.text.startsWith(prefix))?.answer;
 
-  expect(sydneyAnswer("This role is Sydney based.")).toBe("Yes");
   expect(sydneyAnswer("Do you live in one of the following states?")).toBe("No");
 });
 

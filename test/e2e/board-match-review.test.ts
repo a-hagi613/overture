@@ -27,13 +27,7 @@ const reviewCreatedSchema = z.object({ reviewId: z.string(), questionId: z.strin
 
 const targets = {
   roles: ["Platform Engineer", "DevOps Engineer", "Site Reliability Engineer"],
-  seniorities: ["senior", "staff"],
-  workplaces: ["remote", "hybrid"],
   locations: ["city:ca:toronto"],
-  employmentTypes: ["full_time"],
-  salaryFloorMinor: null,
-  salaryCurrency: null,
-  salaryPeriod: "year",
 };
 
 const applications: {

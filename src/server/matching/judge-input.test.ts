@@ -51,37 +51,25 @@ describe("descriptionSummary", () => {
 });
 
 describe("targetsLine", () => {
-  test("names roles, levels, places, workplaces and the pay floor", () => {
+  test("names the picked categories, the title words and the places", () => {
     expect(
       targetsLine({
-        roles: ["health.rn", "Registered Nurse", "ICU charge nurse"],
-        seniorities: ["mid"],
-        workplaces: ["onsite"],
+        roles: ["healthcare", "ICU charge nurse"],
         locations: ["city:us:houston"],
         unresolvedLocations: [],
-        employmentTypes: ["full_time"],
-        salaryFloorMinor: 7_000_000,
-        salaryCurrency: "USD",
-        salaryPeriod: "year",
+        unresolvedRoles: [],
       }),
-    ).toBe(
-      "roles: Registered Nurse, ICU charge nurse; level: mid; places: Houston, Texas, United States; workplace: onsite; pay floor: USD 70,000/year",
-    );
+    ).toBe("roles: Healthcare, ICU charge nurse; places: Houston, Texas, United States");
   });
 
   test("leaves out what the person did not set", () => {
     expect(
       targetsLine({
-        roles: ["Software Engineering"],
-        seniorities: [],
-        workplaces: [],
+        roles: ["software_engineering"],
         locations: [],
         unresolvedLocations: [],
-        employmentTypes: [],
-        salaryFloorMinor: null,
-        salaryCurrency: null,
-        salaryPeriod: "year",
+        unresolvedRoles: [],
       }),
-    ).toBe("roles: Software & IT");
+    ).toBe("roles: Software engineering");
   });
 });

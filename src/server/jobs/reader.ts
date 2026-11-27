@@ -1,4 +1,4 @@
-import { and, desc, eq, exists, inArray } from "drizzle-orm";
+import { and, desc, eq, exists, inArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -21,8 +21,29 @@ export function createJobReader(db: AppDatabase) {
   function forPreferences(preferences: PullPreferences, limit = DEFAULT_LIMIT) {
     const conditions: SQL[] = [eq(jobs.status, "open")];
 
+    const titleWords = preferences.titleWords
+      .map((word) => word.trim().toLowerCase())
+      .filter((word) => word !== "");
+
+    const roleParts: SQL[] = [];
+
     if (preferences.categories.length > 0) {
-      conditions.push(inArray(jobs.category, [...preferences.categories]));
+      roleParts.push(inArray(jobs.category, [...preferences.categories]));
+    }
+
+    for (const word of titleWords) {
+      roleParts.push(sql`instr(${jobs.titleNorm}, ${word}) > 0`);
+    }
+
+    const [firstRolePart, ...restRoleParts] = roleParts;
+
+    if (firstRolePart !== undefined) {
+      const rolePart =
+        restRoleParts.length === 0
+          ? firstRolePart
+          : (or(firstRolePart, ...restRoleParts) ?? firstRolePart);
+
+      conditions.push(rolePart);
     }
 
     if (preferences.placeIds.length > 0) {

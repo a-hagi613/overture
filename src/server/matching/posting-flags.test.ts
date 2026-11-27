@@ -25,14 +25,9 @@ afterEach(() => {
 
 const TARGETS: TargetsInput = {
   roles: ["software engineer"],
-  seniorities: ["senior"],
-  workplaces: ["onsite"],
   locations: ["city:de:berlin"],
   unresolvedLocations: [],
-  employmentTypes: ["full_time"],
-  salaryFloorMinor: null,
-  salaryCurrency: null,
-  salaryPeriod: "year",
+  unresolvedRoles: [],
 };
 
 function fresh() {
@@ -71,13 +66,10 @@ function fresh() {
   app.db
     .insert(targets)
     .values({
-      employmentTypes: JSON.stringify(TARGETS.employmentTypes),
       locations: JSON.stringify(TARGETS.locations),
       roles: JSON.stringify(TARGETS.roles),
-      seniorities: JSON.stringify(TARGETS.seniorities),
       updatedAt: new Date(NOW),
       userId: "user-1",
-      workplaces: JSON.stringify(TARGETS.workplaces),
     })
     .run();
 

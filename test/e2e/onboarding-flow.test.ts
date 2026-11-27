@@ -43,13 +43,9 @@ const stateSchema = z.object({
 
 const targets = {
   roles: ["Platform Engineer"],
-  seniorities: ["senior"],
-  workplaces: ["remote", "hybrid"],
+  unresolvedRoles: [],
   locations: ["city:ca:toronto"],
-  employmentTypes: ["full_time"],
-  salaryFloorMinor: 14_000_000,
-  salaryCurrency: "CAD",
-  salaryPeriod: "year",
+  unresolvedLocations: [],
 };
 
 async function newUser(request: APIRequestContext, appServerUrl: string) {

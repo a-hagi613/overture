@@ -1,66 +1,13 @@
 import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
 
-import type { RoleCategoryId } from "../../shared/role-taxonomy.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 
 import { grants } from "../platform/db/schema.ts";
-import { roleCategoryOf } from "../../shared/role-taxonomy.ts";
+import { isFreehireCategory } from "../../shared/freehire-categories.ts";
 import { placeSearchFacets } from "../places/catalog.ts";
 import type { JobSearchQuery } from "./source.ts";
-
-/** The freehire category slugs each Overture role category reaches. One category maps to several freehire ones. */
-export const TAXONOMY_TO_FREEHIRE = {
-  "software-it": [
-    "software_engineering",
-    "backend",
-    "frontend",
-    "fullstack",
-    "mobile",
-    "devops",
-    "sre",
-    "network_engineering",
-    "system_administration",
-    "it_support",
-    "security",
-    "qa",
-    "embedded",
-  ],
-  "data-ai": ["data_analytics", "data_engineering", "data_science", "ml_ai", "ai_engineering"],
-  "product-design": ["product", "design", "creative", "project_management"],
-  engineering: [
-    "engineering_design",
-    "industrial_engineering",
-    "occupational_safety",
-    "architecture",
-  ],
-  science: ["science"],
-  healthcare: ["healthcare"],
-  "care-health-support": ["healthcare", "social_services", "personal_services"],
-  education: ["education"],
-  sales: ["sales", "solutions_engineering"],
-  "marketing-communications": ["marketing", "creative", "developer_relations", "technical_writing"],
-  "customer-service": ["support", "customer_success"],
-  "finance-accounting": ["finance"],
-  "people-hr": ["hr", "recruiting"],
-  "business-operations": ["operations", "business_analysis", "project_management"],
-  management: ["operations", "project_management"],
-  legal: ["legal"],
-  "admin-office": ["administration"],
-  "hospitality-food": ["hospitality", "retail"],
-  "cleaning-grounds": ["personal_services"],
-  "skilled-trades": ["skilled_trades"],
-  "maintenance-repair": ["skilled_trades"],
-  manufacturing: ["manufacturing", "industrial_engineering"],
-  "transport-logistics": ["logistics"],
-  "protective-services": ["public_safety", "security"],
-  "community-social-services": ["social_services"],
-  "arts-media": ["creative"],
-  "personal-services": ["personal_services"],
-  "agriculture-outdoors": ["other"],
-  military: ["public_safety", "other"],
-} as const satisfies Record<RoleCategoryId, readonly string[]>;
 
 export interface PullPreferences {
   /** freehire category slugs. Empty means every category. */
@@ -80,8 +27,8 @@ export interface PullPreferences {
 }
 
 /**
- * The freehire categories a user's saved roles reach. A picker target is a taxonomy id, name or subcategory, which
- * `roleCategoryOf` folds to its 29-category root; anything else is free text and becomes a title word instead.
+ * The freehire categories a user's saved roles pick. A role target is a freehire category id or a title word, so only
+ * ids that freehire still knows are sent as categories.
  * @param roles The saved role targets.
  * @returns The categories, deduplicated and sorted.
  */
@@ -89,12 +36,10 @@ export function categoriesForRoles(roles: readonly string[]) {
   const categories = new Set<string>();
 
   for (const role of roles) {
-    const category = roleCategoryOf(role);
+    const trimmed = role.trim();
 
-    if (category !== null) {
-      for (const freehire of TAXONOMY_TO_FREEHIRE[category]) {
-        categories.add(freehire);
-      }
+    if (isFreehireCategory(trimmed)) {
+      categories.add(trimmed);
     }
   }
 
@@ -110,13 +55,9 @@ export function titleWordsForRoles(roles: readonly string[]) {
   const words = new Set<string>();
 
   for (const role of roles) {
-    if (roleCategoryOf(role) !== null) {
-      continue;
-    }
-
     const trimmed = role.trim();
 
-    if (trimmed !== "") {
+    if (trimmed !== "" && !isFreehireCategory(trimmed)) {
       words.add(trimmed);
     }
   }

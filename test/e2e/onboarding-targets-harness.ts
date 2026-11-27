@@ -8,14 +8,10 @@ import { latestMailLink, requestMagicLink, verifyAuthState } from "./sign-in.ts"
 const createdSchema = z.object({ id: z.string() });
 
 const boardTargets = {
-  roles: ["Platform Engineer", "Backend Engineer", "Site Reliability Engineer"],
-  seniorities: ["senior", "staff"],
-  workplaces: ["remote", "hybrid"],
+  roles: ["software_engineering", "backend", "Platform", "Reliability"],
   locations: ["city:gb:london", "remote:country:gb"],
-  employmentTypes: ["full_time"],
-  salaryFloorMinor: 14_000_000,
-  salaryCurrency: "CAD",
-  salaryPeriod: "year",
+  unresolvedLocations: [],
+  unresolvedRoles: [],
 };
 
 interface LocationSlot {

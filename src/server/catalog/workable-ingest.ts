@@ -67,10 +67,7 @@ export function buildWorkableTargets(db: AppDatabase, at: number) {
   const rows = db
     .select({
       roles: targets.roles,
-      seniorities: targets.seniorities,
-      workplaces: targets.workplaces,
       locations: targets.locations,
-      employmentTypes: targets.employmentTypes,
     })
     .from(targets)
     .innerJoin(users, eq(users.id, targets.userId))
@@ -85,11 +82,6 @@ export function buildWorkableTargets(db: AppDatabase, at: number) {
       rows.map((row) =>
         locationTextsOfPlaceIds(stringArraySchema.parse(JSON.parse(row.locations))),
       ),
-    ),
-    seniorities: union(rows.map((row) => stringArraySchema.parse(JSON.parse(row.seniorities)))),
-    workplaces: union(rows.map((row) => stringArraySchema.parse(JSON.parse(row.workplaces)))),
-    employmentTypes: union(
-      rows.map((row) => stringArraySchema.parse(JSON.parse(row.employmentTypes))),
     ),
   });
 }

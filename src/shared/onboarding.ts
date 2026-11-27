@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { KeyDetailFactKey } from "./key-details.ts";
 import type { PlaceSuggestion } from "./places.ts";
 import type { TargetsInput } from "./targets.ts";
-import type { EmploymentType, Seniority, Workplace } from "./tag-taxonomy.ts";
+import type { EmploymentType, Workplace } from "./tag-taxonomy.ts";
 
 import { KEY_DETAIL_FACT_KEYS } from "./key-details.ts";
 import { timezoneSchema } from "./targets.ts";
@@ -48,20 +48,9 @@ export interface OnboardingMatchesView {
   selected: string[];
 }
 
-export interface OnboardingTargetChoices {
-  roles: string[];
-  roleCounts?: Record<string, number>;
-  locations: string[];
-  seniorities: Seniority[];
-  workplaces: Workplace[];
-  employmentTypes: EmploymentType[];
-}
-
 export interface OnboardingTargetsView {
   targets: TargetsInput;
   matchedCount: number;
-  choices: OnboardingTargetChoices;
-  currencies: string[];
   /** The labels for the places already saved, so a pill never renders a raw id. */
   places: PlaceSuggestion[];
 }
