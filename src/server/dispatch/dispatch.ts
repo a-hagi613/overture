@@ -9,8 +9,8 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { PostingLiveness, PostingLivenessChecker } from "./liveness.ts";
 
 import {
-  applicationEvents,
   applications,
+  applicationEvents,
   attempts,
   bgJobs,
   killSwitches,
@@ -19,8 +19,8 @@ import {
   resumes,
   users,
 } from "../platform/db/schema.ts";
-import { companyBoards, postings } from "../platform/db/catalog-schema.ts";
 
+import { postings } from "../platform/db/catalog-schema.ts";
 import { applicationsLeft, dailyUsageSince, isOnboardingTrial } from "../billing/ledger.ts";
 import { skipClosedPostingApplications } from "../catalog/posting-close.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
@@ -33,6 +33,7 @@ import { stageForStatus } from "../pipeline/stage.ts";
 import { pauseForBlocker } from "../profile/running-state.ts";
 import { APPLICATION_SEND_JOB_KIND } from "./executor.ts";
 import { browserSessionAvailability, freeSendSlots } from "./browser/session-slots.ts";
+import { closeJobPosting, jobPostingsById } from "../jobs/job-posting.ts";
 import { bestEffortCatalogWrite } from "../platform/db/read-only-catalog.ts";
 
 export const DISPATCH_TICK_JOB_KIND = "dispatch.tick";
@@ -374,6 +375,8 @@ export function createDispatcherTick(deps: DispatchDeps) {
   }
 
   function skipClosed(candidate: Candidate, now: number) {
+    closeJobPosting(deps, candidate.postingId, now);
+
     bestEffortCatalogWrite("dispatch.skip_closed", () => {
       deps.catalogDb
         .update(postings)
@@ -501,25 +504,9 @@ export function createDispatcherTick(deps: DispatchDeps) {
       .all()
       .filter((row) => !activeSends.applicationIds.has(row.id));
 
-    const postingRows = new Map(
-      deps.catalogDb
-        .select({
-          ats: postings.ats,
-          atsJobId: postings.atsJobId,
-          boardToken: companyBoards.boardToken,
-          id: postings.id,
-          region: companyBoards.region,
-        })
-        .from(postings)
-        .innerJoin(companyBoards, eq(companyBoards.id, postings.boardId))
-        .where(
-          inArray(
-            postings.id,
-            dueApplications.map((row) => row.postingId),
-          ),
-        )
-        .all()
-        .map((row) => [row.id, row]),
+    const postingRows = jobPostingsById(
+      { catalogDb: deps.catalogDb, db },
+      dueApplications.map((row) => row.postingId),
     );
 
     const rows: Candidate[] = dueApplications.flatMap((application) => {
@@ -537,7 +524,7 @@ export function createDispatcherTick(deps: DispatchDeps) {
           companyId: application.companyId,
           id: application.id,
           postingId: application.postingId,
-          region: posting.region,
+          region: posting.boardRegion ?? "us",
           scheduledFor: application.scheduledFor,
           userId: application.userId,
         },

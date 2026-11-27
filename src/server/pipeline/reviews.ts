@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
@@ -7,8 +7,8 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { QuestionFieldType, ReviewCategory, ReviewReason } from "../../shared/questions.ts";
 import type { PreparationService } from "./prepare.ts";
 
-import { postings } from "../platform/db/catalog-schema.ts";
 import { applications, reviewApplications, reviews } from "../platform/db/schema.ts";
+import { jobPostingsById } from "../jobs/job-posting.ts";
 import { createQuestionCatalog } from "../catalog/questions.ts";
 import { countryNameFor } from "../catalog/geo.ts";
 import { reviewCategory } from "../catalog/question-normalize.ts";
@@ -93,20 +93,12 @@ function openApplicationIds(
   }
 
   const open = new Set(
-    catalogDb
-      .select({ id: postings.id })
-      .from(postings)
-      .where(
-        and(
-          inArray(
-            postings.id,
-            rows.map((row) => row.postingId),
-          ),
-          isNull(postings.closedAt),
-        ),
-      )
-      .all()
-      .map((row) => row.id),
+    [
+      ...jobPostingsById(
+        { catalogDb, db },
+        rows.map((row) => row.postingId),
+      ).values(),
+    ].flatMap((posting) => (posting.open ? [posting.postingId] : [])),
   );
 
   return new Set(rows.flatMap((row) => (open.has(row.postingId) ? [row.id] : [])));

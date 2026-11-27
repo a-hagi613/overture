@@ -8,6 +8,7 @@ import { createClock } from "../platform/ports/clock.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import {
   applications,
+  jobs,
   questions,
   reviewApplications,
   reviews,
@@ -235,5 +236,72 @@ describe("the review list", () => {
     const views = listReviews({ catalogDb, clock, db, userId: USER });
 
     expect(views.map((view) => view.id)).toEqual(["review-1"]);
+  });
+});
+
+function addJobApplication(db: AppDatabase, index: number) {
+  const postingId = `job-posting-${String(index)}`;
+
+  db.insert(jobs)
+    .values({
+      applyUrl: "https://jobs.lever.co/northwind/123/apply",
+      applyVia: "direct",
+      atsJobId: "123",
+      boardToken: "northwind",
+      company: "Northwind",
+      companyNorm: "northwind",
+      companySlug: "northwind",
+      countries: JSON.stringify(["ca"]),
+      createdAt: NOW,
+      dedupeKey: `northwind|job ${String(index)}`,
+      description: "Build things.",
+      externalId: `northwind:${String(index)}`,
+      firstSeenAt: NOW,
+      freehireSource: "lever",
+      id: postingId,
+      lastSeenAt: NOW,
+      source: "lever",
+      title: `Job ${String(index)}`,
+      titleNorm: `job ${String(index)}`,
+      updatedAt: NOW,
+      workMode: "remote",
+    })
+    .run();
+
+  db.insert(applications)
+    .values({
+      companyId: "northwind",
+      companyName: "Northwind",
+      companyNameNorm: "northwind",
+      createdAt: NOW,
+      id: `job-app-${String(index)}`,
+      origin: "pick",
+      postingId,
+      postingTitle: `Job ${String(index)}`,
+      postingUrl: "https://jobs.lever.co/northwind/123",
+      status: "preparing",
+      updatedAt: NOW,
+      userId: USER,
+    })
+    .run();
+
+  return `job-app-${String(index)}`;
+}
+
+describe("the review list after the freehire cutover", () => {
+  test("keeps a Review attached while the freehire job is open with an empty catalog", () => {
+    const { catalogDb, db, clock } = seeded(1);
+    const applicationId = addJobApplication(db, 10);
+    const reviewId = addReview(db, { applicationIds: [applicationId], index: 10 });
+
+    expect(listReviews({ catalogDb, clock, db, userId: USER }).map((view) => view.id)).toContain(
+      reviewId,
+    );
+
+    db.update(jobs).set({ closedAt: NOW, status: "closed" }).run();
+
+    expect(
+      listReviews({ catalogDb, clock, db, userId: USER }).map((view) => view.id),
+    ).not.toContain(reviewId);
   });
 });
