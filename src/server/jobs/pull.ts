@@ -464,7 +464,7 @@ export function createPullService(deps: PullDeps) {
     } catch (error) {
       recordRun({
         counters,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? (error.stack ?? error.message) : String(error),
         firstSkipped: skipped.first,
         groupKey: group.key,
         mode,

@@ -529,7 +529,7 @@ describe("resilience", () => {
 
     const [run] = db.select().from(jobPullRuns).all();
 
-    expect(run?.error).toBe("freehire answered HTTP 503 for /api/v1/jobs/search");
+    expect(run?.error).toContain("freehire answered HTTP 503 for /api/v1/jobs/search");
     expect(run?.failed).toBe(0);
     expect(run?.firstError).toBeNull();
     expect(getSetting(db, "jobs.pull_failures")).toBe("1");
