@@ -152,6 +152,7 @@
           "src/server/inbox/threads.test.ts",
           "src/server/pipeline/approved-plan.test.ts",
           "src/server/pipeline/email-notes.test.ts",
+          "src/server/pipeline/form-fixes-2026-11-26.test.ts",
           "src/server/pipeline/reviews.test.ts"
         ],
         "allowRoots": ["test/e2e", "scripts"]
@@ -283,6 +284,7 @@
           "src/server/pipeline/batch4-forms.test.ts",
           "src/server/pipeline/daily-prep.test.ts",
           "src/server/pipeline/email-notes.test.ts",
+          "src/server/pipeline/form-fixes-2026-11-26.test.ts",
           "src/server/pipeline/hosted-form.test.ts",
           "src/server/pipeline/in-progress.test.ts",
           "src/server/pipeline/login-wall.test.ts",

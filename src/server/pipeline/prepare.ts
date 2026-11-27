@@ -44,6 +44,7 @@ import { ungatedSpend } from "../billing/spend.ts";
 import { greenhouseBoardUrl } from "./greenhouse-board-url.ts";
 import { countriesNamedIn } from "../catalog/question-normalize.ts";
 import { mapQuestionsWithLlm } from "../catalog/question-mapping.ts";
+import { isTemplateLeftover } from "../catalog/question-rules.ts";
 import { createQuestionCatalog, questionInputsFromAts } from "../catalog/questions.ts";
 import { logInfo } from "../platform/log.ts";
 import { planEmailAddress } from "../../shared/apply-alias.ts";
@@ -445,6 +446,7 @@ export function createPreparationService(deps: {
           fieldType: input.fieldType,
           options: input.options,
           companyNames: [posting.companyName],
+          fieldName: input.fieldName,
         });
 
         return {
@@ -694,11 +696,16 @@ export function createPreparationService(deps: {
         continue;
       }
 
+      if (isTemplateLeftover(field.label)) {
+        continue;
+      }
+
       const question = catalog.findOrCreate({
         companyNames: [row.companyName],
         fieldType: field.fieldType,
         options: field.options,
         text: field.label,
+        fieldName: field.fieldName,
       });
 
       catalog.addPostingQuestion(row.postingId, {

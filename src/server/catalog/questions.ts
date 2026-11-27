@@ -15,7 +15,7 @@ import {
   questionOptionsHash,
   questionVariantHash,
 } from "./question-normalize.ts";
-import { mapQuestionByRules } from "./question-rules.ts";
+import { mapIdentityFieldName, mapQuestionByRules } from "./question-rules.ts";
 
 export interface QuestionRecord {
   id: string;
@@ -32,6 +32,7 @@ export interface QuestionInput {
   fieldType: QuestionFieldType;
   options: string[];
   companyNames: string[];
+  fieldName?: string | null;
 }
 
 export function createQuestionCatalog(deps: {
@@ -111,7 +112,7 @@ export function createQuestionCatalog(deps: {
       return { ...existing, seenCount: existing.seenCount + 1 } satisfies QuestionRecord;
     }
 
-    const mapped = mapQuestionByRules(input.text);
+    const mapped = mapQuestionByRules(input.text) ?? mapIdentityFieldName(input.fieldName ?? null);
 
     const fallback: RuleMapping = { answerKind: "unknown", factKey: null };
 

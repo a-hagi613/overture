@@ -12,6 +12,7 @@ export const FIELD_KINDS = [
   "email",
   "phone",
   "location",
+  "current_company",
   "linkedin_url",
   "github_url",
   "website_url",
@@ -25,6 +26,7 @@ export type FieldKind = (typeof FIELD_KINDS)[number];
 
 /** The Fact each field kind fills, when the profile keeps one. */
 export const FACT_KEY_BY_FIELD_KIND: Readonly<Record<FieldKind, FactKey | null>> = {
+  current_company: "current_employer",
   email: "email",
   first_name: "legal_name",
   full_name: "legal_name",
@@ -81,6 +83,11 @@ const LABEL_RULES: readonly FieldLabelRule[] = [
     kind: "location",
     pattern:
       /\bcity\b|\blocation\b|\bwhere do you live\b|\bstadt\b|\bwohnort\b|\bville\b|\bciudad\b|\bdireccion\b/u,
+  },
+  {
+    kind: "current_company",
+    pattern:
+      /\bcurrent company\b|\bcurrent employer\b|\bmost recent employer\b|\bpresent employer\b|\bemployer name\b|\bcompany name\b|\bfirma\b|\bentreprise\b|\bempresa\b|\barbeitgeber\b/u,
   },
   {
     kind: "first_name",
@@ -157,6 +164,44 @@ export function classifyFieldLabel(raw: string) {
   }
 
   return null;
+}
+
+const FIELD_NAME_KINDS: ReadonlyMap<string, FieldKind> = new Map([
+  ["org", "current_company"],
+  ["organisation", "current_company"],
+  ["organization", "current_company"],
+  ["employer", "current_company"],
+  ["company", "current_company"],
+  ["currentcompany", "current_company"],
+  ["city", "location"],
+  ["location", "location"],
+]);
+
+/**
+ * Classifies one form control's machine name into the field kind Overture can
+ * answer, for boards whose label is missing or unreadable. Names are folded the
+ * same way as labels, and a system-field prefix such as `_systemfield_` or a
+ * form wrapper such as `candidate[...]` is unwrapped first.
+ *
+ * @param fieldName The control name a board printed, or null when it has none.
+ * @returns The field kind, or `null` when the name is not a known identity control.
+ */
+export function classifyFieldName(fieldName: string | null) {
+  if (fieldName === null) {
+    return null;
+  }
+
+  const bare = fieldName
+    .replaceAll(/[[\]]/gu, " ")
+    .replace(/^_*systemfield[_-]?/iu, "")
+    .replaceAll(/[_-]+/gu, " ")
+    .trim();
+
+  if (bare === "") {
+    return null;
+  }
+
+  return FIELD_NAME_KINDS.get(foldFieldLabel(bare).replaceAll(" ", "")) ?? classifyFieldLabel(bare);
 }
 
 /**

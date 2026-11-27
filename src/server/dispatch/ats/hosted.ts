@@ -3,6 +3,7 @@ import type { Page } from "playwright-core";
 import type { FormQuestion, SendPlanField } from "../../pipeline/send-plan.ts";
 import type { QuestionFieldType } from "../../../shared/questions.ts";
 
+import { openApplyForm } from "../forms/apply-link.ts";
 import {
   APPLICATION_RESPONSE_MS,
   CONFIRMATION_SOURCES,
@@ -10,7 +11,6 @@ import {
   fillField,
   isPositiveAnswer,
   norm,
-  openForm,
   preflightForm,
 } from "../forms/engine.ts";
 import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
@@ -623,7 +623,7 @@ export const runHostedAttempt: (
     };
   }
 
-  const scope = await openForm(page, config.formSelector);
+  const scope = await openApplyForm(page, config.formSelector);
 
   if (scope === null) {
     return {

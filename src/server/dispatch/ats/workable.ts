@@ -2,6 +2,7 @@ import type { Page } from "playwright-core";
 
 import type { SendPlanField } from "../../pipeline/send-plan.ts";
 
+import { openApplyForm } from "../forms/apply-link.ts";
 import {
   APPLICATION_RESPONSE_MS,
   CONFIRMATION_SOURCES,
@@ -9,7 +10,6 @@ import {
   fillField,
   norm,
   isPositiveAnswer,
-  openForm,
   preflightForm,
 } from "../forms/engine.ts";
 import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
@@ -256,7 +256,7 @@ export const runWorkableAttempt: (
     };
   }
 
-  const scope = await openForm(page, WORKABLE_FORM_SELECTOR);
+  const scope = await openApplyForm(page, WORKABLE_FORM_SELECTOR);
 
   if (scope === null) {
     return {

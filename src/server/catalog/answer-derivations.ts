@@ -22,6 +22,10 @@ export const DERIVED_ANSWER_KEYS = [
   "us_state_residence",
   "city_region",
   "city_region_country",
+  "work_auth_status",
+  "sponsorship_status",
+  "english_fluency",
+  "role_category",
 ] as const;
 
 export const DERIVATION_KEYS = [...TARGET_DERIVATION_KEYS, ...DERIVED_ANSWER_KEYS] as const;
@@ -360,6 +364,288 @@ function deriveCityRegionCountry(input: DerivationInput) {
     .join(", ");
 }
 
+const NATIONALITY_CODES: ReadonlyMap<string, string> = new Map([
+  ["american", "US"],
+  ["australian", "AU"],
+  ["brazilian", "BR"],
+  ["british", "GB"],
+  ["canadian", "CA"],
+  ["chinese", "CN"],
+  ["colombian", "CO"],
+  ["danish", "DK"],
+  ["dutch", "NL"],
+  ["french", "FR"],
+  ["german", "DE"],
+  ["indian", "IN"],
+  ["irish", "IE"],
+  ["israeli", "IL"],
+  ["italian", "IT"],
+  ["japanese", "JP"],
+  ["mexican", "MX"],
+  ["new zealander", "NZ"],
+  ["nigerian", "NG"],
+  ["norwegian", "NO"],
+  ["pakistani", "PK"],
+  ["philippine", "PH"],
+  ["filipino", "PH"],
+  ["polish", "PL"],
+  ["portuguese", "PT"],
+  ["romanian", "RO"],
+  ["singaporean", "SG"],
+  ["south african", "ZA"],
+  ["spanish", "ES"],
+  ["swedish", "SE"],
+  ["swiss", "CH"],
+  ["ukrainian", "UA"],
+  ["uruguayan", "UY"],
+]);
+
+function statedCountryCodes(value: string) {
+  const folded = normalizeOptionText(value);
+  const codes = new Set(countryCodesNamedIn(value));
+
+  for (const [nationality, code] of NATIONALITY_CODES) {
+    if (containsPhrase(folded, nationality)) {
+      codes.add(code);
+    }
+  }
+
+  return [...codes];
+}
+
+function countryMatchesQuestion(questionText: string, value: string) {
+  const asked = countryCodesNamedIn(questionText);
+
+  if (asked.length === 0) {
+    return true;
+  }
+
+  const stated = statedCountryCodes(value);
+
+  return stated.length === 0 || stated.some((code) => asked.includes(code));
+}
+
+/**
+ * Whether a stored work-authorisation value may answer a question: a question
+ * that names a country is never answered by a value that names only other
+ * countries, so a Canadian citizen is not reported as allowed to work in the US.
+ *
+ * @param questionText The question a board asks.
+ * @param value The confirmed work-authorisation or sponsorship Fact.
+ * @returns true when the countries agree, or when either side names none.
+ */
+export function workAuthorizationFitsQuestion(questionText: string, value: string) {
+  return countryMatchesQuestion(questionText, value);
+}
+
+function confirmedFact(input: DerivationInput, key: string) {
+  const fact = factOf(input, key);
+
+  return fact === null || !fact.confirmed ? null : fact;
+}
+
+function authorizationOf(value: string) {
+  const folded = normalizeOptionText(value);
+
+  if (/\bno\b.*\bsponsor|\bdo(?:es)? not (?:require|need) spons|\bwithout spons/u.test(folded)) {
+    return "authorized" as const;
+  }
+
+  if (/\b(?:need|needs|require|requires|will require)\b.*\bsponsor/u.test(folded)) {
+    return "not_authorized" as const;
+  }
+
+  if (
+    /\bcitizen|permanent resident|green card|authori[sz]ed|eligible|right to work|work permit|unrestricted|no restriction/u.test(
+      folded,
+    )
+  ) {
+    return "authorized" as const;
+  }
+
+  if (
+    /\bnot\b.*\b(?:authori[sz]ed|eligible|permit)\b|\bcannot work\b|\bno (?:right|permit|authori[sz]ation) to work\b/u.test(
+      folded,
+    )
+  ) {
+    return "not_authorized" as const;
+  }
+
+  const polarity = factPolarity(value);
+
+  if (polarity === "affirmative") {
+    return "authorized" as const;
+  }
+
+  return polarity === "negative" ? ("not_authorized" as const) : null;
+}
+
+function sponsorshipOf(value: string) {
+  const folded = normalizeOptionText(value);
+
+  if (
+    /\bno\b.*\bsponsor|\bdo(?:es)? not (?:require|need) spons|\bwithout spons|\bnot required\b/u.test(
+      folded,
+    )
+  ) {
+    return "none" as const;
+  }
+
+  if (/\b(?:need|needs|require|requires|will require)\b.*\bsponsor/u.test(folded)) {
+    return "needs" as const;
+  }
+
+  const polarity = factPolarity(value);
+
+  if (polarity === "affirmative") {
+    return "needs" as const;
+  }
+
+  return polarity === "negative" ? ("none" as const) : null;
+}
+
+function deriveWorkAuthStatus(input: DerivationInput) {
+  const workAuth = confirmedFact(input, "work_auth");
+
+  if (workAuth !== null) {
+    if (!countryMatchesQuestion(input.questionText, workAuth.value)) {
+      return null;
+    }
+
+    const status = authorizationOf(workAuth.value);
+
+    if (status !== null) {
+      return optionWithPolarity(input.options, status === "authorized");
+    }
+  }
+
+  const sponsorship = confirmedFact(input, "sponsorship_required");
+
+  if (sponsorship !== null && countryMatchesQuestion(input.questionText, sponsorship.value)) {
+    const status = sponsorshipOf(sponsorship.value);
+
+    if (status !== null) {
+      return optionWithPolarity(input.options, status === "none");
+    }
+  }
+
+  return null;
+}
+
+function deriveSponsorshipStatus(input: DerivationInput) {
+  const sponsorship = confirmedFact(input, "sponsorship_required");
+
+  if (sponsorship !== null) {
+    if (!countryMatchesQuestion(input.questionText, sponsorship.value)) {
+      return null;
+    }
+
+    const status = sponsorshipOf(sponsorship.value);
+
+    if (status !== null) {
+      return optionWithPolarity(input.options, status === "needs");
+    }
+  }
+
+  const workAuth = confirmedFact(input, "work_auth");
+
+  if (workAuth !== null && countryMatchesQuestion(input.questionText, workAuth.value)) {
+    const status = authorizationOf(workAuth.value);
+
+    if (status !== null) {
+      return optionWithPolarity(input.options, status === "not_authorized");
+    }
+  }
+
+  return null;
+}
+
+function deriveEnglishFluency(input: DerivationInput) {
+  const languages = confirmedFact(input, "languages");
+
+  if (languages === null || !containsPhrase(normalizeOptionText(languages.value), "english")) {
+    return null;
+  }
+
+  return optionWithPolarity(input.options, true);
+}
+
+const ROLE_TITLE_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "associate",
+  "at",
+  "chief",
+  "director",
+  "for",
+  "head",
+  "in",
+  "intern",
+  "junior",
+  "lead",
+  "manager",
+  "of",
+  "on",
+  "or",
+  "principal",
+  "senior",
+  "staff",
+  "the",
+  "to",
+  "vp",
+]);
+
+const ROLE_SUFFIXES = ["ments", "ment", "ings", "ing", "ers", "er", "es", "s"] as const;
+
+function stemRoleWord(word: string) {
+  let stem = word;
+
+  for (const suffix of ROLE_SUFFIXES) {
+    if (stem.length - suffix.length >= 4 && stem.endsWith(suffix)) {
+      stem = stem.slice(0, -suffix.length);
+    }
+  }
+
+  return stem;
+}
+
+function roleWords(text: string) {
+  return normalizeOptionText(text)
+    .split(" ")
+    .filter((word) => word.length > 1 && !ROLE_TITLE_STOP_WORDS.has(word))
+    .map((word) => stemRoleWord(word));
+}
+
+function deriveRoleCategory(input: DerivationInput) {
+  const title = confirmedFact(input, "current_job_title");
+
+  if (title === null) {
+    return null;
+  }
+
+  const wanted = new Set(roleWords(title.value));
+
+  if (wanted.size === 0) {
+    return null;
+  }
+
+  const scored = input.options.map((option) => ({
+    option,
+    score: roleWords(option).filter((word) => wanted.has(word)).length,
+  }));
+
+  const best = Math.max(...scored.map((entry) => entry.score));
+
+  if (best === 0) {
+    return null;
+  }
+
+  const winners = scored.filter((entry) => entry.score === best);
+
+  return winners.length === 1 ? (winners[0]?.option ?? null) : null;
+}
+
 const DERIVATIONS: Record<DerivationKey, (input: DerivationInput) => string | null> = {
   target_countries: deriveTargetCountries,
   target_workplace: deriveTargetWorkplace,
@@ -368,6 +654,10 @@ const DERIVATIONS: Record<DerivationKey, (input: DerivationInput) => string | nu
   us_state_residence: deriveUsStateResidence,
   city_region: deriveCityRegion,
   city_region_country: deriveCityRegionCountry,
+  work_auth_status: deriveWorkAuthStatus,
+  sponsorship_status: deriveSponsorshipStatus,
+  english_fluency: deriveEnglishFluency,
+  role_category: deriveRoleCategory,
 };
 
 export function deriveAnswer(key: DerivationKey, input: DerivationInput) {

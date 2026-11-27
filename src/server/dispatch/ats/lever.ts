@@ -3,10 +3,10 @@ import type { Page } from "playwright-core";
 import type { FormQuestion, SendPlanField } from "../../pipeline/send-plan.ts";
 import type { QuestionFieldType } from "../../../shared/questions.ts";
 
+import { openApplyForm } from "../forms/apply-link.ts";
 import {
   APPLICATION_RESPONSE_MS,
   fillField,
-  openForm,
   preflightForm,
   readConfirmation,
   submitPathnameOf,
@@ -337,7 +337,7 @@ export const runLeverAttempt: (
     };
   }
 
-  const scope = await openForm(page, "form#application-form");
+  const scope = await openApplyForm(page, "form#application-form");
 
   if (scope === null) {
     return {
