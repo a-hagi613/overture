@@ -9,7 +9,6 @@ import {
   exportReadyEmail,
   magicLinkEmail,
   notificationEmail,
-  recapEmail,
   supportReplyEmail,
   supportRequestEmail,
   waitlistInviteEmail,
@@ -82,17 +81,6 @@ const previews = {
       { detail: "Larkspur Health · Remote, UK", meta: "Ashby", title: "Senior Backend Engineer" },
     ],
     subject: "3 applications ready to approve",
-    url: READY,
-  }),
-  recap: recapEmail({
-    needAnswer: 2,
-    ready: [
-      { company: "Northwind Labs", title: "Platform Engineer" },
-      { company: "Halden Systems", title: "Site Reliability Engineer" },
-    ],
-    replied: [{ company: "Larkspur Health" }],
-    sent: [{ company: "Northwind Labs", title: "Senior Backend Engineer" }],
-    subject: "Overture recap: 2 ready to approve, 2 need an answer",
     url: READY,
   }),
   "support-reply": supportReplyEmail({

@@ -28,11 +28,6 @@ import { getSetting } from "../platform/settings/index.ts";
 import { createTimeZoneService } from "../profile/time-zone.ts";
 import { addLocalDays, localDateAt, localDayStartFor } from "../platform/local-time.ts";
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
-import {
-  ensurePrepDailyQueued,
-  nextPrepRunAt,
-  parsePrepRunMinutes,
-} from "../pipeline/daily-prep.ts";
 import { dueCheckins } from "../pipeline/checkins.ts";
 import { notifyPaused } from "../notify/events.ts";
 import { pauseByUser, resumeByUser } from "../profile/running-state.ts";
@@ -647,7 +642,6 @@ export function createHomeRoutes(deps: {
     const reviewList = reviews.list(userId);
     const inbox = await inboxViews(userId);
     const checkIns = dueCheckins({ db, now }, userId);
-    const prepRunMinutes = parsePrepRunMinutes(getSetting(db, "prep.run_local_time"));
 
     return context.json({
       activity: activityOf(userId, now),
@@ -658,7 +652,6 @@ export function createHomeRoutes(deps: {
       endingGrant: billing.endingGrant,
       inProgress: inProgressOf(db, userId, now, MAX_IN_PROGRESS_ROWS),
       newMatches: newMatchesOf({ catalogDb, db }, userId, MAX_NEW_MATCH_ROWS),
-      nextPrepAt: nextPrepRunAt(now, zone, prepRunMinutes),
       nextSendAt,
       now,
       pauseReason: profile.pauseReason,
@@ -719,7 +712,6 @@ export function createHomeRoutes(deps: {
 
     if (running) {
       enqueuePlannerDay(db, clock, user.id);
-      ensurePrepDailyQueued(db, clock, user.id);
     } else {
       notifyPaused(db, clock, { reason: "user", userId: user.id });
     }

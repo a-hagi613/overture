@@ -549,63 +549,6 @@ export const copy = {
         "",
       ].join("\n");
     },
-    recapSubject: (ready: number, needAnswer: number) => {
-      const readyPart = `${String(ready)} ready to approve`;
-
-      return needAnswer > 0
-        ? `Overture recap: ${readyPart}, ${String(needAnswer)} need an answer`
-        : `Overture recap: ${readyPart}`;
-    },
-    recapBody: (input: {
-      ready: { title: string; company: string }[];
-      needAnswer: number;
-      sent: { title: string; company: string }[];
-      replied: { company: string }[];
-      url: string;
-    }) => {
-      const lines =
-        input.ready.length === 0
-          ? ["No new applications are ready to approve."]
-          : [
-              input.ready.length === 1
-                ? "1 application is ready to approve:"
-                : `${String(input.ready.length)} applications are ready to approve:`,
-              ...input.ready.map(
-                (application) => `- ${application.title} at ${application.company}`,
-              ),
-            ];
-
-      if (input.needAnswer > 0) {
-        lines.push(
-          "",
-          input.needAnswer === 1
-            ? "1 question needs an answer."
-            : `${String(input.needAnswer)} questions need an answer.`,
-        );
-      }
-
-      if (input.sent.length > 0) {
-        lines.push(
-          "",
-          "Sent yesterday:",
-          ...input.sent.map((application) => `- ${application.title} at ${application.company}`),
-        );
-      }
-
-      if (input.replied.length > 0) {
-        lines.push(
-          "",
-          input.replied.length === 1
-            ? "1 employer replied yesterday:"
-            : "Employers replied yesterday:",
-          ...input.replied.map((reply) => `- ${reply.company}`),
-        );
-      }
-
-      lines.push("", `Review them at ${input.url}`);
-
-      return `${lines.join("\n")}\n`;
-    },
     billingPauseSubject: (reason: "plan_ended" | "payment_failed") =>
       reason === "plan_ended"
         ? "Your Overture plan has ended"
@@ -695,9 +638,6 @@ export const copy = {
       interviews: "Interviews",
       replies: "Replies",
     },
-    caughtUp: {
-      nextLabel: "Next preparation run at",
-    },
     codeWait: {
       eyebrow: "Needs you",
       expires: (time: string) => `Expires in ${time}`,
@@ -727,7 +667,7 @@ export const copy = {
       pausedDetail: "Nothing new will send until you resume.",
       pausedTitle: "Application sending",
       pausedToast: "Sending paused.",
-      readyEmptyDetail: "Overture is watching career pages and preparing your next matches.",
+      readyEmptyDetail: "Overture is watching career pages for your next matches.",
       readyEmptyTitle: "All caught up",
       resumeAction: "Resume sending",
       resumedToast: "Sending resumed.",
@@ -1280,7 +1220,7 @@ export const copy = {
               kind: "bullets",
               items: [
                 "Contractual Performance: Authenticating your account, matching job opportunities, drafting tailored application responses, and transmitting applications you approve.",
-                "User Communications: Delivering authentication links, email verification notices, critical status alerts, and requested application recaps.",
+                "User Communications: Delivering authentication links, email verification notices, critical status alerts, and requested application updates.",
                 "Billing and Fraud Prevention: Processing subscription charges, administering trial eligibility via decoupled card fingerprinting, and satisfying tax and financial accounting obligations.",
                 "Security and Reliability: Enforcing access controls, diagnosing technical failures, preventing abuse, and maintaining service availability.",
               ],
@@ -1825,9 +1765,6 @@ export const copy = {
     legalOpen: "Open",
     notificationsHeading: "Notifications",
     notificationsIntro: "Choose which email and push alerts you receive. Changes save right away.",
-    recapTitle: "Recap email",
-    recapDetail:
-      "A morning summary of applications sent, employer replies, open reviews, and check-ins.",
     pushTitle: "Push notifications",
     pushIntro: "Push alerts open the app. Nothing is ever approved from a notification.",
     pushKinds: {
@@ -3103,7 +3040,7 @@ export const copy = {
       showLess: "Show fewer",
       emptyTitle: "Nothing yet.",
       emptyBody:
-        "Daily recaps, employer replies, interview invites, and updates needing your attention appear here.",
+        "Employer replies, interview invites, and updates needing your attention appear here.",
       emptyAction: "Notification settings",
       footer: "Manage email and alert preferences in ",
       settings: "Settings",
@@ -3126,7 +3063,7 @@ export const copy = {
       enableDetail:
         "Push works only from the app on your home screen on most phones. Your browser asks once.",
       enabled: "Notifications are on for this device.",
-      enabledDetail: "Overture can send the recap and the rest to this device.",
+      enabledDetail: "Overture can send alerts to this device.",
       disable: "Turn off notifications",
       denied: "Notifications are blocked in your browser. Allow them in your browser settings.",
       unsupported: "This browser cannot receive notifications.",

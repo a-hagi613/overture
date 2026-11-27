@@ -9,7 +9,6 @@ import { isDemoRole } from "../../shared/demo.ts";
 import { createBillingPauseNotice } from "../notify/billing-notice.ts";
 import { logInfo } from "../platform/log.ts";
 import { enqueuePlannerDay } from "../dispatch/planner.ts";
-import { ensurePrepDailyQueued } from "../pipeline/daily-prep.ts";
 import { claimTrialCard } from "./card-fingerprint.ts";
 import { linkStripeCustomer, userIdForStripeCustomer } from "./customers.ts";
 import { grantPaidPeriod } from "./periods.ts";
@@ -253,7 +252,6 @@ export function createPaymentsWebhookService(deps: {
             resumed = granted.userId;
 
             enqueuePlannerDay(tx, clock, granted.userId);
-            ensurePrepDailyQueued(tx, clock, granted.userId);
           }
 
           billingUpdatedUserId =

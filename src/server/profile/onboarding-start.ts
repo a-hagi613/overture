@@ -3,15 +3,13 @@ import { and, eq, isNull, or } from "drizzle-orm";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
-import { ensurePrepNextQueued } from "../pipeline/daily-prep.ts";
 import { enqueueUserPull } from "../jobs/pull.ts";
 import { profiles } from "../platform/db/schema.ts";
 import { ONBOARDING_STEP_COUNT } from "../../shared/onboarding.ts";
 
 /**
  * Finish onboarding in one transaction: mark it done, clear the `onboarding` pause
- * reason (any other reason stays), switch the account on and queue only the next
- * staggered morning run.
+ * reason (any other reason stays) and switch the account on.
 
  * A profile with no pause reason is a new account that never received the
  * `onboarding` default, so it is switched on too; a manually paused account or a
@@ -19,7 +17,7 @@ import { ONBOARDING_STEP_COUNT } from "../../shared/onboarding.ts";
  * The database is one synchronous connection, so the helpers that take `db` run inside the transaction too.
  * Pressing Start again changes nothing and queues nothing new.
  * @param db The application database.
- * @param clock The clock the timestamps and the schedule are read from.
+ * @param clock The clock the timestamps are read from.
  * @param userId The user pressing Start.
  * @returns Whether the account was switched on by this call.
  */
@@ -57,10 +55,6 @@ export function startOnboarding(db: AppDatabase, clock: Clock, userId: string) {
       )
       .returning({ userId: profiles.userId })
       .all();
-
-    if (cleared.length > 0) {
-      ensurePrepNextQueued(db, clock, userId);
-    }
 
     return cleared.length > 0;
   });

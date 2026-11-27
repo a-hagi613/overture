@@ -21,7 +21,6 @@ import {
 import { applicationsLeft } from "./ledger.ts";
 import { BILLING_NOTICE_JOB_KIND } from "../notify/billing-notice.ts";
 import { PLANNER_DAY_JOB_KIND } from "../dispatch/planner.ts";
-import { PREP_DAILY_JOB_KIND } from "../pipeline/daily-prep.ts";
 import { createPaymentsWebhookService } from "./webhooks.ts";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -324,7 +323,6 @@ describe("billing webhooks", () => {
     expect(webhooks.handle(paid)).toBe("processed");
     expect(profileOf(db)).toMatchObject({ pauseReason: null, running: true });
     expect(jobKinds(db)).toContain(PLANNER_DAY_JOB_KIND);
-    expect(jobKinds(db)).toContain(PREP_DAILY_JOB_KIND);
     expect(
       db.select().from(stripeEvents).where(eq(stripeEvents.id, paid.id)).get()?.processedAt,
     ).not.toBeNull();

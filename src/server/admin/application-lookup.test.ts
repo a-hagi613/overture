@@ -116,7 +116,7 @@ async function seeded() {
       costRecordedAt: NOW,
       id: APPLICATION_ID,
       llmCostMicros: 3000,
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-lookup",
       postingTitle: "Senior Platform Engineer",
       postingUrl: "https://boards.example/jobs/lookup",

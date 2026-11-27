@@ -216,41 +216,6 @@ export async function homeFor(owner: APIRequestContext) {
   return { ...home, upNext: candidates.items };
 }
 
-const jobStatusSchema = z.object({ status: z.string() });
-
-/**
- * Runs one Daily run and waits for its job to finish.
- *
- * The job's own status is the signal, not an SSE event: a stream that ends
- * before the event (a dropped connection, a restart) would otherwise let the
- * caller assert on work that has not run yet.
- * @param request The owner's API context.
- * @param userId The running user to prepare for.
- */
-export async function runPrepDaily(request: APIRequestContext, userId: string) {
-  const running = await request.post("/__test__/profile/running", {
-    data: { running: true, userId },
-  });
-
-  expect(running.ok()).toBe(true);
-
-  const body: unknown = await (
-    await request.post("/__test__/jobs/enqueue", {
-      data: { kind: "prep.daily", payload: JSON.stringify({ userId }) },
-    })
-  ).json();
-
-  const jobId = createdSchema.parse(body).id;
-
-  await expect
-    .poll(
-      async () =>
-        jobStatusSchema.parse(await (await request.get(`/__test__/jobs/${jobId}`)).json()).status,
-      { timeout: 30_000 },
-    )
-    .toBe("done");
-}
-
 export async function seedApplication(
   request: APIRequestContext,
   input: {
@@ -276,7 +241,7 @@ export async function seedApplication(
   const response = await request.post("/__test__/applications/seed", {
     data: {
       createdAt: input.createdAt ?? null,
-      origin: "auto",
+      origin: "pick",
       readyAt: input.readyAt ?? null,
       scheduledFor: input.scheduledFor ?? null,
       sentAt: input.sentAt ?? null,

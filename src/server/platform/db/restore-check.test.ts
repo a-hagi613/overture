@@ -107,7 +107,7 @@ function seededRestoredDatabase() {
     NOW,
     NOW,
   );
-  dueJob.run("job-ready", "ready.notify", '{"userId":"user-1"}', NOW - SECOND, NOW, NOW);
+  dueJob.run("job-export", "export.notify", '{"exportId":"export-1"}', NOW - SECOND, NOW, NOW);
   dueJob.run("job-mail", "mail.classify", '{"messageId":"message-1"}', NOW - SECOND, NOW, NOW);
   dueJob.run("job-billing-notice", "billing.notice", '{"userId":"user-1"}', NOW - SECOND, NOW, NOW);
   dueJob.run("job-billing-reconcile", "billing.reconcile", "{}", NOW - SECOND, NOW, NOW);

@@ -38,7 +38,7 @@ function database() {
       companyNameNorm: "northwind",
       createdAt: NOW,
       id: APPLICATION,
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-1",
       postingTitle: "Engineer",
       postingUrl: "https://example.test/job-1",

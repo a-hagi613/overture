@@ -57,8 +57,7 @@ user holds a slot from, so a capture holding the last session offers a send no s
 queues, #425, #515), the browser provider's Kernel mode and cleanup and its image trim (`kernel.test.ts`,
 `proxy-trim.test.ts`: a session is headless unless a bot block escalates it to stealth, every close deletes the
 session even when the usage read fails, a generic image is aborted while a CAPTCHA host's image still loads, and the
-font, media and tracker blocks stay), the daily preparation stagger (`daily-prep.test.ts`: each user's slot is
-deterministic inside 05:00-07:30 local time and a stored `prep.run_local_time` overrides it), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
+font, media and tracker blocks stay), the event-loop lag monitor (a late timer tick reports how long the loop was blocked, once
 per cooldown, so a paused main thread becomes a log line), the copy guard (no canvas annotation — `fig. N`, `folio`, `§`, a section ordinal — is
 a copy string or key), the trusted client IP (only the header Fly's proxy stamps is believed; a forged
 `x-forwarded-for` never sets Turnstile's `remoteip` or the auth limiter's key), the signed-in event stream

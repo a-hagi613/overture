@@ -145,7 +145,7 @@ async function seedUsedTrial(request: APIRequestContext, appUrl: string, ownerId
         await request.post(`${appUrl}/__test__/applications/seed`, {
           data: {
             createdAt: now,
-            origin: "auto",
+            origin: "pick",
             postingId,
             sentAt: now,
             stage: "applied",

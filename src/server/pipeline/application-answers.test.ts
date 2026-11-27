@@ -52,7 +52,7 @@ function seeded() {
       companyNameNorm: "northwind",
       createdAt: NOW,
       id: APPLICATION,
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-scoped",
       postingTitle: "Platform Engineer",
       postingUrl: "https://example.test/job-scoped",

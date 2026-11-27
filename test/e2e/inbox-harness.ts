@@ -118,7 +118,7 @@ async function seedApplication(
       await request.post("/__test__/applications/seed", {
         data: {
           createdAt: referenceNow - 9 * DAY_MS,
-          origin: "auto",
+          origin: "pick",
           postingId,
           sentAt: referenceNow - 9 * DAY_MS,
           stage: "applied",

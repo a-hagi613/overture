@@ -83,7 +83,7 @@ describe("creating an Application", () => {
     const { catalogDb, db, sqlite } = freshCatalog();
 
     const id = createApplication({ catalogDb, db }, NOW, {
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-1",
       score: 82,
       userId: "user-1",
@@ -104,6 +104,7 @@ describe("creating an Application", () => {
       companyName: "Ferro Cloud",
       companyNameNorm: "ferro cloud",
       locationRaw: "Remote — Canada",
+      origin: "pick",
       postingId: "posting-1",
       postingTitle: "Senior Platform Engineer",
       postingUrl: "https://boards.example/jobs/1",
@@ -117,7 +118,7 @@ describe("creating an Application", () => {
         applicationId: id,
         fromValue: null,
         kind: "stage",
-        source: "system",
+        source: "user",
         toValue: "queued",
         userId: "user-1",
       },

@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
-import { NOTIFICATION_KINDS, RECAP_EMAIL_PREFERENCE } from "../../shared/notifications.ts";
+import { NOTIFICATION_KINDS } from "../../shared/notifications.ts";
 import {
   useNotificationPreferences,
   useSetNotificationPreference,
@@ -19,10 +19,7 @@ export function SettingsNotifications() {
   const ready = values !== undefined;
   const busy = !ready || save.isPending;
 
-  const toggle = (
-    kind: (typeof NOTIFICATION_KINDS)[number] | typeof RECAP_EMAIL_PREFERENCE,
-    enabled: boolean,
-  ) => {
+  const toggle = (kind: (typeof NOTIFICATION_KINDS)[number], enabled: boolean) => {
     save.mutate(
       { enabled, kind },
       {
@@ -49,17 +46,6 @@ export function SettingsNotifications() {
       <p className={`${dsBody} mt-1 text-xs`}>{copy.settings.notificationsIntro}</p>
 
       <div className="mt-4">
-        <PreferenceRow
-          checked={values?.[RECAP_EMAIL_PREFERENCE] ?? true}
-          detail={copy.settings.recapDetail}
-          disabled={busy}
-          id={RECAP_EMAIL_PREFERENCE}
-          label={copy.settings.recapTitle}
-          onToggle={toggle}
-        />
-      </div>
-
-      <div className="mt-4 border-t border-border pt-4">
         <p className={dsEyebrow}>{copy.settings.pushTitle}</p>
         <p className="mt-1 text-xs text-muted-foreground">{copy.settings.pushIntro}</p>
         <div className="mt-2">

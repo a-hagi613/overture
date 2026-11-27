@@ -397,7 +397,7 @@ async function seedCard(request: APIRequestContext, userId: string, card: CardSe
           boardPosition: index,
           closedReason: card.closedReason ?? null,
           createdAt,
-          origin: "auto",
+          origin: "pick",
           postingId,
           scheduledFor,
           sentAt: card.stage === "queued" || card.stage === "ready" ? null : createdAt,

@@ -5,13 +5,7 @@ import type { APIRequestContext } from "@playwright/test";
 
 import { authTestIdentity } from "./auth.fixture.ts";
 import { expect, startFreshAppServer, test } from "./app.fixture.ts";
-import {
-  ownerContextFor,
-  seedApplication,
-  seedBoard,
-  seedCompany,
-  seedPosting,
-} from "./matching-harness.ts";
+import { ownerContextFor } from "./matching-harness.ts";
 import { requestMagicLink, verifyAuthState } from "./sign-in.ts";
 
 const cloudflareEnvironment = {
@@ -31,8 +25,6 @@ const cloudflareMessageSchema = z.object({ subject: z.string(), text: z.string()
 
 const magicLinkPattern = /(?<url>https?:\/\/\S+)/u;
 
-const READY_AT = 1_800_000_000_000;
-
 const mailUsageSchema = z.object({
   month: z.string(),
   total: z.number(),
@@ -48,13 +40,12 @@ const mailUsageSchema = z.object({
 });
 
 const notificationsSchema = z.object({
-  notifications: z.array(
-    z.object({
-      body: z.string(),
-      emailedAt: z.number().nullable(),
-      kind: z.string(),
-      title: z.string(),
-    }),
+  notifications: z.array(z.object({ body: z.string(), kind: z.string(), title: z.string() })),
+});
+
+const exportsSchema = z.object({
+  exports: z.array(
+    z.object({ id: z.string(), notifiedAt: z.number().nullable(), status: z.string() }),
   ),
 });
 
@@ -112,25 +103,28 @@ async function signInOwner(serverUrl: string, request: APIRequestContext) {
   return user?.id ?? "";
 }
 
-async function seedReadyApplication(request: APIRequestContext, userId: string) {
-  const companyId = await seedCompany(request, "Reserve Recaps", "reserve-recaps.example");
-  const boardId = await seedBoard(request, companyId, "greenhouse", "reserve-recaps");
+async function seedExport(request: APIRequestContext, userId: string) {
+  const response = await request.post("/__test__/account-exports/seed", { data: { userId } });
 
-  const postingId = await seedPosting(request, {
-    atsJobId: "reserve-1",
-    boardId,
-    companyId,
-    title: "Platform Engineer",
-    url: "https://reserve-recaps.example/jobs/1",
-  });
-
-  return seedApplication(request, { postingId, readyAt: READY_AT, status: "ready", userId });
+  return z.object({ id: z.string() }).parse(await response.json()).id;
 }
 
-async function runRecap(request: APIRequestContext, userId: string) {
+async function runExportNotice(request: APIRequestContext, exportId: string) {
   return request.post("/__test__/jobs/run-now", {
-    data: { kind: "ready.notify", payload: JSON.stringify({ since: 0, userId }) },
+    data: { kind: "export.notify", payload: JSON.stringify({ exportId }) },
   });
+}
+
+async function exportNotifiedAt(request: APIRequestContext, userId: string) {
+  const parsed = exportsSchema.parse(
+    await (
+      await request.get(`/__test__/account/exports?userId=${encodeURIComponent(userId)}`)
+    ).json(),
+  );
+
+  const [first] = parsed.exports;
+
+  return first?.notifiedAt ?? null;
 }
 
 test("the 2,701st send of the month is refused, and the owner is alerted once", async ({
@@ -148,9 +142,8 @@ test("the 2,701st send of the month is refused, and the owner is alerted once", 
 
     expect(seeded).toMatchObject({ cap: 2700, noticeLimit: 2430, reserve: 270, total: 2700 });
 
-    await seedReadyApplication(request, userId);
-
-    const run = await runRecap(request, userId);
+    const exportId = await seedExport(request, userId);
+    const run = await runExportNotice(request, exportId);
 
     expect(run.ok()).toBe(true);
     expect(await cloudflareRequests(request)).toHaveLength(0);
@@ -159,20 +152,13 @@ test("the 2,701st send of the month is refused, and the owner is alerted once", 
 
     expect(after.total).toBe(2700);
     expect(after.refusedAt).not.toBeNull();
+    expect(await exportNotifiedAt(request, userId)).toBeNull();
 
     const alerts = await alertsFor(request, userId);
 
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.title).toBe("Overture alert: mail.cap");
     expect(alerts[0]?.body).toContain('"stage":"refused"');
-
-    const notes = notificationsSchema.parse(
-      await (await request.get(`/__test__/notifications?userId=${userId}`)).json(),
-    );
-
-    const ready = notes.notifications.find((note) => note.kind === "ready");
-
-    expect(ready?.emailedAt).toBeNull();
 
     const secondSignIn = await requestMagicLink(server.url, request, authTestIdentity.ownerEmail);
 
@@ -186,7 +172,7 @@ test("the 2,701st send of the month is refused, and the owner is alerted once", 
   }
 });
 
-test("a Recap is refused at the reserve while sign-in mail still goes, and the cap alert still fires at 2,700", async ({
+test("an export notice is refused at the reserve while sign-in mail still goes, and the cap alert still fires at 2,700", async ({
   identityServer,
 }) => {
   const server = await startFreshAppServer(identityServer, cloudflareEnvironment);
@@ -201,12 +187,12 @@ test("a Recap is refused at the reserve while sign-in mail still goes, and the c
 
     expect(seeded.total).toBe(seeded.noticeLimit);
 
-    await seedReadyApplication(request, userId);
-
-    const run = await runRecap(request, userId);
+    const exportId = await seedExport(request, userId);
+    const run = await runExportNotice(request, exportId);
 
     expect(run.ok()).toBe(true);
     expect(await cloudflareRequests(request)).toHaveLength(0);
+    expect(await exportNotifiedAt(request, userId)).toBeNull();
 
     const refused = await mailUsage(request);
 

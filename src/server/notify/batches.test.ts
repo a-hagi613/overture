@@ -3,17 +3,20 @@ import { and, eq } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 
-import { bgJobs, notifications, users } from "../platform/db/schema.ts";
+import { bgJobs, notifications, settings, users } from "../platform/db/schema.ts";
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
-import { NOTIFICATION_BATCH_WINDOW_MS } from "../../shared/notifications.ts";
+import {
+  NOTIFICATION_BATCH_WINDOW_MS,
+  notificationPreferencesKey,
+} from "../../shared/notifications.ts";
 import {
   notifyCardMoved,
   notifyEmployerReply,
   notifyInterviewDetected,
   notifyReviewOpened,
 } from "./events.ts";
-import { setNotificationPreference } from "./preferences.ts";
+import { readNotificationPreferences, setNotificationPreference } from "./preferences.ts";
 import { PUSH_NOTIFY_JOB_KIND } from "./push.ts";
 
 Bun.env.BETTER_AUTH_SECRET ??= "batches-test-secret-0123456789";
@@ -188,6 +191,27 @@ test("a merged row becomes unread again and keeps the single rows' links", () =>
   expect(merged?.readAt).toBeNull();
   expect(merged?.title).toBe("2 applications moved");
   expect(merged?.url).toBe("/tracker");
+
+  sqlite.close();
+});
+
+test("preferences saved before the recap switch was removed keep their other switches", () => {
+  const { db, sqlite } = seeded();
+
+  db.insert(settings)
+    .values({
+      key: notificationPreferencesKey(USER_ID),
+      updatedAt: NOW,
+      updatedBy: USER_ID,
+      value: JSON.stringify({ recap_email: true, review: false }),
+    })
+    .run();
+
+  const preferences = readNotificationPreferences(db, USER_ID);
+
+  expect(preferences.review).toBe(false);
+  expect(preferences.reply).toBe(true);
+  expect(preferences).not.toHaveProperty("recap_email");
 
   sqlite.close();
 });

@@ -42,7 +42,7 @@ function fresh() {
       companyNameNorm: "ferro cloud",
       createdAt: NOW,
       id: APPLICATION_ID,
-      origin: "auto",
+      origin: "pick",
       postingId: "posting-events",
       postingTitle: "Senior Platform Engineer",
       postingUrl: "https://boards.example/jobs/events",

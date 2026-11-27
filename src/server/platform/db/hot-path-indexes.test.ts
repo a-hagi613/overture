@@ -46,7 +46,7 @@ function seeded() {
   const insertApplication = sqlite.prepare(
     `insert into applications (id, user_id, posting_id, company_id, company_name, company_name_norm, posting_title,
        posting_url, origin, status, created_at, updated_at)
-     values (?, ?, ?, ?, 'Northwind', 'northwind', 'Platform Engineer', 'https://example.test/job', 'auto', ?, ?, ?)`,
+     values (?, ?, ?, ?, 'Northwind', 'northwind', 'Platform Engineer', 'https://example.test/job', 'pick', ?, ?, ?)`,
   );
 
   const insertGrant = sqlite.prepare(

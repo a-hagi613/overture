@@ -18,7 +18,7 @@ export const ACTIVE_APPLICATION_STATUSES = [
 export interface ApplicationInput {
   userId: string;
   postingId: string;
-  origin: "auto" | "manual";
+  origin: "pick" | "manual";
   score: number | null;
 }
 
@@ -138,7 +138,7 @@ export function createClosedApplication(
   return insertApplication(
     db,
     at,
-    { origin: "manual", postingId: input.postingId, score: null, userId: input.userId },
+    { origin: "pick", postingId: input.postingId, score: null, userId: input.userId },
     input.display,
     { stage: "closed", status: "failed", statusReason: input.reason },
   );
@@ -189,10 +189,8 @@ function insertApplication(
         detail: { score: input.score },
         fromValue: null,
         kind: initial.status === "failed" ? "status" : "stage",
-        reason:
-          initial.statusReason ??
-          (input.origin === "auto" ? "selected_automatically" : "selected_by_user"),
-        source: input.origin === "auto" ? "system" : "user",
+        reason: initial.statusReason ?? "selected_by_user",
+        source: "user",
         toValue: initial.status === "failed" ? "failed" : "queued",
         userId: input.userId,
       },
