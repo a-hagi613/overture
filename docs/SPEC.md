@@ -144,7 +144,7 @@ product; where a launch switch is still off, the section says so. The earlier M1
   code and tests against the local fixture server only. Outside production the app installs an
   outbound guard (ADR 0016): a request to an ATS or paid-service host that is not a local fixture throws instead of
   leaving the machine.
-- Litestream replicates `app.sqlite` continuously to R2 `overture-backups`; a nightly snapshot is kept 30 days; a
+- Litestream replicates `app.sqlite` continuously to R2 `overture-backups`; a nightly snapshot is kept 7 days; a
   restore drill runs in CI weekly against a throwaway machine, checks the restored file read-only and never starts
   the app server or any scheduler, worker or outbound client (issue #412). When Litestream owns the file
   (`LITESTREAM_OWNS_CHECKPOINTS=true`, set by `scripts/docker-entrypoint.sh` only on its `litestream replicate -exec`
