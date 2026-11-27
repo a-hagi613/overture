@@ -83,3 +83,16 @@ The pull proof found two ways an unwanted row reached a pool, so both are now de
   Kong and the three 26 Nov walk users, then writes `docs/research/685-filter-proof.md`. It never calls freehire or a
   paid service; the pull is a fixture and the command is offline.
 
+## Amendment of 2026-11-27: one bad posting cannot abort a group
+
+A production group failed on every tick because one posting's store step threw and aborted the whole group. The store
+loop now isolates that one posting: its apply-target resolution or write is caught, counted in `failed`, logged with
+its public slug, source, external id and message, and skipped while the remaining postings are stored. A run that only
+skipped postings is still a successful run: it updates `lastFreshPullAt`/`lastFullPullAt`, resets
+`jobs.pull_failures`, and records `job_pull_runs.failed` with a null `error`. The first skipped posting is written to
+`job_pull_runs.first_error` and to the `jobs.pull` event's `firstSkipped` object, and the `jobs.pull` alert names
+`failedJob` and `error` once per distinct posting instead of paging every tick. This isolation never hides an API
+problem: a page that fails `searchSchema.parse` is still a source failure, so the pull fails and alerts exactly as
+before rather than dropping the page.
+
+

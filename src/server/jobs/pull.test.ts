@@ -8,6 +8,7 @@ import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
 import {
   bgJobs,
+  events,
   grants,
   jobPullRuns,
   jobPullState,
@@ -17,10 +18,12 @@ import {
   users,
 } from "../platform/db/schema.ts";
 import { createJobStore } from "./store.ts";
+import type { JobStore } from "./store.ts";
 import { getSetting, setSetting } from "../platform/settings/index.ts";
 import { createPullJobHandlers, createPullService } from "./pull.ts";
 import type { PullService } from "./pull.ts";
 import { createFakeJobSource } from "./testing/fake-source.ts";
+import { JobSourceError } from "./source.ts";
 import type { ApplyTarget } from "./apply-link.ts";
 
 const NOW = 1_800_000_000_000;
@@ -390,6 +393,161 @@ describe("resilience", () => {
     expect(alerts).toHaveLength(1);
   });
 
+  test("one posting that throws in the store is skipped and named, and the rest of the group is stored", async () => {
+    const { db } = migrated();
+    const alerts: Record<string, string | number | boolean | null>[] = [];
+
+    seedUser(db, { id: "user-1" });
+
+    const clock = { now: () => NOW };
+    const realStore = createJobStore({ clock, db });
+
+    const poison = record({
+      company: "Acme",
+      company_slug: "acme",
+      external_id: "acme:666",
+      public_slug: "poisoned-platform-engineer-acme",
+      title: "Platform Engineer",
+    });
+
+    const good = record({
+      company: "Acme",
+      company_slug: "acme",
+      public_slug: "good-executive-assistant-acme",
+      title: "Executive Assistant",
+    });
+
+    const store: JobStore = {
+      ...realStore,
+      upsert: (job, jobTarget) => {
+        if (job.public_slug === poison.public_slug) {
+          throw new Error("NOT NULL constraint failed: jobs.title_norm");
+        }
+
+        return realStore.upsert(job, jobTarget);
+      },
+    };
+
+    setSetting(db, clock, "jobs.pull_failures", "2", "system:test");
+
+    const source = createFakeJobSource({
+      pages: [{ ignoredParams: [], jobs: [poison, good], total: 2 }],
+    });
+
+    const service = createPullService({
+      applyTarget: async (job) => await Promise.resolve(target(job)),
+      clock,
+      db,
+      onAlert: (detail) => {
+        alerts.push(detail);
+      },
+      source,
+      store,
+    });
+
+    const result = await service.runUser("user-1");
+
+    const [run] = db.select().from(jobPullRuns).all();
+
+    expect(result?.failed).toBe(false);
+    expect(run?.error).toBeNull();
+    expect(run?.fetched).toBe(2);
+    expect(run?.failed).toBe(1);
+    expect(run?.kept).toBe(1);
+    expect(run?.firstError).toContain(poison.public_slug);
+    expect(run?.firstError).toContain("NOT NULL constraint failed: jobs.title_norm");
+    expect(
+      db
+        .select()
+        .from(jobs)
+        .all()
+        .map((row) => row.id),
+    ).toEqual([good.public_slug]);
+
+    const state = db.select().from(jobPullState).where(eq(jobPullState.userId, "user-1")).get();
+
+    expect(state?.lastFullPullAt).toBe(NOW);
+    expect(getSetting(db, "jobs.pull_failures")).toBe("0");
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      error: "NOT NULL constraint failed: jobs.title_norm",
+      failed: 1,
+      failedJob: poison.public_slug,
+      mode: "full",
+      userCount: 1,
+    });
+
+    const pullEvent = db
+      .select()
+      .from(events)
+      .all()
+      .find((event) => event.topic === "jobs.pull");
+
+    expect(JSON.parse(pullEvent?.payload ?? "{}")).toMatchObject({
+      counters: { failed: 1, kept: 1 },
+      firstSkipped: {
+        externalId: poison.external_id,
+        message: "NOT NULL constraint failed: jobs.title_norm",
+        publicSlug: poison.public_slug,
+        source: poison.source,
+      },
+    });
+
+    await service.runUser("user-1");
+
+    expect(alerts).toHaveLength(1);
+    expect(db.select().from(jobPullRuns).all()).toHaveLength(2);
+    expect(getSetting(db, "jobs.pull_failures")).toBe("0");
+  });
+
+  test("a source HTTP failure still fails the pull and alerts as before", async () => {
+    const { db } = migrated();
+    const alerts: Record<string, string | number | boolean | null>[] = [];
+
+    seedUser(db, { id: "user-1" });
+
+    const source = createFakeJobSource({
+      search: async () =>
+        await Promise.reject(
+          new JobSourceError(503, "freehire answered HTTP 503 for /api/v1/jobs/search"),
+        ),
+    });
+
+    const service = createPullService({
+      applyTarget: async (job) => await Promise.resolve(target(job)),
+      clock: { now: () => NOW },
+      db,
+      onAlert: (detail) => {
+        alerts.push(detail);
+      },
+      source,
+      store: createJobStore({ clock: { now: () => NOW }, db }),
+    });
+
+    await service.runUser("user-1");
+
+    const [run] = db.select().from(jobPullRuns).all();
+
+    expect(run?.error).toBe("freehire answered HTTP 503 for /api/v1/jobs/search");
+    expect(run?.failed).toBe(0);
+    expect(run?.firstError).toBeNull();
+    expect(getSetting(db, "jobs.pull_failures")).toBe("1");
+    expect(db.select().from(jobPullState).all()).toHaveLength(0);
+    expect(alerts).toHaveLength(0);
+
+    await service.runUser("user-1");
+    await service.runUser("user-1");
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      error: "freehire answered HTTP 503 for /api/v1/jobs/search",
+      failures: 3,
+      mode: "full",
+      userCount: 1,
+    });
+  });
+
   test("a still-failing pull alerts again after six hours with the current failure count", async () => {
     const { db } = migrated();
     const alerts: Record<string, string | number | boolean | null>[] = [];
@@ -668,6 +826,7 @@ describe("a user pull scores after it finishes", () => {
             droppedDuplicate: 0,
             droppedNoLink: 0,
             droppedUnsupported: 0,
+            failed: 0,
             fetched: 0,
             kept: 0,
           },

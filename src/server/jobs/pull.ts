@@ -41,6 +41,7 @@ const FAILURE_SETTING = "jobs.pull_failures";
 const LAST_ERROR_SETTING = "jobs.pull_last_error";
 const LAST_ALERT_AT_SETTING = "jobs.pull_last_alert_at";
 const ALERTED_FAILURES_SETTING = "jobs.pull_alerted_failures";
+const LAST_SKIPPED_SETTING = "jobs.pull_last_skipped";
 const CURSOR_SETTING = "jobs.changes_cursor";
 
 const stringArray = z.array(z.string());
@@ -63,10 +64,32 @@ function stringArrayFromColumn(value: string) {
 export interface PullCounters {
   fetched: number;
   kept: number;
+  /** Postings whose store step threw and were skipped so the rest of the group could finish. */
+  failed: number;
   droppedClosed: number;
   droppedDuplicate: number;
   droppedNoLink: number;
   droppedUnsupported: number;
+}
+
+/** The one posting a run could not store, kept so the log, run row and alert can name it. */
+export interface SkippedPosting {
+  publicSlug: string;
+  source: string;
+  externalId: string;
+  message: string;
+}
+
+interface SkippedAccumulator {
+  first: SkippedPosting | null;
+}
+
+function skippedPostingText(skipped: SkippedPosting) {
+  return `${skipped.publicSlug} (${skipped.source} ${skipped.externalId}): ${skipped.message}`;
+}
+
+function firstErrorText(skipped: SkippedPosting) {
+  return `${skipped.publicSlug} (${skipped.source} ${skipped.externalId}): ${redactPullError(skipped.message)}`;
 }
 
 function emptyCounters() {
@@ -75,6 +98,7 @@ function emptyCounters() {
     droppedDuplicate: 0,
     droppedNoLink: 0,
     droppedUnsupported: 0,
+    failed: 0,
     fetched: 0,
     kept: 0,
   };
@@ -232,6 +256,7 @@ export function createPullService(deps: PullDeps) {
     userCount: number;
     startedAt: number;
     counters: PullCounters;
+    firstSkipped?: SkippedPosting | null;
     error?: string;
   }) {
     db.insert(jobPullRuns)
@@ -241,8 +266,13 @@ export function createPullService(deps: PullDeps) {
         droppedNoLink: input.counters.droppedNoLink,
         droppedUnsupported: input.counters.droppedUnsupported,
         error: input.error ?? null,
+        failed: input.counters.failed,
         fetched: input.counters.fetched,
         finishedAt: clock.now(),
+        firstError:
+          input.firstSkipped === undefined || input.firstSkipped === null
+            ? null
+            : firstErrorText(input.firstSkipped),
         groupKey: input.groupKey,
         id: crypto.randomUUID(),
         kept: input.counters.kept,
@@ -264,6 +294,7 @@ export function createPullService(deps: PullDeps) {
     userCount: number,
     mode: "full" | "fresh" | "changes",
     error: Error,
+    firstSkipped: SkippedPosting | null = null,
   ) {
     const failures = storedNumber(FAILURE_SETTING) + 1;
     const errorText = redactPullError(error.message);
@@ -279,6 +310,7 @@ export function createPullService(deps: PullDeps) {
       JSON.stringify({
         error: error.message,
         failures,
+        firstSkipped,
         groupKey,
         mode,
         userCount,
@@ -301,7 +333,53 @@ export function createPullService(deps: PullDeps) {
     setSetting(db, clock, LAST_ALERT_AT_SETTING, String(now), "system:jobs.pull");
     setSetting(db, clock, ALERTED_FAILURES_SETTING, String(failures), "system:jobs.pull");
 
-    deps.onAlert?.({ error: errorText, failures, groupKey, mode, userCount });
+    deps.onAlert?.(
+      firstSkipped === null
+        ? { error: errorText, failures, groupKey, mode, userCount }
+        : {
+            error: errorText,
+            failedJob: firstSkipped.publicSlug,
+            failures,
+            firstError: redactPullError(firstSkipped.message),
+            groupKey,
+            mode,
+            userCount,
+          },
+    );
+  }
+
+  function noteSkipped(
+    groupKey: string,
+    userCount: number,
+    mode: "full" | "fresh",
+    skipped: SkippedPosting | null,
+    failed: number,
+  ) {
+    if (skipped === null) {
+      if (getSetting(db, LAST_SKIPPED_SETTING) !== "") {
+        setSetting(db, clock, LAST_SKIPPED_SETTING, "", "system:jobs.pull");
+      }
+
+      return;
+    }
+
+    const signature = JSON.stringify([skipped.publicSlug, skipped.message]);
+
+    if (getSetting(db, LAST_SKIPPED_SETTING) === signature) {
+      return;
+    }
+
+    setSetting(db, clock, LAST_SKIPPED_SETTING, signature, "system:jobs.pull");
+
+    deps.onAlert?.({
+      error: redactPullError(skipped.message),
+      failed,
+      failedJob: skipped.publicSlug,
+      groupKey,
+      mode,
+      source: skipped.source,
+      userCount,
+    });
   }
 
   function noteSuccess() {
@@ -319,12 +397,13 @@ export function createPullService(deps: PullDeps) {
   async function pullGroup(group: Group, mode: "full" | "fresh", since: number | null) {
     const startedAt = clock.now();
     const counters = emptyCounters();
+    const skipped: SkippedAccumulator = { first: null };
     const maxPages = Math.max(1, getSettingNumber(db, "jobs.pull_max_pages"));
 
     try {
       const pages = await collectPages(source, group, mode, since, maxPages, 0, []);
 
-      await storePagesAt(group.key, pages, 0, counters, mode, since);
+      await storePagesAt(group.key, pages, 0, counters, mode, since, skipped);
 
       const finishedAt = clock.now();
 
@@ -353,19 +432,32 @@ export function createPullService(deps: PullDeps) {
 
       recordRun({
         counters,
+        firstSkipped: skipped.first,
         groupKey: group.key,
         mode,
         startedAt,
         userCount: group.members.length,
       });
 
-      publishEvent(
-        db,
-        clock,
-        "jobs.pull",
-        JSON.stringify({ counters, groupKey: group.key, mode, userCount: group.members.length }),
-      );
+      const pullEvent =
+        skipped.first === null
+          ? {
+              counters,
+              groupKey: group.key,
+              mode,
+              userCount: group.members.length,
+            }
+          : {
+              counters,
+              firstSkipped: skipped.first,
+              groupKey: group.key,
+              mode,
+              userCount: group.members.length,
+            };
 
+      publishEvent(db, clock, "jobs.pull", JSON.stringify(pullEvent));
+
+      noteSkipped(group.key, group.members.length, mode, skipped.first, counters.failed);
       noteSuccess();
 
       return { counters, failed: false as const };
@@ -373,6 +465,7 @@ export function createPullService(deps: PullDeps) {
       recordRun({
         counters,
         error: error instanceof Error ? error.message : String(error),
+        firstSkipped: skipped.first,
         groupKey: group.key,
         mode,
         startedAt,
@@ -384,7 +477,13 @@ export function createPullService(deps: PullDeps) {
         group.members.length,
         mode,
         error instanceof Error ? error : new Error(String(error)),
+        skipped.first,
       );
+
+      if (skipped.first !== null) {
+        noteSkipped(group.key, group.members.length, mode, skipped.first, counters.failed);
+      }
+
       logError("jobs.pull", error);
 
       return { counters, failed: true as const };
@@ -398,7 +497,8 @@ export function createPullService(deps: PullDeps) {
     counters: PullCounters,
     mode: "full" | "fresh",
     since: number | null,
-  ) => Promise<void> = async (groupKey, pages, index, counters, mode, since) => {
+    skipped: SkippedAccumulator,
+  ) => Promise<void> = async (groupKey, pages, index, counters, mode, since, skipped) => {
     const page = pages[index];
 
     if (page === undefined) {
@@ -414,9 +514,9 @@ export function createPullService(deps: PullDeps) {
       );
     }
 
-    await storeJobAt(page.jobs, 0, counters, mode, since);
+    await storeJobAt(page.jobs, 0, counters, mode, since, skipped);
 
-    return storePagesAt(groupKey, pages, index + 1, counters, mode, since);
+    return storePagesAt(groupKey, pages, index + 1, counters, mode, since, skipped);
   };
 
   const storeJobAt: (
@@ -425,7 +525,8 @@ export function createPullService(deps: PullDeps) {
     counters: PullCounters,
     mode: "full" | "fresh",
     since: number | null,
-  ) => Promise<void> = async (pageJobs, index, counters, mode, since) => {
+    skipped: SkippedAccumulator,
+  ) => Promise<void> = async (pageJobs, index, counters, mode, since, skipped) => {
     const job = pageJobs[index];
 
     if (job === undefined) {
@@ -434,41 +535,45 @@ export function createPullService(deps: PullDeps) {
 
     counters.fetched += 1;
 
-    const created = timestampOf(job.created_at);
+    try {
+      const created = timestampOf(job.created_at);
 
-    if (mode === "fresh" && since !== null && created !== null && created < since) {
-      return storeJobAt(pageJobs, index + 1, counters, mode, since);
+      if (mode !== "fresh" || since === null || created === null || created >= since) {
+        if (job.closed_at !== null) {
+          counters.droppedClosed += 1;
+        } else if (atsForFreehireSource(job.source) === null) {
+          counters.droppedUnsupported += 1;
+        } else {
+          const target = await applyTarget(job);
+
+          if (target === null) {
+            counters.droppedNoLink += 1;
+          } else {
+            const outcome = store.upsert(job, target);
+
+            if (outcome.status === "duplicate") {
+              counters.droppedDuplicate += 1;
+            } else if (outcome.status === "kept") {
+              counters.kept += 1;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      const posting: SkippedPosting = {
+        externalId: job.external_id,
+        message: error instanceof Error ? error.message : String(error),
+        publicSlug: job.public_slug,
+        source: job.source,
+      };
+
+      counters.failed += 1;
+      skipped.first ??= posting;
+
+      logError("jobs.pull.store", new Error(skippedPostingText(posting)));
     }
 
-    if (job.closed_at !== null) {
-      counters.droppedClosed += 1;
-
-      return storeJobAt(pageJobs, index + 1, counters, mode, since);
-    }
-
-    if (atsForFreehireSource(job.source) === null) {
-      counters.droppedUnsupported += 1;
-
-      return storeJobAt(pageJobs, index + 1, counters, mode, since);
-    }
-
-    const target = await applyTarget(job);
-
-    if (target === null) {
-      counters.droppedNoLink += 1;
-
-      return storeJobAt(pageJobs, index + 1, counters, mode, since);
-    }
-
-    const outcome = store.upsert(job, target);
-
-    if (outcome.status === "duplicate") {
-      counters.droppedDuplicate += 1;
-    } else if (outcome.status === "kept") {
-      counters.kept += 1;
-    }
-
-    return storeJobAt(pageJobs, index + 1, counters, mode, since);
+    return storeJobAt(pageJobs, index + 1, counters, mode, since, skipped);
   };
 
   const pullNextGroup: (

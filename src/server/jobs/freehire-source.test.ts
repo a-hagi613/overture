@@ -82,6 +82,45 @@ describe("freehire search", () => {
     expect(closed?.closed_at).toBe("2026-11-18T00:00:00Z");
   });
 
+  test("rejects the whole page when one row breaks the search schema instead of skipping it", async () => {
+    let calls = 0;
+
+    const source = createFreehireJobSource({
+      clock,
+      fetchImpl: async () => {
+        calls += 1;
+
+        return await Promise.resolve(
+          jsonResponse({
+            data: [
+              {
+                company: "Acme",
+                external_id: "acme:1",
+                public_slug: "bad-row-acme",
+                source: "greenhouse",
+                title: 42,
+              },
+            ],
+            meta: { total: 1 },
+          }),
+        );
+      },
+      minIntervalMs: 0,
+      sleep: async () => await Promise.resolve(),
+    });
+
+    let failure: Error | null = null;
+
+    try {
+      await source.search({});
+    } catch (error) {
+      failure = error instanceof Error ? error : new Error(String(error));
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(calls).toBe(1);
+  });
+
   test("never asks for a page beyond freehire's 100-row ceiling", async () => {
     const urls: string[] = [];
 
