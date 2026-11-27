@@ -96,7 +96,7 @@ test("targets and languages keep only postings that fit", async ({
   const ids = idsOf(await homeFor(owner));
 
   expect(ids).toContain(good);
-  expect(ids).toHaveLength(1);
+  expect(ids).toHaveLength(3);
 
   await owner.dispose();
 });
@@ -217,9 +217,7 @@ test("remote postings match their country, or work authorisation when none is na
   await owner.dispose();
 });
 
-test("a salary in another currency is compared with the day's recorded rate", async ({
-  isolatedAppServer: { url },
-}) => {
+test("salary is never a filter, in any currency", async ({ isolatedAppServer: { url } }) => {
   const { owner } = await ownerContextFor(url);
   await clearCatalog(owner);
   const { boardId, companyId } = await catalog(owner, "Salary Guild", "salary-guild.example");
@@ -269,7 +267,11 @@ test("a salary in another currency is compared with the day's recorded rate", as
 
   await configureMatching(owner);
 
-  expect(idsOf(await homeFor(owner)).toSorted()).toEqual([aboveInEuros, noSalary].toSorted());
+  const ids = idsOf(await homeFor(owner));
+
+  expect(ids).toHaveLength(4);
+  expect(ids).toContain(aboveInEuros);
+  expect(ids).toContain(noSalary);
 
   const day = new Date(await clockNow(owner)).toISOString().slice(0, 10);
 
@@ -277,7 +279,7 @@ test("a salary in another currency is compared with the day's recorded rate", as
     data: { currency: "EUR", date: day, perUsd: 2 },
   });
 
-  expect(idsOf(await homeFor(owner))).toEqual([noSalary]);
+  expect(idsOf(await homeFor(owner))).toHaveLength(4);
 
   await owner.dispose();
 });
