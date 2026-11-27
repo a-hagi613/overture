@@ -1,4 +1,4 @@
-import type { AppDatabase } from "../platform/db/client.ts";
+import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { PickPreparationResult } from "./picks.ts";
 
@@ -25,12 +25,12 @@ import { displayFromJobPosting } from "./freehire-job.ts";
  * @returns One result per pick, keyed by the freehire posting id.
  */
 export function preparePickedJobs(
-  deps: { db: AppDatabase; clock: Clock },
+  deps: { catalogDb?: CatalogDatabase; db: AppDatabase; clock: Clock },
   userId: string,
   picks: readonly { postingId: string }[],
   excluded: ReadonlySet<string>,
 ) {
-  const { db, clock } = deps;
+  const { catalogDb, db, clock } = deps;
   const results = new Map<string, PickPreparationResult & { postingId: string }>();
 
   for (const pick of picks) {
@@ -47,7 +47,7 @@ export function preparePickedJobs(
       continue;
     }
 
-    const posting = jobPostingById({ db }, pick.postingId);
+    const posting = jobPostingById({ catalogDb, db }, pick.postingId);
     const display = posting === undefined ? undefined : displayFromJobPosting(posting);
 
     const closed = (reason: "apply_unsupported" | "company_excluded" | "posting_closed") => {

@@ -197,7 +197,12 @@ export function createOnboardingRoutes(deps: {
       (await skipCompanies.list(userId)).map((company) => normalizeCompanyName(company.name)),
     );
 
-    const results = preparePickedJobs({ db, clock }, userId, stored, skipNames);
+    const results = preparePickedJobs(
+      { catalogDb: deps.catalogDb, db, clock },
+      userId,
+      stored,
+      skipNames,
+    );
 
     picks.applyPreparation(userId, results);
 
