@@ -195,6 +195,40 @@ async function saveShots(page: Page, width: number, theme: string) {
   });
 }
 
+async function watchToastOpacity(page: Page) {
+  await page.evaluate(() => {
+    const sample = () => {
+      for (const toast of document.querySelectorAll<HTMLElement>("[data-sonner-toast]")) {
+        if (
+          toast.dataset.mounted === "true" &&
+          toast.dataset.removed !== "true" &&
+          toast.dataset.visible !== "false"
+        ) {
+          const seen = document.documentElement.dataset.toastOpacities ?? "";
+
+          document.documentElement.dataset.toastOpacities = `${seen}${getComputedStyle(toast).opacity},`;
+        }
+      }
+
+      requestAnimationFrame(sample);
+    };
+
+    requestAnimationFrame(sample);
+  });
+}
+
+async function expectToastsAtFullOpacity(page: Page) {
+  const opacities = await page.evaluate(() =>
+    (document.documentElement.dataset.toastOpacities ?? "")
+      .split(",")
+      .filter((value) => value !== "")
+      .map(Number),
+  );
+
+  expect(opacities.length).toBeGreaterThan(0);
+  expect(opacities.filter((opacity) => opacity < 1)).toEqual([]);
+}
+
 test("two applications with 5 and 3 questions and 2 shared move to Ready from one form each", async ({
   browser,
   grouped,
@@ -249,6 +283,28 @@ test("two applications with 5 and 3 questions and 2 shared move to Ready from on
 
   await dialog.getByRole("textbox", { name: kaseyaOnly[2] }).fill("A payments retry storm");
 
+  await page.evaluate(() => {
+    const sample = () => {
+      for (const toast of document.querySelectorAll<HTMLElement>("[data-sonner-toast]")) {
+        if (
+          toast.dataset.mounted === "true" &&
+          toast.dataset.removed !== "true" &&
+          toast.dataset.visible !== "false"
+        ) {
+          const seen = document.documentElement.dataset.toastOpacities ?? "";
+
+          document.documentElement.dataset.toastOpacities = `${seen}${getComputedStyle(toast).opacity},`;
+        }
+      }
+
+      requestAnimationFrame(sample);
+    };
+
+    requestAnimationFrame(sample);
+  });
+
+  await watchToastOpacity(page);
+
   const firstSave = page.waitForResponse(
     (candidate) =>
       candidate.request().method() === "POST" && candidate.url().endsWith("/api/reviews/answers"),
@@ -283,6 +339,8 @@ test("two applications with 5 and 3 questions and 2 shared move to Ready from on
 
   expect(statuses.get(kaseya)).toBe("ready");
   expect(statuses.get(northwind)).toBe("ready");
+
+  await expectToastsAtFullOpacity(page);
 
   const results = await new AxeBuilder({ page }).analyze();
 
