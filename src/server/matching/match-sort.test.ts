@@ -6,6 +6,7 @@ import {
   matchBandOf,
   matchIsVisible,
   matchPage,
+  orderedByMatchOrder,
   orderedMatches,
   orderedMatchesWithPending,
   topPicksByEmployer,
@@ -94,6 +95,17 @@ describe("the match order", () => {
     ]);
 
     expect(ordered.map((row) => row.id)).toEqual(["shown"]);
+  });
+
+  test("orders the picks a person already chose without hiding a low or unscored one", () => {
+    const ordered = orderedByMatchOrder([
+      match({ id: "low", postedAt: 1000, score: 40 }),
+      match({ id: "unscored", postedAt: 3000, score: null }),
+      match({ id: "newest", postedAt: 2000, score: 90 }),
+      match({ id: "older", postedAt: 1000, score: 90 }),
+    ]);
+
+    expect(ordered.map((row) => row.id)).toEqual(["newest", "older", "low", "unscored"]);
   });
 });
 

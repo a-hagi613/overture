@@ -65,12 +65,12 @@ const roleCounts: {
   employmentType: "full_time" | "part_time";
   role: string;
 }[] = [
-  { count: 80, employmentType: "full_time", role: "Platform Engineer" },
-  { count: 70, employmentType: "full_time", role: "Backend Engineer" },
-  { count: 63, employmentType: "full_time", role: "Site Reliability Engineer" },
-  { count: 40, employmentType: "part_time", role: "DevOps Engineer" },
-  { count: 35, employmentType: "part_time", role: "Data Engineer" },
-  { count: 30, employmentType: "part_time", role: "AI Engineer" },
+  { count: 2, employmentType: "full_time", role: "Platform Engineer" },
+  { count: 2, employmentType: "full_time", role: "Backend Engineer" },
+  { count: 2, employmentType: "full_time", role: "Site Reliability Engineer" },
+  { count: 2, employmentType: "part_time", role: "DevOps Engineer" },
+  { count: 2, employmentType: "part_time", role: "Data Engineer" },
+  { count: 2, employmentType: "part_time", role: "AI Engineer" },
 ];
 
 interface PostingSeed {
@@ -123,26 +123,37 @@ async function seedOwner(request: APIRequestContext, appServerUrl: string) {
   return owner.id;
 }
 
-async function seedBoard(request: APIRequestContext) {
+interface Employer {
+  boardId: string;
+  companyId: string;
+}
+
+async function seedEmployer(request: APIRequestContext, index: number) {
   const companyId = await created(request, "/__test__/catalog/companies", {
-    domain: "onboarding-targets.example",
-    name: "Onboarding Targets Co",
+    domain: `onboarding-targets-${String(index)}.example`,
+    name: `Onboarding Targets ${String(index)} Co`,
   });
 
   const boardId = await created(request, "/__test__/catalog/boards", {
     ats: "greenhouse",
-    boardToken: "onboarding-targets",
+    boardToken: `onboarding-targets-${String(index)}`,
     companyId,
   });
 
   return { boardId, companyId };
 }
 
+async function seedEmployers(request: APIRequestContext, count: number) {
+  return await Promise.all(
+    Array.from({ length: count }, async (_, index) => await seedEmployer(request, index)),
+  );
+}
+
 function expand<T>(rows: { count: number; value: T }[]) {
   return rows.flatMap((row) => Array.from({ length: row.count }, () => row.value));
 }
 
-function boardPostings(board: { boardId: string; companyId: string }) {
+function boardPostings(employers: readonly Employer[]) {
   const roles = expand(
     roleCounts.map((row) => ({
       count: row.count,
@@ -159,17 +170,18 @@ function boardPostings(board: { boardId: string; companyId: string }) {
 
   const postings = roles.map((mapping, index) => {
     const slot = locations[index];
+    const employer = employers[index];
 
-    if (slot === undefined) {
-      throw new Error("a posting has no location");
+    if (slot === undefined || employer === undefined) {
+      throw new Error("a posting has no location or employer");
     }
 
     return {
       ats: "greenhouse",
       atsJobId: `onboarding-targets-${String(index)}`,
-      boardId: board.boardId,
+      boardId: employer.boardId,
       city: slot.city,
-      companyId: board.companyId,
+      companyId: employer.companyId,
       countryCode: slot.countryCode,
       employmentType: mapping.employmentType,
       language: "en",
@@ -187,32 +199,47 @@ function boardPostings(board: { boardId: string; companyId: string }) {
   return postings satisfies PostingSeed[];
 }
 
-function otherSeniorityPostings(board: { boardId: string; companyId: string }) {
+function otherSeniorityPostings(employers: readonly Employer[], offset: number) {
   const rows: { count: number; seniority: string }[] = [
     { count: 5, seniority: "mid" },
     { count: 3, seniority: "principal" },
   ];
 
-  return rows.flatMap((row) =>
-    Array.from({ length: row.count }, (_, index) => ({
-      ats: "greenhouse" as const,
-      atsJobId: `onboarding-targets-${row.seniority}-${String(index)}`,
-      boardId: board.boardId,
-      city: "London",
-      companyId: board.companyId,
-      countryCode: "GB",
-      employmentType: "full_time" as const,
-      language: "en",
-      locationRaw: "London, England, United Kingdom",
-      tags: [
-        { dimension: "role" as const, value: "DevOps Engineer" },
-        { dimension: "seniority" as const, value: row.seniority },
-      ],
-      title: "DevOps Engineer",
-      url: `https://onboarding-targets.example/seniority/${row.seniority}/${String(index)}`,
-      workplace: "onsite" as const,
-    })),
-  ) satisfies PostingSeed[];
+  const postings: PostingSeed[] = [];
+  let position = offset;
+
+  for (const row of rows) {
+    for (let index = 0; index < row.count; index += 1) {
+      const employer = employers[position];
+
+      position += 1;
+
+      if (employer === undefined) {
+        throw new Error("a seniority posting has no employer");
+      }
+
+      postings.push({
+        ats: "greenhouse",
+        atsJobId: `onboarding-targets-${row.seniority}-${String(index)}`,
+        boardId: employer.boardId,
+        city: "London",
+        companyId: employer.companyId,
+        countryCode: "GB",
+        employmentType: "full_time",
+        language: "en",
+        locationRaw: "London, England, United Kingdom",
+        tags: [
+          { dimension: "role", value: "DevOps Engineer" },
+          { dimension: "seniority", value: row.seniority },
+        ],
+        title: "DevOps Engineer",
+        url: `https://onboarding-targets.example/seniority/${row.seniority}/${String(index)}`,
+        workplace: "onsite",
+      });
+    }
+  }
+
+  return postings;
 }
 
 async function seedPostings(request: APIRequestContext, postings: PostingSeed[]) {
@@ -254,11 +281,18 @@ async function seedGhostRole(
 
 export async function seedOnboardingTargetsBoard(request: APIRequestContext, appServerUrl: string) {
   const userId = await seedOwner(request, appServerUrl);
-  const board = await seedBoard(request);
+  const employers = await seedEmployers(request, 20);
+  const [employer] = employers;
+
+  if (employer === undefined) {
+    throw new Error("the onboarding targets board has no employer");
+  }
+
+  const postings = boardPostings(employers);
 
   await request.post("/__test__/catalog/postings/close-all");
-  await seedPostings(request, [...boardPostings(board), ...otherSeniorityPostings(board)]);
-  await seedGhostRole(request, board);
+  await seedPostings(request, [...postings, ...otherSeniorityPostings(employers, postings.length)]);
+  await seedGhostRole(request, employer);
 
   await request.put("/api/profile/languages", { data: { languages: ["en"] } });
   await request.put("/api/profile/targets", { data: boardTargets });
@@ -268,7 +302,12 @@ export async function seedOnboardingTargetsBoard(request: APIRequestContext, app
 
 export async function seedOnboardingTargetsFlow(request: APIRequestContext, appServerUrl: string) {
   const userId = await seedOwner(request, appServerUrl);
-  const board = await seedBoard(request);
+  const employers = await seedEmployers(request, 6);
+  const [board] = employers;
+
+  if (board === undefined) {
+    throw new Error("the onboarding flow has no employer");
+  }
 
   const postings: PostingSeed[] = [
     {
@@ -286,7 +325,7 @@ export async function seedOnboardingTargetsFlow(request: APIRequestContext, appS
         { dimension: "granular_role", value: "infra.devops" },
         { dimension: "seniority", value: "senior" },
       ],
-      title: "Platform Engineer",
+      title: "Platform Engineer I",
       url: "https://onboarding-targets.example/flow-1",
       workplace: "remote",
     },
@@ -305,7 +344,7 @@ export async function seedOnboardingTargetsFlow(request: APIRequestContext, appS
         { dimension: "granular_role", value: "infra.devops" },
         { dimension: "seniority", value: "senior" },
       ],
-      title: "Platform Engineer",
+      title: "Platform Engineer II",
       url: "https://onboarding-targets.example/flow-2",
       workplace: "remote",
     },
@@ -324,7 +363,7 @@ export async function seedOnboardingTargetsFlow(request: APIRequestContext, appS
         { dimension: "granular_role", value: "infra.devops" },
         { dimension: "seniority", value: "senior" },
       ],
-      title: "Platform Engineer",
+      title: "Platform Engineer III",
       url: "https://onboarding-targets.example/flow-3",
       workplace: "remote",
     },
@@ -385,8 +424,24 @@ export async function seedOnboardingTargetsFlow(request: APIRequestContext, appS
     },
   ];
 
+  const postingsByEmployer: PostingSeed[] = [];
+
+  for (const [index, posting] of postings.entries()) {
+    const employer = employers[index];
+
+    if (employer === undefined) {
+      throw new Error("a flow posting has no employer");
+    }
+
+    postingsByEmployer.push({
+      ...posting,
+      boardId: employer.boardId,
+      companyId: employer.companyId,
+    });
+  }
+
   await request.post("/__test__/catalog/postings/close-all");
-  await seedPostings(request, postings);
+  await seedPostings(request, postingsByEmployer);
   await seedGhostRole(request, board);
 
   return { userId };

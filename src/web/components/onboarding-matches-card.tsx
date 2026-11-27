@@ -78,7 +78,7 @@ export function OnboardingMatchesCard({
 
               return (
                 <OnboardingMatchItem
-                  disabled={!on && full}
+                  disabled={busy || (!on && full)}
                   key={match.id}
                   match={match}
                   on={on}

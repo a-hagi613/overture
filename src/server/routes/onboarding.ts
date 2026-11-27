@@ -153,8 +153,8 @@ export function createOnboardingRoutes(deps: {
     };
   }
 
-  async function matchesView(userId: string) {
-    const durable = picks.view(userId);
+  async function matchesView(userId: string, droppedPicks = 0) {
+    const durable = picks.view(userId, droppedPicks);
     const { targets } = await targetsService.read(userId);
     const { languages } = await languagesService.read(userId);
 
@@ -301,7 +301,7 @@ export function createOnboardingRoutes(deps: {
 
       context.header("Cache-Control", "no-store");
 
-      return context.json(await matchesView(account.id));
+      return context.json(await matchesView(account.id, saved.droppedPicks));
     },
   );
 
@@ -478,12 +478,18 @@ export function createOnboardingRoutes(deps: {
       return context.json({ error: "selection_required" }, 409);
     }
 
+    let droppedPicks = 0;
+
     if (stored.length === 0) {
       const saved = picks.save(account.id, postingIds);
 
       if (saved === null) {
         return context.json({ error: API_ERRORS.notFound }, 404);
       }
+
+      const { droppedPicks: savedDroppedPicks } = saved;
+
+      droppedPicks = savedDroppedPicks;
     }
 
     await retryWhenBusy(() => startOnboarding(db, clock, account.id), "onboarding.start");
@@ -494,7 +500,7 @@ export function createOnboardingRoutes(deps: {
 
     return context.json({
       onboarding: await view(account),
-      picks: picks.view(account.id),
+      picks: picks.view(account.id, droppedPicks),
       prepared,
     });
   });

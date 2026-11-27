@@ -2881,6 +2881,10 @@ export const copy = {
       poolCount: (count: number) =>
         `${String(count)} matching ${plural(count, "role", "roles")} found`,
       pickNote: (picked: number, limit: number) => `${String(picked)} of ${String(limit)} selected`,
+      droppedForEmployer: (count: number) =>
+        count === 1
+          ? "One pick was dropped: you can apply to one role per employer at a time."
+          : `${String(count)} picks were dropped: you can apply to one role per employer at a time.`,
       pickOne: (title: string, company: string) => `Select ${title} at ${company}`,
       selectedOne: (title: string, company: string) => `Selected ${title} at ${company}`,
       selected: "Selected",

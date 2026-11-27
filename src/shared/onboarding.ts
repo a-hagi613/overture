@@ -147,6 +147,8 @@ export interface OnboardingPickView {
 /** The durable batch plus its picks; the same view on every refresh and tab. */
 export interface OnboardingPicksView {
   batchStatus: OnboardingBatchStatus;
+  /** How many requested picks the last save dropped because their employer already had one. */
+  droppedPicks: number;
   pickLimit: number;
   /** The plan the person chose, or null while the last onboarding step has not decided yet. */
   planKind: OnboardingPlanKind | null;
