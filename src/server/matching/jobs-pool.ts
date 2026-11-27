@@ -1,5 +1,4 @@
-import { z } from "zod";
-import { and, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, exists, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -39,9 +38,8 @@ export interface JobPoolCriteria {
   exactCategories?: readonly string[];
   /** The title words the user named directly; absent means every title word is treated as a direct match. */
   exactTitleWords?: readonly string[];
-  countries: readonly string[];
-  cities: readonly string[];
-  regions: readonly string[];
+  /** The canonical place ids the user picked, including their remote scopes (issue #683). */
+  placeIds: readonly string[];
   /** The user's spoken languages, lower case ISO-639-1. An undetected posting language always passes. */
   languages: readonly string[];
   /** Employer names already excluded by the user or current-employer rule, normalised. */
@@ -50,8 +48,6 @@ export interface JobPoolCriteria {
   cooldownEmployers: readonly string[];
   /** Job ids the user has already applied to. */
   appliedJobIds: readonly string[];
-  /** True when the user asked for worldwide remote work, which a remote job with no place scope reaches. */
-  remoteWorldwide: boolean;
 }
 
 export interface PoolJob {
@@ -66,9 +62,8 @@ export interface PoolJob {
   locationRaw: string | null;
   workMode: "remote" | "hybrid" | "onsite" | null;
   postedAt: number | null;
-  countries: readonly string[];
-  regions: readonly string[];
-  cities: readonly string[];
+  /** The canonical place ids the posting was published for, including its remote scope. */
+  placeIds: readonly string[];
   /** The posting's own language when detection has run; null means undetected and never excludes a job. */
   language: string | null;
 }
@@ -168,37 +163,13 @@ function roleCriteria(roles: readonly string[]) {
 }
 
 function placeOverlap(job: PoolJob, criteria: JobPoolCriteria) {
-  const countries = lowerSet(criteria.countries);
-  const cities = lowerSet(criteria.cities);
-  const regions = lowerSet(criteria.regions);
-
-  if (countries.size === 0 && cities.size === 0 && regions.size === 0) {
+  if (criteria.placeIds.length === 0) {
     return true;
   }
 
-  const jobCountries = lowerSet(job.countries);
-  const jobCities = lowerSet(job.cities);
-  const jobRegions = lowerSet(job.regions);
+  const wanted = lowerSet(criteria.placeIds);
 
-  if (criteria.countries.some((country) => jobCountries.has(country.toLowerCase()))) {
-    return true;
-  }
-
-  if (criteria.cities.some((city) => jobCities.has(city.toLowerCase()))) {
-    return true;
-  }
-
-  if (criteria.regions.some((region) => jobRegions.has(region.toLowerCase()))) {
-    return true;
-  }
-
-  const remoteAndUnscoped =
-    job.workMode === "remote" &&
-    jobCountries.size === 0 &&
-    jobCities.size === 0 &&
-    jobRegions.size === 0;
-
-  return criteria.remoteWorldwide && remoteAndUnscoped;
+  return job.placeIds.some((placeId) => wanted.has(placeId.toLowerCase()));
 }
 
 function exactRoleOf(job: PoolJob, criteria: JobPoolCriteria) {
@@ -272,20 +243,6 @@ export function filterPoolJobs(rows: readonly PoolJob[], criteria: JobPoolCriter
   });
 }
 
-function parseList(value: string | null) {
-  if (value === null) {
-    return [];
-  }
-
-  try {
-    const parsed = z.array(z.string()).safeParse(JSON.parse(value));
-
-    return parsed.success ? parsed.data : [];
-  } catch {
-    return [];
-  }
-}
-
 export function criteriaFor(input: {
   targets: TargetsInput;
   languages: readonly string[];
@@ -296,22 +253,15 @@ export function criteriaFor(input: {
   const roles = roleCriteria(input.targets.roles);
   const places = placesForLocations(input.targets.locations);
 
-  const remoteWorldwide = input.targets.locations.some((location) =>
-    /^remote$/iu.test(location.trim()),
-  );
-
   return {
     appliedJobIds: [...new Set(input.appliedJobIds)],
     categories: roles.categories,
-    cities: places.cities,
     cooldownEmployers: [...new Set(input.cooldownEmployers)],
-    countries: places.countries,
     exactCategories: [...roles.exactCategories].toSorted(),
     exactTitleWords: [...roles.exactTitleWords].toSorted(),
     excludedEmployers: [...new Set(input.excludedEmployers)],
     languages: lowerList(input.languages),
-    regions: places.regions,
-    remoteWorldwide,
+    placeIds: places.placeIds,
     titleWords: roles.titleWords,
   } satisfies JobPoolCriteria;
 }
@@ -331,33 +281,21 @@ export function createJobsPool(deps: JobsPoolDeps) {
   const { db, clock } = deps;
 
   function placesFor(jobIds: readonly string[]) {
-    const byJob = new Map<string, { countries: string[]; regions: string[]; cities: string[] }>();
+    const byJob = new Map<string, string[]>();
 
     for (const id of jobIds) {
-      byJob.set(id, { cities: [], countries: [], regions: [] });
+      byJob.set(id, []);
     }
 
     for (let start = 0; start < jobIds.length; start += ID_CHUNK) {
       const chunk = jobIds.slice(start, start + ID_CHUNK);
 
       for (const row of db
-        .select({ jobId: jobPlaces.jobId, kind: jobPlaces.kind, value: jobPlaces.value })
+        .select({ jobId: jobPlaces.jobId, placeId: jobPlaces.placeId })
         .from(jobPlaces)
         .where(inArray(jobPlaces.jobId, chunk))
         .all()) {
-        const places = byJob.get(row.jobId);
-
-        if (places === undefined) {
-          continue;
-        }
-
-        if (row.kind === "country") {
-          places.countries.push(row.value);
-        } else if (row.kind === "region" || row.kind === "metro") {
-          places.regions.push(row.value);
-        } else {
-          places.cities.push(row.value);
-        }
+        byJob.get(row.jobId)?.push(row.placeId);
       }
     }
 
@@ -422,58 +360,61 @@ export function createJobsPool(deps: JobsPoolDeps) {
       ...criteria.titleWords.map((word) => sql`${jobs.titleNorm} like ${`%${word}%`}`),
     ].filter((condition) => condition !== undefined);
 
+    const conditions = [
+      eq(jobs.status, "open"),
+      roleConditions.length === 0 ? sql`0` : or(...roleConditions),
+    ];
+
+    if (criteria.placeIds.length > 0) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: jobPlaces.placeId })
+            .from(jobPlaces)
+            .where(
+              and(eq(jobPlaces.jobId, jobs.id), inArray(jobPlaces.placeId, [...criteria.placeIds])),
+            ),
+        ),
+      );
+    }
+
     const rows = db
       .select({
         category: jobs.category,
-        cities: jobs.cities,
         company: jobs.company,
         companySlug: jobs.companySlug,
-        countries: jobs.countries,
         description: jobs.description,
         descriptionHash: jobs.descriptionHash,
         id: jobs.id,
         locationRaw: jobs.locationRaw,
         postedAt: jobs.postedAt,
-        regions: jobs.regions,
         title: jobs.title,
         titleNorm: jobs.titleNorm,
         workMode: jobs.workMode,
       })
       .from(jobs)
-      .where(
-        and(eq(jobs.status, "open"), roleConditions.length === 0 ? sql`0` : or(...roleConditions)),
-      )
+      .where(and(...conditions))
       .orderBy(desc(jobs.postedAt))
       .limit(POOL_QUERY_LIMIT)
       .all();
 
     const places = placesFor(rows.map((row) => row.id));
 
-    const poolRows: PoolJob[] = rows.map((row) => {
-      const jobPlacesForRow = places.get(row.id) ?? { cities: [], countries: [], regions: [] };
-
-      return {
-        category: row.category,
-        cities: jobPlacesForRow.cities.length > 0 ? jobPlacesForRow.cities : parseList(row.cities),
-        company: row.company,
-        companySlug: row.companySlug,
-        countries:
-          jobPlacesForRow.countries.length > 0
-            ? jobPlacesForRow.countries
-            : parseList(row.countries),
-        description: row.description,
-        descriptionHash: row.descriptionHash,
-        id: row.id,
-        locationRaw: row.locationRaw,
-        language: null,
-        postedAt: row.postedAt,
-        regions:
-          jobPlacesForRow.regions.length > 0 ? jobPlacesForRow.regions : parseList(row.regions),
-        title: row.title,
-        titleNorm: row.titleNorm,
-        workMode: row.workMode,
-      };
-    });
+    const poolRows: PoolJob[] = rows.map((row) => ({
+      category: row.category,
+      company: row.company,
+      companySlug: row.companySlug,
+      description: row.description,
+      descriptionHash: row.descriptionHash,
+      id: row.id,
+      language: null,
+      locationRaw: row.locationRaw,
+      placeIds: places.get(row.id) ?? [],
+      postedAt: row.postedAt,
+      title: row.title,
+      titleNorm: row.titleNorm,
+      workMode: row.workMode,
+    }));
 
     return { criteria, jobs: filterPoolJobs(poolRows, criteria) };
   }

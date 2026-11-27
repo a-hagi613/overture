@@ -9,7 +9,15 @@ import type {
 
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
-import { grants, jobs, profiles, resumes, targets, users } from "../platform/db/schema.ts";
+import {
+  grants,
+  jobPlaces,
+  jobs,
+  profiles,
+  resumes,
+  targets,
+  users,
+} from "../platform/db/schema.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { ungatedSpend } from "../billing/spend.ts";
 import { readStoredMatches } from "./match-store.ts";
@@ -213,7 +221,7 @@ function fresh() {
   db.insert(targets)
     .values({
       employmentTypes: JSON.stringify([]),
-      locations: JSON.stringify(["Toronto"]),
+      locations: JSON.stringify(["city:ca:toronto"]),
       roles: JSON.stringify(["backend"]),
       seniorities: JSON.stringify(["senior"]),
       updatedAt: new Date(NOW),
@@ -261,6 +269,12 @@ function addJob(
       titleNorm: title.toLowerCase(),
       updatedAt: NOW,
     })
+    .run();
+  db.insert(jobPlaces)
+    .values([
+      { jobId: id, kind: "country", placeId: "country:ca" },
+      { jobId: id, kind: "city", placeId: "city:ca:toronto" },
+    ])
     .run();
 }
 

@@ -21,7 +21,7 @@ const NOW = 1_800_000_000_000;
 function targets(overrides: Partial<TargetsInput> = {}) {
   return {
     ...emptyTargets,
-    locations: ["Toronto"],
+    locations: ["city:ca:toronto"],
     roles: ["backend"],
     ...overrides,
   } satisfies TargetsInput;
@@ -31,13 +31,10 @@ function criteria(overrides: Partial<JobPoolCriteria> = {}) {
   return {
     appliedJobIds: [],
     categories: ["backend"],
-    cities: ["toronto"],
     cooldownEmployers: [],
-    countries: ["ca"],
     excludedEmployers: [],
     languages: ["en"],
-    regions: [],
-    remoteWorldwide: false,
+    placeIds: ["country:ca", "city:ca:toronto"],
     titleWords: [],
     ...overrides,
   } satisfies JobPoolCriteria;
@@ -46,17 +43,15 @@ function criteria(overrides: Partial<JobPoolCriteria> = {}) {
 function job(overrides: Partial<PoolJob> = {}) {
   return {
     category: "backend",
-    cities: ["toronto"],
     company: "Acme",
     companySlug: "acme",
-    countries: ["ca"],
     description: "Build Go services.",
     descriptionHash: "hash-1",
     id: "job-1",
     language: "en",
     locationRaw: "Toronto, Canada",
+    placeIds: ["country:ca", "city:ca:toronto"],
     postedAt: NOW,
-    regions: [],
     title: "Backend Engineer",
     titleNorm: "backend engineer",
     workMode: "onsite",
@@ -112,39 +107,38 @@ describe("the code pool", () => {
   });
 
   test("drops a remote job scoped to another country and keeps the one scoped to the candidate's", () => {
-    const criteriaValue = criteria();
+    const criteriaValue = criteria({ placeIds: ["remote:country:ca"] });
 
     const spain = job({
-      cities: [],
-      countries: ["es"],
       id: "spain",
       locationRaw: "Remote Spain",
+      placeIds: ["remote:country:es"],
       workMode: "remote",
     });
 
     const canada = job({
-      cities: [],
-      countries: ["ca"],
       id: "canada",
       locationRaw: "Remote Canada",
+      placeIds: ["remote:country:ca"],
       workMode: "remote",
     });
 
     expect(filterPoolJobs([spain, canada], criteriaValue).map((row) => row.id)).toEqual(["canada"]);
   });
 
-  test("matches an unscoped remote job only when the candidate asked for worldwide remote", () => {
+  test("matches a worldwide remote job only when the candidate asked for worldwide remote", () => {
     const worldwide = job({
-      cities: [],
-      countries: [],
       id: "worldwide",
       locationRaw: "Remote",
+      placeIds: ["remote:worldwide"],
       workMode: "remote",
     });
 
     expect(filterPoolJobs([worldwide], criteria())).toHaveLength(0);
     expect(
-      filterPoolJobs([worldwide], criteria({ remoteWorldwide: true })).map((row) => row.id),
+      filterPoolJobs([worldwide], criteria({ placeIds: ["remote:worldwide"] })).map(
+        (row) => row.id,
+      ),
     ).toEqual(["worldwide"]);
   });
 
@@ -187,13 +181,15 @@ describe("criteria from saved targets", () => {
       cooldownEmployers: [],
       excludedEmployers: [],
       languages: ["en"],
-      targets: targets({ locations: ["Toronto", "Remote"], roles: ["backend", "Kubernetes"] }),
+      targets: targets({
+        locations: ["country:ca", "remote:worldwide"],
+        roles: ["backend", "Kubernetes"],
+      }),
     });
 
     expect(value.categories).toEqual(["backend"]);
     expect(value.titleWords).toEqual(["kubernetes"]);
-    expect(value.countries).toEqual(["ca"]);
-    expect(value.remoteWorldwide).toBe(true);
+    expect(value.placeIds).toEqual(["country:ca", "remote:worldwide"]);
   });
 });
 
@@ -239,8 +235,8 @@ describe("the jobs reader", () => {
       .run();
     db.insert(jobPlaces)
       .values([
-        { jobId: "job-1", kind: "country", value: "ca" },
-        { jobId: "job-1", kind: "city", value: "toronto" },
+        { jobId: "job-1", kind: "country", placeId: "country:ca" },
+        { jobId: "job-1", kind: "city", placeId: "city:ca:toronto" },
       ])
       .run();
 
