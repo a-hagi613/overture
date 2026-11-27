@@ -1,8 +1,6 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { request as apiRequest } from "@playwright/test";
 import type { APIRequestContext, Page } from "@playwright/test";
-import { z } from "zod";
-
 import type { AppServer } from "./app-server.ts";
 
 import { expect, startFreshAppServer, test as appTest } from "./app.fixture.ts";
@@ -13,7 +11,7 @@ const test = appTest.extend<{ supplyServer: AppServer }>({
       const server = await startFreshAppServer(identityServer);
       const request = await apiRequest.newContext({ baseURL: server.url });
 
-      await seedSupplyCatalog(request);
+      await seedSupplyJobs(request);
       await request.dispose();
       await provide(server);
       await server.stop();
@@ -22,178 +20,67 @@ const test = appTest.extend<{ supplyServer: AppServer }>({
   ],
 });
 
-const createdSchema = z.object({ id: z.string() });
-
-const ATS_VALUES = ["greenhouse", "lever"] as const;
-
-interface PostingSeed {
-  ats: (typeof ATS_VALUES)[number];
-  atsJobId: string;
-  city: string;
-  countryCode: string;
-  locationRaw: string;
-  role: "Operations" | "Software Engineering";
-  granularRole: string;
-  extraTags?: readonly { dimension: "role" | "granular_role"; value: string }[];
+interface JobSeed {
+  category: string;
+  cities: string[];
+  countries: string[];
+  public_slug: string;
   title: string;
-  url: string;
-  workplace: "hybrid" | "remote";
+  work_mode: "hybrid" | "remote";
 }
 
-interface SeedRequest {
-  [field: string]: string | number | null | SeedRequest | (string | number | SeedRequest)[];
-}
-
-const OPEN_SEEDS: readonly PostingSeed[] = [
+const OPEN_SEEDS: readonly JobSeed[] = [
   {
-    ats: "greenhouse",
-    atsJobId: "supply-gh-swe-remote",
-    city: "Austin",
-    countryCode: "US",
-    locationRaw: "Austin, TX",
-    role: "Software Engineering",
-    granularRole: "Software Engineer",
+    category: "software_engineering",
+    cities: ["Austin"],
+    countries: ["us"],
+    public_slug: "supply-gh-swe-remote",
     title: "Backend Engineer",
-    url: "https://supply.example/gh-swe-remote",
-    workplace: "remote",
+    work_mode: "remote",
   },
   {
-    ats: "greenhouse",
-    atsJobId: "supply-gh-swe-onsite",
-    city: "Toronto",
-    countryCode: "CA",
-    locationRaw: "Toronto, ON",
-    role: "Software Engineering",
-    granularRole: "Software Engineer",
+    category: "software_engineering",
+    cities: ["Toronto"],
+    countries: ["ca"],
+    public_slug: "supply-gh-swe-onsite",
     title: "Platform Engineer",
-    url: "https://supply.example/gh-swe-onsite",
-    workplace: "hybrid",
+    work_mode: "hybrid",
   },
   {
-    ats: "lever",
-    atsJobId: "supply-lever-ops-remote",
-    city: "London",
-    countryCode: "GB",
-    locationRaw: "London, United Kingdom",
-    role: "Operations",
-    granularRole: "Operations Manager",
+    category: "operations",
+    cities: ["London"],
+    countries: ["gb"],
+    public_slug: "supply-lever-ops-remote",
     title: "Revenue Operations Lead",
-    url: "https://supply.example/lever-ops-remote",
-    workplace: "remote",
+    work_mode: "remote",
   },
   {
-    ats: "lever",
-    atsJobId: "supply-lever-ops-hybrid",
-    city: "London",
-    countryCode: "GB",
-    locationRaw: "London, United Kingdom",
-    role: "Operations",
-    granularRole: "Operations Manager",
+    category: "operations",
+    cities: ["London"],
+    countries: ["gb"],
+    public_slug: "supply-lever-ops-hybrid",
     title: "Business Operations Manager",
-    url: "https://supply.example/lever-ops-hybrid",
-    workplace: "hybrid",
+    work_mode: "hybrid",
   },
   {
-    ats: "greenhouse",
-    atsJobId: "supply-gh-swe-data-hybrid-label",
-    city: "Austin",
-    countryCode: "US",
-    extraTags: [
-      { dimension: "role", value: "Data & Analytics" },
-      { dimension: "granular_role", value: "Data Scientist" },
-    ],
-    locationRaw: "Austin, TX",
-    role: "Software Engineering",
-    granularRole: "Software Engineer",
+    category: "data_science",
+    cities: ["Austin"],
+    countries: ["us"],
+    public_slug: "supply-gh-swe-data",
     title: "Machine Learning Engineer",
-    url: "https://supply.example/gh-swe-data",
-    workplace: "remote",
+    work_mode: "remote",
   },
 ];
 
-const CLOSED_SEED: PostingSeed = {
-  ats: "greenhouse",
-  atsJobId: "supply-gh-swe-closed",
-  city: "Austin",
-  countryCode: "US",
-  locationRaw: "Austin, TX",
-  role: "Software Engineering",
-  granularRole: "Software Engineer",
-  title: "Closed Backend Engineer",
-  url: "https://supply.example/gh-swe-closed",
-  workplace: "remote",
-};
-
-async function created(request: APIRequestContext, path: string, data: SeedRequest) {
-  const response = await request.post(path, { data });
+async function seedSupplyJobs(request: APIRequestContext) {
+  const response = await request.post("/__test__/jobs/seed", {
+    data: { jobs: OPEN_SEEDS },
+  });
 
   if (!response.ok()) {
-    throw new Error(`${path} failed: ${String(response.status())} ${await response.text()}`);
-  }
-
-  return createdSchema.parse(await response.json()).id;
-}
-
-async function seedSupplyCatalog(request: APIRequestContext) {
-  const cleared = await request.post("/__test__/catalog/postings/close-all");
-
-  if (!cleared.ok()) {
-    throw new Error(`closing the template catalog failed: ${String(cleared.status())}`);
-  }
-
-  const companyId = await created(request, "/__test__/catalog/companies", {
-    domain: "supply.example",
-    name: "Supply Preview Co",
-  });
-
-  const boards = new Map<string, string>();
-
-  const boardEntries = await Promise.all(
-    ATS_VALUES.map(async (ats) => ({
-      ats,
-      id: await created(request, "/__test__/catalog/boards", {
-        ats,
-        boardToken: `supply-${ats}`,
-        companyId,
-      }),
-    })),
-  );
-
-  for (const entry of boardEntries) {
-    boards.set(entry.ats, entry.id);
-  }
-
-  const postingFor = (seed: PostingSeed) =>
-    ({
-      ats: seed.ats,
-      atsJobId: seed.atsJobId,
-      boardId: boards.get(seed.ats) ?? "",
-      city: seed.city,
-      companyId,
-      countryCode: seed.countryCode,
-      employmentType: "full_time",
-      language: "en",
-      locationRaw: seed.locationRaw,
-      tags: [
-        { dimension: "role", value: seed.role },
-        { dimension: "granular_role", value: seed.granularRole },
-        ...(seed.extraTags ?? []),
-      ],
-      title: seed.title,
-      url: seed.url,
-      workplace: seed.workplace,
-    }) satisfies SeedRequest;
-
-  const closedId = await created(request, "/__test__/catalog/postings", postingFor(CLOSED_SEED));
-
-  await request.post("/__test__/catalog/postings/close", { data: { id: closedId } });
-
-  const bulk = await request.post("/__test__/catalog/postings/bulk", {
-    data: { postings: OPEN_SEEDS.map((seed) => postingFor(seed)) },
-  });
-
-  if (!bulk.ok()) {
-    throw new Error(`postings bulk failed: ${String(bulk.status())} ${await bulk.text()}`);
+    throw new Error(
+      `seeding freehire jobs failed: ${String(response.status())} ${await response.text()}`,
+    );
   }
 }
 

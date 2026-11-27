@@ -1,22 +1,28 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import type { Database } from "bun:sqlite";
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { count } from "drizzle-orm";
 import { Hono } from "hono";
+
+import type { FreehireJobRecord } from "../../shared/freehire.ts";
 
 import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
 import { createClock } from "../platform/ports/clock.ts";
+import { createJobStore } from "../jobs/store.ts";
+import { postings } from "../platform/db/catalog-schema.ts";
+import { suggestLocations } from "../catalog/geo-suggest.ts";
+import { resolvePlaceText } from "../places/resolve.ts";
 import { createSupplyRoutes } from "./supply.ts";
 import { locationSuggestionsResponseSchema, supplyCountsSchema } from "../../shared/supply.ts";
 
 const NOW = 1_800_000_000_000;
 const RATE_LIMIT_MAX = 120;
 
-const INSERT_POSTING = `INSERT INTO postings (id, board_id, company_id, ats, ats_job_id, url, apply_url_norm,
-  title, title_norm, location_raw, country_code, city, language, workplace, employment_type,
-  first_seen_at, last_seen_at, closed_at, status, apply_supported, dedupe_key)
-  VALUES (?, 'board', 'company', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en', ?, 'full_time', ?, ?, ?, ?, ?, ?)`;
-
 const handles: { close: () => void }[] = [];
+
+beforeAll(() => {
+  suggestLocations("ott");
+  resolvePlaceText("Ottawa");
+});
 
 afterEach(() => {
   for (const handle of handles.splice(0)) {
@@ -24,88 +30,185 @@ afterEach(() => {
   }
 });
 
-function seedPosting(
-  sqlite: Database,
-  id: string,
-  ats: "greenhouse" | "lever",
-  role: "Operations" | "Software Engineering",
-  workplace: "hybrid" | "remote",
-  options: { closed?: boolean; granularRole?: string } = {},
+type TestAts = "ashby" | "greenhouse" | "lever";
+
+const record: (overrides?: Partial<FreehireJobRecord>) => FreehireJobRecord = (overrides = {}) => {
+  const publicSlug = overrides.public_slug ?? "senior-software-engineer-acme";
+
+  return {
+    apply_url: null,
+    cities: ["Toronto"],
+    closed_at: null,
+    company: "Acme",
+    company_slug: "acme",
+    countries: ["ca"],
+    created_at: "2026-11-20T09:00:00Z",
+    description: null,
+    enrichment: { category: "software_engineering" },
+    external_id: `acme:${publicSlug}`,
+    location: "Toronto, Canada",
+    metros: null,
+    posted_at: "2026-11-20T00:00:00Z",
+    public_slug: publicSlug,
+    reality: null,
+    regions: null,
+    skills: null,
+    source: "greenhouse",
+    title: "Senior Software Engineer",
+    url: null,
+    work_mode: null,
+    ...overrides,
+  };
+};
+
+function storeJob(
+  db: ReturnType<typeof openDatabase>["db"],
+  job: FreehireJobRecord,
+  ats: TestAts = "greenhouse",
 ) {
-  const closed = options.closed === true;
+  createJobStore({ clock: { now: () => NOW }, db }).upsert(job, {
+    applyUrl: `https://jobs.example/${job.public_slug}`,
+    ats,
+    atsJobId: job.public_slug,
+    boardToken: "acme",
+    via: "direct",
+  });
+}
 
-  sqlite
-    .prepare(INSERT_POSTING)
-    .run(
-      id,
-      ats,
-      id,
-      `https://jobs.example/${id}`,
-      `https://jobs.example/${id}`,
-      `Role ${id}`,
-      "role",
-      "Austin, TX",
-      "US",
-      "Austin",
-      workplace,
-      NOW,
-      NOW,
-      closed ? NOW : null,
-      closed ? "closed" : "open",
-      1,
-      id,
-    );
-  sqlite
-    .prepare(
-      "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, 'role', ?, 'rules')",
-    )
-    .run(id, role);
+function seedJobs(db: ReturnType<typeof openDatabase>["db"]) {
+  storeJob(
+    db,
+    record({
+      cities: ["Toronto"],
+      countries: ["ca"],
+      public_slug: "gh-swe-remote-toronto",
+      work_mode: "remote",
+    }),
+  );
+  storeJob(
+    db,
+    record({
+      cities: ["Austin"],
+      countries: ["us"],
+      location: "Austin, United States",
+      public_slug: "gh-swe-remote-austin",
+      work_mode: "remote",
+    }),
+  );
+  storeJob(
+    db,
+    record({
+      cities: ["New York"],
+      countries: ["us"],
+      enrichment: { category: "operations" },
+      external_id: "lever:ops-remote",
+      location: "New York, United States",
+      public_slug: "lever-ops-remote-new-york",
+      source: "lever",
+      title: "Operations Manager",
+      work_mode: "remote",
+    }),
+    "lever",
+  );
+  storeJob(
+    db,
+    record({
+      cities: ["Toronto"],
+      countries: ["ca"],
+      enrichment: { category: "operations" },
+      external_id: "lever:ops-hybrid",
+      public_slug: "lever-ops-hybrid-toronto",
+      source: "lever",
+      title: "Operations Manager",
+      work_mode: "hybrid",
+    }),
+    "lever",
+  );
+  storeJob(
+    db,
+    record({
+      cities: ["Berlin"],
+      countries: ["de"],
+      enrichment: { category: "design" },
+      external_id: "ashby:design-berlin",
+      location: "Berlin, Germany",
+      public_slug: "ashby-design-berlin",
+      source: "ashby",
+      title: "Product Designer",
+      work_mode: "onsite",
+    }),
+    "ashby",
+  );
+  storeJob(
+    db,
+    record({
+      cities: ["Ottawa"],
+      countries: ["ca"],
+      enrichment: { category: "education" },
+      location: "Ottawa, Canada",
+      public_slug: "gh-teacher-ottawa",
+      title: "Primary Teacher",
+      work_mode: "hybrid",
+    }),
+  );
+  storeJob(
+    db,
+    record({
+      cities: ["Mississauga"],
+      countries: ["ca"],
+      enrichment: { category: "support" },
+      location: "Mississauga, Canada",
+      public_slug: "gh-support-mississauga",
+      title: "Customer Support Specialist",
+      work_mode: "hybrid",
+    }),
+  );
+  storeJob(
+    db,
+    record({
+      cities: ["Austin"],
+      countries: ["us"],
+      enrichment: { category: "ml_ai" },
+      location: "Austin, United States",
+      public_slug: "gh-ml-remote-austin",
+      title: "Machine Learning Engineer",
+      work_mode: "remote",
+    }),
+  );
 
-  if (options.granularRole !== undefined) {
-    sqlite
-      .prepare(
-        "INSERT INTO posting_tags (posting_id, dimension, value, source) VALUES (?, 'granular_role', ?, 'rules')",
-      )
-      .run(id, options.granularRole);
-  }
+  storeJob(
+    db,
+    record({
+      public_slug: "gh-swe-remote-closed",
+      work_mode: "remote",
+    }),
+  );
+  createJobStore({ clock: { now: () => NOW }, db }).close("gh-swe-remote-closed", NOW);
+
+  storeJob(
+    db,
+    record({
+      public_slug: "gh-talent-pool",
+      title: "Talent Pool - Future Opportunities",
+      work_mode: "remote",
+    }),
+  );
 }
 
 function createTestApp() {
   const app = openDatabase(":memory:");
-  const catalog = openCatalogDatabase(":memory:");
 
-  handles.push(app.sqlite, catalog.sqlite);
+  handles.push(app.sqlite);
 
   migrateDatabase(app.db, "drizzle");
-  migrateCatalogDatabase(catalog.db, "drizzle-catalog");
 
-  catalog.sqlite.run(
-    "INSERT INTO companies (id, name, name_norm, created_at) VALUES ('company', 'Co', 'co', 1)",
-  );
-  catalog.sqlite.run(
-    "INSERT INTO company_boards (id, company_id, ats, board_token, region, status, source, created_at) VALUES ('board', 'company', 'greenhouse', 'token', 'us', 'active', 'import', 1)",
-  );
-
-  catalog.sqlite.run("BEGIN");
-  seedPosting(catalog.sqlite, "gh-swe-remote", "greenhouse", "Software Engineering", "remote");
-  seedPosting(catalog.sqlite, "gh-swe-remote-2", "greenhouse", "Software Engineering", "remote", {
-    granularRole: "Software Engineer",
-  });
-  seedPosting(catalog.sqlite, "lever-ops-remote", "lever", "Operations", "remote", {
-    granularRole: "Operations Manager",
-  });
-  seedPosting(catalog.sqlite, "lever-ops-hybrid", "lever", "Operations", "hybrid");
-  seedPosting(catalog.sqlite, "gh-swe-closed", "greenhouse", "Software Engineering", "remote", {
-    closed: true,
-  });
-  catalog.sqlite.run("COMMIT");
+  seedJobs(app.db);
 
   const routes = new Hono();
 
   routes.route(
     "/api",
     createSupplyRoutes({
-      catalogDb: catalog.db,
       clientIpConfig: { flyAppName: undefined, nodeEnv: "test" },
       clock: createClock(),
       db: app.db,
@@ -120,7 +223,7 @@ async function request(app: Hono, path: string, ip = "203.0.113.7") {
 }
 
 describe("GET /api/supply", () => {
-  test("answers an unauthenticated aggregate count with a public cache header", async () => {
+  test("answers an unauthenticated aggregate count of open freehire jobs with a public cache header", async () => {
     const app = createTestApp();
     const response = await request(app, "/api/supply");
 
@@ -130,37 +233,41 @@ describe("GET /api/supply", () => {
 
     const body = supplyCountsSchema.parse(await response.json());
 
-    expect(body.total).toBe(4);
+    expect(body.total).toBe(8);
     expect(body.byAts).toEqual([
-      { ats: "greenhouse", count: 2 },
+      { ats: "greenhouse", count: 5 },
       { ats: "lever", count: 2 },
+      { ats: "ashby", count: 1 },
     ]);
   });
 
-  test("filters by role, location and remote", async () => {
+  test("counts the freehire jobs table even when the legacy catalog is empty", async () => {
+    const app = createTestApp();
+    const catalog = openCatalogDatabase(":memory:");
+
+    handles.push(catalog.sqlite);
+
+    migrateCatalogDatabase(catalog.db, "drizzle-catalog");
+
+    expect(catalog.db.select({ total: count() }).from(postings).get()?.total).toBe(0);
+
+    const body = supplyCountsSchema.parse(await (await request(app, "/api/supply")).json());
+
+    expect(body.total).toBe(8);
+  });
+
+  test("filters by freehire category, legacy category, granular role, location and remote", async () => {
     const app = createTestApp();
 
-    const byRole = supplyCountsSchema.parse(
-      await (await request(app, "/api/supply?role=Software%20Engineering")).json(),
+    const byFreehireCategory = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?role=software_engineering")).json(),
     );
 
-    const byLocation = supplyCountsSchema.parse(
-      await (await request(app, "/api/supply?location=Austin")).json(),
+    const byLegacyCategory = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?role=software-it")).json(),
     );
 
-    const remote = supplyCountsSchema.parse(
-      await (await request(app, "/api/supply?remote=true")).json(),
-    );
-
-    const both = supplyCountsSchema.parse(
-      await (await request(app, "/api/supply?role=Software%20Engineering&remote=1")).json(),
-    );
-
-    const nothing = supplyCountsSchema.parse(
-      await (await request(app, "/api/supply?role=Design")).json(),
-    );
-
-    const byCategoryAlias = supplyCountsSchema.parse(
+    const byLegacyCategoryName = supplyCountsSchema.parse(
       await (await request(app, "/api/supply?category=Software%20Engineering")).json(),
     );
 
@@ -168,20 +275,85 @@ describe("GET /api/supply", () => {
       await (await request(app, "/api/supply?granularRole=Software%20Engineer")).json(),
     );
 
-    const granularWins = supplyCountsSchema.parse(
+    const byCity = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?location=Toronto")).json(),
+    );
+
+    const byCountry = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?location=Canada")).json(),
+    );
+
+    const remote = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?remote=true")).json(),
+    );
+
+    const both = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?role=operations&location=Toronto&remote=1")).json(),
+    );
+
+    const byLegacyDataCategory = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?role=data-ai")).json(),
+    );
+
+    const nothing = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?role=legal")).json(),
+    );
+
+    expect(byFreehireCategory.total).toBe(2);
+    expect(byLegacyCategory.total).toBe(2);
+    expect(byLegacyCategoryName.total).toBe(2);
+    expect(byGranularRole.total).toBe(2);
+    expect(byCity.total).toBe(2);
+    expect(byCountry.total).toBe(4);
+    expect(remote.total).toBe(4);
+    expect(both.total).toBe(0);
+    expect(byLegacyDataCategory.total).toBe(1);
+    expect(nothing.total).toBe(0);
+  });
+
+  test("expands a city by radius, counting neighbouring jobs that carry their own city place id", async () => {
+    const app = createTestApp();
+
+    const nearby = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?location=Toronto&radius=80")).json(),
+    );
+
+    expect(nearby.total).toBe(3);
+  });
+
+  test("excludes closed rows and non-jobs from every total", async () => {
+    const app = createTestApp();
+
+    const remote = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?remote=true")).json(),
+    );
+
+    const byCategory = supplyCountsSchema.parse(
+      await (await request(app, "/api/supply?role=software_engineering")).json(),
+    );
+
+    expect(remote.total).toBe(4);
+    expect(byCategory.total).toBe(2);
+  });
+
+  test("keeps landing location suggestions consistent with the place ids the count reads", async () => {
+    const app = createTestApp();
+    const suggestionsResponse = await request(app, "/api/supply/locations?q=ott");
+
+    expect(suggestionsResponse.status).toBe(200);
+
+    const suggestions = locationSuggestionsResponseSchema.parse(await suggestionsResponse.json());
+    const ottawa = suggestions.suggestions.find((item) => item.label === "Ottawa");
+
+    expect(ottawa).toBeDefined();
+
+    const body = supplyCountsSchema.parse(
       await (
-        await request(app, "/api/supply?role=Operations&granularRole=Software%20Engineer&remote=1")
+        await request(app, `/api/supply?location=${encodeURIComponent(ottawa?.value ?? "")}`)
       ).json(),
     );
 
-    expect(byRole.total).toBe(2);
-    expect(byLocation.total).toBe(4);
-    expect(remote.total).toBe(3);
-    expect(both.total).toBe(2);
-    expect(nothing.total).toBe(0);
-    expect(byCategoryAlias.total).toBe(2);
-    expect(byGranularRole.total).toBe(1);
-    expect(granularWins.total).toBe(1);
+    expect(body.total).toBe(1);
   });
 
   test("refuses an unknown role, granular role or a one-character location with invalid_request", async () => {
