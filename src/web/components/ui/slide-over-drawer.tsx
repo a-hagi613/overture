@@ -91,6 +91,7 @@ function DrawerPanel({
       aria-labelledby={ariaLabel === undefined ? titleId : undefined}
       aria-modal="true"
       className="ov-drawer-in fixed inset-y-0 right-0 left-auto z-40 m-0 flex h-full max-h-none w-full max-w-xl flex-col overflow-hidden rounded-none border-0 border-l border-border bg-card p-0 text-foreground shadow-lift outline-none"
+      data-sheet-backdrop="lift"
       ref={sheetRef}
       tabIndex={-1}
     >

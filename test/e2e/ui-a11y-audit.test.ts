@@ -32,7 +32,7 @@ function viewportFor(width: number) {
 
 for (const width of widths) {
   for (const theme of themes) {
-    test(`captures the accessible Ready drawer and sign-in error at ${String(width)}px ${theme}`, async ({
+    test(`captures the Ready drawer, sign-in error and support validation at ${String(width)}px ${theme}`, async ({
       browser,
       auditServer,
     }) => {

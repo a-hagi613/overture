@@ -24,7 +24,10 @@ export function LandingLiveCounter() {
   }, [reduceMotion]);
 
   return (
-    <p className="mt-4 inline-flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+    <p
+      className="mt-4 inline-flex items-center gap-2 text-xs text-muted-foreground sm:text-sm"
+      data-testid="hero-counter"
+    >
       <span
         aria-hidden="true"
         className="relative flex h-2.5 w-2.5 flex-none items-center justify-center"

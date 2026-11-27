@@ -81,6 +81,7 @@ function ConfirmPanel({
       aria-labelledby={titleId}
       aria-modal="true"
       className="fixed left-1/2 top-1/2 z-50 m-0 w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-5 text-foreground shadow-lift outline-none"
+      data-sheet-backdrop="lift"
       ref={dialogRef}
       tabIndex={-1}
     >
