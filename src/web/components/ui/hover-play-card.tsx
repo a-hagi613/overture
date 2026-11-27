@@ -1,5 +1,5 @@
 import { Pause, Play } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 
@@ -46,8 +46,6 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const prevMutedRef = useRef<boolean | null>(null);
-  const reduceMotion = useReducedMotion() === true;
-
   const [isHovering, setIsHovering] = useState(false);
   const [hasFocus, setHasFocus] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -78,7 +76,7 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
     }
 
     if (video?.getAttribute("src") === src) {
-      if (isHovering && !userStarted && !reduceMotion) {
+      if (isHovering && !userStarted) {
         void playMuted(video);
       } else if (!isHovering && !userStarted) {
         video.pause();
@@ -92,7 +90,7 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
     return () => {
       ignore = true;
     };
-  }, [isHovering, mutedOnHover, reduceMotion, src, userStarted]);
+  }, [isHovering, mutedOnHover, src, userStarted]);
 
   async function togglePlayback(video: HTMLVideoElement) {
     if (!video.paused) {
@@ -127,7 +125,7 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
   const handleLoadedData = async () => {
     const video = videoRef.current;
 
-    if (video === null || !isHovering || reduceMotion || userStarted || !video.paused) {
+    if (video === null || !isHovering || userStarted || !video.paused) {
       return;
     }
 
