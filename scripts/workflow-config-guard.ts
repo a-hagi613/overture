@@ -736,6 +736,10 @@ function readJobBlock(source: string, name: string) {
  */
 export const DEPLOY_CHECKOUT_REF = `ref: \${{ github.event.workflow_run.head_sha || github.sha }}`;
 
+/** The deploy step that refuses a commit that already has a Deploy run, and a deploy without `FLY_API_TOKEN`. */
+export const DEPLOY_GUARD_STEP =
+  "Skip when this commit already has a Deploy run, or while FLY_API_TOKEN is unset";
+
 /**
  * Checks the deploy workflow ships the three Cloudflare Workers without wiping dashboard-set values or leaking the
  * API token, and that the marketing Worker ships the Fly release's own prerendered page instead of a second build.
@@ -1159,6 +1163,24 @@ export function findDeployTriggerProblems(input: DeployTriggerInput) {
         "deploy.yml's deploy job no longer runs for the CI workflow_run, so a human merge stops deploying",
       );
     }
+  }
+
+  const guard = readWorkflowStep(input.deploy, DEPLOY_GUARD_STEP);
+
+  if (guard === null) {
+    problems.push(
+      "deploy.yml has no guard that skips a commit that already has a Deploy run, so two triggers can deploy one tree twice",
+    );
+  } else if (!guard.includes("gh run list") || !guard.includes("skip=true")) {
+    problems.push(
+      "deploy.yml's guard does not consult this workflow's runs for the same commit, so two triggers can deploy one tree twice",
+    );
+  }
+
+  if (!/^ {6}force:\s*$/mu.test(input.deploy)) {
+    problems.push(
+      "deploy.yml has no force input, so a commit that already deployed cannot be deployed again deliberately",
+    );
   }
 
   if (workersJob !== null && !workersJob.includes("github.event_name == 'workflow_dispatch'")) {
