@@ -78,11 +78,6 @@ function portFor(model: string) {
   );
 }
 
-interface ScoredCall {
-  costMicros: number;
-  reply: ReturnType<typeof parseScoreReply>;
-}
-
 async function askOnce(llm: LlmPort, fixture: Fixture, job: FixtureJob) {
   const request = scoreRequestFor({
     candidate: { resume: fixture.resume, targets: fixture.targets },
