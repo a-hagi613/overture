@@ -26,6 +26,19 @@ $0.03 gate over the last hour and there were at least five sends to judge.
 form changed or a provider retried; model cost belongs to the matching and
 answer steps, not the browser session.
 
+## `jobs.pull`
+
+**Means:** three pulls in a row failed. The alert detail carries `error` (the
+source's message, capped at 300 characters), `mode` (`full`, `fresh` or
+`changes`), `userCount` and the current `failures` count.
+
+**First check:** read `jobs.pull_last_error` and the `jobs.pull.failed` events,
+then the latest `job_pull_runs` rows (`error`, `group_key`, `mode`). A freehire
+429 or 5xx is usually transient; a 4xx or a shape error means the source
+changed. A still-failing pull pages at most every six hours (or every 24 more
+failures), so a repeat page means it has not recovered. No job is deleted or
+closed while the pull fails.
+
 ## `match.unscored`
 
 **Means:** more than 2,000 `matches` rows have no score, so the scored queue is
