@@ -60,6 +60,7 @@ import { createClock } from "./platform/ports/clock.ts";
 import { createFreehireJobSource } from "./jobs/freehire-source.ts";
 import type { FreehireSourceOptions } from "./jobs/freehire-source.ts";
 import { createJobStore } from "./jobs/store.ts";
+import { backfillJobLanguages } from "./jobs/backfill.ts";
 import { resolveApplyTarget } from "./jobs/apply-link.ts";
 import { createRateLimiter } from "./catalog/rate-limiter.ts";
 import {
@@ -331,6 +332,12 @@ const rebuiltJobPlaces = rebuildStoredJobPlaces(db);
 
 if (rebuiltJobPlaces > 0) {
   logInfo("boot", `rebuilt canonical place ids for ${String(rebuiltJobPlaces)} jobs`);
+}
+
+const languagesBackfilled = backfillJobLanguages(db);
+
+if (languagesBackfilled > 0) {
+  logInfo("boot", `backfilled the language on ${String(languagesBackfilled)} stored jobs`);
 }
 
 if (localCatalog === null) {

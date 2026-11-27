@@ -9,6 +9,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { jobPlaces, jobs, matches } from "../platform/db/schema.ts";
 import { enqueueMatchRescoreJob } from "../matching/match-jobs.ts";
+import { detectLanguage } from "../catalog/language.ts";
 import type { ApplyTarget } from "./apply-link.ts";
 import { jobPlaceRows } from "../places/job-places.ts";
 
@@ -121,6 +122,7 @@ export function createJobStore(deps: { db: AppDatabase; clock: Clock }) {
       firstSeenAt: now,
       freehireSource: job.source,
       id: job.public_slug,
+      language: detectLanguage(job.description ?? ""),
       lastSeenAt: now,
       locationRaw: job.location,
       metros: job.metros === null ? null : JSON.stringify(job.metros),
@@ -160,6 +162,7 @@ export function createJobStore(deps: { db: AppDatabase; clock: Clock }) {
           closedAt: values.closedAt,
           description: values.description,
           descriptionHash: values.descriptionHash,
+          language: values.language,
           lastSeenAt: now,
           status: "open",
           updatedAt: now,

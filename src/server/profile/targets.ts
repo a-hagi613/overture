@@ -1,4 +1,4 @@
-import { and, count, eq, exists, inArray, or, sql } from "drizzle-orm";
+import { and, count, eq, exists, inArray, isNull, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
@@ -7,6 +7,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { jobPlaces, jobs, targets } from "../platform/db/schema.ts";
 import { isFreehireCategory } from "../../shared/freehire-categories.ts";
+import { nonJobTitleCondition } from "../jobs/non-job.ts";
 import { emptyTargets, targetsInputSchema } from "../../shared/targets.ts";
 import { promotePlaceValues } from "../places/resolve.ts";
 
@@ -65,12 +66,24 @@ function roleCondition(filters: MatchFilters) {
   return parts.length === 0 ? null : or(...parts);
 }
 
-function countMatches(db: AppDatabase, filters: MatchFilters) {
+function countMatches(db: AppDatabase, filters: MatchFilters, languages: readonly string[]) {
   const role = roleCondition(filters);
 
   if (role === null || filters.placeIds.length === 0) {
     return 0;
   }
+
+  const language =
+    languages.length === 0
+      ? undefined
+      : or(
+          isNull(jobs.language),
+          eq(jobs.language, ""),
+          inArray(
+            sql`lower(${jobs.language})`,
+            languages.map((languageValue) => languageValue.toLowerCase()),
+          ),
+        );
 
   const rows = db
     .select({ total: count() })
@@ -78,6 +91,8 @@ function countMatches(db: AppDatabase, filters: MatchFilters) {
     .where(
       and(
         eq(jobs.status, "open"),
+        nonJobTitleCondition(jobs.titleNorm),
+        language,
         role,
         exists(
           db
@@ -92,8 +107,13 @@ function countMatches(db: AppDatabase, filters: MatchFilters) {
   return rows.at(0)?.total ?? 0;
 }
 
-function cacheKeyOf(filters: MatchFilters) {
-  return JSON.stringify([filters.categories, filters.titleWords, filters.placeIds]);
+function cacheKeyOf(filters: MatchFilters, languages: readonly string[]) {
+  return JSON.stringify([
+    filters.categories,
+    filters.titleWords,
+    filters.placeIds,
+    languages.map((language) => language.toLowerCase()).toSorted(),
+  ]);
 }
 
 function databaseRevision(db: AppDatabase) {
@@ -117,15 +137,21 @@ function databaseRevision(db: AppDatabase) {
 /**
  * Counts the open jobs a candidate's preferences match. Role and location are the only hard filters (issue #684):
  * a job passes when its freehire category is picked or its title contains a picked title word, and one of its place
- * ids is picked. The store keeps only jobs with an apply adapter, so every open row is apply-supported.
+ * ids is picked. Non-jobs are never counted, and a job in a language the candidate does not read is not counted.
+ * The store keeps only jobs with an apply adapter, so every open row is apply-supported.
  *
  * The cache key is the normalized filters plus a cheap database revision (`PRAGMA data_version` plus
  * `total_changes()`), so any write to the job tables invalidates every entry. The store is a 512-entry LRU.
  * @param db The application database.
  * @param input The candidate's preferences.
+ * @param languages The languages the candidate reads; empty keeps the language gate open.
  * @returns How many open jobs pass the filters, or 0 when a required filter is empty.
  */
-export function countMatchingJobs(db: AppDatabase, input: z.input<typeof targetsInputSchema>) {
+export function countMatchingJobs(
+  db: AppDatabase,
+  input: z.input<typeof targetsInputSchema>,
+  languages: readonly string[] = [],
+) {
   const parsed = targetsInputSchema.parse(input);
   const filters = normalizeFilters(parsed);
 
@@ -140,7 +166,7 @@ export function countMatchingJobs(db: AppDatabase, input: z.input<typeof targets
   const revision = databaseRevision(db);
 
   if (revision === null) {
-    return countMatches(db, filters);
+    return countMatches(db, filters, languages);
   }
 
   let cache = matchCountCaches.get(db);
@@ -150,7 +176,7 @@ export function countMatchingJobs(db: AppDatabase, input: z.input<typeof targets
     matchCountCaches.set(db, cache);
   }
 
-  const key = cacheKeyOf(filters);
+  const key = cacheKeyOf(filters, languages);
   const cached = cache.entries.get(key);
 
   if (cached !== undefined) {
@@ -160,7 +186,7 @@ export function countMatchingJobs(db: AppDatabase, input: z.input<typeof targets
     return cached;
   }
 
-  const value = countMatches(db, filters);
+  const value = countMatches(db, filters, languages);
 
   cache.entries.set(key, value);
 

@@ -73,6 +73,7 @@ interface Seed {
   region: string | null;
   role: string | null;
   subrole: string | null;
+  title?: string;
   workplace: "hybrid" | "onsite" | "remote" | "unknown";
 }
 
@@ -133,8 +134,8 @@ function insertSeed(sqlite: Database, seed: Seed) {
       seed.id,
       url,
       url,
-      `Role ${seed.id}`,
-      `role ${seed.id}`,
+      seed.title ?? `Role ${seed.id}`,
+      (seed.title ?? `Role ${seed.id}`).toLowerCase(),
       seed.city === null ? (seed.countryCode ?? "Remote") : `${seed.city}, ${seed.countryCode}`,
       seed.countryCode,
       seed.region,
@@ -226,6 +227,28 @@ function expectParity(db: ReturnType<typeof catalog>["db"], filters: SupplyFilte
 }
 
 describe("supply_facets", () => {
+  test("excludes a non-job title from the live count and the rollup", () => {
+    const target = catalog();
+
+    insertSeed(target.sqlite, {
+      ats: "greenhouse",
+      applySupported: true,
+      city: "Toronto",
+      closed: false,
+      countryCode: "CA",
+      id: "talent-pool",
+      region: "Ontario",
+      role: "Software Engineering",
+      subrole: null,
+      title: "Talent Pool - Future Opportunities",
+      workplace: "onsite",
+    });
+    rebuildSupplyFacets(target.db);
+
+    expect(countSupplyLive(target.db, filter()).total).toBe(0);
+    expect(supplyFacetTotals(target.db, filter())?.total ?? 0).toBe(0);
+  });
+
   test("matches the live count for every deterministic filter combination", () => {
     const target = seededCatalog(600);
 

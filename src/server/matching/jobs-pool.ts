@@ -8,22 +8,14 @@ import { applications, jobPlaces, jobs, skipCompanies } from "../platform/db/sch
 import { getSettingNumber } from "../platform/settings/index.ts";
 import { normalizeCompanyName } from "../profile/skip-companies.ts";
 import { isFreehireCategory } from "../../shared/freehire-categories.ts";
+import { isNonJobTitle } from "../../shared/non-job.ts";
 import { placesForLocations } from "../jobs/preferences.ts";
 
 const DAY_MS = 86_400_000;
 const POOL_QUERY_LIMIT = 5000;
 const ID_CHUNK = 400;
 
-const NON_JOB_TITLES = [
-  "general application",
-  "join our talent",
-  "open application",
-  "speculative application",
-  "talent pipeline",
-  "talent pool",
-  "test job",
-  "placeholder",
-] as const;
+export { isNonJobTitle } from "../../shared/non-job.ts";
 
 export interface JobPoolCriteria {
   categories: readonly string[];
@@ -88,12 +80,6 @@ function lowerSet(values: readonly string[]) {
 
 function lowerList(values: readonly string[]) {
   return lowerValues(values);
-}
-
-export function isNonJobTitle(title: string) {
-  const normalized = normalizeWord(title);
-
-  return NON_JOB_TITLES.some((phrase) => normalized.includes(phrase));
 }
 
 /**
@@ -370,6 +356,7 @@ export function createJobsPool(deps: JobsPoolDeps) {
         description: jobs.description,
         descriptionHash: jobs.descriptionHash,
         id: jobs.id,
+        language: jobs.language,
         locationRaw: jobs.locationRaw,
         postedAt: jobs.postedAt,
         title: jobs.title,
@@ -391,7 +378,7 @@ export function createJobsPool(deps: JobsPoolDeps) {
       description: row.description,
       descriptionHash: row.descriptionHash,
       id: row.id,
-      language: null,
+      language: row.language,
       locationRaw: row.locationRaw,
       placeIds: places.get(row.id) ?? [],
       postedAt: row.postedAt,

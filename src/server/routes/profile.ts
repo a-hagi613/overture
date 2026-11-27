@@ -353,10 +353,11 @@ export function createProfileRoutes(deps: {
     }
 
     const saved = await targetsService.read(account.id);
+    const { languages } = await languagesService.read(account.id);
 
     return context.json({
       ...saved,
-      matchedCount: countMatchingJobs(deps.db, saved.targets),
+      matchedCount: countMatchingJobs(deps.db, saved.targets, languages),
       places: describePlaceIds(saved.targets.locations),
     });
   });
@@ -376,9 +377,11 @@ export function createProfileRoutes(deps: {
       enqueueMatchScorePool(db, clock, account.id);
     }
 
+    const { languages } = await languagesService.read(account.id);
+
     return context.json({
       ...saved,
-      matchedCount: countMatchingJobs(deps.db, saved.targets),
+      matchedCount: countMatchingJobs(deps.db, saved.targets, languages),
       places: describePlaceIds(saved.targets.locations),
     });
   });
@@ -390,8 +393,10 @@ export function createProfileRoutes(deps: {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
+    const { languages } = await languagesService.read(account.id);
+
     return context.json({
-      matchedCount: countMatchingJobs(deps.db, context.req.valid("json")),
+      matchedCount: countMatchingJobs(deps.db, context.req.valid("json"), languages),
     });
   });
 

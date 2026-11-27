@@ -21,6 +21,7 @@ import {
   sameRegion,
 } from "../catalog/geo.ts";
 import { ACTIVE_APPLICATION_STATUSES } from "./applications.ts";
+import { nonJobTitleCondition } from "../jobs/non-job.ts";
 import { countryInRegion, remoteRegionOf } from "./regions.ts";
 import { locationTextsOfPlaceIds } from "../places/catalog.ts";
 import { skipMatches } from "./skip-match.ts";
@@ -419,6 +420,7 @@ export function createCandidateService(deps: CandidateDeps) {
           isNull(postings.closedAt),
           eq(postings.status, "open"),
           eq(postings.applySupported, true),
+          nonJobTitleCondition(postings.titleNorm),
           or(
             isNull(postings.language),
             eq(postings.language, ""),

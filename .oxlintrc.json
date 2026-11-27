@@ -320,6 +320,7 @@
           "src/server/platform/http-body.test.ts",
           "src/server/platform/jobs/queue.test.ts",
           "src/server/jobs/apply-link.test.ts",
+          "src/server/jobs/filter-proof.test.ts",
           "src/server/jobs/freehire-source.test.ts",
           "src/server/jobs/preferences.test.ts",
           "src/server/jobs/pull.test.ts",
