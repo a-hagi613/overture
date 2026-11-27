@@ -11,7 +11,7 @@ const boardTargets = {
   roles: ["Platform Engineer", "Backend Engineer", "Site Reliability Engineer"],
   seniorities: ["senior", "staff"],
   workplaces: ["remote", "hybrid"],
-  locations: ["London", "Remote, UK"],
+  locations: ["city:gb:london", "remote:country:gb"],
   employmentTypes: ["full_time"],
   salaryFloorMinor: 14_000_000,
   salaryCurrency: "CAD",

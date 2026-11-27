@@ -16,7 +16,8 @@ ingest (ADR 0032, ADR 0036) as the source of every job Overture matches and appl
 2. **freehire's fields are stored, not translated.** `jobs` in `app.sqlite` carries freehire's `category`,
    `seniority`, `work_mode`, `countries`, `regions`, `metros`, `cities`, `skills`, salary and the `reality` block
    (`fake_freshness`, `repost_count`, `age_days`) directly. A blank or unknown `work_mode` is stored as `NULL`; it is
-   never inferred. `job_places` holds the geography facets lower-cased so a place filter is an indexed lookup.
+   never inferred. `job_places` holds the canonical place ids from ADR 0048, so a place filter is an indexed lookup
+   both a saved target and a posted job speak.
 3. **The source is the 28 sendable systems.** `FREEHIRE_SOURCE_TO_ATS` maps freehire's source names to the ATS names
    the senders use (`zohorecruit` → `zoho_recruit`, `join` → `join_com`, `isolvedhire` → `isolved_hire`). A posting
    from a source outside the map is dropped, because no sender could fill it. The adapter sends that list as one

@@ -9,6 +9,7 @@ import type { CatalogDatabase } from "../platform/db/client.ts";
 
 import { openCatalogDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase } from "../platform/db/migrate.ts";
+import { promotePlaceValues } from "../places/resolve.ts";
 import { countMatchingPostings } from "./targets.ts";
 
 const NOW = 1_800_000_000_000;
@@ -195,15 +196,18 @@ function countFresh(target: Fixture, input: FilterInput, languages: string[]) {
 }
 
 function filter(overrides: Partial<FilterInput> = {}) {
+  const { locations: rawLocations, ...rest } = overrides;
+  const locations = rawLocations ?? CITIES.map((place) => place.city);
+
   return {
     roles: ["backend", "designer"],
     seniorities: [...SENIORITY_TAGS],
     workplaces: [...WORKPLACES],
-    locations: CITIES.map((place) => place.city),
+    locations: promotePlaceValues(locations).ids,
     employmentTypes: [...EMPLOYMENT_TYPES],
     salaryFloorMinor: null,
     salaryCurrency: null,
-    ...overrides,
+    ...rest,
   } satisfies FilterInput;
 }
 
@@ -265,7 +269,7 @@ describe("countMatchingPostings", () => {
 
     const base = {
       employmentTypes: [...EMPLOYMENT_TYPES],
-      locations: ["Toronto"],
+      locations: promotePlaceValues(["Toronto"]).ids,
       salaryCurrency: null,
       salaryFloorMinor: null,
       seniorities: ["senior" as const],
@@ -367,7 +371,7 @@ describe("countMatchingPostings", () => {
           roles: ["Designer", "BACKEND"],
           seniorities: ["senior", "entry", "mid", "mid"],
           workplaces: ["onsite", "remote", "hybrid", "remote"],
-          locations: ["berlin", "LISBON", "toronto", "austin"],
+          locations: promotePlaceValues(["berlin", "LISBON", "toronto", "austin"]).ids,
           employmentTypes: ["contract", "full_time", "part_time", "full_time"],
         },
         ["DE", " en ", "en"],

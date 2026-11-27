@@ -9,6 +9,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { jobPlaces, jobs } from "../platform/db/schema.ts";
 import type { ApplyTarget } from "./apply-link.ts";
+import { jobPlaceRows } from "../places/job-places.ts";
 
 export type StoreOutcome =
   | { status: "kept"; jobId: string }
@@ -43,23 +44,6 @@ function descriptionHash(description: string | null) {
   return description === null || description === ""
     ? null
     : createHash("sha256").update(description).digest("hex");
-}
-
-function placeRows(job: FreehireJobRecord) {
-  const rows: { kind: "country" | "region" | "metro" | "city"; value: string }[] = [];
-
-  for (const [kind, values] of [
-    ["country", job.countries],
-    ["region", job.regions],
-    ["metro", job.metros],
-    ["city", job.cities],
-  ] as const) {
-    for (const value of uniqueLower(values)) {
-      rows.push({ kind, value });
-    }
-  }
-
-  return rows;
 }
 
 export interface JobStore {
@@ -175,11 +159,15 @@ export function createJobStore(deps: { db: AppDatabase; clock: Clock }) {
       })
       .run();
 
-    const places = placeRows(job);
+    const places = jobPlaceRows(job);
+
+    db.delete(jobPlaces).where(eq(jobPlaces.jobId, values.id)).run();
 
     if (places.length > 0) {
       db.insert(jobPlaces)
-        .values(places.map((place) => ({ jobId: values.id, kind: place.kind, value: place.value })))
+        .values(
+          places.map((place) => ({ jobId: values.id, kind: place.kind, placeId: place.placeId })),
+        )
         .onConflictDoNothing()
         .run();
     }

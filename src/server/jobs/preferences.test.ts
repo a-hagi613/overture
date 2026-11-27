@@ -47,22 +47,25 @@ describe("preferences become a freehire search", () => {
     ]);
   });
 
-  test("places resolve to countries and cities, and remote text still names its country", () => {
-    expect(placesForLocations(["Toronto, Canada"])).toEqual({
+  test("place ids become freehire facets, and a remote country still names its country", () => {
+    expect(placesForLocations(["city:ca:toronto"])).toEqual({
       cities: ["Toronto"],
       countries: ["ca"],
+      metros: [],
+      placeIds: ["city:ca:toronto"],
       regions: [],
     });
-    expect(placesForLocations(["Remote in Canada"]).countries).toEqual(["ca"]);
+    expect(placesForLocations(["remote:country:ca"]).countries).toEqual(["ca"]);
+    expect(placesForLocations(["remote:continent:EU"]).regions).toEqual(["eu"]);
   });
 
   test("the group key is shared for the same roles and places and differs when either changes", () => {
-    const first = pullPreferencesFor({ locations: ["Toronto, Canada"], roles: ["software-it"] });
-    const same = pullPreferencesFor({ locations: ["Toronto, Canada"], roles: ["software-it"] });
-    const otherRoles = pullPreferencesFor({ locations: ["Toronto, Canada"], roles: ["education"] });
+    const first = pullPreferencesFor({ locations: ["city:ca:toronto"], roles: ["software-it"] });
+    const same = pullPreferencesFor({ locations: ["city:ca:toronto"], roles: ["software-it"] });
+    const otherRoles = pullPreferencesFor({ locations: ["city:ca:toronto"], roles: ["education"] });
 
     const otherPlaces = pullPreferencesFor({
-      locations: ["Berlin, Germany"],
+      locations: ["city:de:berlin"],
       roles: ["software-it"],
     });
 
@@ -72,11 +75,11 @@ describe("preferences become a freehire search", () => {
   });
 
   test("only a change to roles or places needs a new full pull", () => {
-    const before = { locations: ["Toronto, Canada"], roles: ["software-it"] };
+    const before = { locations: ["city:ca:toronto"], roles: ["software-it"] };
 
     expect(preferencesChanged(before, before)).toBe(false);
     expect(preferencesChanged(before, { ...before, roles: ["education"] })).toBe(true);
-    expect(preferencesChanged(before, { ...before, locations: ["Berlin, Germany"] })).toBe(true);
+    expect(preferencesChanged(before, { ...before, locations: ["city:de:berlin"] })).toBe(true);
   });
 });
 

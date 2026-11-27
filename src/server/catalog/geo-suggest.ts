@@ -1,4 +1,15 @@
 import type { LocationSuggestion } from "../../shared/supply.ts";
+import {
+  cityPlaceId,
+  countryPlaceId,
+  isContinentCode,
+  metroPlaceId,
+  regionPlaceId,
+  remoteContinentPlaceId,
+  remoteCountryPlaceId,
+  REMOTE_WORLDWIDE_ID,
+} from "../../shared/places.ts";
+import type { PlaceKind, PlaceSuggestion } from "../../shared/places.ts";
 
 import {
   countryNameFor,
@@ -11,10 +22,11 @@ import {
 } from "./geo.ts";
 
 interface IndexedPlace {
+  readonly id: string | null;
+  readonly kind: PlaceKind | "continent";
   readonly value: string;
   readonly label: string;
   readonly meta: string;
-  readonly kind: LocationSuggestion["kind"];
   readonly normName: string;
   readonly words: readonly string[];
   readonly searchKeys: readonly string[];
@@ -30,6 +42,31 @@ const DEFAULT_SUGGESTIONS: readonly LocationSuggestion[] = [
   { kind: "city", label: "New York", meta: "New York, United States", value: "New York" },
   { kind: "city", label: "Toronto", meta: "Ontario, Canada", value: "Toronto" },
   { kind: "city", label: "London", meta: "England, United Kingdom", value: "London" },
+];
+
+const DEFAULT_PLACES: readonly PlaceSuggestion[] = [
+  {
+    id: REMOTE_WORLDWIDE_ID,
+    kind: "remote_worldwide",
+    label: "Remote · Worldwide",
+    meta: "Anywhere",
+  },
+  { id: countryPlaceId("US"), kind: "country", label: "United States", meta: "" },
+  { id: countryPlaceId("CA"), kind: "country", label: "Canada", meta: "" },
+  { id: countryPlaceId("GB"), kind: "country", label: "United Kingdom", meta: "" },
+  {
+    id: remoteContinentPlaceId("EU"),
+    kind: "remote_continent",
+    label: "Remote · Europe",
+    meta: "Europe",
+  },
+  { id: cityPlaceId("CA", "Toronto"), kind: "city", label: "Toronto", meta: "Ontario, Canada" },
+  {
+    id: cityPlaceId("GB", "London"),
+    kind: "city",
+    label: "London",
+    meta: "England, United Kingdom",
+  },
 ];
 
 const COUNTRY_SEARCH_ALIASES = new Map<string, readonly string[]>([
@@ -76,9 +113,10 @@ function buildPlaceIndex() {
     ];
 
     entries.push({
+      id: regionPlaceId(continent.code),
       kind: "continent",
       label: continent.name,
-      meta: "Continent",
+      meta: "",
       normName,
       searchKeys: keys.filter((item) => item.length > 0),
       value: continent.name,
@@ -93,9 +131,10 @@ function buildPlaceIndex() {
     const keys = [normName, country.code.toLowerCase(), ...extraAliases];
 
     entries.push({
+      id: countryPlaceId(country.code),
       kind: "country",
       label: country.name,
-      meta: "Country",
+      meta: "",
       normName,
       searchKeys: keys.filter((item) => item.length > 0),
       value: country.name,
@@ -110,6 +149,7 @@ function buildPlaceIndex() {
     const country = countryNameFor(metro.countryCode) ?? metro.countryCode;
 
     entries.push({
+      id: metroPlaceId(metro.name),
       kind: "metro",
       label: metro.name,
       meta: `${country} · Metro`,
@@ -126,6 +166,7 @@ function buildPlaceIndex() {
     const country = countryNameFor(region.countryCode) ?? region.countryCode;
 
     entries.push({
+      id: null,
       kind: "region",
       label: region.name,
       meta: `${country} · Region`,
@@ -150,6 +191,7 @@ function buildPlaceIndex() {
       });
 
     entries.push({
+      id: cityPlaceId(city.countryCode, city.name),
       kind: "city",
       label: city.name,
       meta: formatCityMeta(city.countryCode, city.isoRegionCode, regionsByIso),
@@ -170,6 +212,72 @@ function placeIndex() {
   cachedIndex ??= buildPlaceIndex();
 
   return cachedIndex;
+}
+
+let cachedRemoteIndex: readonly IndexedPlace[] | null = null;
+
+function remoteIndex() {
+  if (cachedRemoteIndex !== null) {
+    return cachedRemoteIndex;
+  }
+
+  const entries: IndexedPlace[] = [];
+
+  for (const country of geoCountries()) {
+    const normName = normalizePlaceName(country.name);
+
+    entries.push({
+      id: remoteCountryPlaceId(country.code),
+      kind: "remote_country",
+      label: `Remote · ${country.name}`,
+      meta: country.name,
+      normName: normalizePlaceName(`Remote ${country.name}`),
+      searchKeys: [
+        normName,
+        normalizePlaceName(`remote ${country.name}`),
+        country.code.toLowerCase(),
+      ],
+      value: country.name,
+      weight: 205,
+      words: splitWords(normName),
+    });
+  }
+
+  for (const continent of geoContinents()) {
+    const normName = normalizePlaceName(continent.name);
+
+    if (!isContinentCode(continent.code)) {
+      continue;
+    }
+
+    entries.push({
+      id: remoteContinentPlaceId(continent.code),
+      kind: "remote_continent",
+      label: `Remote · ${continent.name}`,
+      meta: continent.name,
+      normName: normalizePlaceName(`Remote ${continent.name}`),
+      searchKeys: [normName, normalizePlaceName(`remote ${continent.name}`)],
+      value: continent.name,
+      weight: 200,
+      words: splitWords(normName),
+    });
+  }
+
+  entries.push({
+    id: REMOTE_WORLDWIDE_ID,
+    kind: "remote_worldwide",
+    label: "Remote · Worldwide",
+    meta: "Anywhere",
+    normName: "remote worldwide",
+    searchKeys: ["remote", "worldwide", "anywhere", "global", "remote worldwide"],
+    value: "Remote · Worldwide",
+    weight: 230,
+    words: ["remote", "worldwide"],
+  });
+
+  cachedRemoteIndex = entries;
+
+  return entries;
 }
 
 function isOrderedSubsequence(target: string, query: string) {
@@ -258,6 +366,22 @@ function scorePlace(place: IndexedPlace, normalizedQuery: string, queryWords: re
   return 0;
 }
 
+function rankedPlaces(entries: readonly IndexedPlace[], normalized: string) {
+  const queryWords = splitWords(normalized);
+
+  const ranked: { place: IndexedPlace; score: number }[] = [];
+
+  for (const place of entries) {
+    const score = scorePlace(place, normalized, queryWords);
+
+    if (score > 0) {
+      ranked.push({ place, score });
+    }
+  }
+
+  return ranked.toSorted((left, right) => right.score - left.score);
+}
+
 /**
  * Suggests global places (continents, countries, metro areas, regions, and cities) from the
  * local geographic catalog for interactive typeahead pickers.
@@ -272,23 +396,10 @@ export function suggestLocations(rawQuery: string, limit = 10) {
     return DEFAULT_SUGGESTIONS.slice(0, limit);
   }
 
-  const queryWords = splitWords(normalized);
-  const scored: { place: IndexedPlace; score: number }[] = [];
-
-  for (const place of placeIndex()) {
-    const score = scorePlace(place, normalized, queryWords);
-
-    if (score > 0) {
-      scored.push({ place, score });
-    }
-  }
-
-  scored.sort((left, right) => right.score - left.score);
-
   const seen = new Set<string>();
   const suggestions: LocationSuggestion[] = [];
 
-  for (const entry of scored) {
+  for (const entry of rankedPlaces(placeIndex(), normalized)) {
     const dedupeKey = `${entry.place.kind}:${entry.place.normName}`;
 
     if (seen.has(dedupeKey)) {
@@ -297,10 +408,90 @@ export function suggestLocations(rawQuery: string, limit = 10) {
 
     seen.add(dedupeKey);
     suggestions.push({
-      kind: entry.place.kind,
+      kind: legacyKindOf(entry.place),
       label: entry.place.label,
       meta: entry.place.meta,
       value: entry.place.value,
+    });
+
+    if (suggestions.length >= limit) {
+      break;
+    }
+  }
+
+  return suggestions;
+}
+
+function legacyKindOf(entry: IndexedPlace) {
+  if (entry.kind === "continent") {
+    return "continent";
+  }
+
+  if (entry.kind === "region") {
+    return "region";
+  }
+
+  if (entry.kind === "country") {
+    return "country";
+  }
+
+  if (entry.kind === "metro") {
+    return "metro";
+  }
+
+  return "city";
+}
+
+function placeKindOf(entry: IndexedPlace) {
+  if (entry.kind === "continent") {
+    return "region";
+  }
+
+  if (entry.kind === "region") {
+    return "region";
+  }
+
+  return entry.kind;
+}
+
+/**
+ * Suggests the canonical places a target may hold from the same catalog both sides of a location match read
+ * (issue #683): physical countries, regions, metros and cities, plus the explicit `Remote · …` scopes. Only a
+ * returned suggestion carries an id, so free text can never become a saved target.
+ * @param rawQuery The text in the picker.
+ * @param limit Maximum suggestions to return.
+ * @returns Ranked place suggestions with canonical ids.
+ */
+export function suggestPlaces(rawQuery: string, limit = 10) {
+  const normalized = normalizePlaceName(rawQuery);
+
+  if (normalized.length < 2) {
+    return DEFAULT_PLACES.slice(0, limit);
+  }
+
+  const entries = [
+    ...rankedPlaces(placeIndex(), normalized),
+    ...rankedPlaces(remoteIndex(), normalized),
+  ]
+    .filter((entry) => entry.place.id !== null)
+    .toSorted((left, right) => right.score - left.score);
+
+  const seen = new Set<string>();
+  const suggestions: PlaceSuggestion[] = [];
+
+  for (const entry of entries) {
+    const { id } = entry.place;
+
+    if (id === null || seen.has(id)) {
+      continue;
+    }
+
+    seen.add(id);
+    suggestions.push({
+      id,
+      kind: placeKindOf(entry.place),
+      label: entry.place.label,
+      meta: entry.place.meta,
     });
 
     if (suggestions.length >= limit) {

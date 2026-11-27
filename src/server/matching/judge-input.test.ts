@@ -57,14 +57,15 @@ describe("targetsLine", () => {
         roles: ["health.rn", "Registered Nurse", "ICU charge nurse"],
         seniorities: ["mid"],
         workplaces: ["onsite"],
-        locations: ["Houston, TX"],
+        locations: ["city:us:houston"],
+        unresolvedLocations: [],
         employmentTypes: ["full_time"],
         salaryFloorMinor: 7_000_000,
         salaryCurrency: "USD",
         salaryPeriod: "year",
       }),
     ).toBe(
-      "roles: Registered Nurse, ICU charge nurse; level: mid; places: Houston, TX; workplace: onsite; pay floor: USD 70,000/year",
+      "roles: Registered Nurse, ICU charge nurse; level: mid; places: Houston, Texas, United States; workplace: onsite; pay floor: USD 70,000/year",
     );
   });
 
@@ -75,6 +76,7 @@ describe("targetsLine", () => {
         seniorities: [],
         workplaces: [],
         locations: [],
+        unresolvedLocations: [],
         employmentTypes: [],
         salaryFloorMinor: null,
         salaryCurrency: null,

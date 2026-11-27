@@ -66,14 +66,8 @@ async function expectOnboardingMatchesBoard(
   await expect(
     page.getByRole("button", { exact: true, name: "Software Engineer (general)" }),
   ).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByRole("button", { name: "London" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(page.getByRole("button", { name: "Remote, UK" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("button", { name: "Remove London" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Remote · United Kingdom" })).toBeVisible();
   await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
   await expect(page.getByLabel("Minimum salary")).toHaveValue("140,000");
 

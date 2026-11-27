@@ -25,6 +25,7 @@ import { createLanguagesService } from "../profile/languages.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import { createStrengthenService } from "../profile/strengthen.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
+import { describePlaceIds } from "../places/catalog.ts";
 import { enqueueUserPull } from "../jobs/pull.ts";
 import { preferencesChanged } from "../jobs/preferences.ts";
 import { returnStaleApprovals } from "../pipeline/approval-invalidation.ts";
@@ -335,6 +336,7 @@ export function createProfileRoutes(deps: {
     return context.json({
       ...saved,
       matchedCount: countMatchingPostings(deps.catalogDb, saved.targets, languages),
+      places: describePlaceIds(saved.targets.locations),
     });
   });
 
@@ -357,6 +359,7 @@ export function createProfileRoutes(deps: {
     return context.json({
       ...saved,
       matchedCount: countMatchingPostings(deps.catalogDb, saved.targets, languages),
+      places: describePlaceIds(saved.targets.locations),
     });
   });
 

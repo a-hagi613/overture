@@ -67,6 +67,8 @@ describe("the freehire-shaped job read", () => {
       categories: ["backend"],
       cities: [],
       countries: [],
+      metros: [],
+      placeIds: [],
       regions: [],
       titleWords: [],
     });
@@ -74,7 +76,7 @@ describe("the freehire-shaped job read", () => {
     expect(rows.map((row) => row.id)).toEqual(["senior-go-engineer-acme"]);
   });
 
-  test("ORs a job's countries and cities, matching freehire's geography rule", () => {
+  test("intersects the job's canonical place ids with the user's, matching freehire's geography rule", () => {
     const db = migrated();
 
     storeJob(db, record());
@@ -94,8 +96,10 @@ describe("the freehire-shaped job read", () => {
 
     const rows = reader.forPreferences({
       categories: [],
-      cities: ["Toronto"],
-      countries: ["de"],
+      cities: [],
+      countries: [],
+      metros: [],
+      placeIds: ["country:de", "city:ca:toronto"],
       regions: [],
       titleWords: [],
     });
@@ -123,9 +127,63 @@ describe("the freehire-shaped job read", () => {
         categories: [],
         cities: [],
         countries: [],
+        metros: [],
+        placeIds: [],
         regions: [],
         titleWords: [],
       }),
     ).toHaveLength(0);
+  });
+
+  test("a Remote · Canada user never sees a Remote US only job, and worldwide sees the country-less one", () => {
+    const db = migrated();
+
+    storeJob(db, record({ work_mode: "remote" }));
+    storeJob(
+      db,
+      record({
+        cities: ["Austin"],
+        countries: ["us"],
+        external_id: "bright:us",
+        public_slug: "us-only",
+        work_mode: "remote",
+      }),
+    );
+    storeJob(
+      db,
+      record({
+        cities: [],
+        countries: [],
+        external_id: "bright:anywhere",
+        public_slug: "anywhere",
+        work_mode: "remote",
+      }),
+    );
+
+    const reader = createJobReader(db);
+
+    const canada = reader.forPreferences({
+      categories: [],
+      cities: [],
+      countries: [],
+      metros: [],
+      placeIds: ["city:ca:toronto", "remote:country:ca"],
+      regions: [],
+      titleWords: [],
+    });
+
+    expect(canada.map((row) => row.id)).toEqual(["senior-go-engineer-acme"]);
+
+    const worldwide = reader.forPreferences({
+      categories: [],
+      cities: [],
+      countries: [],
+      metros: [],
+      placeIds: ["remote:worldwide"],
+      regions: [],
+      titleWords: [],
+    });
+
+    expect(worldwide.map((row) => row.id)).toContain("anywhere");
   });
 });

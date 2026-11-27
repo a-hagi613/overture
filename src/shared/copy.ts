@@ -2143,6 +2143,14 @@ export const copy = {
       add: "Add",
       locations: "Locations",
       addLocation: "Add location",
+      pickLocationPlaceholder: "Search a city, country, or remote scope",
+      locationNoResults: "No matching places. Pick a suggestion to save it.",
+      removeLocation: (label: string) => `Remove ${label}`,
+      unresolvedTitle: "Places we couldn't match exactly",
+      unresolvedNote:
+        "Pick the exact place below, or dismiss it. We never guess between same-name places.",
+      pickUnresolved: "Pick a place",
+      dismissLocation: (place: string) => `Dismiss ${place}`,
       workplace: "Workplace",
       remote: "Remote",
       hybrid: "Hybrid",
@@ -2859,6 +2867,7 @@ export const copy = {
     locationsPlaceholder: "Choose locations",
     locationsSearchPlaceholder: "Search cities or remote regions...",
     locationsEmpty: "No matching locations.",
+    addLocation: "Add location",
     locationsSelectedCount: (count: number) =>
       `${String(count)} ${plural(count, "location", "locations")} selected`,
     workplace: "Workplace",

@@ -14,6 +14,7 @@ import { enqueueJob } from "../platform/jobs/queue.ts";
 import type { JobHandlers } from "../platform/jobs/queue.ts";
 import type { ApplyTarget } from "./apply-link.ts";
 import { resolveApplyTarget } from "./apply-link.ts";
+import { promotePlaceValues } from "../places/resolve.ts";
 import type { JobSearchPage, JobSource } from "./source.ts";
 import type { PullPreferences } from "./preferences.ts";
 import { paidUserIds, pullPreferencesFor, queryKeyOf, searchQueryFor } from "./preferences.ts";
@@ -65,6 +66,7 @@ interface PullMemberRow {
   userId: string;
   roles: string;
   locations: string;
+  unresolvedLocations: string;
   lastFullPullAt: number | null;
   lastFreshPullAt: number | null;
   lastQueryKey: string | null;
@@ -88,9 +90,14 @@ export interface PullDeps {
   onAlert?: (detail: Record<string, string | number | boolean | null>) => void;
 }
 
-function preferencesOf(row: Pick<PullMemberRow, "roles" | "locations">) {
+function preferencesOf(row: Pick<PullMemberRow, "roles" | "locations" | "unresolvedLocations">) {
+  const places = promotePlaceValues([
+    ...stringArrayFromColumn(row.locations),
+    ...stringArrayFromColumn(row.unresolvedLocations),
+  ]);
+
   return pullPreferencesFor({
-    locations: stringArrayFromColumn(row.locations),
+    locations: places.ids,
     roles: stringArrayFromColumn(row.roles),
   });
 }
@@ -463,6 +470,7 @@ export function createPullService(deps: PullDeps) {
         lastQueryKey: jobPullState.lastQueryKey,
         locations: targets.locations,
         roles: targets.roles,
+        unresolvedLocations: targets.unresolvedLocations,
         userId: targets.userId,
       })
       .from(targets)
@@ -503,6 +511,7 @@ export function createPullService(deps: PullDeps) {
         lastQueryKey: jobPullState.lastQueryKey,
         locations: targets.locations,
         roles: targets.roles,
+        unresolvedLocations: targets.unresolvedLocations,
         userId: targets.userId,
       })
       .from(targets)

@@ -27,7 +27,8 @@ afterEach(() => {
 const BASE_TARGETS = {
   seniorities: ["senior"],
   workplaces: ["onsite"],
-  locations: ["Berlin, Germany"],
+  locations: ["city:de:berlin"],
+  unresolvedLocations: [],
   employmentTypes: ["full_time"],
   salaryFloorMinor: null,
   salaryCurrency: null,

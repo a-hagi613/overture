@@ -82,7 +82,7 @@ const baseTargets = {
   roles: ["Backend"],
   seniorities: ["senior"],
   workplaces: ["onsite"],
-  locations: ["Ottawa, ON"],
+  locations: ["city:ca:ottawa"],
   employmentTypes: ["full_time"],
   salaryFloorMinor: 14_000_000,
   salaryCurrency: "CAD",
