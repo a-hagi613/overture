@@ -4,7 +4,6 @@ import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { AnswerKind, QuestionFieldType, QuestionMapper } from "../../shared/questions.ts";
 import type { AtsQuestion } from "./greenhouse-questions.ts";
-import type { RuleMapping } from "./question-rules.ts";
 
 import { questionVariants, questions } from "../platform/db/schema.ts";
 import { postingQuestions } from "../platform/db/catalog-schema.ts";
@@ -35,6 +34,16 @@ export interface QuestionInput {
   fieldName?: string | null;
 }
 
+const QUESTION_COLUMNS = {
+  answerKind: questions.answerKind,
+  factKey: questions.factKey,
+  fieldType: questions.fieldType,
+  id: questions.id,
+  mappedBy: questions.mappedBy,
+  seenCount: questions.seenCount,
+  textDisplay: questions.textDisplay,
+};
+
 export function createQuestionCatalog(deps: {
   db: AppDatabase;
   catalogDb: CatalogDatabase;
@@ -44,15 +53,7 @@ export function createQuestionCatalog(deps: {
 
   function byVariantHash(hash: string) {
     return db
-      .select({
-        factKey: questions.factKey,
-        id: questions.id,
-        answerKind: questions.answerKind,
-        mappedBy: questions.mappedBy,
-        fieldType: questions.fieldType,
-        seenCount: questions.seenCount,
-        textDisplay: questions.textDisplay,
-      })
+      .select(QUESTION_COLUMNS)
       .from(questionVariants)
       .innerJoin(questions, eq(questions.id, questionVariants.questionId))
       .where(eq(questionVariants.variantHash, hash))
@@ -71,35 +72,28 @@ export function createQuestionCatalog(deps: {
     mapping: { answerKind: AnswerKind; factKey: string | null },
   ) {
     const variantHash = questionVariantHash(input.text, input.companyNames);
-    const id = crypto.randomUUID();
     const optionsHash = questionOptionsHash(input.options);
 
+    const record = {
+      answerKind: mapping.answerKind,
+      factKey: mapping.factKey,
+      fieldType: input.fieldType,
+      id: crypto.randomUUID(),
+      mappedBy: mapping.answerKind === "unknown" ? null : "rules",
+      seenCount: 1,
+      textDisplay: input.text,
+    } satisfies QuestionRecord;
+
     db.insert(questions)
-      .values({
-        id,
-        textDisplay: input.text,
-        textNormHash: variantHash,
-        fieldType: input.fieldType,
-        optionsHash,
-        factKey: mapping.factKey,
-        answerKind: mapping.answerKind,
-        mappedBy: mapping.answerKind === "unknown" ? null : "rules",
-        seenCount: 1,
-        createdAt: clock.now(),
-      })
+      .values({ ...record, createdAt: clock.now(), optionsHash, textNormHash: variantHash })
       .run();
 
-    db.insert(questionVariants).values({ variantHash, questionId: id }).onConflictDoNothing().run();
+    db.insert(questionVariants)
+      .values({ variantHash, questionId: record.id })
+      .onConflictDoNothing()
+      .run();
 
-    return {
-      id,
-      textDisplay: input.text,
-      fieldType: input.fieldType,
-      factKey: mapping.factKey,
-      answerKind: mapping.answerKind,
-      mappedBy: mapping.answerKind === "unknown" ? null : ("rules" as const),
-      seenCount: 1,
-    } satisfies QuestionRecord;
+    return record;
   }
 
   function findOrCreate(input: QuestionInput) {
@@ -114,9 +108,7 @@ export function createQuestionCatalog(deps: {
 
     const mapped = mapQuestionByRules(input.text) ?? mapIdentityFieldName(input.fieldName ?? null);
 
-    const fallback: RuleMapping = { answerKind: "unknown", factKey: null };
-
-    return create(input, mapped ?? fallback);
+    return create(input, mapped ?? { answerKind: "unknown", factKey: null });
   }
 
   function byLabel(text: string) {
@@ -124,19 +116,7 @@ export function createQuestionCatalog(deps: {
   }
 
   function byId(id: string) {
-    return db
-      .select({
-        id: questions.id,
-        textDisplay: questions.textDisplay,
-        fieldType: questions.fieldType,
-        factKey: questions.factKey,
-        answerKind: questions.answerKind,
-        mappedBy: questions.mappedBy,
-        seenCount: questions.seenCount,
-      })
-      .from(questions)
-      .where(eq(questions.id, id))
-      .get();
+    return db.select(QUESTION_COLUMNS).from(questions).where(eq(questions.id, id)).get();
   }
 
   function setMapping(
@@ -257,15 +237,7 @@ export function createQuestionCatalog(deps: {
     }
 
     const questionRows = db
-      .select({
-        id: questions.id,
-        textDisplay: questions.textDisplay,
-        fieldType: questions.fieldType,
-        factKey: questions.factKey,
-        answerKind: questions.answerKind,
-        mappedBy: questions.mappedBy,
-        seenCount: questions.seenCount,
-      })
+      .select(QUESTION_COLUMNS)
       .from(questions)
       .where(
         inArray(

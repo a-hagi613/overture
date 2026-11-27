@@ -155,14 +155,6 @@ export function countMatchingJobs(
   const parsed = targetsInputSchema.parse(input);
   const filters = normalizeFilters(parsed);
 
-  if (filters.categories.length === 0 && filters.titleWords.length === 0) {
-    return 0;
-  }
-
-  if (filters.placeIds.length === 0) {
-    return 0;
-  }
-
   const revision = databaseRevision(db);
 
   if (revision === null) {
@@ -234,29 +226,21 @@ export function createTargetsService(deps: { db: AppDatabase; clock: Clock }) {
     const parsed = targetsInputSchema.parse(input);
     const current = await read(userId);
     const version = current.version + 1;
+    const at = new Date(clock.now());
+
+    const stored = {
+      locations: JSON.stringify(parsed.locations),
+      roles: JSON.stringify(parsed.roles),
+      unresolvedLocations: JSON.stringify(parsed.unresolvedLocations),
+      unresolvedRoles: JSON.stringify(parsed.unresolvedRoles),
+      updatedAt: at,
+      version,
+    };
 
     await db
       .insert(targets)
-      .values({
-        userId,
-        roles: JSON.stringify(parsed.roles),
-        unresolvedRoles: JSON.stringify(parsed.unresolvedRoles),
-        locations: JSON.stringify(parsed.locations),
-        unresolvedLocations: JSON.stringify(parsed.unresolvedLocations),
-        version,
-        updatedAt: new Date(clock.now()),
-      })
-      .onConflictDoUpdate({
-        target: targets.userId,
-        set: {
-          roles: JSON.stringify(parsed.roles),
-          unresolvedRoles: JSON.stringify(parsed.unresolvedRoles),
-          locations: JSON.stringify(parsed.locations),
-          unresolvedLocations: JSON.stringify(parsed.unresolvedLocations),
-          version,
-          updatedAt: new Date(clock.now()),
-        },
-      });
+      .values({ ...stored, userId })
+      .onConflictDoUpdate({ target: targets.userId, set: stored });
 
     return { targets: parsed, version };
   }

@@ -322,12 +322,8 @@ interface Verdict {
   locationScore: number;
 }
 
-function targetBasicsMatch(posting: CandidatePosting, rolePlan: RoleTargetPlan) {
-  if (roleMatchScore(rolePlan, posting) === 0) {
-    return "role" satisfies FilterReason;
-  }
-
-  return null;
+function rejected(reason: FilterReason) {
+  return { locationScore: 0, reason, roleScore: 0 } satisfies Verdict;
 }
 
 export function createCandidateService(deps: CandidateDeps) {
@@ -662,27 +658,15 @@ export function createCandidateService(deps: CandidateDeps) {
     checkApplied: boolean,
   ) {
     if (posting.closedAt !== null || posting.status === "closed") {
-      return {
-        reason: "closed",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("closed");
     }
 
     if (!posting.applySupported) {
-      return {
-        reason: "apply_unsupported",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("apply_unsupported");
     }
 
     if (!languageAccepted(posting.language, context.languages)) {
-      return {
-        reason: "language",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("language");
     }
 
     if (
@@ -690,90 +674,48 @@ export function createCandidateService(deps: CandidateDeps) {
       context.atsOff.has(posting.ats) ||
       context.employerOff.has(posting.companyId)
     ) {
-      return {
-        reason: "kill_switch",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("kill_switch");
     }
 
     if (context.hidden.has(posting.id)) {
-      return {
-        reason: "hidden",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("hidden");
     }
 
     if (context.flaggedPostings.has(posting.id)) {
-      return {
-        reason: "flagged",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("flagged");
     }
 
-    const basics = targetBasicsMatch(posting, context.rolePlan);
-
-    if (basics !== null) {
-      return {
-        reason: basics,
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+    if (roleMatchScore(context.rolePlan, posting) === 0) {
+      return rejected("role");
     }
 
     if (checkApplied && context.appliedPostings.has(posting.id)) {
-      return {
-        reason: "already_applied",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("already_applied");
     }
 
     if (context.activeCompanies.has(posting.companyId)) {
-      return {
-        reason: "open_application_company",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("open_application_company");
     }
 
     if (context.recentCompanies.has(posting.companyId)) {
-      return {
-        reason: "company_cooldown",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("company_cooldown");
     }
 
     if (context.repostKeys.has(posting.dedupeKey)) {
-      return {
-        reason: "repost_guard",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("repost_guard");
     }
 
     if (
       (context.crowdByPosting.get(posting.id) ?? 0) >= context.crowdPosting ||
       (context.crowdByCompany.get(posting.companyId) ?? 0) >= context.crowdEmployer
     ) {
-      return {
-        reason: "crowd_limit",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("crowd_limit");
     }
 
     const location = locationMatch(posting, context.locationCriteria, context.workAuthorised);
 
     if (!location.matched) {
-      return {
-        reason: "location",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected("location");
     }
 
     const skip = skipMatches(
@@ -792,11 +734,7 @@ export function createCandidateService(deps: CandidateDeps) {
         );
       }
 
-      return {
-        reason: skip.reason === "current_employer" ? "current_employer" : "skip_list",
-        roleScore: 0,
-        locationScore: 0,
-      } satisfies Verdict;
+      return rejected(skip.reason === "current_employer" ? "current_employer" : "skip_list");
     }
 
     return {

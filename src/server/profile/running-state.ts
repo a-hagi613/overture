@@ -27,16 +27,12 @@ function stateOf(db: AppDatabase, userId: string) {
   return { profile, suspended: user === undefined || user.suspendedAt !== null };
 }
 
-/**
- * Starts sending for the person pressing Resume. Only the person's own pause or
- * no pause at all may be cleared; every other hold (setup, billing, a suspension)
- * keeps sending stopped and is returned so the caller can explain the fix.
- * @param db The application database.
- * @param clock The clock stamping the profile.
- * @param userId The person pressing Resume.
- * @returns Whether the profile changed, or the hold that still blocks sending.
- */
-export function resumeByUser(db: AppDatabase, clock: Clock, userId: string) {
+function writeUserRunning(
+  db: AppDatabase,
+  clock: Clock,
+  userId: string,
+  state: { pauseReason: "user" | null; running: boolean },
+) {
   return db.transaction(() => {
     const { profile, suspended } = stateOf(db, userId);
 
@@ -50,15 +46,14 @@ export function resumeByUser(db: AppDatabase, clock: Clock, userId: string) {
       return { ok: false, reason: current } satisfies RunningStateResult;
     }
 
-    const at = new Date(clock.now());
-
     if (profile === undefined) {
+      const at = new Date(clock.now());
+
       db.insert(profiles)
         .values({
           createdAt: at,
           languages: "[]",
-          pauseReason: null,
-          running: true,
+          ...state,
           updatedAt: at,
           userId,
         })
@@ -67,17 +62,30 @@ export function resumeByUser(db: AppDatabase, clock: Clock, userId: string) {
       return { changed: true, ok: true } satisfies RunningStateResult;
     }
 
-    if (profile.running && current === null) {
+    if (profile.running === state.running && current === state.pauseReason) {
       return { changed: false, ok: true } satisfies RunningStateResult;
     }
 
     db.update(profiles)
-      .set({ pauseReason: null, running: true, updatedAt: at })
+      .set({ ...state, updatedAt: new Date(clock.now()) })
       .where(eq(profiles.userId, userId))
       .run();
 
     return { changed: true, ok: true } satisfies RunningStateResult;
   });
+}
+
+/**
+ * Starts sending for the person pressing Resume. Only the person's own pause or
+ * no pause at all may be cleared; every other hold (setup, billing, a suspension)
+ * keeps sending stopped and is returned so the caller can explain the fix.
+ * @param db The application database.
+ * @param clock The clock stamping the profile.
+ * @param userId The person pressing Resume.
+ * @returns Whether the profile changed, or the hold that still blocks sending.
+ */
+export function resumeByUser(db: AppDatabase, clock: Clock, userId: string) {
+  return writeUserRunning(db, clock, userId, { pauseReason: null, running: true });
 }
 
 /**
@@ -90,47 +98,7 @@ export function resumeByUser(db: AppDatabase, clock: Clock, userId: string) {
  * @returns Whether the profile changed, or the hold that keeps sending stopped.
  */
 export function pauseByUser(db: AppDatabase, clock: Clock, userId: string) {
-  return db.transaction(() => {
-    const { profile, suspended } = stateOf(db, userId);
-
-    if (suspended) {
-      return { ok: false, reason: "suspended" } satisfies RunningStateResult;
-    }
-
-    const current = profile?.pauseReason ?? null;
-
-    if (current !== null && current !== "user") {
-      return { ok: false, reason: current } satisfies RunningStateResult;
-    }
-
-    const at = new Date(clock.now());
-
-    if (profile === undefined) {
-      db.insert(profiles)
-        .values({
-          createdAt: at,
-          languages: "[]",
-          pauseReason: "user",
-          running: false,
-          updatedAt: at,
-          userId,
-        })
-        .run();
-
-      return { changed: true, ok: true } satisfies RunningStateResult;
-    }
-
-    if (!profile.running && current === "user") {
-      return { changed: false, ok: true } satisfies RunningStateResult;
-    }
-
-    db.update(profiles)
-      .set({ pauseReason: "user", running: false, updatedAt: at })
-      .where(eq(profiles.userId, userId))
-      .run();
-
-    return { changed: true, ok: true } satisfies RunningStateResult;
-  });
+  return writeUserRunning(db, clock, userId, { pauseReason: "user", running: false });
 }
 
 /**

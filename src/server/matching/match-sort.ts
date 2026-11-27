@@ -1,14 +1,14 @@
 import type { ScoreBlocker } from "./score-schema.ts";
 
-export const MATCH_HIDDEN_BELOW = 50;
+const MATCH_HIDDEN_BELOW = 50;
 
-export const MATCH_BANDS = {
+const MATCH_BANDS = {
   possible: { label: "Possible", max: 69, min: 50 },
   good: { label: "Good", max: 84, min: 70 },
   strong: { label: "Strong", max: 100, min: 85 },
 } as const;
 
-export type MatchBand = (typeof MATCH_BANDS)[keyof typeof MATCH_BANDS]["label"];
+type MatchBand = (typeof MATCH_BANDS)[keyof typeof MATCH_BANDS]["label"];
 
 const BAND_ORDER: Record<MatchBand, number> = { Good: 2, Possible: 1, Strong: 3 };
 
@@ -53,14 +53,7 @@ function compareOptionalNumberDescending(left: number | null, right: number | nu
   return (right ?? 0) - (left ?? 0);
 }
 
-/**
- * The whole sort rule from ADR 0045: band, then an exact target role before a category-only match, then score, then
- * the newest posting, then the posting id. The id tie-break makes server pages stable and non-overlapping.
- * @param left One stored match.
- * @param right Another stored match.
- * @returns A negative number when `left` comes first.
- */
-export function compareMatches(left: SortableMatch, right: SortableMatch) {
+function compareMatches(left: SortableMatch, right: SortableMatch) {
   const leftScore = left.score ?? 0;
   const rightScore = right.score ?? 0;
   const leftBand = matchBandOf(leftScore) ?? "Possible";
@@ -84,13 +77,43 @@ export function compareMatches(left: SortableMatch, right: SortableMatch) {
 }
 
 /**
- * Filters to the visible matches and orders them by the one sort rule. The result is deterministic across calls, so
- * a page load never re-rolls the order.
+ * Filters to the visible matches and orders them by the one sort rule from ADR 0045: band, then an exact target role
+ * before a category-only match, then score, then the newest posting, then the posting id. The id tie-break makes
+ * server pages stable and non-overlapping, so a page load never re-rolls the order.
  * @param matches The stored matches.
  * @returns The visible matches, best first.
  */
 export function orderedMatches<T extends SortableMatch>(matches: readonly T[]) {
   return matches.filter((match) => matchIsVisible(match)).toSorted(compareMatches);
+}
+
+/** A match that may still be scoring: its code rank orders it until a stored score exists. */
+export type PendingSortableMatch = SortableMatch & { codeRank: number };
+
+function comparePendingMatches(left: PendingSortableMatch, right: PendingSortableMatch) {
+  if (left.codeRank !== right.codeRank) {
+    return right.codeRank - left.codeRank;
+  }
+
+  const posted = compareOptionalNumberDescending(left.postedAt, right.postedAt);
+
+  return posted === 0 ? left.id.localeCompare(right.id) : posted;
+}
+
+/**
+ * The whole list as Home and Matches show it: scored rows in the ADR 0045 order, then rows still scoring by their code
+ * rank, newest posting and id. Both screens read the one rule, so an unscored row never sorts two ways.
+ * @param matches The stored matches, scored or still scoring.
+ * @returns The visible scored rows followed by the rows that are still scoring.
+ */
+export function orderedMatchesWithPending<T extends PendingSortableMatch>(matches: readonly T[]) {
+  const scored = orderedMatches(matches);
+
+  const pending = matches
+    .filter((row) => row.score === null && row.blockers.length === 0)
+    .toSorted(comparePendingMatches);
+
+  return [...scored, ...pending];
 }
 
 /**

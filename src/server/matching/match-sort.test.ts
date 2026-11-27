@@ -7,18 +7,20 @@ import {
   matchIsVisible,
   matchPage,
   orderedMatches,
+  orderedMatchesWithPending,
   topPicksByEmployer,
 } from "./match-sort.ts";
 
-function match(overrides: Partial<SortableMatch> & { id: string }) {
+function match(overrides: Partial<SortableMatch> & { id: string; codeRank?: number }) {
   return {
     blockers: [],
+    codeRank: 0,
     companyKey: "acme",
     exactRole: false,
     postedAt: 1000,
     score: 70,
     ...overrides,
-  } satisfies SortableMatch;
+  } satisfies SortableMatch & { codeRank: number };
 }
 
 describe("the match band", () => {
@@ -109,6 +111,38 @@ describe("the match page", () => {
     expect(first.total).toBe(7);
     expect(new Set(ids).size).toBe(7);
     expect(ids).toEqual(["job-0", "job-1", "job-2", "job-3", "job-4", "job-5", "job-6"]);
+  });
+});
+
+describe("the whole list including rows still scoring", () => {
+  test("keeps every scored row above a row that has no stored score yet", () => {
+    const ordered = orderedMatchesWithPending([
+      match({ codeRank: 99, id: "scoring", score: null }),
+      match({ codeRank: 10, id: "scored", score: 60 }),
+    ]);
+
+    expect(ordered.map((row) => row.id)).toEqual(["scored", "scoring"]);
+  });
+
+  test("orders the rows still scoring by code rank, then newest posting, then id", () => {
+    const ordered = orderedMatchesWithPending([
+      match({ codeRank: 10, id: "b", postedAt: 1000, score: null }),
+      match({ codeRank: 10, id: "newest", postedAt: 2000, score: null }),
+      match({ codeRank: 10, id: "a", postedAt: 1000, score: null }),
+      match({ codeRank: 20, id: "ranker", postedAt: 500, score: null }),
+    ]);
+
+    expect(ordered.map((row) => row.id)).toEqual(["ranker", "newest", "a", "b"]);
+  });
+
+  test("never shows a blocked or low-scoring row, scored or not", () => {
+    const ordered = orderedMatchesWithPending([
+      match({ codeRank: 1, id: "blocked", blockers: ["not_a_job"], score: 90 }),
+      match({ codeRank: 1, id: "low", score: 40 }),
+      match({ codeRank: 1, id: "shown", score: 80 }),
+    ]);
+
+    expect(ordered.map((row) => row.id)).toEqual(["shown"]);
   });
 });
 

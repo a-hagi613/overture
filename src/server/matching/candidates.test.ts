@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +7,7 @@ import { join } from "node:path";
 import type { TargetsInput } from "../../shared/targets.ts";
 
 import { createCandidateService } from "./candidates.ts";
+import { recordPostingFailure } from "./posting-flags.ts";
 import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
 import { profiles, users } from "../platform/db/schema.ts";
@@ -196,7 +198,7 @@ function fresh() {
     personal: createPersonalCrypto(app.db, masterKeyringFor(new Uint8Array(32).fill(9))),
   });
 
-  return { candidates, catalog, clock };
+  return { app, candidates, catalog, clock };
 }
 
 async function rankedIds(roles: readonly string[]) {
@@ -259,6 +261,35 @@ describe("candidate matching on role-taxonomy ids", () => {
 
     expect(ids.slice(0, 2)).toEqual(["registered-nurse", "nurse-practitioner"]);
     expect(ids.slice(2).toSorted()).toEqual(["platform", "software"]);
+  });
+});
+
+describe("the filter order one Posting reports", () => {
+  test("a closed Posting reports closed before a role the person did not target", async () => {
+    const { candidates, catalog } = fresh();
+
+    catalog.db
+      .update(postings)
+      .set({ closedAt: NOW, status: "closed" })
+      .where(eq(postings.id, "software"))
+      .run();
+
+    const result = await candidates.check("user-1", "software");
+
+    expect(result).toBe("closed");
+  });
+
+  test("a flagged Posting leaves the pool before its role is judged", async () => {
+    const { app, candidates, clock } = fresh();
+
+    recordPostingFailure(app.db, clock, {
+      postingId: "software",
+      reason: "unsupported_login_required",
+    });
+
+    const result = await candidates.check("user-1", "software");
+
+    expect(result).toBe("flagged");
   });
 });
 

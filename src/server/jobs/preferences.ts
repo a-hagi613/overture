@@ -22,7 +22,7 @@ export interface PullPreferences {
   metros: readonly string[];
   /** The canonical place ids the user picked, which the reader matches job places against. */
   placeIds: readonly string[];
-  /** Free-text role targets, searched as title words. */
+  /** Free-text role targets, searched as title words rather than categories. */
   titleWords: readonly string[];
   /** The languages the person reads; a posting in another language is not a match. Empty means no language gate. */
   languages?: readonly string[];
@@ -48,12 +48,7 @@ export function categoriesForRoles(roles: readonly string[]) {
   return [...categories].toSorted();
 }
 
-/**
- * The free-text role targets, which freehire searches as title words rather than categories.
- * @param roles The saved role targets.
- * @returns The trimmed free-text values.
- */
-export function titleWordsForRoles(roles: readonly string[]) {
+function titleWordsForRoles(roles: readonly string[]) {
   const words = new Set<string>();
 
   for (const role of roles) {

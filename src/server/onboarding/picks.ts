@@ -14,7 +14,11 @@ import type {
 import { applications, onboardingBatches, onboardingPicks } from "../platform/db/schema.ts";
 import { postings } from "../platform/db/catalog-schema.ts";
 import { postingDisplayFor } from "../matching/applications.ts";
-import { onboardingPickLimitFor, pickStatusOfApplication } from "../../shared/onboarding.ts";
+import {
+  isOnboardingPickFailureReason,
+  onboardingPickLimitFor,
+  pickStatusOfApplication,
+} from "../../shared/onboarding.ts";
 
 export interface PickPreparationResult {
   applicationId: string | null;
@@ -39,17 +43,6 @@ function batchStatusAfter(results: readonly PickPreparationResult[]) {
   }
 
   return "prepared" as const;
-}
-
-function isFailureReason(value: string | null): value is OnboardingPickFailureReason {
-  return (
-    value === "posting_closed" ||
-    value === "apply_unsupported" ||
-    value === "language" ||
-    value === "company_excluded" ||
-    value === "already_applied" ||
-    value === "prepare_failed"
-  );
 }
 
 /**
@@ -149,7 +142,7 @@ export function createOnboardingPicks(deps: {
         company: row.companyName,
         location: row.locationRaw,
         postingId: row.postingId,
-        reason: isFailureReason(row.reason) ? row.reason : null,
+        reason: isOnboardingPickFailureReason(row.reason) ? row.reason : null,
         status: live,
         title: row.postingTitle,
       };

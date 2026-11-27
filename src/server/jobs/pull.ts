@@ -39,6 +39,16 @@ const CURSOR_SETTING = "jobs.changes_cursor";
 
 const stringArray = z.array(z.string());
 
+const MEMBER_COLUMNS = {
+  lastFreshPullAt: jobPullState.lastFreshPullAt,
+  lastFullPullAt: jobPullState.lastFullPullAt,
+  lastQueryKey: jobPullState.lastQueryKey,
+  locations: targets.locations,
+  roles: targets.roles,
+  unresolvedLocations: targets.unresolvedLocations,
+  userId: targets.userId,
+};
+
 function stringArrayFromColumn(value: string) {
   return stringArray.parse(JSON.parse(value));
 }
@@ -471,15 +481,7 @@ export function createPullService(deps: PullDeps) {
     });
 
     const rows = db
-      .select({
-        lastFreshPullAt: jobPullState.lastFreshPullAt,
-        lastFullPullAt: jobPullState.lastFullPullAt,
-        lastQueryKey: jobPullState.lastQueryKey,
-        locations: targets.locations,
-        roles: targets.roles,
-        unresolvedLocations: targets.unresolvedLocations,
-        userId: targets.userId,
-      })
+      .select(MEMBER_COLUMNS)
       .from(targets)
       .innerJoin(profiles, eq(profiles.userId, targets.userId))
       .leftJoin(jobPullState, eq(jobPullState.userId, targets.userId))
@@ -512,15 +514,7 @@ export function createPullService(deps: PullDeps) {
     }
 
     const row = db
-      .select({
-        lastFreshPullAt: jobPullState.lastFreshPullAt,
-        lastFullPullAt: jobPullState.lastFullPullAt,
-        lastQueryKey: jobPullState.lastQueryKey,
-        locations: targets.locations,
-        roles: targets.roles,
-        unresolvedLocations: targets.unresolvedLocations,
-        userId: targets.userId,
-      })
+      .select(MEMBER_COLUMNS)
       .from(targets)
       .leftJoin(jobPullState, eq(jobPullState.userId, targets.userId))
       .where(eq(targets.userId, userId))
