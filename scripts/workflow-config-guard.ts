@@ -14,6 +14,12 @@ export function readBunVersions(source: string) {
   );
 }
 
+/**
+ * The source of one workflow step, from `- name: <name>` to the next step or the next job, whichever comes first.
+ * @param source The workflow, or the job block.
+ * @param name The step name.
+ * @returns The step source, or null when no step has that name.
+ */
 export function readWorkflowStep(source: string, name: string) {
   const marker = `- name: ${name}`;
   const start = source.indexOf(marker);
@@ -23,7 +29,7 @@ export function readWorkflowStep(source: string, name: string) {
   }
 
   const rest = source.slice(start + marker.length);
-  const end = rest.search(/^ {6}- /mu);
+  const end = rest.search(/^ {6}- |^ {2}[A-Za-z_][\w-]*:/mu);
 
   return end === -1 ? rest : rest.slice(0, end);
 }
@@ -725,6 +731,12 @@ function readJobBlock(source: string, name: string) {
 }
 
 /**
+ * The checkout ref shared by both deploy jobs: a `workflow_run` deploy ships the CI run's commit, and a dispatched
+ * deploy has no `workflow_run`, so it ships the dispatched ref's SHA (`main` at dispatch time).
+ */
+export const DEPLOY_CHECKOUT_REF = `ref: \${{ github.event.workflow_run.head_sha || github.sha }}`;
+
+/**
  * Checks the deploy workflow ships the three Cloudflare Workers without wiping dashboard-set values or leaking the
  * API token, and that the marketing Worker ships the Fly release's own prerendered page instead of a second build.
  * A deploy that forgot `--keep-vars` would erase the owner's forwarding address and alert topic; one that rebuilt the
@@ -750,8 +762,10 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
     problems.push("deploy-workers runs even when the Fly deploy was skipped");
   }
 
-  if (!job.includes(`ref: \${{ github.event.workflow_run.head_sha }}`)) {
-    problems.push("deploy-workers does not check out the CI run's head SHA");
+  if (!job.includes(DEPLOY_CHECKOUT_REF)) {
+    problems.push(
+      "deploy-workers does not check out the deploy SHA (the CI run's head SHA, or the dispatched ref's SHA)",
+    );
   }
 
   for (const worker of WORKER_DEPLOYS) {
@@ -1076,6 +1090,176 @@ export function findFreehireLaunchSecretProblems(input: FreehireLaunchSecretInpu
       problems.push(
         "ops-live.yml sync-ops-secrets does not import FREEHIRE_API_KEY inside the non-empty check",
       );
+    }
+  }
+
+  return problems;
+}
+
+/** The step in `auto-merge.yml` that watches an armed auto-merge and starts Deploy for `main`. */
+export const AUTO_MERGE_DISPATCH_STEP = "Wait for the merge, then dispatch Deploy for main";
+
+export interface DeployTriggerInput {
+  readonly deploy: string;
+  readonly autoMerge: string;
+}
+
+function jobPermissionsBlock(job: string) {
+  const at = job.indexOf("\n    permissions:");
+
+  if (at === -1) {
+    return null;
+  }
+
+  const rest = job.slice(at + 1);
+  const end = rest.search(/\n {4}[A-Za-z_][\w-]*:/u);
+
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+/**
+ * Checks that a green, auto-merged pull request reaches production. GitHub completes an armed auto-merge as
+ * `app/github-actions` and starts no workflow for an event caused by `GITHUB_TOKEN`, so the merge creates no CI run on
+ * `main` and Deploy's `workflow_run` trigger never fires; a manual or `gh`-token merge does start that CI run. The
+ * dispatch job must therefore wait for a real merge, ask for the one permission `gh workflow run` needs, and start
+ * Deploy exactly once. `deploy.yml` must accept the dispatch and still run the jobs for the `workflow_run` path.
+ * @param input The deploy and auto-merge workflow sources.
+ * @returns Every rule the two workflows break, empty when a merge reaches production once.
+ */
+export function findDeployTriggerProblems(input: DeployTriggerInput) {
+  const problems: string[] = [];
+  const deployJob = readJobBlock(input.deploy, "deploy");
+  const workersJob = readJobBlock(input.deploy, "deploy-workers");
+  const armJob = readJobBlock(input.autoMerge, "arm");
+  const dispatchJob = readJobBlock(input.autoMerge, "deploy");
+
+  if (!/^ {2}workflow_dispatch:\s*$/mu.test(input.deploy)) {
+    problems.push(
+      "deploy.yml has no workflow_dispatch trigger, so an auto-merge that starts no CI run has no way to deploy main",
+    );
+  }
+
+  if (deployJob === null) {
+    problems.push("deploy.yml has no deploy job");
+  } else {
+    if (!deployJob.includes("github.event_name == 'workflow_dispatch'")) {
+      problems.push(
+        "deploy.yml's deploy job skips a dispatched run, so a dispatched Deploy deploys nothing",
+      );
+    }
+
+    if (!deployJob.includes(DEPLOY_CHECKOUT_REF)) {
+      problems.push(
+        "deploy.yml's deploy job does not check out the deploy SHA (the CI run's head SHA, or the dispatched ref's SHA)",
+      );
+    }
+
+    if (!deployJob.includes("github.event.workflow_run.conclusion == 'success'")) {
+      problems.push(
+        "deploy.yml's deploy job no longer runs for the CI workflow_run, so a human merge stops deploying",
+      );
+    }
+  }
+
+  if (workersJob !== null && !workersJob.includes("github.event_name == 'workflow_dispatch'")) {
+    problems.push(
+      "deploy.yml's deploy-workers job skips a dispatched run, so the Workers stay on their previous release",
+    );
+  }
+
+  if (
+    workersJob !== null &&
+    !workersJob.includes("github.event.workflow_run.conclusion == 'success'")
+  ) {
+    problems.push(
+      "deploy.yml's deploy-workers job no longer runs for the CI workflow_run, so a human merge stops shipping the Workers",
+    );
+  }
+
+  if (
+    !/^concurrency:\s*\n(?:\s*#[^\n]*\n)*\s+group:\s*deploy-main\s*\n(?:\s*#[^\n]*\n)*\s+cancel-in-progress:\s*false\s*$/mu.test(
+      input.deploy,
+    )
+  ) {
+    problems.push(
+      "deploy.yml does not serialize deploys in the deploy-main group without cancelling a queued one, so two entry points can race",
+    );
+  }
+
+  const permissionsAt = input.autoMerge.indexOf("\npermissions:");
+  const jobsAt = input.autoMerge.indexOf("\njobs:");
+
+  if (
+    permissionsAt !== -1 &&
+    jobsAt > permissionsAt &&
+    input.autoMerge.slice(permissionsAt, jobsAt).includes("actions: write")
+  ) {
+    problems.push(
+      "auto-merge.yml grants actions: write at the workflow level; only the deploy job's dispatch needs it",
+    );
+  }
+
+  if (armJob?.includes("gh workflow run")) {
+    problems.push(
+      "auto-merge.yml dispatches Deploy from the arm job; `gh pr merge --auto` returns before the merge, so the merge must be observed first",
+    );
+  }
+
+  if (dispatchJob === null) {
+    problems.push(
+      "auto-merge.yml has no deploy job, so an auto-merged pull request never dispatches Deploy",
+    );
+
+    return problems;
+  }
+
+  if (!/^ {4}needs:\s*arm\s*$/mu.test(dispatchJob)) {
+    problems.push("auto-merge.yml's deploy job does not wait for the arm job");
+  }
+
+  const permissions = jobPermissionsBlock(dispatchJob);
+
+  if (permissions === null) {
+    problems.push(
+      "auto-merge.yml's deploy job has no permissions block; a dispatch needs actions: write and nothing more",
+    );
+  } else {
+    if (!/^\s+actions:\s*write\s*$/mu.test(permissions)) {
+      problems.push(
+        "auto-merge.yml's deploy job lacks actions: write, so `gh workflow run` is refused",
+      );
+    }
+
+    if (!/^\s+contents:\s*read\s*$/mu.test(permissions)) {
+      problems.push("auto-merge.yml's deploy job does not limit contents to read");
+    }
+
+    if (/^\s+contents:\s*write\s*$/mu.test(permissions)) {
+      problems.push(
+        "auto-merge.yml's deploy job widens contents to write; only the merge in the arm job needs it",
+      );
+    }
+  }
+
+  const dispatch = readWorkflowStep(dispatchJob, AUTO_MERGE_DISPATCH_STEP);
+
+  if (dispatch === null) {
+    problems.push(
+      `auto-merge.yml has no "${AUTO_MERGE_DISPATCH_STEP}" step, so a completed merge dispatches nothing`,
+    );
+
+    return problems;
+  }
+
+  for (const [needle, rule] of [
+    ["MERGED", "does not wait for the pull request to merge"],
+    ["CLOSED", "does not skip a pull request that closed without merging"],
+    ["gh run list", "does not skip a tree that already has a Deploy run"],
+    ["gh workflow run", "does not dispatch a workflow"],
+    ["--ref main", "does not dispatch Deploy for main"],
+  ] as const) {
+    if (!dispatch.includes(needle)) {
+      problems.push(`auto-merge.yml's dispatch step ${rule}`);
     }
   }
 
