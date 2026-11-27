@@ -87,12 +87,14 @@ export function applicationFor(db: AppDatabase, userId: string, postingId: strin
  * @param deps The application database to write and the catalog database to read the display fields from.
  * @param at Creation time, epoch milliseconds.
  * @param input The user, the Posting, the origin and the score.
+ * @param snapshot The display snapshot taken when the person picked, used when the Posting has left the catalog.
  * @returns The new Application id, or null when nothing was created.
  */
 export function createApplication(
   deps: { db: AppDatabase; catalogDb: CatalogDatabase },
   at: number,
   input: ApplicationInput,
+  snapshot?: PostingDisplay,
 ) {
   const { db, catalogDb } = deps;
   const existing = applicationFor(db, input.userId, input.postingId);
@@ -101,12 +103,58 @@ export function createApplication(
     return null;
   }
 
-  const display = postingDisplayFor(catalogDb, input.postingId);
+  const display = snapshot ?? postingDisplayFor(catalogDb, input.postingId);
 
   if (display === undefined) {
     return null;
   }
 
+  return insertApplication(db, at, input, display, {
+    stage: "queued",
+    status: "preparing",
+    statusReason: null,
+  });
+}
+
+/**
+ * Create one tracked Application for a pick that can no longer be prepared, from its frozen snapshot alone. It keeps
+ * the employer and title visible in the Tracker and Closed, and the unique user/posting index keeps it to one row.
+ * @param db The application database.
+ * @param at Creation time, epoch milliseconds.
+ * @param input The user, the Posting and the frozen display snapshot.
+ * @returns The new Application id, or null when nothing was created.
+ */
+export function createClosedApplication(
+  db: AppDatabase,
+  at: number,
+  input: { display: PostingDisplay; postingId: string; reason: string; userId: string },
+) {
+  const existing = applicationFor(db, input.userId, input.postingId);
+
+  if (existing !== undefined) {
+    return null;
+  }
+
+  return insertApplication(
+    db,
+    at,
+    { origin: "manual", postingId: input.postingId, score: null, userId: input.userId },
+    input.display,
+    { stage: "closed", status: "failed", statusReason: input.reason },
+  );
+}
+
+function insertApplication(
+  db: AppDatabase,
+  at: number,
+  input: ApplicationInput,
+  display: PostingDisplay,
+  initial: {
+    stage: "closed" | "queued";
+    status: "failed" | "preparing";
+    statusReason: string | null;
+  },
+) {
   const id = crypto.randomUUID();
 
   const inserted = db
@@ -117,8 +165,9 @@ export function createApplication(
       userId: input.userId,
       postingId: input.postingId,
       origin: input.origin,
-      status: "preparing",
-      stage: "queued",
+      status: initial.status,
+      statusReason: initial.statusReason,
+      stage: initial.stage,
       stageLocked: false,
       boardPosition: null,
       scoreAtQueue: input.score,
@@ -139,10 +188,12 @@ export function createApplication(
         applicationId: inserted.id,
         detail: { score: input.score },
         fromValue: null,
-        kind: "stage",
-        reason: input.origin === "auto" ? "selected_automatically" : "selected_by_user",
+        kind: initial.status === "failed" ? "status" : "stage",
+        reason:
+          initial.statusReason ??
+          (input.origin === "auto" ? "selected_automatically" : "selected_by_user"),
         source: input.origin === "auto" ? "system" : "user",
-        toValue: "queued",
+        toValue: initial.status === "failed" ? "failed" : "queued",
         userId: input.userId,
       },
     );

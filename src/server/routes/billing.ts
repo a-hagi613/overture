@@ -8,16 +8,13 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { PaymentEvent, Payments } from "../platform/ports/payments.ts";
 
 import { readSessionUser } from "../auth/session.ts";
-import {
-  cardFingerprintHmac,
-  claimTrialCard,
-  TRIAL_APPLICATIONS,
-} from "../billing/card-fingerprint.ts";
+import { cardFingerprintHmac, TRIAL_APPLICATIONS } from "../billing/card-fingerprint.ts";
 import { billingAccountOf } from "../billing/plan-account.ts";
 import { planForPriceId, stripePriceId } from "../billing/index.ts";
 import { createCheckoutCoordinator } from "../billing/checkout.ts";
-import { linkStripeCustomer, stripeCustomerIdFor } from "../billing/customers.ts";
+import { stripeCustomerIdFor } from "../billing/customers.ts";
 import { currentSubscriptionOf, subscriptionBlocksCheckout } from "../billing/subscriptions.ts";
+import { verifyTrialCardForUser } from "../billing/trial-verify.ts";
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { logError } from "../platform/log.ts";
@@ -163,7 +160,7 @@ export function createBillingRoutes(deps: {
         email: access.account.email,
         plan: context.req.valid("json").plan,
         priceId,
-        successUrl: `${plansUrl}?billing=success`,
+        successUrl: `${baseUrl}/tracker?billing=success`,
         userId: access.account.id,
       });
 
@@ -192,10 +189,10 @@ export function createBillingRoutes(deps: {
       const origin = appOrigin.replace(/\/+$/u, "");
 
       const session = await payments.createSetupSession({
-        cancelUrl: `${origin}/onboarding/trial?card=cancelled`,
+        cancelUrl: `${origin}/onboarding/matches?card=cancelled`,
         customerId: stripeCustomerIdFor(db, access.account.id),
         email: access.account.email,
-        successUrl: `${origin}/onboarding/trial?card=verified&session={CHECKOUT_SESSION_ID}`,
+        successUrl: `${origin}/tracker?card=verified&session={CHECKOUT_SESSION_ID}`,
         userId: access.account.id,
       });
 
@@ -220,36 +217,18 @@ export function createBillingRoutes(deps: {
       return context.json({ error: "billing_disabled" }, 503);
     }
 
-    let card;
-
-    try {
-      card = await payments.retrieveVerifiedCard(context.req.valid("json").sessionId);
-    } catch (error) {
-      logError("billing", error);
-
-      return context.json({ error: "stripe_error" }, 502);
-    }
-
-    if (card === null || card.userId !== access.account.id) {
-      return context.json({ error: "card_not_verified" }, 402);
-    }
-
-    if (card.customerId !== null) {
-      linkStripeCustomer(db, {
-        at: clock.now(),
-        stripeCustomerId: card.customerId,
-        userId: access.account.id,
-      });
-    }
-
-    const claim = claimTrialCard(db, clock, {
-      hmac: cardFingerprintHmac(cardFingerprintSecret, card.fingerprint),
-      userId: access.account.id,
-    });
+    const verified = await verifyTrialCardForUser(
+      { cardFingerprintSecret, clock, db, payments },
+      { sessionId: context.req.valid("json").sessionId, userId: access.account.id },
+    );
 
     context.header("Cache-Control", "no-store");
 
-    if (claim.status === "granted") {
+    if (verified.outcome === "stripe_error") {
+      return context.json({ error: "stripe_error" }, 502);
+    }
+
+    if (verified.outcome === "granted") {
       publishEvent(
         db,
         clock,
@@ -258,10 +237,22 @@ export function createBillingRoutes(deps: {
         access.account.id,
       );
 
-      return context.json({ result: "granted", applications: TRIAL_APPLICATIONS });
+      return context.json({ applications: TRIAL_APPLICATIONS, result: "granted" });
     }
 
-    return context.json({ error: claim.status }, 409);
+    if (verified.outcome === "pending") {
+      return context.json({ error: "pending" }, 202);
+    }
+
+    if (verified.outcome === "billing_disabled") {
+      return context.json({ error: "billing_disabled" }, 503);
+    }
+
+    if (verified.outcome === "card_not_verified") {
+      return context.json({ error: "card_not_verified" }, 402);
+    }
+
+    return context.json({ error: verified.outcome }, 409);
   });
 
   routes.post("/billing/portal", async (context) => {

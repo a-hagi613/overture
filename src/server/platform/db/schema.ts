@@ -16,6 +16,7 @@ import { CHECKIN_ANSWERS } from "../../../shared/checkins.ts";
 import { APPLY_SUPPORTED_ATS, ATS_VALUES, PLAN_CACHE_ATS } from "../../../shared/ats.ts";
 import { SUPPORT_CATEGORIES, SUPPORT_TICKET_STATUSES } from "../../../shared/support.ts";
 import { POSTING_FLAG_REASONS } from "../../../shared/posting-flags.ts";
+import { ONBOARDING_BATCH_STATUSES, ONBOARDING_PICK_STATUSES } from "../../../shared/onboarding.ts";
 
 const timestamp = (name: string) => integer(name, { mode: "timestamp" });
 
@@ -1527,4 +1528,62 @@ export const jobPullRuns = sqliteTable(
     finishedAt: integer("finished_at"),
   },
   (t) => [index("job_pull_runs_group_started").on(t.groupKey, t.startedAt)],
+);
+
+/**
+ * One onboarding run's durable batch state, written before the Stripe card check and resumed after it (issue #687).
+ * One row per account: a refresh, a second tab or a repeated return reads and reuses the same batch, so preparation
+ * can never create a second set of Applications.
+ */
+export const onboardingBatches = sqliteTable(
+  "onboarding_batches",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    planKind: text("plan_kind", { enum: ["free_trial", "week", "month"] }),
+    status: text("status", { enum: ONBOARDING_BATCH_STATUSES }).notNull(),
+    failureReason: text("failure_reason"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("onboarding_batches_user_unique").on(t.userId)],
+);
+
+/**
+ * One posting a person chose during onboarding, with the immutable display snapshot taken at pick time. The snapshot
+ * keeps employer and title meaningful when the Posting closes while the person is in Stripe Checkout, and
+ * `application_id` makes preparation and every later return reuse exactly one Application per pick.
+ */
+export const onboardingPicks = sqliteTable(
+  "onboarding_picks",
+  {
+    id: text("id").primaryKey(),
+    userId: cascadeUserId(),
+    postingId: text("posting_id").notNull(),
+    applicationId: text("application_id").references(() => applications.id, {
+      onDelete: "set null",
+    }),
+    status: text("status", { enum: ONBOARDING_PICK_STATUSES }).notNull(),
+    statusReason: text("status_reason"),
+    companyId: text("company_id").notNull(),
+    companyName: text("company_name").notNull(),
+    companyNameNorm: text("company_name_norm").notNull(),
+    companyDomain: text("company_domain"),
+    postingTitle: text("posting_title").notNull(),
+    postingUrl: text("posting_url").notNull(),
+    applyUrl: text("apply_url"),
+    ats: text("ats", { enum: ATS_VALUES }),
+    locationRaw: text("location_raw"),
+    salaryCurrency: text("salary_currency"),
+    salaryMinMinor: integer("salary_min_minor"),
+    salaryMaxMinor: integer("salary_max_minor"),
+    salaryPeriod: text("salary_period", { enum: ["year", "month", "hour"] }),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("onboarding_picks_user_posting_unique").on(t.userId, t.postingId),
+    index("onboarding_picks_user_status").on(t.userId, t.status),
+    index("onboarding_picks_application").on(t.applicationId),
+  ],
 );

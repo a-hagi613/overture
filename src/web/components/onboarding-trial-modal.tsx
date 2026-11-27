@@ -11,7 +11,7 @@ import { dsBody, dsCardTitle } from "./ui/ds.ts";
 
 const text = copy.onboarding.trial;
 
-export type TrialCardState = "verify" | "declined" | "used";
+export type TrialCardState = "verify" | "declined" | "used" | "pending";
 
 export function OnboardingTrialModal({
   busy,
@@ -53,6 +53,11 @@ export function OnboardingTrialModal({
     badgeLabel = text.usedTitle;
     titleText = text.usedHeading;
     leadText = text.usedBody;
+  } else if (state === "pending") {
+    badgeVariant = "need";
+    badgeLabel = text.pendingTitle;
+    titleText = text.pendingTitle;
+    leadText = text.pendingBody;
   }
 
   let ctaLabel: string = returned ? text.ctaReturnButton : text.ctaButton;
@@ -115,6 +120,15 @@ export function OnboardingTrialModal({
         <Button disabled={busy} onClick={onVerify} size="default" variant="secondary">
           {text.anotherCard}
         </Button>
+      </div>
+    );
+  } else if (state === "pending") {
+    footerSlot = (
+      <div className="mt-5 flex flex-col gap-2.5">
+        <Button disabled={busy} onClick={onVerify} size="default" variant="primary">
+          {text.retryPending}
+        </Button>
+        <p className="text-xs text-muted-foreground">{text.picksKeptNote}</p>
       </div>
     );
   }

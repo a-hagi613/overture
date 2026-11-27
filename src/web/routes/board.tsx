@@ -40,6 +40,7 @@ import {
 import type { BoardCard, StageKey } from "../lib/board-api.ts";
 import { onBoardMoved } from "../lib/live-events.ts";
 import { useMediaQuery } from "../lib/media-query.ts";
+import { useSendAll } from "../lib/ready-api.ts";
 import {
   MOBILE_TAB_PREFIX,
   TRACKER_LANES,
@@ -74,6 +75,7 @@ export function BoardPage({
   const moveStage = useMoveStage();
   const undoStage = useUndoStage();
   const withdraw = useWithdraw();
+  const sendAll = useSendAll();
   const isDesktopBoard = useMediaQuery("(min-width: 1024px)");
   const [searchParams, setSearchParams] = useSearchParams();
   const cardParam = searchParams.get("card") ?? searchParams.get("application");
@@ -498,11 +500,48 @@ export function BoardPage({
     visibleCount += count;
   }
 
+  const readyCount = allCards.filter((card) => card.status === "ready").length;
+
+  const sendAllNow = () => {
+    sendAll.mutate(undefined, {
+      onError: () => {
+        toast.error(copy.ready.toast.failed);
+      },
+      onSuccess: (result) => {
+        if (result.approved.length > 0) {
+          toast.success(copy.ready.toast.sendAllDone(result.approved.length));
+        }
+
+        if (result.needsReview.length > 0) {
+          toast.info(copy.ready.toast.sendAllNeedsReview(result.needsReview.length));
+        }
+
+        if (result.approved.length === 0 && result.needsReview.length === 0) {
+          toast.info(copy.ready.toast.sendAllNone);
+        }
+      },
+    });
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         actions={
           <div className="flex flex-wrap items-center gap-2 max-md:w-full">
+            {!boardPending && !boardError && readyCount > 0 ? (
+              <Button
+                ariaBusy={sendAll.isPending}
+                ariaLabel={copy.ready.sendAllAria(readyCount)}
+                className="max-md:min-h-11"
+                disabled={sendAll.isPending}
+                onClick={sendAllNow}
+                size="sm"
+                variant="primary"
+              >
+                {sendAll.isPending ? copy.ready.sendAllBusy : copy.ready.sendAll}
+              </Button>
+            ) : null}
+
             {!boardPending && !boardError && closedCount > 0 ? (
               <Button
                 ariaExpanded={showClosed}

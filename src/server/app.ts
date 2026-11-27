@@ -580,11 +580,13 @@ export function createApp(deps: AppDependencies) {
     "/api",
     createOnboardingRoutes({
       auth: deps.auth,
+      cardFingerprintSecret: env.CARD_FINGERPRINT_SECRET ?? null,
       catalogDb: deps.catalogDb,
       clock: deps.clock,
       db: deps.db,
       llm: deps.llm,
       objects: deps.objects,
+      payments: deps.payments,
       personal,
       reviews: deps.reviews,
       spendGate: deps.spendGate,

@@ -66,11 +66,45 @@ const onboardingMatchSchema = z.object({
   workplace: z.string(),
 });
 
+const onboardingPickSchema = z.object({
+  applicationId: z.string().nullable(),
+  applyUrl: z.string().nullable(),
+  company: z.string(),
+  location: z.string().nullable(),
+  postingId: z.string(),
+  reason: z.string().nullable(),
+  status: z.enum(["picked", "preparing", "needs_answer", "prepared", "closed", "failed"]),
+  title: z.string(),
+});
+
+const onboardingPicksSchema = z.object({
+  batchStatus: z.enum(["picking", "awaiting_card", "preparing", "prepared", "failed"]),
+  pickLimit: z.number(),
+  picks: z.array(onboardingPickSchema),
+  selected: z.array(z.string()),
+});
+
 const onboardingMatchesSchema = z.object({
   matches: z.array(onboardingMatchSchema),
   pickLimit: z.number(),
+  picks: onboardingPicksSchema.optional(),
   poolCount: z.number(),
   selected: z.array(z.string()),
+});
+
+const settleSchema = z.object({
+  applicationsLeft: z.number().default(0),
+  outcome: z.enum([
+    "prepared",
+    "pending",
+    "already_trialed",
+    "already_used",
+    "card_not_verified",
+    "trial_required",
+    "no_picks",
+  ]),
+  picks: onboardingPicksSchema,
+  prepared: z.number(),
 });
 
 const keyDetailFieldSchema = z.object({
@@ -87,6 +121,7 @@ const onboardingGapsSchema = z.object({
 
 const prepareResultSchema = z.object({
   onboarding: onboardingStateSchema,
+  picks: onboardingPicksSchema.optional(),
   prepared: z.number(),
 });
 
@@ -220,6 +255,55 @@ export async function prepareOnboarding(postingIds: string[]) {
       }),
     ),
   );
+}
+
+export type OnboardingSettle = z.infer<typeof settleSchema>;
+
+async function postSettle(sessionId: string | null) {
+  const response = await fetch("/api/onboarding/settle", {
+    body: JSON.stringify(sessionId === null ? {} : { sessionId }),
+    headers: { "content-type": "application/json" },
+    method: "POST",
+  });
+
+  if (response.ok) {
+    return settleSchema.parse(await response.json());
+  }
+
+  const body: unknown = await response.json().catch(() => null);
+
+  if (response.status === 202) {
+    return settleSchema.parse(body);
+  }
+
+  if (response.status === 409 || response.status === 402) {
+    const parsed = settleSchema.safeParse(body);
+
+    if (parsed.success) {
+      return parsed.data;
+    }
+  }
+
+  throw new Error(`The card check did not finish (${String(response.status)}).`);
+}
+
+export function useSettleOnboarding() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: postSettle,
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: stateKey }),
+        client.invalidateQueries({ queryKey: matchesKey }),
+        client.invalidateQueries({ queryKey: ["home"] }),
+        client.invalidateQueries({ queryKey: ["nav"] }),
+        client.invalidateQueries({ queryKey: ["ready"] }),
+        client.invalidateQueries({ queryKey: ["board"] }),
+        client.invalidateQueries({ queryKey: ["billing"] }),
+      ]);
+    },
+  });
 }
 
 export function useOnboardingState(enabled = true) {

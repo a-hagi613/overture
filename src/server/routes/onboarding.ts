@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { and, eq, inArray } from "drizzle-orm";
 import { validJson } from "./validators.ts";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
@@ -8,14 +7,13 @@ import type { Auth } from "../auth/index.ts";
 import { readSessionUser } from "../auth/session.ts";
 import type { LlmPort } from "../platform/ports/llm.ts";
 import type { ObjectStore } from "../platform/ports/object-store.ts";
+import type { Payments } from "../platform/ports/payments.ts";
 import type { ReviewService } from "../pipeline/reviews.ts";
 import type { MatchingService } from "../matching/score.ts";
 import type { SpendGate } from "../billing/spend.ts";
 
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { applicationsLeft } from "../billing/ledger.ts";
-import { postingUserState } from "../platform/db/schema.ts";
-import { postings } from "../platform/db/catalog-schema.ts";
 import { startOnboarding } from "../profile/onboarding-start.ts";
 import { enqueueUserPull } from "../jobs/pull.ts";
 import { enqueueMatchScorePool } from "../matching/match-jobs.ts";
@@ -30,6 +28,10 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import { createResumeService } from "../profile/resume.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import { countMatchingJobs, createTargetsService } from "../profile/targets.ts";
+import { createOnboardingPicks } from "../onboarding/picks.ts";
+import type { OnboardingPicksService } from "../onboarding/picks.ts";
+import { verifyTrialCardForUser } from "../billing/trial-verify.ts";
+import { publishEvent } from "../platform/sse/stream.ts";
 import { describePlaceIds } from "../places/catalog.ts";
 import { masterKeyring } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
@@ -41,10 +43,29 @@ import {
   onboardingGapsInputSchema,
   onboardingMatchSelectionInputSchema,
   onboardingPrepareInputSchema,
+  onboardingSettleInputSchema,
   onboardingTimezoneInputSchema,
 } from "../../shared/onboarding.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
+
+function displayOf(pick: ReturnType<OnboardingPicksService["forPreparation"]>[number]) {
+  return {
+    applyUrl: pick.applyUrl,
+    ats: pick.ats,
+    companyDomain: pick.companyDomain,
+    companyId: pick.companyId,
+    companyName: pick.companyName,
+    companyNameNorm: pick.companyNameNorm,
+    locationRaw: pick.locationRaw,
+    postingTitle: pick.postingTitle,
+    postingUrl: pick.postingUrl,
+    salaryCurrency: pick.salaryCurrency,
+    salaryMaxMinor: pick.salaryMaxMinor,
+    salaryMinMinor: pick.salaryMinMinor,
+    salaryPeriod: pick.salaryPeriod,
+  };
+}
 
 export function createOnboardingRoutes(deps: {
   db: AppDatabase;
@@ -54,6 +75,8 @@ export function createOnboardingRoutes(deps: {
   llm: LlmPort;
   objects: ObjectStore;
   personal?: PersonalCrypto | undefined;
+  payments?: Payments | null | undefined;
+  cardFingerprintSecret?: string | null | undefined;
   reviews: ReviewService;
   spendGate?: SpendGate | undefined;
   matching: MatchingService;
@@ -61,6 +84,9 @@ export function createOnboardingRoutes(deps: {
   const { db, clock, auth, llm, objects, reviews: reviewService } = deps;
 
   const personal = deps.personal ?? createPersonalCrypto(db, masterKeyring);
+  const payments = deps.payments ?? null;
+  const cardFingerprintSecret = deps.cardFingerprintSecret ?? null;
+  const picks = createOnboardingPicks({ catalogDb: deps.catalogDb, clock, db });
 
   const targetsService = createTargetsService({ db, clock });
   const languagesService = createLanguagesService({ db, clock });
@@ -132,18 +158,9 @@ export function createOnboardingRoutes(deps: {
     };
   }
 
-  function savedPostingIds(userId: string) {
-    return db
-      .select({ postingId: postingUserState.postingId })
-      .from(postingUserState)
-      .where(and(eq(postingUserState.userId, userId), eq(postingUserState.state, "saved")))
-      .all()
-      .map((row) => row.postingId);
-  }
-
   async function matchesView(userId: string) {
     const preview = await deps.matching.preview(userId, 9);
-    const saved = savedPostingIds(userId);
+    const durable = picks.view(userId);
 
     const selectableIds = new Set(
       preview.items.slice(0, ONBOARDING_MATCH_PICK_LIMIT).map((item) => item.id),
@@ -151,41 +168,37 @@ export function createOnboardingRoutes(deps: {
 
     return {
       matches: preview.items,
-      pickLimit: ONBOARDING_MATCH_PICK_LIMIT,
+      pickLimit: durable.pickLimit,
+      picks: durable,
       poolCount: preview.poolCount,
-      selected: saved.filter((id) => selectableIds.has(id)),
+      selected: durable.selected.filter((id) => selectableIds.has(id)),
     };
   }
 
-  function saveSelection(userId: string, postingIds: readonly string[]) {
-    const unique = [...new Set(postingIds)];
+  async function prepareStoredPicks(userId: string) {
+    const stored = picks.forPreparation(userId);
 
-    if (unique.length > 0) {
-      const open = deps.catalogDb
-        .select({ id: postings.id })
-        .from(postings)
-        .where(and(inArray(postings.id, unique), eq(postings.status, "open")))
-        .all()
-        .map((row) => row.id);
-
-      if (open.length !== unique.length) {
-        return null;
-      }
+    if (stored.length === 0) {
+      return { prepared: 0, results: new Map() };
     }
 
-    db.transaction((tx) => {
-      tx.delete(postingUserState)
-        .where(and(eq(postingUserState.userId, userId), eq(postingUserState.state, "saved")))
-        .run();
+    picks.markStatus(userId, "preparing");
 
-      for (const postingId of unique) {
-        tx.insert(postingUserState)
-          .values({ userId, postingId, state: "saved", updatedAt: clock.now() })
-          .run();
-      }
-    });
+    const results = await deps.matching.preparePicks(
+      userId,
+      stored.map((pick) => ({ display: displayOf(pick), postingId: pick.postingId })),
+    );
 
-    return unique;
+    picks.applyPreparation(userId, results);
+
+    const prepared = [...results.values()].filter(
+      (result) =>
+        result.status === "prepared" ||
+        result.status === "preparing" ||
+        result.status === "needs_answer",
+    ).length;
+
+    return { prepared, results };
   }
 
   const routes = new Hono();
@@ -258,7 +271,7 @@ export function createOnboardingRoutes(deps: {
         return context.json({ error: "already_onboarded" }, 409);
       }
 
-      const saved = saveSelection(account.id, context.req.valid("json").postingIds);
+      const saved = picks.save(account.id, context.req.valid("json").postingIds);
 
       if (saved === null) {
         return context.json({ error: API_ERRORS.notFound }, 404);
@@ -315,20 +328,141 @@ export function createOnboardingRoutes(deps: {
 
     const postingIds = [...new Set(context.req.valid("json").postingIds)];
 
-    if (postingIds.length === 0) {
+    if (postingIds.length === 0 && picks.forPreparation(account.id).length === 0) {
       return context.json({ error: "selection_required" }, 409);
+    }
+
+    if (picks.forPreparation(account.id).length === 0) {
+      const saved = picks.save(account.id, postingIds);
+
+      if (saved === null) {
+        return context.json({ error: API_ERRORS.notFound }, 404);
+      }
     }
 
     await retryWhenBusy(() => startOnboarding(db, clock, account.id), "onboarding.start");
 
-    const prepared = await deps.matching.prepareChosen(
-      account.id,
-      postingIds.slice(0, ONBOARDING_MATCH_PICK_LIMIT),
-    );
+    const { prepared } = await prepareStoredPicks(account.id);
 
     context.header("Cache-Control", "no-store");
 
-    return context.json({ onboarding: await view(account), prepared: prepared.length });
+    return context.json({
+      onboarding: await view(account),
+      picks: picks.view(account.id),
+      prepared,
+    });
+  });
+
+  routes.post("/onboarding/settle", validJson(onboardingSettleInputSchema), async (context) => {
+    const account = await readSessionUser(auth, context.req.raw.headers);
+
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    context.header("Cache-Control", "no-store");
+
+    const stored = picks.forPreparation(account.id);
+
+    if (stored.length === 0) {
+      return context.json(
+        {
+          applicationsLeft: applicationsLeft(db, account.id, clock.now()),
+          outcome: "no_picks",
+          picks: picks.view(account.id),
+          prepared: 0,
+        },
+        409,
+      );
+    }
+
+    const { sessionId } = context.req.valid("json");
+
+    if (sessionId !== undefined && applicationsLeft(db, account.id, clock.now()) <= 0) {
+      const verified = await verifyTrialCardForUser(
+        { cardFingerprintSecret, clock, db, payments },
+        { sessionId, userId: account.id },
+      );
+
+      if (verified.outcome === "stripe_error") {
+        return context.json({ error: "stripe_error" }, 502);
+      }
+
+      if (verified.outcome === "billing_disabled") {
+        return context.json({ error: "billing_disabled" }, 503);
+      }
+
+      if (verified.outcome === "pending") {
+        return context.json(
+          { applicationsLeft: 0, outcome: "pending", picks: picks.view(account.id), prepared: 0 },
+          202,
+        );
+      }
+
+      if (verified.outcome === "card_not_verified") {
+        return context.json(
+          {
+            applicationsLeft: applicationsLeft(db, account.id, clock.now()),
+            error: "card_not_verified",
+            outcome: verified.outcome,
+            picks: picks.view(account.id),
+            prepared: 0,
+          },
+          402,
+        );
+      }
+
+      if (verified.outcome !== "granted") {
+        return context.json(
+          {
+            applicationsLeft: applicationsLeft(db, account.id, clock.now()),
+            error: verified.outcome,
+            outcome: verified.outcome,
+            picks: picks.view(account.id),
+            prepared: 0,
+          },
+          409,
+        );
+      }
+
+      publishEvent(
+        db,
+        clock,
+        "billing.updated",
+        JSON.stringify({ billing: true, trial: true }),
+        account.id,
+      );
+    }
+
+    if (applicationsLeft(db, account.id, clock.now()) <= 0) {
+      if (sessionId === undefined) {
+        return context.json(
+          {
+            applicationsLeft: 0,
+            outcome: "pending",
+            picks: picks.view(account.id),
+            prepared: 0,
+          },
+          202,
+        );
+      }
+
+      return context.json({ error: "trial_required", outcome: "trial_required" }, 402);
+    }
+
+    await retryWhenBusy(() => startOnboarding(db, clock, account.id), "onboarding.start");
+
+    const { prepared } = await prepareStoredPicks(account.id);
+
+    publishEvent(db, clock, "home.updated", JSON.stringify({ prepared }), account.id);
+    publishEvent(db, clock, "application.updated", JSON.stringify({ prepared }), account.id);
+
+    return context.json({
+      applicationsLeft: applicationsLeft(db, account.id, clock.now()),
+      outcome: "prepared",
+      picks: picks.view(account.id),
+      prepared,
+    });
   });
 
   routes.post("/onboarding/:step", async (context) => {

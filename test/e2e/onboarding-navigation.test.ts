@@ -472,8 +472,8 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   await expect(startBtn).toBeEnabled();
   await startBtn.click();
 
-  await expect(page).toHaveURL(/\/ready$/u, { timeout: 10_000 });
-  await expect(page.getByRole("heading", { level: 1, name: /Approval Queue/u })).toBeVisible();
+  await expect(page).toHaveURL(/\/tracker$/u, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1, name: /Application Tracker/u })).toBeVisible();
 
   const finalState = onboardingSchema.parse(await (await api.get("/api/onboarding")).json());
 
