@@ -5,9 +5,9 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { MailSender } from "../platform/mail/port.ts";
 
 import { CODE_WAIT_TIMEOUT_MS } from "../../shared/code-wait.ts";
-import { copy } from "../../shared/copy.ts";
 import { isDemoRole } from "../../shared/demo.ts";
 import { MailCapExceededError } from "../platform/mail/errors.ts";
+import { codeWaitEmail } from "../platform/mail/emails.ts";
 import { notifications, users } from "../platform/db/schema.ts";
 import { logInfo } from "../platform/log.ts";
 import { hasActivePushEndpoint } from "./push.ts";
@@ -98,12 +98,12 @@ async function deliverCodeWaitEmail(deps: CodeWaitEmailDeps, input: CodeWaitEmai
 
   try {
     await deps.mail.sendCodeWait({
-      body: copy.mail.codeWaitBody({
+      to: to.email,
+      ...codeWaitEmail({
         minutes: CODE_WAIT_TIMEOUT_MS / 60_000,
+        subject: notification.title,
         url: `${deps.appOrigin.replace(/\/+$/u, "")}${notification.url}`,
       }),
-      subject: notification.title,
-      to: to.email,
     });
   } catch (error) {
     if (!(error instanceof MailCapExceededError)) {

@@ -2,6 +2,9 @@ import type { AddressObject, Attachment, HeaderValue, ParsedMail } from "mailpar
 
 import { z } from "zod";
 
+import { renderEmail } from "../platform/mail/template.ts";
+import type { EmailTemplateInput } from "../platform/mail/template.ts";
+
 import type { OutboundCopyAttachment, OutboundInboundCopyMail } from "../platform/mail/port.ts";
 
 /** Kept well under the provider's 25 MiB message limit so one copy always fits. */
@@ -274,7 +277,15 @@ function copyAttachments(parsed: ParsedMail) {
   return { attachments, omitted };
 }
 
-function forwardedText(input: {
+function sentAtText(date: Date | undefined) {
+  if (date === undefined || Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toUTCString();
+}
+
+function forwardedMessage(input: {
   parsed: ParsedMail;
   rcptTo: string;
   inboxUrl: string;
@@ -284,41 +295,71 @@ function forwardedText(input: {
 }) {
   const { attachments, inboxUrl, keptInInbox, omitted, parsed, rcptTo } = input;
   const preview = previewOf(parsed);
+  const sentAt = sentAtText(parsed.date);
 
-  const lines = [
-    `From: ${senderOf(parsed)}`,
-    `To: ${recipientText(parsed, rcptTo)}`,
-    `Subject: ${subjectOf(parsed)}`,
-    "",
-    preview.text,
-  ];
+  const paragraphs: string[] = [];
 
   if (preview.truncated) {
-    lines.push("", `[Message truncated. Open this message in Overture: ${inboxUrl}]`);
-  }
-
-  if (preview.htmlOnly) {
-    lines.push("", `[This message is HTML. Open it in Overture: ${inboxUrl}]`);
-  }
-
-  if (keptInInbox && attachments.length > 0) {
-    lines.push("", "Attachments kept in your Overture Inbox:");
-
-    for (const attachment of attachments) {
-      lines.push(`- ${attachment.filename} (${formatBytes(attachment.content.byteLength)})`);
-    }
-
-    lines.push("", `Open this message in Overture to view or download them: ${inboxUrl}`);
-  }
-
-  if (omitted > 0) {
-    lines.push(
-      "",
-      `This message has ${String(omitted)} more attachments. Open it in Overture to view them: ${inboxUrl}`,
+    paragraphs.push(
+      "This message is longer than the copy, so it is truncated. Open it in Overture to read all of it.",
     );
   }
 
-  return lines.join("\n");
+  if (preview.htmlOnly) {
+    paragraphs.push("This message arrived as HTML. Open it in Overture to read it.");
+  }
+
+  if (attachments.length > 0) {
+    paragraphs.push(
+      keptInInbox
+        ? "Attachments kept in your Overture Inbox:"
+        : "Attachments are included with this email:",
+    );
+  }
+
+  if (omitted > 0) {
+    paragraphs.push(
+      `This message has ${String(omitted)} more attachments. Open it in Overture to view them.`,
+    );
+  }
+
+  const meta = [
+    { label: "From", value: senderOf(parsed) },
+    { label: "To", value: recipientText(parsed, rcptTo) },
+    { label: "Subject", value: subjectOf(parsed) },
+  ];
+
+  if (sentAt !== null) {
+    meta.push({ label: "Time", value: sentAt });
+  }
+
+  const rows = attachments.map((attachment) => ({
+    meta: formatBytes(attachment.content.byteLength),
+    name: attachment.filename,
+  }));
+
+  const template: EmailTemplateInput = {
+    action: { label: "Open in Overture", url: inboxUrl },
+    attachments: rows,
+    heading: `New message to ${rcptTo}`,
+    meta,
+    paragraphs,
+    preheader: `${senderOf(parsed)} wrote to ${rcptTo}.`,
+    subject: subjectOf(parsed),
+    why: `You are getting this because ${rcptTo} is your Overture application address and a copy of its mail goes to your sign-in email.`,
+  };
+
+  if (!preview.htmlOnly) {
+    template.quote = { label: "Original message", text: preview.text };
+  }
+
+  if (senderAddress(parsed) !== null) {
+    template.note = "Reply to this email to answer the sender directly.";
+  }
+
+  const rendered = renderEmail(template);
+
+  return { body: rendered.text, html: rendered.html };
 }
 
 /**
@@ -343,16 +384,19 @@ export function inboundCopyOf(input: { parsed: ParsedMail; rcptTo: string; inbox
   const headers = forwardedHeaders(parsed);
   const replyTo = senderAddress(parsed);
 
+  const forwarded = forwardedMessage({
+    attachments,
+    inboxUrl,
+    keptInInbox,
+    omitted,
+    parsed,
+    rcptTo,
+  });
+
   const copy: Omit<OutboundInboundCopyMail, "to"> = {
+    body: forwarded.body,
+    html: forwarded.html,
     subject: subjectOf(parsed),
-    text: forwardedText({
-      attachments,
-      inboxUrl,
-      keptInInbox,
-      omitted,
-      parsed,
-      rcptTo,
-    }),
   };
 
   if (replyTo !== null) {

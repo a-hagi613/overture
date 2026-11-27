@@ -322,6 +322,7 @@
           "src/server/platform/llm/usage.test.ts",
           "src/server/platform/mail/budget.test.ts",
           "src/server/platform/mail/cloudflare.test.ts",
+          "src/server/platform/mail/template.test.ts",
           "src/server/platform/mail/sending-domain.test.ts",
           "src/server/platform/outbound-guard.test.ts",
           "src/server/platform/outbound-interception.test.ts",

@@ -5,6 +5,7 @@ import type { Auth } from "../auth/index.ts";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { MailSender } from "../platform/mail/port.ts";
+import { supportRequestEmail } from "../platform/mail/emails.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 
 import { validJson } from "./validators.ts";
@@ -13,7 +14,6 @@ import { demoLocked } from "../demo/guard.ts";
 import { consumeRateLimit } from "../platform/rate-limit.ts";
 import { logError } from "../platform/log.ts";
 import { supportTickets } from "../platform/db/schema.ts";
-import { copy } from "../../shared/copy.ts";
 import { env } from "../config/env.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
 import { supportRequestSchema } from "../../shared/support.ts";
@@ -88,7 +88,9 @@ export function createSupportRoutes(deps: {
 
     try {
       await mail.sendSupport({
-        body: copy.mail.supportBody({
+        replyTo: user.email,
+        to: env.SUPPORT_EMAIL,
+        ...supportRequestEmail({
           category: request.category,
           email: user.email,
           message: request.message,
@@ -96,9 +98,6 @@ export function createSupportRoutes(deps: {
           referenceId,
           subject: request.subject,
         }),
-        replyTo: user.email,
-        subject: copy.mail.supportSubject(referenceId, request.subject),
-        to: env.SUPPORT_EMAIL,
       });
     } catch (error) {
       logError("support.mail", error);

@@ -2,8 +2,6 @@ import { Buffer } from "node:buffer";
 
 import { z } from "zod";
 
-import { copy } from "../../../shared/copy.ts";
-
 import type { InboundCopyDelivery, MailSender, OutboundCopyAttachment } from "./port.ts";
 
 const SEND_TIMEOUT_MS = 30_000;
@@ -38,9 +36,14 @@ function failureDetail(body: z.infer<typeof sendEmailResponseSchema>) {
   return messages.length > 0 ? messages.join("; ") : "no error detail";
 }
 
-interface SendEmailOptions {
-  headers?: Record<string, string>;
+interface SendEmailInput {
   attachments?: OutboundCopyAttachment[];
+  body: string;
+  headers?: Record<string, string>;
+  html: string;
+  replyTo?: string;
+  subject: string;
+  to: string;
 }
 
 interface SendEmailPayload {
@@ -52,37 +55,32 @@ interface SendEmailPayload {
   }[];
   from: string;
   headers?: Record<string, string>;
+  html: string;
   reply_to?: string;
   subject: string;
   text: string;
   to: string[];
 }
 
-async function sendEmail(
-  config: CloudflareMailConfig,
-  to: string,
-  subject: string,
-  body: string,
-  replyTo?: string,
-  options: SendEmailOptions = {},
-) {
+async function sendEmail(config: CloudflareMailConfig, input: SendEmailInput) {
   const payload: SendEmailPayload = {
     from: config.from,
-    to: [to],
-    subject: subject.replaceAll(/[\r\n]+/gu, " ").trim(),
-    text: body,
+    html: input.html,
+    subject: input.subject.replaceAll(/[\r\n]+/gu, " ").trim(),
+    text: input.body,
+    to: [input.to],
   };
 
-  if (replyTo !== undefined) {
-    payload.reply_to = replyTo;
+  if (input.replyTo !== undefined) {
+    payload.reply_to = input.replyTo;
   }
 
-  if (options.headers !== undefined) {
-    payload.headers = options.headers;
+  if (input.headers !== undefined) {
+    payload.headers = input.headers;
   }
 
-  if (options.attachments !== undefined && options.attachments.length > 0) {
-    payload.attachments = options.attachments.map((attachment) => ({
+  if (input.attachments !== undefined && input.attachments.length > 0) {
+    payload.attachments = input.attachments.map((attachment) => ({
       content: Buffer.from(attachment.content).toString("base64"),
       disposition: attachment.disposition,
       filename: attachment.filename,
@@ -116,7 +114,7 @@ async function sendEmail(
 
   return {
     bounced: (parsed.result.permanent_bounces ?? []).some(
-      (address) => address.trim().toLowerCase() === to.trim().toLowerCase(),
+      (address) => address.trim().toLowerCase() === input.to.trim().toLowerCase(),
     ),
     messageId: parsed.result.message_id,
   } satisfies InboundCopyDelivery;
@@ -125,62 +123,56 @@ async function sendEmail(
 export function createCloudflareMailSender(config: CloudflareMailConfig) {
   const sender: MailSender = {
     sendMagicLink: async (mail) => {
-      await sendEmail(
-        config,
-        mail.to,
-        copy.mail.magicLinkSubject,
-        copy.mail.magicLinkBody(mail.url),
-      );
+      await sendEmail(config, mail);
     },
     sendCheck: async (mail) => {
-      await sendEmail(config, mail.to, mail.subject, mail.body);
+      await sendEmail(config, mail);
     },
     sendWaitlistInvite: async (mail) => {
-      await sendEmail(
-        config,
-        mail.to,
-        copy.mail.waitlistInviteSubject,
-        copy.mail.waitlistInviteBody(mail.url),
-      );
+      await sendEmail(config, mail);
     },
     sendCodeWait: async (mail) => {
-      await sendEmail(config, mail.to, mail.subject, mail.body);
+      await sendEmail(config, mail);
     },
     sendReadyRecap: async (mail) => {
-      await sendEmail(config, mail.to, mail.subject, mail.body);
+      await sendEmail(config, mail);
     },
     sendAccountDeleted: async (mail) => {
-      await sendEmail(
-        config,
-        mail.to,
-        copy.mail.accountDeletedSubject,
-        copy.mail.accountDeletedBody(mail.name),
-      );
+      await sendEmail(config, mail);
     },
     sendExportReady: async (mail) => {
-      await sendEmail(config, mail.to, mail.subject, mail.body);
+      await sendEmail(config, mail);
     },
     sendBillingNotice: async (mail) => {
-      await sendEmail(config, mail.to, mail.subject, mail.body);
+      await sendEmail(config, mail);
     },
     sendSupport: async (mail) => {
-      await sendEmail(config, mail.to, mail.subject, mail.body, mail.replyTo);
+      await sendEmail(config, mail);
     },
     sendSupportReply: async (mail) => {
-      await sendEmail(config, mail.to, mail.subject, mail.body);
+      await sendEmail(config, mail);
     },
     sendInboundCopy: async (mail) => {
-      const options: SendEmailOptions = {};
+      const input: SendEmailInput = {
+        body: mail.body,
+        html: mail.html,
+        subject: mail.subject,
+        to: mail.to,
+      };
 
       if (mail.attachments !== undefined) {
-        options.attachments = mail.attachments;
+        input.attachments = mail.attachments;
       }
 
       if (mail.headers !== undefined) {
-        options.headers = mail.headers;
+        input.headers = mail.headers;
       }
 
-      return sendEmail(config, mail.to, mail.subject, mail.text, mail.replyTo, options);
+      if (mail.replyTo !== undefined) {
+        input.replyTo = mail.replyTo;
+      }
+
+      return sendEmail(config, input);
     },
   };
 

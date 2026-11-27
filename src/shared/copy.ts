@@ -676,24 +676,6 @@ export const copy = {
         "Overture support",
         "",
       ].join("\n"),
-    supportBody: (input: {
-      referenceId: string;
-      category: string;
-      subject: string;
-      message: string;
-      name: string;
-      email: string;
-    }) =>
-      [
-        `New support request ${input.referenceId}`,
-        "",
-        `From: ${input.name} <${input.email}>`,
-        `Category: ${input.category}`,
-        `Subject: ${input.subject}`,
-        "",
-        input.message,
-        "",
-      ].join("\n"),
   },
   stages: {
     queued: "Queued",

@@ -3,6 +3,7 @@ import { and, eq, isNull, lte } from "drizzle-orm";
 import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 import type { MailSender } from "../platform/mail/port.ts";
+import { checkEmail } from "../platform/mail/emails.ts";
 import type { LiveCheckResult } from "./types.ts";
 
 import { liveCheckMail } from "../platform/db/schema.ts";
@@ -70,7 +71,7 @@ export async function sendLiveCheckMail(deps: MailCheckDeps) {
     .run();
 
   try {
-    await deps.mail.sendCheck({ to: deps.address, subject, body });
+    await deps.mail.sendCheck({ to: deps.address, ...checkEmail({ body, subject }) });
   } catch (error) {
     deps.db.delete(liveCheckMail).where(eq(liveCheckMail.id, id)).run();
 

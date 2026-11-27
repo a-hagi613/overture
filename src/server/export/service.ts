@@ -13,6 +13,7 @@ import { accountExports, bgJobs, users } from "../platform/db/schema.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { logError, logInfo } from "../platform/log.ts";
 import { MailCapExceededError } from "../platform/mail/errors.ts";
+import { exportReadyEmail } from "../platform/mail/emails.ts";
 import { copy } from "../../shared/copy.ts";
 import {
   EXPORT_CHUNK_BYTES,
@@ -498,10 +499,11 @@ export async function runExportNotifyJob(deps: ExportServiceDeps, exportId: stri
   }
 
   try {
+    const url = `${deps.appOrigin.replace(/\/+$/u, "")}/profile/account`;
+
     await deps.mail.sendExportReady({
-      body: copy.mail.exportReadyBody(`${deps.appOrigin.replace(/\/+$/u, "")}/profile/account`),
-      subject: copy.mail.exportReadySubject,
       to: user.email,
+      ...exportReadyEmail({ subject: copy.mail.exportReadySubject, url }),
     });
   } catch (error) {
     if (!(error instanceof MailCapExceededError)) {

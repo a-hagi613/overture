@@ -1,12 +1,18 @@
-export interface OutboundMagicLinkMail {
+/** The rendered parts of one outbound mail, built by `emails.ts`. */
+export interface OutboundMailContent {
+  /** The plain-text part, always sent alongside the HTML. */
+  body: string;
+  html: string;
+  subject: string;
+}
+
+export interface OutboundMagicLinkMail extends OutboundMailContent {
   to: string;
-  url: string;
 }
 
 /** The onboarding link an approved waitlist entry receives (WS-22). */
-export interface OutboundWaitlistInviteMail {
+export interface OutboundWaitlistInviteMail extends OutboundMailContent {
   to: string;
-  url: string;
 }
 
 export interface SentMail {
@@ -15,60 +21,46 @@ export interface SentMail {
   from: string;
   subject: string;
   body: string;
+  html: string;
   replyTo: string | null;
   sentAt: number;
   headers?: Record<string, string>;
   attachments?: { bytes: number; filename: string; type: string }[];
 }
 
-export interface OutboundCheckMail {
+export interface OutboundCheckMail extends OutboundMailContent {
   to: string;
-  subject: string;
-  body: string;
 }
 
 /** The fallback alert for a verification code when no push endpoint is left (#565). */
-export interface OutboundCodeWaitMail {
+export interface OutboundCodeWaitMail extends OutboundMailContent {
   to: string;
-  subject: string;
-  body: string;
 }
 
-export interface OutboundReadyRecapMail {
+export interface OutboundReadyRecapMail extends OutboundMailContent {
   to: string;
-  subject: string;
-  body: string;
 }
 
-export interface OutboundAccountDeletedMail {
+export interface OutboundAccountDeletedMail extends OutboundMailContent {
   to: string;
-  name: string;
 }
 
-export interface OutboundExportReadyMail {
+export interface OutboundExportReadyMail extends OutboundMailContent {
   to: string;
-  subject: string;
-  body: string;
 }
 
-export interface OutboundBillingNoticeMail {
+export interface OutboundBillingNoticeMail extends OutboundMailContent {
   to: string;
-  subject: string;
-  body: string;
 }
 
-export interface OutboundSupportMail {
+export interface OutboundSupportMail extends OutboundMailContent {
   to: string;
-  subject: string;
-  body: string;
   /** The signed-in person's address, so the support desk can reply to them directly. */
   replyTo: string;
 }
 
-export interface OutboundSupportReplyMail {
+export interface OutboundSupportReplyMail extends OutboundMailContent {
   to: string;
-  subject: string;
-  body: string;
 }
 
 export interface OutboundCopyAttachment {
@@ -83,10 +75,8 @@ export interface OutboundCopyAttachment {
  * The copy is always addressed from the Overture sending domain; `replyTo` is the original sender so
  * answering it goes back to the employer or recruiter.
  */
-export interface OutboundInboundCopyMail {
+export interface OutboundInboundCopyMail extends OutboundMailContent {
   to: string;
-  subject: string;
-  text: string;
   replyTo?: string;
   headers?: Record<string, string>;
   attachments?: OutboundCopyAttachment[];

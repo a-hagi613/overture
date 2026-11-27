@@ -26,6 +26,7 @@ import {
 } from "./config/env.ts";
 import { createMailSender, emailSendingConfigFromEnv } from "./platform/mail/index.ts";
 import { MailCapExceededError } from "./platform/mail/errors.ts";
+import { accountDeletedEmail } from "./platform/mail/emails.ts";
 import { createPayments } from "./billing/index.ts";
 import { grantApplications } from "./billing/ledger.ts";
 import {
@@ -926,7 +927,7 @@ const accountJobHandlers: JobHandlers = {
     const notice = await noticeCrypto.open(payload);
 
     try {
-      await mailSender.sendAccountDeleted(notice);
+      await mailSender.sendAccountDeleted({ to: notice.to, ...accountDeletedEmail(notice.name) });
     } catch (error) {
       if (!(error instanceof MailCapExceededError)) {
         throw error;

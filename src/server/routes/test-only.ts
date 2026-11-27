@@ -2491,6 +2491,7 @@ export function createTestRoutes(
       from: sent.from,
       subject: sent.subject,
       body: sent.body,
+      html: sent.html,
       replyTo: sent.replyTo,
       sentAt: sent.sentAt,
       headers: sent.headers ?? {},

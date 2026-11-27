@@ -244,6 +244,10 @@ describe("the per-user inbound copy", () => {
     expect(sent[0]?.to).not.toBe("owner@example.test");
     expect(sent[0]?.subject).toBe("Your application");
     expect(sent[0]?.body).toContain("Hello Ada.");
+    expect(sent[0]?.body).toContain(`New message to ${address}`);
+    expect(sent[0]?.html).toContain(`New message to ${address}`);
+    expect(sent[0]?.html).toContain("Hello Ada.");
+    expect(sent[0]?.html).toContain("Wed, 18 Nov 2026 15:04:05 GMT");
     expect(sent[0]?.replyTo).toBe("priya@northstar.example");
     expect(sent[0]?.headers).toEqual({
       "in-reply-to": "<parent@northstar.example>",
@@ -251,6 +255,32 @@ describe("the per-user inbound copy", () => {
     });
     expect(sent[0]?.headers).not.toHaveProperty("Date");
     expect(sent[0]?.headers).not.toHaveProperty("Message-ID");
+
+    w.sqlite.close();
+  });
+
+  test("an inbound subject and body never inject HTML into the branded copy", async () => {
+    const w = world();
+
+    w.addUser("user-x", "ada@example.test", "Ada Chen");
+    const address = await mailboxAddress(w, "user-x");
+
+    await w.post({
+      raw: mime({
+        messageId: "xss",
+        subject: '<img src=x onerror="alert(1)">',
+        text: '<script>alert("body")</script>',
+      }),
+      to: address,
+    });
+
+    const [sent] = listSinkMail();
+
+    expect(sent?.html).not.toContain("<img src=x");
+    expect(sent?.html).not.toContain("<script");
+    expect(sent?.html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    expect(sent?.html).toContain("&lt;script&gt;alert(&quot;body&quot;)&lt;/script&gt;");
+    expect(sent?.body).toContain('<script>alert("body")</script>');
 
     w.sqlite.close();
   });
