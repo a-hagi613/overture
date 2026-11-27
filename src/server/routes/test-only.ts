@@ -390,6 +390,7 @@ const seedAttemptBody = z.object({
       "crash",
       "interrupted",
       "identity_mismatch",
+      "dry_submit",
     ])
     .nullable()
     .default("sent"),

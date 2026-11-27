@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import { turnstileScriptUrl } from "../../shared/turnstile.ts";
+import {
+  DRY_SUBMIT_ENV,
+  DRY_SUBMIT_PRODUCTION_REFUSAL,
+  isDrySubmitValue,
+  parseDrySubmitFlag,
+} from "../dispatch/dry-submit.ts";
 import { masterKeyChainProblem, parseMasterKeyring } from "../platform/crypto.ts";
 import type { MasterKeyring } from "../platform/crypto.ts";
 import { catalogPathFor } from "../platform/db/client.ts";
@@ -187,6 +193,13 @@ const envSchema = z
     CATALOG_REFRESH_SECRET: z.string().min(1).optional(),
     STATIC_ROOT: z.string().min(1).default("dist"),
     ENABLE_TEST_ROUTES: booleanFromString.default(false),
+    [DRY_SUBMIT_ENV]: z
+      .string()
+      .default("0")
+      .refine(isDrySubmitValue, {
+        message: `${DRY_SUBMIT_ENV} must be one of 1, 0, true or false.`,
+      })
+      .transform(parseDrySubmitFlag),
     DEMO_LOGIN_ENABLED: booleanFromString.default(false),
     PUBLIC_SIGNUP_ENABLED: booleanFromString.default(true),
     GREENHOUSE_FEED_BASE_URL: z.string().min(1).optional(),
@@ -363,6 +376,14 @@ const envSchema = z
         code: "custom",
         message: "JOBS_AUTORUN must not be false in production or on Fly.",
         path: ["JOBS_AUTORUN"],
+      });
+    }
+
+    if (value[DRY_SUBMIT_ENV] && (value.NODE_ENV === "production" || value.FLY_APP_NAME)) {
+      context.addIssue({
+        code: "custom",
+        message: DRY_SUBMIT_PRODUCTION_REFUSAL,
+        path: [DRY_SUBMIT_ENV],
       });
     }
 

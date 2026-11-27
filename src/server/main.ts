@@ -166,6 +166,7 @@ import {
   DISPATCH_RECOVER_JOB_KIND,
   createDispatcher,
 } from "./dispatch/executor.ts";
+import { drySubmitActive } from "./dispatch/dry-submit.ts";
 import {
   SCREENSHOT_CLEANUP_JOB_KIND,
   ensureScreenshotCleanupQueued,
@@ -990,6 +991,7 @@ const activeDispatcher =
         appOrigin,
         db,
         clock,
+        drySubmit: drySubmitActive(env),
         hardTimeoutMs: env.SEND_HARD_TIMEOUT_MS,
         llm: anthropicLlmPort,
         mail: mailSender,

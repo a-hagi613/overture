@@ -248,6 +248,7 @@
           "src/server/config/env.test.ts",
           "src/server/demo/seed.test.ts",
           "src/server/dispatch/application-cost.test.ts",
+          "src/server/dispatch/dry-submit.test.ts",
           "src/server/dispatch/ats/batch4.test.ts",
           "src/server/dispatch/ats/wave2.test.ts",
           "src/server/dispatch/browser/kernel.test.ts",

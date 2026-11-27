@@ -1380,6 +1380,7 @@ export const attemptOutcomeSchema = z.enum([
   "timeout",
   "crash",
   "interrupted",
+  "dry_submit",
 ]);
 
 const insightActivitySchema = z.object({

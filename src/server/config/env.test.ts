@@ -189,6 +189,55 @@ describe("FREEHIRE_API_KEY", () => {
   });
 });
 
+describe("OVERTURE_DRY_SUBMIT", () => {
+  test("is off by default", () => {
+    expect(checkedEnvSchema.parse({ ...productionEnv, NODE_ENV: "test" }).OVERTURE_DRY_SUBMIT).toBe(
+      false,
+    );
+  });
+
+  test("1 and true turn it on outside production", () => {
+    expect(
+      checkedEnvSchema.parse({ ...productionEnv, NODE_ENV: "test", OVERTURE_DRY_SUBMIT: "1" })
+        .OVERTURE_DRY_SUBMIT,
+    ).toBe(true);
+    expect(
+      checkedEnvSchema.parse({
+        ...productionEnv,
+        NODE_ENV: "development",
+        OVERTURE_DRY_SUBMIT: "true",
+      }).OVERTURE_DRY_SUBMIT,
+    ).toBe(true);
+  });
+
+  test("production refuses it at config parse", () => {
+    expect(() => checkedEnvSchema.parse({ ...productionEnv, OVERTURE_DRY_SUBMIT: "1" })).toThrow(
+      "local-only",
+    );
+
+    expect(() => checkedEnvSchema.parse({ ...productionEnv, OVERTURE_DRY_SUBMIT: "true" })).toThrow(
+      "local-only",
+    );
+  });
+
+  test("Fly counts as production", () => {
+    expect(() =>
+      checkedEnvSchema.parse({
+        ...productionEnv,
+        FLY_APP_NAME: "overture-web",
+        NODE_ENV: "test",
+        OVERTURE_DRY_SUBMIT: "1",
+      }),
+    ).toThrow("local-only");
+  });
+
+  test("a value it does not understand is refused instead of guessed", () => {
+    expect(() =>
+      checkedEnvSchema.parse({ ...productionEnv, NODE_ENV: "test", OVERTURE_DRY_SUBMIT: "yes" }),
+    ).toThrow("OVERTURE_DRY_SUBMIT must be one of");
+  });
+});
+
 describe("better-auth secrets", () => {
   const oldSecret = "old-secret-value-0123456789";
   const newSecret = "new-secret-value-9876543210";
