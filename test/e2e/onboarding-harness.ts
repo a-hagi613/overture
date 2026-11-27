@@ -11,7 +11,7 @@ const targets = {
   roles: ["Platform Engineer", "Senior Backend Engineer", "DevOps Engineer"],
   seniorities: ["senior", "staff"],
   workplaces: ["remote", "hybrid"],
-  locations: ["Toronto, ON", "Vancouver, BC", "Austin, TX", "London, UK"],
+  locations: ["city:ca:toronto", "city:ca:vancouver", "city:us:austin", "city:gb:london"],
   employmentTypes: ["full_time"],
   salaryFloorMinor: 14_000_000,
   salaryCurrency: "CAD",

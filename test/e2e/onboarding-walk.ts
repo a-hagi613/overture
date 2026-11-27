@@ -80,8 +80,11 @@ export async function walkOnboardingSteps1To4(page: Page, baseUrl: string) {
   }
 
   await page.getByLabel("Locations").click();
-  await page.getByRole("option", { exact: true, name: "London" }).click();
-  await page.keyboard.press("Escape");
+  await page.getByPlaceholder("Search cities or remote regions...").fill("London");
+  await page
+    .getByRole("option", { name: /^London/u })
+    .first()
+    .click();
 
   const remote = page.getByRole("button", { exact: true, name: "Remote" });
   const senior = page.getByRole("button", { name: "Senior" });

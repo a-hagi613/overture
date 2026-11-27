@@ -9,6 +9,7 @@ import {
 } from "../../shared/tag-taxonomy.ts";
 import { taxonomyRoleTags } from "./taxonomy-tags.ts";
 import { planRoleTargets, roleMatchScore } from "../matching/role-targets.ts";
+import { locationTextsOfPlaceIds } from "../places/catalog.ts";
 import { resolveLocation } from "./geo.ts";
 import { DESCRIPTION_CAP, htmlToText } from "./html-to-text.ts";
 import { normalizeTitle } from "./normalize.ts";
@@ -237,10 +238,9 @@ export function workableTargetMatches(
     return false;
   }
 
-  return (
-    targets.locations.length === 0 ||
-    targets.locations.some((place) => locationMatches(place, tags, locationRaw))
-  );
+  const places = locationTextsOfPlaceIds(targets.locations);
+
+  return places.length === 0 || places.some((place) => locationMatches(place, tags, locationRaw));
 }
 
 export interface WorkablePassStats {

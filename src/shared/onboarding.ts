@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { KeyDetailFactKey } from "./key-details.ts";
+import type { PlaceSuggestion } from "./places.ts";
 import type { TargetsInput } from "./targets.ts";
 import type { EmploymentType, Seniority, Workplace } from "./tag-taxonomy.ts";
 
@@ -61,6 +62,8 @@ export interface OnboardingTargetsView {
   matchedCount: number;
   choices: OnboardingTargetChoices;
   currencies: string[];
+  /** The labels for the places already saved, so a pill never renders a raw id. */
+  places: PlaceSuggestion[];
 }
 
 export const WORK_AUTH_OPTIONS = [

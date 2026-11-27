@@ -1,0 +1,1362 @@
+[
+  {
+    "input": "United States",
+    "expect": ["country:us"]
+  },
+  {
+    "input": "USA",
+    "expect": ["country:us"]
+  },
+  {
+    "input": "America",
+    "expect": ["country:us"]
+  },
+  {
+    "input": "US",
+    "expect": ["country:us"]
+  },
+  {
+    "input": "Canada",
+    "expect": ["country:ca"]
+  },
+  {
+    "input": "ca",
+    "expect": ["country:ca"]
+  },
+  {
+    "input": "United Kingdom",
+    "expect": ["country:gb"]
+  },
+  {
+    "input": "UK",
+    "expect": ["country:gb"]
+  },
+  {
+    "input": "England",
+    "expect": ["country:gb"]
+  },
+  {
+    "input": "Scotland",
+    "expect": ["country:gb"]
+  },
+  {
+    "input": "Wales",
+    "expect": ["country:gb"]
+  },
+  {
+    "input": "Ireland",
+    "expect": ["country:ie"]
+  },
+  {
+    "input": "Republic of Ireland",
+    "expect": ["country:ie"]
+  },
+  {
+    "input": "Germany",
+    "expect": ["country:de"]
+  },
+  {
+    "input": "Deutschland",
+    "expect": ["country:de"]
+  },
+  {
+    "input": "France",
+    "expect": ["country:fr"]
+  },
+  {
+    "input": "Spain",
+    "expect": ["country:es"]
+  },
+  {
+    "input": "Espa\u00f1a",
+    "expect": ["country:es"]
+  },
+  {
+    "input": "Italy",
+    "expect": ["country:it"]
+  },
+  {
+    "input": "Italia",
+    "expect": ["country:it"]
+  },
+  {
+    "input": "Portugal",
+    "expect": ["country:pt"]
+  },
+  {
+    "input": "Netherlands",
+    "expect": ["country:nl"]
+  },
+  {
+    "input": "Nederland",
+    "expect": ["country:nl"]
+  },
+  {
+    "input": "Belgium",
+    "expect": ["country:be"]
+  },
+  {
+    "input": "Belgique",
+    "expect": ["country:be"]
+  },
+  {
+    "input": "Switzerland",
+    "expect": ["country:ch"]
+  },
+  {
+    "input": "Schweiz",
+    "expect": ["country:ch"]
+  },
+  {
+    "input": "Austria",
+    "expect": ["country:at"]
+  },
+  {
+    "input": "\u00d6sterreich",
+    "expect": ["country:at"]
+  },
+  {
+    "input": "Poland",
+    "expect": ["country:pl"]
+  },
+  {
+    "input": "Polska",
+    "expect": ["country:pl"]
+  },
+  {
+    "input": "Sweden",
+    "expect": ["country:se"]
+  },
+  {
+    "input": "Sverige",
+    "expect": ["country:se"]
+  },
+  {
+    "input": "Norway",
+    "expect": ["country:no"]
+  },
+  {
+    "input": "Norge",
+    "expect": ["country:no"]
+  },
+  {
+    "input": "Denmark",
+    "expect": ["country:dk"]
+  },
+  {
+    "input": "Danmark",
+    "expect": ["country:dk"]
+  },
+  {
+    "input": "Finland",
+    "expect": ["country:fi"]
+  },
+  {
+    "input": "Suomi",
+    "expect": ["country:fi"]
+  },
+  {
+    "input": "Czechia",
+    "expect": ["country:cz"]
+  },
+  {
+    "input": "Hungary",
+    "expect": ["country:hu"]
+  },
+  {
+    "input": "Magyarorsz\u00e1g",
+    "expect": ["country:hu"]
+  },
+  {
+    "input": "Romania",
+    "expect": ["country:ro"]
+  },
+  {
+    "input": "Bulgaria",
+    "expect": ["country:bg"]
+  },
+  {
+    "input": "Greece",
+    "expect": ["country:gr"]
+  },
+  {
+    "input": "Turkey",
+    "expect": ["country:tr"]
+  },
+  {
+    "input": "T\u00fcrkiye",
+    "expect": ["country:tr"]
+  },
+  {
+    "input": "Brazil",
+    "expect": ["country:br"]
+  },
+  {
+    "input": "Brasil",
+    "expect": ["country:br"]
+  },
+  {
+    "input": "Mexico",
+    "expect": ["country:mx"]
+  },
+  {
+    "input": "Argentina",
+    "expect": ["country:ar"]
+  },
+  {
+    "input": "Chile",
+    "expect": ["country:cl"]
+  },
+  {
+    "input": "Colombia",
+    "expect": ["country:co"]
+  },
+  {
+    "input": "Peru",
+    "expect": ["country:pe"]
+  },
+  {
+    "input": "India",
+    "expect": ["country:in"]
+  },
+  {
+    "input": "Pakistan",
+    "expect": ["country:pk"]
+  },
+  {
+    "input": "Japan",
+    "expect": ["country:jp"]
+  },
+  {
+    "input": "South Korea",
+    "expect": ["country:kr"]
+  },
+  {
+    "input": "China",
+    "expect": ["country:cn"]
+  },
+  {
+    "input": "Taiwan",
+    "expect": ["country:tw"]
+  },
+  {
+    "input": "Hong Kong",
+    "expect": ["country:hk"]
+  },
+  {
+    "input": "Singapore",
+    "expect": ["country:sg"]
+  },
+  {
+    "input": "Australia",
+    "expect": ["country:au"]
+  },
+  {
+    "input": "New Zealand",
+    "expect": ["country:nz"]
+  },
+  {
+    "input": "South Africa",
+    "expect": ["country:za"]
+  },
+  {
+    "input": "Nigeria",
+    "expect": ["country:ng"]
+  },
+  {
+    "input": "Kenya",
+    "expect": ["country:ke"]
+  },
+  {
+    "input": "Egypt",
+    "expect": ["country:eg"]
+  },
+  {
+    "input": "Israel",
+    "expect": ["country:il"]
+  },
+  {
+    "input": "United Arab Emirates",
+    "expect": ["country:ae"]
+  },
+  {
+    "input": "UAE",
+    "expect": ["country:ae"]
+  },
+  {
+    "input": "Saudi Arabia",
+    "expect": ["country:sa"]
+  },
+  {
+    "input": "Ukraine",
+    "expect": ["country:ua"]
+  },
+  {
+    "input": "Russia",
+    "expect": ["country:ru"]
+  },
+  {
+    "input": "Toronto, Canada",
+    "expect": ["city:ca:toronto"]
+  },
+  {
+    "input": "Vancouver, Canada",
+    "expect": ["city:ca:vancouver"]
+  },
+  {
+    "input": "Montreal, Canada",
+    "expect": ["city:ca:montreal"]
+  },
+  {
+    "input": "Ottawa, Canada",
+    "expect": ["city:ca:ottawa"]
+  },
+  {
+    "input": "Calgary, Canada",
+    "expect": ["city:ca:calgary"]
+  },
+  {
+    "input": "Berlin, Germany",
+    "expect": ["city:de:berlin"]
+  },
+  {
+    "input": "Munich, Germany",
+    "expect": ["city:de:munich"]
+  },
+  {
+    "input": "Hamburg, Germany",
+    "expect": ["city:de:hamburg"]
+  },
+  {
+    "input": "Cologne, Germany",
+    "expect": ["city:de:koeln"]
+  },
+  {
+    "input": "Frankfurt, Germany",
+    "expect": ["city:de:frankfurt-am-main"]
+  },
+  {
+    "input": "Paris, France",
+    "expect": ["city:fr:paris"]
+  },
+  {
+    "input": "Lyon, France",
+    "expect": ["city:fr:lyon"]
+  },
+  {
+    "input": "Marseille, France",
+    "expect": ["city:fr:marseille"]
+  },
+  {
+    "input": "Madrid, Spain",
+    "expect": ["city:es:madrid"]
+  },
+  {
+    "input": "Barcelona, Spain",
+    "expect": ["city:es:barcelona"]
+  },
+  {
+    "input": "Lisbon, Portugal",
+    "expect": ["city:pt:lisbon"]
+  },
+  {
+    "input": "Rome, Italy",
+    "expect": ["city:it:rome"]
+  },
+  {
+    "input": "Milan, Italy",
+    "expect": ["city:it:milan"]
+  },
+  {
+    "input": "Amsterdam, Netherlands",
+    "expect": ["city:nl:amsterdam"]
+  },
+  {
+    "input": "Rotterdam, Netherlands",
+    "expect": ["city:nl:rotterdam"]
+  },
+  {
+    "input": "Brussels, Belgium",
+    "expect": ["city:be:brussels"]
+  },
+  {
+    "input": "Vienna, Austria",
+    "expect": ["city:at:vienna"]
+  },
+  {
+    "input": "Zurich, Switzerland",
+    "expect": ["city:ch:zuerich"]
+  },
+  {
+    "input": "Geneva, Switzerland",
+    "expect": ["city:ch:geneva"]
+  },
+  {
+    "input": "Stockholm, Sweden",
+    "expect": ["city:se:stockholm"]
+  },
+  {
+    "input": "Gothenburg, Sweden",
+    "expect": ["city:se:gothenburg"]
+  },
+  {
+    "input": "Oslo, Norway",
+    "expect": ["city:no:oslo"]
+  },
+  {
+    "input": "Copenhagen, Denmark",
+    "expect": ["city:dk:copenhagen"]
+  },
+  {
+    "input": "Helsinki, Finland",
+    "expect": ["city:fi:helsinki"]
+  },
+  {
+    "input": "Dublin, Ireland",
+    "expect": ["city:ie:dublin"]
+  },
+  {
+    "input": "London, United Kingdom",
+    "expect": ["city:gb:london"]
+  },
+  {
+    "input": "Manchester, United Kingdom",
+    "expect": ["city:gb:manchester"]
+  },
+  {
+    "input": "Birmingham, United Kingdom",
+    "expect": ["city:gb:birmingham"]
+  },
+  {
+    "input": "Edinburgh, United Kingdom",
+    "expect": ["city:gb:edinburgh"]
+  },
+  {
+    "input": "Glasgow, United Kingdom",
+    "expect": ["city:gb:glasgow"]
+  },
+  {
+    "input": "Leeds, United Kingdom",
+    "expect": ["city:gb:leeds"]
+  },
+  {
+    "input": "New York, United States",
+    "expect": ["city:us:new-york-city"]
+  },
+  {
+    "input": "San Francisco, United States",
+    "expect": ["city:us:san-francisco"]
+  },
+  {
+    "input": "Seattle, United States",
+    "expect": ["city:us:seattle"]
+  },
+  {
+    "input": "Austin, United States",
+    "expect": ["city:us:austin"]
+  },
+  {
+    "input": "Boston, United States",
+    "expect": ["city:us:boston"]
+  },
+  {
+    "input": "Chicago, United States",
+    "expect": ["city:us:chicago"]
+  },
+  {
+    "input": "Los Angeles, United States",
+    "expect": ["city:us:los-angeles"]
+  },
+  {
+    "input": "Denver, United States",
+    "expect": ["city:us:denver"]
+  },
+  {
+    "input": "Miami, United States",
+    "expect": ["city:us:miami"]
+  },
+  {
+    "input": "Atlanta, United States",
+    "expect": ["city:us:atlanta"]
+  },
+  {
+    "input": "Dallas, United States",
+    "expect": ["city:us:dallas"]
+  },
+  {
+    "input": "Houston, United States",
+    "expect": ["city:us:houston"]
+  },
+  {
+    "input": "Portland, United States",
+    "expect": ["city:us:portland"]
+  },
+  {
+    "input": "San Diego, United States",
+    "expect": ["city:us:san-diego"]
+  },
+  {
+    "input": "Phoenix, United States",
+    "expect": ["city:us:phoenix"]
+  },
+  {
+    "input": "Philadelphia, United States",
+    "expect": ["city:us:philadelphia"]
+  },
+  {
+    "input": "Washington, United States",
+    "expect": ["city:us:washington"]
+  },
+  {
+    "input": "Sydney, Australia",
+    "expect": ["city:au:sydney"]
+  },
+  {
+    "input": "Melbourne, Australia",
+    "expect": ["city:au:melbourne"]
+  },
+  {
+    "input": "Brisbane, Australia",
+    "expect": ["city:au:brisbane"]
+  },
+  {
+    "input": "Perth, Australia",
+    "expect": ["city:au:perth"]
+  },
+  {
+    "input": "Auckland, New Zealand",
+    "expect": ["city:nz:auckland"]
+  },
+  {
+    "input": "Wellington, New Zealand",
+    "expect": ["city:nz:wellington"]
+  },
+  {
+    "input": "Tokyo, Japan",
+    "expect": ["city:jp:tokyo"]
+  },
+  {
+    "input": "Osaka, Japan",
+    "expect": ["city:jp:osaka"]
+  },
+  {
+    "input": "Seoul, South Korea",
+    "expect": ["city:kr:seoul"]
+  },
+  {
+    "input": "Beijing, China",
+    "expect": ["city:cn:beijing"]
+  },
+  {
+    "input": "Shanghai, China",
+    "expect": ["city:cn:shanghai"]
+  },
+  {
+    "input": "Shenzhen, China",
+    "expect": ["city:cn:shenzhen"]
+  },
+  {
+    "input": "Taipei, Taiwan",
+    "expect": ["city:tw:taipei"]
+  },
+  {
+    "input": "Bangkok, Thailand",
+    "expect": ["city:th:bangkok"]
+  },
+  {
+    "input": "Kuala Lumpur, Malaysia",
+    "expect": ["city:my:kuala-lumpur"]
+  },
+  {
+    "input": "Jakarta, Indonesia",
+    "expect": ["city:id:jakarta"]
+  },
+  {
+    "input": "Manila, Philippines",
+    "expect": ["city:ph:manila"]
+  },
+  {
+    "input": "Mumbai, India",
+    "expect": ["city:in:mumbai"]
+  },
+  {
+    "input": "Bangalore, India",
+    "expect": ["city:in:bengaluru"]
+  },
+  {
+    "input": "Dubai, United Arab Emirates",
+    "expect": ["city:ae:dubai"]
+  },
+  {
+    "input": "Tel Aviv, Israel",
+    "expect": ["city:il:tel-aviv"]
+  },
+  {
+    "input": "Cape Town, South Africa",
+    "expect": ["city:za:cape-town"]
+  },
+  {
+    "input": "Johannesburg, South Africa",
+    "expect": ["city:za:johannesburg"]
+  },
+  {
+    "input": "Nairobi, Kenya",
+    "expect": ["city:ke:nairobi"]
+  },
+  {
+    "input": "Lagos, Nigeria",
+    "expect": ["city:ng:lagos"]
+  },
+  {
+    "input": "Cairo, Egypt",
+    "expect": ["city:eg:cairo"]
+  },
+  {
+    "input": "Sao Paulo, Brazil",
+    "expect": ["city:br:sao-paulo"]
+  },
+  {
+    "input": "Rio de Janeiro, Brazil",
+    "expect": ["city:br:rio-de-janeiro"]
+  },
+  {
+    "input": "Buenos Aires, Argentina",
+    "expect": ["city:ar:buenos-aires"]
+  },
+  {
+    "input": "Santiago, Chile",
+    "expect": ["city:cl:santiago"]
+  },
+  {
+    "input": "Bogota, Colombia",
+    "expect": ["city:co:bogota"]
+  },
+  {
+    "input": "Lima, Peru",
+    "expect": ["city:pe:lima"]
+  },
+  {
+    "input": "Mexico City, Mexico",
+    "expect": ["city:mx:mexico-city"]
+  },
+  {
+    "input": "Frisco, Texas",
+    "expect": ["city:us:frisco"]
+  },
+  {
+    "input": "Paris, Texas",
+    "expect": ["city:us:paris"]
+  },
+  {
+    "input": "Portland, Oregon",
+    "expect": ["city:us:portland"]
+  },
+  {
+    "input": "Portland, Maine",
+    "expect": ["city:us:portland"]
+  },
+  {
+    "input": "Springfield, Illinois",
+    "expect": ["city:us:springfield"]
+  },
+  {
+    "input": "London, Ontario",
+    "expect": ["city:ca:london"]
+  },
+  {
+    "input": "London, England",
+    "expect": ["city:gb:london"]
+  },
+  {
+    "input": "Victoria, British Columbia",
+    "expect": ["city:ca:victoria"]
+  },
+  {
+    "input": "Melbourne, Victoria, Australia",
+    "expect": ["city:au:melbourne"]
+  },
+  {
+    "input": "Cambridge, England",
+    "expect": ["city:gb:cambridge"]
+  },
+  {
+    "input": "Cambridge, Ontario",
+    "expect": ["city:ca:cambridge"]
+  },
+  {
+    "input": "Cambridge, Massachusetts",
+    "expect": ["city:us:cambridge"]
+  },
+  {
+    "input": "Birmingham, England",
+    "expect": ["city:gb:birmingham"]
+  },
+  {
+    "input": "Birmingham, Alabama",
+    "expect": ["city:us:birmingham"]
+  },
+  {
+    "input": "Manchester, New Hampshire",
+    "expect": ["city:us:manchester"]
+  },
+  {
+    "input": "Manchester, England",
+    "expect": ["city:gb:manchester"]
+  },
+  {
+    "input": "Richmond, Virginia",
+    "expect": ["city:us:richmond"]
+  },
+  {
+    "input": "Richmond, British Columbia",
+    "expect": ["city:ca:richmond"]
+  },
+  {
+    "input": "Hamilton, Ontario",
+    "expect": ["city:ca:hamilton"]
+  },
+  {
+    "input": "Hamilton, New Zealand",
+    "expect": ["city:nz:hamilton"]
+  },
+  {
+    "input": "Waterloo, Ontario",
+    "expect": ["city:ca:waterloo"]
+  },
+  {
+    "input": "Waterloo, Iowa",
+    "expect": ["city:us:waterloo"]
+  },
+  {
+    "input": "Windsor, Ontario",
+    "expect": ["city:ca:windsor"]
+  },
+  {
+    "input": "Windsor, England",
+    "expect": ["city:gb:windsor"]
+  },
+  {
+    "input": "Salem, Oregon",
+    "expect": ["city:us:salem"]
+  },
+  {
+    "input": "Salem, India",
+    "expect": ["city:in:salem"]
+  },
+  {
+    "input": "Athens, Georgia",
+    "expect": ["city:us:athens"]
+  },
+  {
+    "input": "Athens, Greece",
+    "expect": ["city:gr:athens"]
+  },
+  {
+    "input": "Perth, Australia",
+    "expect": ["city:au:perth"]
+  },
+  {
+    "input": "Perth, Scotland",
+    "expect": ["city:gb:perth"]
+  },
+  {
+    "input": "Newcastle, New South Wales",
+    "expect": ["city:au:newcastle"]
+  },
+  {
+    "input": "London, England, United Kingdom",
+    "expect": ["city:gb:london"]
+  },
+  {
+    "input": "London",
+    "expect": ["city:gb:london"]
+  },
+  {
+    "input": "Paris",
+    "expect": ["city:fr:paris"]
+  },
+  {
+    "input": "Berlin",
+    "expect": ["city:de:berlin"]
+  },
+  {
+    "input": "Toronto",
+    "expect": ["city:ca:toronto"]
+  },
+  {
+    "input": "Sydney",
+    "expect": ["city:au:sydney"]
+  },
+  {
+    "input": "Tokyo",
+    "expect": ["city:jp:tokyo"]
+  },
+  {
+    "input": "Madrid",
+    "expect": ["city:es:madrid"]
+  },
+  {
+    "input": "Rome",
+    "expect": ["city:it:rome"]
+  },
+  {
+    "input": "Munich",
+    "expect": ["city:de:munich"]
+  },
+  {
+    "input": "Dublin",
+    "expect": ["city:ie:dublin"]
+  },
+  {
+    "input": "Nairobi",
+    "expect": ["city:ke:nairobi"]
+  },
+  {
+    "input": "Lagos",
+    "expect": ["city:ng:lagos"]
+  },
+  {
+    "input": "Mumbai",
+    "expect": ["city:in:mumbai"]
+  },
+  {
+    "input": "Seoul",
+    "expect": ["city:kr:seoul"]
+  },
+  {
+    "input": "Bangkok",
+    "expect": ["city:th:bangkok"]
+  },
+  {
+    "input": "Cairo",
+    "expect": ["city:eg:cairo"]
+  },
+  {
+    "input": "Lima",
+    "expect": ["city:pe:lima"]
+  },
+  {
+    "input": "Bogota",
+    "expect": ["city:co:bogota"]
+  },
+  {
+    "input": "Chicago",
+    "expect": ["city:us:chicago"]
+  },
+  {
+    "input": "Los Angeles",
+    "expect": ["city:us:los-angeles"]
+  },
+  {
+    "input": "Victoria",
+    "expect": []
+  },
+  {
+    "input": "Vancouver",
+    "expect": []
+  },
+  {
+    "input": "Cambridge",
+    "expect": []
+  },
+  {
+    "input": "San Jose",
+    "expect": []
+  },
+  {
+    "input": "Hamilton",
+    "expect": []
+  },
+  {
+    "input": "Waterloo",
+    "expect": []
+  },
+  {
+    "input": "Newcastle",
+    "expect": []
+  },
+  {
+    "input": "Birmingham",
+    "expect": ["city:gb:birmingham"]
+  },
+  {
+    "input": "Springfield",
+    "expect": ["city:us:springfield"]
+  },
+  {
+    "input": "Portland",
+    "expect": ["city:us:portland"]
+  },
+  {
+    "input": "Remote Canada",
+    "expect": ["remote:continent:NA", "remote:country:ca"]
+  },
+  {
+    "input": "Remote US",
+    "expect": ["remote:continent:NA", "remote:country:us"]
+  },
+  {
+    "input": "Remote US only",
+    "expect": ["remote:continent:NA", "remote:country:us"]
+  },
+  {
+    "input": "Remote in Canada",
+    "expect": ["remote:continent:NA", "remote:country:ca"]
+  },
+  {
+    "input": "Remote (Canada)",
+    "expect": ["remote:continent:NA", "remote:country:ca"]
+  },
+  {
+    "input": "Remote - Canada",
+    "expect": ["remote:continent:NA", "remote:country:ca"]
+  },
+  {
+    "input": "Remote Poland",
+    "expect": ["remote:continent:EU", "remote:country:pl"]
+  },
+  {
+    "input": "Remote Germany",
+    "expect": ["remote:continent:EU", "remote:country:de"]
+  },
+  {
+    "input": "Remote Deutschland",
+    "expect": ["remote:continent:EU", "remote:country:de"]
+  },
+  {
+    "input": "Remote UK",
+    "expect": ["remote:continent:EU", "remote:country:gb"]
+  },
+  {
+    "input": "Remote United Kingdom",
+    "expect": ["remote:continent:EU", "remote:country:gb"]
+  },
+  {
+    "input": "Remote Ireland",
+    "expect": ["remote:continent:EU", "remote:country:ie"]
+  },
+  {
+    "input": "Remote France",
+    "expect": ["remote:continent:EU", "remote:country:fr"]
+  },
+  {
+    "input": "Remote Spain",
+    "expect": ["remote:continent:EU", "remote:country:es"]
+  },
+  {
+    "input": "Remote Portugal",
+    "expect": ["remote:continent:EU", "remote:country:pt"]
+  },
+  {
+    "input": "Remote Netherlands",
+    "expect": ["remote:continent:EU", "remote:country:nl"]
+  },
+  {
+    "input": "Remote Sweden",
+    "expect": ["remote:continent:EU", "remote:country:se"]
+  },
+  {
+    "input": "Remote Norway",
+    "expect": ["remote:continent:EU", "remote:country:no"]
+  },
+  {
+    "input": "Remote Denmark",
+    "expect": ["remote:continent:EU", "remote:country:dk"]
+  },
+  {
+    "input": "Remote Finland",
+    "expect": ["remote:continent:EU", "remote:country:fi"]
+  },
+  {
+    "input": "Remote Australia",
+    "expect": ["remote:continent:OC", "remote:country:au"]
+  },
+  {
+    "input": "Remote New Zealand",
+    "expect": ["remote:continent:OC", "remote:country:nz"]
+  },
+  {
+    "input": "Remote India",
+    "expect": ["remote:continent:AS", "remote:country:in"]
+  },
+  {
+    "input": "Remote Japan",
+    "expect": ["remote:continent:AS", "remote:country:jp"]
+  },
+  {
+    "input": "Remote Singapore",
+    "expect": ["remote:continent:AS", "remote:country:sg"]
+  },
+  {
+    "input": "Remote Brazil",
+    "expect": ["remote:continent:SA", "remote:country:br"]
+  },
+  {
+    "input": "Remote Mexico",
+    "expect": ["remote:continent:NA", "remote:country:mx"]
+  },
+  {
+    "input": "Remote South Africa",
+    "expect": ["remote:continent:AF", "remote:country:za"]
+  },
+  {
+    "input": "Remote Israel",
+    "expect": ["remote:continent:AS", "remote:country:il"]
+  },
+  {
+    "input": "Remote UAE",
+    "expect": ["remote:continent:AS", "remote:country:ae"]
+  },
+  {
+    "input": "Remote Switzerland",
+    "expect": ["remote:continent:EU", "remote:country:ch"]
+  },
+  {
+    "input": "Remote Austria",
+    "expect": ["remote:continent:EU", "remote:country:at"]
+  },
+  {
+    "input": "Remote Italy",
+    "expect": ["remote:continent:EU", "remote:country:it"]
+  },
+  {
+    "input": "Remote Greece",
+    "expect": ["remote:continent:EU", "remote:country:gr"]
+  },
+  {
+    "input": "Remote Turkey",
+    "expect": ["remote:continent:AS", "remote:country:tr"]
+  },
+  {
+    "input": "Remote Argentina",
+    "expect": ["remote:continent:SA", "remote:country:ar"]
+  },
+  {
+    "input": "Remote Chile",
+    "expect": ["remote:continent:SA", "remote:country:cl"]
+  },
+  {
+    "input": "Remote Colombia",
+    "expect": ["remote:continent:SA", "remote:country:co"]
+  },
+  {
+    "input": "US: Washington Remote Worker",
+    "expect": ["remote:continent:NA", "remote:country:us"]
+  },
+  {
+    "input": "Remote - Toronto",
+    "expect": ["remote:continent:NA", "remote:country:ca"]
+  },
+  {
+    "input": "Remote Europe",
+    "expect": ["remote:continent:EU"]
+  },
+  {
+    "input": "Remote - Europe",
+    "expect": ["remote:continent:EU"]
+  },
+  {
+    "input": "Remote Europe only",
+    "expect": ["remote:continent:EU"]
+  },
+  {
+    "input": "Remote LATAM",
+    "expect": ["remote:continent:SA"]
+  },
+  {
+    "input": "Remote Latin America",
+    "expect": ["remote:continent:SA"]
+  },
+  {
+    "input": "Remote South America",
+    "expect": ["remote:continent:SA"]
+  },
+  {
+    "input": "Remote APAC",
+    "expect": ["remote:continent:AS", "remote:continent:OC"]
+  },
+  {
+    "input": "Remote Asia",
+    "expect": ["remote:continent:AS"]
+  },
+  {
+    "input": "Remote Asia Pacific",
+    "expect": ["remote:continent:AS", "remote:continent:OC"]
+  },
+  {
+    "input": "Remote EMEA",
+    "expect": ["remote:continent:AF", "remote:continent:AS", "remote:continent:EU"]
+  },
+  {
+    "input": "Remote North America",
+    "expect": ["remote:continent:NA"]
+  },
+  {
+    "input": "Remote Africa",
+    "expect": ["remote:continent:AF"]
+  },
+  {
+    "input": "Remote Oceania",
+    "expect": ["remote:continent:OC"]
+  },
+  {
+    "input": "Remote EU",
+    "expect": ["remote:continent:EU"]
+  },
+  {
+    "input": "Remote Antarctica",
+    "expect": ["remote:continent:AN", "remote:country:aq"]
+  },
+  {
+    "input": "Remote",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "remote",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "Remote \u00b7 Worldwide",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "Anywhere",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "Fully remote",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "100% remote",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "Work from home",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "WFH",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "Distributed",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "Remote worldwide",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "Remote - Anywhere",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "Remote (Worldwide)",
+    "expect": ["remote:worldwide"]
+  },
+  {
+    "input": "ca",
+    "expect": ["country:ca"]
+  },
+  {
+    "input": "us",
+    "expect": ["country:us"]
+  },
+  {
+    "input": "north_america",
+    "expect": ["region:north_america"]
+  },
+  {
+    "input": "eu",
+    "expect": ["region:eu"]
+  },
+  {
+    "input": "south_america",
+    "expect": ["region:south_america"]
+  },
+  {
+    "input": "Toronto",
+    "expect": ["city:ca:toronto"]
+  },
+  {
+    "input": "Berlin",
+    "expect": ["city:de:berlin"]
+  },
+  {
+    "input": "Canada",
+    "expect": ["country:ca"]
+  },
+  {
+    "input": "San Francisco",
+    "expect": ["city:us:san-francisco"]
+  },
+  {
+    "input": "New York",
+    "expect": ["city:us:new-york-city"]
+  },
+  {
+    "input": "M\u00fcnchen",
+    "expect": ["city:de:munich"]
+  },
+  {
+    "input": "K\u00f6ln",
+    "expect": ["city:de:koeln"]
+  },
+  {
+    "input": "G\u00f6teborg",
+    "expect": ["city:se:gothenburg"]
+  },
+  {
+    "input": "Wien",
+    "expect": ["city:at:vienna"]
+  },
+  {
+    "input": "Z\u00fcrich",
+    "expect": ["city:ch:zuerich"]
+  },
+  {
+    "input": "Milano",
+    "expect": ["city:it:milan"]
+  },
+  {
+    "input": "Roma",
+    "expect": []
+  },
+  {
+    "input": "Lisboa",
+    "expect": ["city:pt:lisbon"]
+  },
+  {
+    "input": "K\u00f8benhavn",
+    "expect": ["city:dk:copenhagen"]
+  },
+  {
+    "input": "Sao Paulo",
+    "expect": ["city:br:sao-paulo"]
+  },
+  {
+    "input": "Toronto (Canada)",
+    "expect": ["city:ca:toronto"]
+  },
+  {
+    "input": "Berlin (Deutschland)",
+    "expect": ["city:de:berlin"]
+  },
+  {
+    "input": "London - United Kingdom",
+    "expect": ["city:gb:london"]
+  },
+  {
+    "input": "toronto, canada",
+    "expect": ["city:ca:toronto"]
+  },
+  {
+    "input": "TORONTO, CANADA",
+    "expect": ["city:ca:toronto"]
+  },
+  {
+    "input": "berlin germany",
+    "expect": ["city:de:berlin"]
+  },
+  {
+    "input": "Toronto, ON, Canada",
+    "expect": ["city:ca:toronto"]
+  },
+  {
+    "input": "Vancouver, British Columbia, Canada",
+    "expect": ["city:ca:vancouver"]
+  },
+  {
+    "input": "Austin, Texas, United States",
+    "expect": ["city:us:austin"]
+  },
+  {
+    "input": "New York City, NY, USA",
+    "expect": ["city:us:new-york-city"]
+  },
+  {
+    "input": "London, UK",
+    "expect": ["city:gb:london"]
+  },
+  {
+    "input": "London, England, UK",
+    "expect": ["city:gb:london"]
+  },
+  {
+    "input": "Paris, Ile-de-France, France",
+    "expect": ["city:fr:paris"]
+  },
+  {
+    "input": "Munich, Bavaria, Germany",
+    "expect": ["city:de:munich"]
+  },
+  {
+    "input": "Cologne, Germany",
+    "expect": ["city:de:koeln"]
+  },
+  {
+    "input": "Ottawa, Ontario, Canada",
+    "expect": ["city:ca:ottawa"]
+  },
+  {
+    "input": "Seattle, WA, USA",
+    "expect": ["city:us:seattle"]
+  },
+  {
+    "input": "Dublin, Ireland",
+    "expect": ["city:ie:dublin"]
+  },
+  {
+    "input": "Sydney, NSW, Australia",
+    "expect": ["city:au:sydney"]
+  },
+  {
+    "input": "Tokyo, Japan",
+    "expect": ["city:jp:tokyo"]
+  },
+  {
+    "input": "Remote, UK",
+    "expect": ["remote:continent:EU", "remote:country:gb"]
+  },
+  {
+    "input": "Remote (US)",
+    "expect": ["remote:continent:NA", "remote:country:us"]
+  },
+  {
+    "input": "Narnia",
+    "expect": []
+  },
+  {
+    "input": "Atlantis",
+    "expect": []
+  },
+  {
+    "input": "Middle of Nowhere",
+    "expect": []
+  },
+  {
+    "input": "Mars Colony",
+    "expect": []
+  },
+  {
+    "input": "asdfgh",
+    "expect": []
+  },
+  {
+    "input": "Remote Narnia",
+    "expect": []
+  },
+  {
+    "input": "Gotham City",
+    "expect": []
+  },
+  {
+    "input": "Westeros",
+    "expect": []
+  },
+  {
+    "input": "Tatooine",
+    "expect": []
+  }
+]

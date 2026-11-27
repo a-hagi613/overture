@@ -1413,7 +1413,7 @@ test("the recorded Greenhouse forms lose the derivable Review families", async (
   const targets = await owner.put("/api/profile/targets", {
     data: {
       employmentTypes: ["full_time"],
-      locations: ["Toronto, ON", "United States", "United Kingdom", "Germany", "Australia"],
+      locations: ["city:ca:toronto", "country:us", "country:gb", "country:de", "country:au"],
       roles: ["Backend"],
       salaryCurrency: null,
       salaryFloorMinor: null,

@@ -1,21 +1,26 @@
 import { X } from "lucide-react";
 
+import type { PlaceSuggestion } from "../../shared/places.ts";
+
 import { copy } from "../../shared/copy.ts";
-import { onboardingLocationChoices } from "../../shared/onboarding-options.ts";
+import { placeFallbackLabel } from "../../shared/places.ts";
 import { Button } from "./ui/button.tsx";
 import { dsEyebrow } from "./ui/ds.ts";
-import { MultiSelectCombobox } from "./ui/multi-select-combobox.tsx";
+import { PlacePicker } from "./ui/place-picker.tsx";
 
 export function OnboardingTargetsLocations({
-  catalogLocations,
-  onToggleLocation,
+  onPickLocation,
+  onRemoveLocation,
+  places,
   selectedLocations,
 }: {
-  catalogLocations: readonly string[];
-  onToggleLocation: (location: string) => void;
+  onPickLocation: (place: PlaceSuggestion) => void;
+  onRemoveLocation: (id: string) => void;
+  places: readonly PlaceSuggestion[];
   selectedLocations: readonly string[];
 }) {
-  const options = onboardingLocationChoices(catalogLocations, selectedLocations);
+  const labelOf = (id: string) =>
+    places.find((place) => place.id === id)?.label ?? placeFallbackLabel(id);
 
   return (
     <div className="space-y-3 border-t border-border pt-5">
@@ -23,36 +28,35 @@ export function OnboardingTargetsLocations({
         <label className={`${dsEyebrow} mb-2 block`} htmlFor="w-locations">
           {copy.onboarding.cities}
         </label>
-        <MultiSelectCombobox
-          emptyText={copy.onboarding.locationsEmpty}
+        <PlacePicker
+          excludeIds={selectedLocations}
           id="w-locations"
-          onToggle={onToggleLocation}
-          options={options}
-          placeholder={copy.onboarding.locationsPlaceholder}
-          searchPlaceholder={copy.onboarding.locationsSearchPlaceholder}
-          selected={selectedLocations}
-          selectedSummary={copy.onboarding.locationsSelectedCount}
+          noResults={copy.onboarding.locationsEmpty}
+          onPick={onPickLocation}
+          placeholder={copy.onboarding.locationsSearchPlaceholder}
+          triggerLabel={copy.onboarding.addLocation}
         />
       </div>
 
       {selectedLocations.length === 0 ? null : (
-        <div className="flex flex-wrap gap-2">
-          {selectedLocations.map((location) => (
-            <Button
-              ariaPressed
-              className="rounded-full"
-              key={location}
-              onClick={() => {
-                onToggleLocation(location);
-              }}
-              size="sm"
-              variant="primary"
-            >
-              <span>{location}</span>
-              <X aria-hidden="true" size={13} />
-            </Button>
+        <ul className="flex flex-wrap gap-2">
+          {selectedLocations.map((id) => (
+            <li key={id}>
+              <Button
+                ariaLabel={copy.profile.targets.removeLocation(labelOf(id))}
+                className="rounded-full"
+                onClick={() => {
+                  onRemoveLocation(id);
+                }}
+                size="sm"
+                variant="primary"
+              >
+                <span>{labelOf(id)}</span>
+                <X aria-hidden="true" size={13} />
+              </Button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

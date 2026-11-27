@@ -73,7 +73,7 @@ const targets = {
   roles: ["Platform Engineer", "DevOps Engineer"],
   seniorities: ["senior"],
   workplaces: ["remote"],
-  locations: ["Toronto, ON"],
+  locations: ["city:ca:toronto"],
   employmentTypes: ["full_time"],
   salaryFloorMinor: null,
   salaryCurrency: null,

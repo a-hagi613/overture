@@ -15,6 +15,8 @@ import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { InviteRow } from "../auth/invites.ts";
 import { ADMIN_REFUSAL_CODES } from "./admin-refusals.ts";
 import type { AdminEnv } from "./admin-refusals.ts";
+import { describePlaceIds } from "../places/catalog.ts";
+import { promotePlaceValues } from "../places/resolve.ts";
 import { resolveAdminAccessOwner } from "../admin/access-owner.ts";
 import { buildUserInsight, signedInUserIds } from "../admin/user-insight.ts";
 import { dashboardLinks } from "../admin/dashboards.ts";
@@ -801,7 +803,9 @@ export function createAdminApi(db: AppDatabase, clock: Clock, deps: AdminDeps) {
           targetRow === undefined
             ? null
             : {
-                locations: readStringList(targetRow.locations),
+                locations: describePlaceIds(
+                  promotePlaceValues(readStringList(targetRow.locations)).ids,
+                ).map((place) => place.label),
                 roles: readStringList(targetRow.roles),
               },
       },

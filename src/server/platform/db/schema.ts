@@ -437,6 +437,7 @@ export const targets = sqliteTable("targets", {
   seniorities: text("seniorities").notNull(),
   workplaces: text("workplaces").notNull(),
   locations: text("locations").notNull(),
+  unresolvedLocations: text("unresolved_locations").notNull().default("[]"),
   employmentTypes: text("employment_types").notNull(),
   salaryFloorMinor: integer("salary_floor_minor"),
   salaryCurrency: text("salary_currency"),
@@ -1462,20 +1463,29 @@ export const jobs = sqliteTable(
   ],
 );
 
-/** The geography facets a job was published for, lower case as freehire spells them. */
+/** The geography facets a job was published for, as the canonical place ids a person picks from (issue #683). */
 export const jobPlaces = sqliteTable(
   "job_places",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
     jobId: text("job_id")
       .notNull()
       .references(() => jobs.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["country", "region", "metro", "city"] }).notNull(),
-    value: text("value").notNull(),
+    placeId: text("place_id").notNull(),
+    kind: text("kind", {
+      enum: [
+        "country",
+        "region",
+        "metro",
+        "city",
+        "remote_country",
+        "remote_continent",
+        "remote_worldwide",
+      ],
+    }).notNull(),
   },
   (t) => [
-    uniqueIndex("job_places_job_kind_value_unique").on(t.jobId, t.kind, t.value),
-    index("job_places_kind_value_job").on(t.kind, t.value, t.jobId),
+    primaryKey({ columns: [t.jobId, t.placeId] }),
+    index("job_places_place_job").on(t.placeId, t.jobId),
   ],
 );
 

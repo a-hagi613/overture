@@ -8,7 +8,7 @@ import { mapQuestionByRules } from "./question-rules.ts";
 
 const canadianProfile = {
   ...emptyTargets,
-  locations: ["Toronto, ON", "United States", "United Kingdom", "Germany", "Australia"],
+  locations: ["city:ca:toronto", "country:us", "country:gb", "country:de", "country:au"],
   workplaces: ["remote" as const, "hybrid" as const, "onsite" as const],
 };
 

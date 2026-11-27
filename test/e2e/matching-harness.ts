@@ -46,7 +46,7 @@ export const defaultTargets = {
   roles: ["Backend"],
   seniorities: ["senior"],
   workplaces: ["remote"],
-  locations: ["Toronto, ON"],
+  locations: ["city:ca:toronto"],
   employmentTypes: ["full_time"],
   salaryFloorMinor: 10_000_000,
   salaryCurrency: "CAD",

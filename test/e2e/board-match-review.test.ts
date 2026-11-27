@@ -29,7 +29,7 @@ const targets = {
   roles: ["Platform Engineer", "DevOps Engineer", "Site Reliability Engineer"],
   seniorities: ["senior", "staff"],
   workplaces: ["remote", "hybrid"],
-  locations: ["Toronto, ON"],
+  locations: ["city:ca:toronto"],
   employmentTypes: ["full_time"],
   salaryFloorMinor: null,
   salaryCurrency: null,

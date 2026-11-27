@@ -1236,3 +1236,246 @@ export function allMetroAreas() {
     bbox: metro.bbox,
   }));
 }
+
+/** One city the dataset knows by a name, with what a picker needs to tell same-name cities apart. */
+export interface GeoCityCandidate {
+  /** The dataset's spelling, which is the one a place id's slug is built from. */
+  canonicalName: string;
+  countryCode: string;
+  regionIsoCode: string | null;
+  regionName: string | null;
+  population: number;
+}
+
+let cityExactNameKeys: Set<string> | null = null;
+
+function cityExactNameSet() {
+  if (cityExactNameKeys !== null) {
+    return cityExactNameKeys;
+  }
+
+  const keys = new Set<string>();
+
+  for (const row of geoDataJson.cities) {
+    const parsed = cityTupleSchema.safeParse(row);
+
+    if (!parsed.success) {
+      continue;
+    }
+
+    const normalized = normalizePlaceName(parsed.data[1]);
+
+    if (normalized !== "") {
+      keys.add(normalized);
+    }
+  }
+
+  cityExactNameKeys = keys;
+
+  return keys;
+}
+
+/**
+ * Every city the dataset files under a name or one of its alternate spellings. A name repeated inside one country
+ * collapses to that country's place id, so only a name that spans countries is ambiguous. An exact name beats an
+ * alternate spelling: "Frisco" is Frisco, Texas, never San Francisco under its old nickname.
+ * @param value The city name or alternate spelling.
+ * @returns The candidates, biggest first.
+ */
+export function cityCandidatesFor(value: string) {
+  const normalized = normalizePlaceName(value);
+
+  if (normalized === "") {
+    return [];
+  }
+
+  const { others, top } = cityIndex();
+  const primary = top.get(normalized);
+
+  const candidates = [
+    ...(primary === undefined ? [] : [primary]),
+    ...(others.get(normalized) ?? []),
+  ];
+
+  const exactNameOnly = cityExactNameSet().has(normalized);
+  const seen = new Set<string>();
+
+  const mapped: GeoCityCandidate[] = [];
+
+  for (const index of candidates) {
+    const city = cityAt(index);
+    const region = regionByLegacy.get(`${city.country}.${city.admin1}`);
+    const key = `${city.country}:${normalizePlaceName(city.name)}`;
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    mapped.push({
+      canonicalName: city.name,
+      countryCode: city.country,
+      population: city.population,
+      regionIsoCode: dataset.regionIso[`${city.country}.${city.admin1}`] ?? null,
+      regionName: region?.name ?? null,
+    });
+  }
+
+  const exact = mapped.filter(
+    (candidate) => normalizePlaceName(candidate.canonicalName) === normalized,
+  );
+
+  const exactIsMeaningful = exact.some((candidate) => candidate.population >= 10_000);
+
+  return (exactNameOnly && exactIsMeaningful ? exact : mapped).toSorted(
+    (left, right) => right.population - left.population,
+  );
+}
+
+/**
+ * The country a place name or code names, aliases included ("Deutschland" → DE, "uk" → GB).
+ * @param value The place name or code.
+ * @returns The upper-case ISO alpha-2 code, or null.
+ */
+export function countryCodeForPlaceName(value: string) {
+  const normalized = normalizePlaceName(value);
+
+  if (normalized === "") {
+    return null;
+  }
+
+  return countries.get(normalized) ?? countries.get(value.trim().toLowerCase()) ?? null;
+}
+
+/**
+ * The continents a continent name or alias names. "LATAM" and "Latin America" reach South America, "LATAM" alone
+ * through the alias table.
+ * @param value The continent name or alias.
+ * @returns The upper-case continent codes.
+ */
+export function continentCodesForPlaceName(value: string) {
+  return continentAliases.get(normalizePlaceName(value)) ?? [];
+}
+
+/** One administrative region the dataset knows, with the country and continent it belongs to. */
+export interface GeoRegionCandidate {
+  isoCode: string;
+  name: string;
+  countryCode: string;
+  continentCode: string;
+}
+
+/**
+ * The administrative regions a name or short code names ("Texas", "TX", "US-TX", "Ontario").
+ * @param value The region name or code.
+ * @returns The matching regions.
+ */
+export function regionCandidatesFor(value: string) {
+  const normalized = normalizePlaceName(value);
+
+  if (normalized === "") {
+    return [];
+  }
+
+  const byName = regionByName.get(normalized) ?? [];
+  const byToken = regionSuffixTokens.get(normalized.replaceAll(" ", "")) ?? [];
+  const seen = new Set<string>();
+
+  const regions: GeoRegionCandidate[] = [];
+
+  for (const region of [...byName, ...byToken]) {
+    if (seen.has(region.iso)) {
+      continue;
+    }
+
+    seen.add(region.iso);
+    regions.push({
+      continentCode: region.continent,
+      countryCode: region.country,
+      isoCode: region.iso,
+      name: region.name,
+    });
+  }
+
+  return regions;
+}
+
+/** One metro area the dataset knows. */
+export interface GeoMetroCandidate {
+  name: string;
+  countryCode: string;
+  isoRegionCode: string | null;
+  continentCode: string;
+}
+
+/**
+ * The metro areas a name or alias names.
+ * @param value The metro name or alias.
+ * @returns The matching metro areas.
+ */
+export function metroCandidatesFor(value: string) {
+  const ref = metros.get(normalizePlaceName(value));
+
+  if (ref === undefined) {
+    return [];
+  }
+
+  return [
+    {
+      continentCode: ref.continentCode,
+      countryCode: ref.countryCode,
+      isoRegionCode: ref.isoRegionCode,
+      name: ref.name,
+    },
+  ] satisfies GeoMetroCandidate[];
+}
+
+let cityNameByCountrySlug: Map<string, string> | null = null;
+
+function cityNameIndex() {
+  if (cityNameByCountrySlug !== null) {
+    return cityNameByCountrySlug;
+  }
+
+  const index = new Map<string, string>();
+
+  for (const row of geoDataJson.cities) {
+    const parsed = cityTupleSchema.safeParse(row);
+
+    if (!parsed.success) {
+      continue;
+    }
+
+    const [, name, country] = parsed.data;
+    const slug = normalizePlaceName(name).replaceAll(" ", "-");
+
+    if (slug !== "") {
+      index.set(`${country}:${slug}`, name);
+    }
+  }
+
+  cityNameByCountrySlug = index;
+
+  return index;
+}
+
+/**
+ * The dataset's spelling of a city from its place id's country and slug.
+ * @param countryCode The ISO alpha-2 country code.
+ * @param slug The city slug.
+ * @returns The name, or null when the dataset has no such city.
+ */
+export function cityNameForPlace(countryCode: string, slug: string) {
+  return cityNameIndex().get(`${countryCode.toUpperCase()}:${slug}`) ?? null;
+}
+
+/**
+ * The dataset's spelling of a metro from its place id's slug.
+ * @param slug The metro slug.
+ * @returns The name, or null.
+ */
+export function metroNameForPlace(slug: string) {
+  const ref = [...metros.values()].find((metro) => metro.norm.replaceAll(" ", "-") === slug);
+
+  return ref?.name ?? null;
+}

@@ -9,16 +9,19 @@ import { targets } from "../platform/db/schema.ts";
 import { postings } from "../platform/db/catalog-schema.ts";
 import { resolveLocation } from "../catalog/geo.ts";
 import { resolvedLocationCondition } from "../catalog/location-filter.ts";
+import { locationTextsOfPlaceIds } from "../places/catalog.ts";
 import { catalogRevision } from "../catalog/revision.ts";
 import { optionalFieldConditions } from "../matching/optional-fields.ts";
 import { planRoleTargets, roleTargetCondition } from "../matching/role-targets.ts";
 import { emptyTargets, targetsInputSchema } from "../../shared/targets.ts";
+import { promotePlaceValues } from "../places/resolve.ts";
 
 const storedSchema = z.object({
   roles: z.string(),
   seniorities: z.string(),
   workplaces: z.string(),
   locations: z.string(),
+  unresolvedLocations: z.string(),
   employmentTypes: z.string(),
   salaryFloorMinor: z.number().nullable(),
   salaryCurrency: z.string().nullable(),
@@ -93,7 +96,7 @@ function normalizeFilters(
 ) {
   const locations = new Map<string, SQL>();
 
-  for (const location of parsed.locations) {
+  for (const location of locationTextsOfPlaceIds(parsed.locations)) {
     const filter = locationFilter(db, location);
 
     if (!locations.has(filter.key)) {
@@ -254,12 +257,18 @@ export function createTargetsService(deps: { db: AppDatabase; clock: Clock }) {
 
     const stored = storedSchema.parse(row);
 
+    const places = promotePlaceValues([
+      ...stringArrayFromColumn(stored.locations),
+      ...stringArrayFromColumn(stored.unresolvedLocations),
+    ]);
+
     return {
       targets: targetsInputSchema.parse({
         roles: stringArrayFromColumn(stored.roles),
         seniorities: stringArrayFromColumn(stored.seniorities),
         workplaces: stringArrayFromColumn(stored.workplaces),
-        locations: stringArrayFromColumn(stored.locations),
+        locations: places.ids,
+        unresolvedLocations: places.unresolved,
         employmentTypes: stringArrayFromColumn(stored.employmentTypes),
         salaryFloorMinor: stored.salaryFloorMinor,
         salaryCurrency: stored.salaryCurrency,
@@ -282,6 +291,7 @@ export function createTargetsService(deps: { db: AppDatabase; clock: Clock }) {
         seniorities: JSON.stringify(parsed.seniorities),
         workplaces: JSON.stringify(parsed.workplaces),
         locations: JSON.stringify(parsed.locations),
+        unresolvedLocations: JSON.stringify(parsed.unresolvedLocations),
         employmentTypes: JSON.stringify(parsed.employmentTypes),
         salaryFloorMinor: parsed.salaryFloorMinor,
         salaryCurrency: parsed.salaryCurrency,
@@ -296,6 +306,7 @@ export function createTargetsService(deps: { db: AppDatabase; clock: Clock }) {
           seniorities: JSON.stringify(parsed.seniorities),
           workplaces: JSON.stringify(parsed.workplaces),
           locations: JSON.stringify(parsed.locations),
+          unresolvedLocations: JSON.stringify(parsed.unresolvedLocations),
           employmentTypes: JSON.stringify(parsed.employmentTypes),
           salaryFloorMinor: parsed.salaryFloorMinor,
           salaryCurrency: parsed.salaryCurrency,

@@ -96,7 +96,7 @@ async function seedPersonalData(request: APIRequestContext, server: DeleteHarnes
   await request.put("/api/profile/targets", {
     data: {
       employmentTypes: ["full_time"],
-      locations: ["Toronto, ON"],
+      locations: ["city:ca:toronto"],
       roles: ["Senior Backend Engineer"],
       salaryCurrency: "CAD",
       salaryFloorMinor: 1_000_000,

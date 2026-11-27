@@ -1,21 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Plus, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import type { PlaceSuggestion } from "../../shared/places.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 import type { RoleCategoryId } from "../../shared/role-taxonomy.ts";
 
 import { copy } from "../../shared/copy.ts";
+import { placeFallbackLabel } from "../../shared/places.ts";
 import { ROLE_CATEGORIES, pickableRoles, roleCategoryById } from "../../shared/role-taxonomy.ts";
 import { fetchTargets, previewTargetsCount, saveTargets } from "../lib/profile-api.ts";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle, dsEyebrow, dsMetric } from "./ui/ds.ts";
 import { Input } from "./ui/input.tsx";
+import { PlacePicker } from "./ui/place-picker.tsx";
 import { RolePicker } from "./ui/role-picker.tsx";
 import { Select } from "./ui/select.tsx";
 import { SectionSkeleton } from "./section-skeleton.tsx";
+import { UnresolvedPlaceRow } from "./unresolved-place-row.tsx";
 
 const moneyFormat = new Intl.NumberFormat("en-US");
 
@@ -93,8 +97,14 @@ export function TargetsSection() {
   });
 
   const [roleCategory, setRoleCategory] = useState<RoleCategoryId | null>(null);
-  const [newLocation, setNewLocation] = useState<string | null>(null);
+  const [pickedPlaces, setPickedPlaces] = useState<PlaceSuggestion[]>([]);
   const matchedCount = countQuery.data?.matchedCount ?? targetsQuery.data?.matchedCount ?? 0;
+
+  const placeById = new Map(
+    [...(targetsQuery.data?.places ?? []), ...pickedPlaces].map((place) => [place.id, place]),
+  );
+
+  const labelOf = (id: string) => placeById.get(id)?.label ?? placeFallbackLabel(id);
 
   function update(patch: Partial<TargetsInput>) {
     if (draft !== null) {
@@ -102,18 +112,36 @@ export function TargetsSection() {
     }
   }
 
-  function addLocation() {
-    if (draft === null || newLocation === null) {
+  function rememberPlace(place: PlaceSuggestion) {
+    setPickedPlaces((current) =>
+      current.some((candidate) => candidate.id === place.id) ? current : [...current, place],
+    );
+  }
+
+  function addPickedPlace(place: PlaceSuggestion) {
+    if (draft === null) {
       return;
     }
 
-    const location = newLocation.trim();
+    rememberPlace(place);
 
-    if (location !== "" && !draft.locations.includes(location)) {
-      update({ locations: [...draft.locations, location] });
+    if (!draft.locations.includes(place.id)) {
+      update({ locations: [...draft.locations, place.id] });
+    }
+  }
+
+  function resolveUnresolved(raw: string, place: PlaceSuggestion) {
+    if (draft === null) {
+      return;
     }
 
-    setNewLocation(null);
+    rememberPlace(place);
+    update({
+      locations: draft.locations.includes(place.id)
+        ? draft.locations
+        : [...draft.locations, place.id],
+      unresolvedLocations: draft.unresolvedLocations.filter((candidate) => candidate !== raw),
+    });
   }
 
   if (targetsQuery.isPending) {
@@ -207,61 +235,79 @@ export function TargetsSection() {
 
       <div className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
         <div className="border-t border-border py-5">
-          <h3 className={dsEyebrow}>{targets.locations}</h3>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <h3 className={dsEyebrow} id="profile-target-locations">
+            {targets.locations}
+          </h3>
+          <ul
+            aria-labelledby="profile-target-locations"
+            className="mt-3 flex flex-wrap items-center gap-2"
+          >
             {(draft?.locations ?? []).map((location) => (
-              <Button
-                ariaLabel={copy.profile.facts.remove(location)}
-                className="rounded-full"
-                key={location}
-                onClick={() => {
-                  update({
-                    locations: (draft?.locations ?? []).filter(
-                      (candidate) => candidate !== location,
-                    ),
-                  });
-                }}
-                size="sm"
-                variant="secondary"
-              >
-                <span>{location}</span>
-                <X aria-hidden="true" size={13} />
-              </Button>
-            ))}
-            {newLocation === null ? (
-              <Button
-                className="rounded-full"
-                onClick={() => {
-                  setNewLocation("");
-                }}
-                size="sm"
-                variant="outline"
-              >
-                <Plus aria-hidden="true" size={14} />
-                <span>{targets.addLocation}</span>
-              </Button>
-            ) : (
-              <form
-                className="flex items-center gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  addLocation();
-                }}
-              >
-                <Input
-                  ariaLabel={targets.addLocation}
-                  className="h-9 min-w-36 flex-1 text-xs sm:w-52 sm:flex-none"
-                  onChange={(event) => {
-                    setNewLocation(event.currentTarget.value);
+              <li key={location}>
+                <Button
+                  ariaLabel={targets.removeLocation(labelOf(location))}
+                  className="rounded-full"
+                  onClick={() => {
+                    update({
+                      locations: (draft?.locations ?? []).filter(
+                        (candidate) => candidate !== location,
+                      ),
+                    });
                   }}
-                  value={newLocation}
-                />
-                <Button size="sm" submit variant="secondary">
-                  {targets.add}
+                  size="sm"
+                  variant="secondary"
+                >
+                  <span>{labelOf(location)}</span>
+                  <X aria-hidden="true" size={13} />
                 </Button>
-              </form>
-            )}
-          </div>
+              </li>
+            ))}
+            <li>
+              <PlacePicker
+                excludeIds={draft?.locations ?? []}
+                id="profile-target-location"
+                noResults={targets.locationNoResults}
+                onPick={addPickedPlace}
+                placeholder={targets.pickLocationPlaceholder}
+                triggerLabel={targets.addLocation}
+              />
+            </li>
+          </ul>
+
+          {(draft?.unresolvedLocations ?? []).length === 0 ? null : (
+            <section
+              aria-labelledby="profile-target-unresolved"
+              className="mt-4 rounded-lg border border-border bg-muted/40 p-3"
+            >
+              <p className={dsEyebrow} id="profile-target-unresolved">
+                {targets.unresolvedTitle}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{targets.unresolvedNote}</p>
+              <ul className="mt-3 space-y-2">
+                {(draft?.unresolvedLocations ?? []).map((raw, index) => (
+                  <UnresolvedPlaceRow
+                    dismissLabel={targets.dismissLocation(raw)}
+                    id={`profile-unresolved-${String(index)}`}
+                    key={raw}
+                    noResults={targets.locationNoResults}
+                    onDismiss={() => {
+                      update({
+                        unresolvedLocations: (draft?.unresolvedLocations ?? []).filter(
+                          (candidate) => candidate !== raw,
+                        ),
+                      });
+                    }}
+                    onPick={(place) => {
+                      resolveUnresolved(raw, place);
+                    }}
+                    placeholder={targets.pickLocationPlaceholder}
+                    raw={raw}
+                    triggerLabel={targets.pickUnresolved}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
 
         <div className="border-t border-border py-5">

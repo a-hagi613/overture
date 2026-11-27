@@ -74,12 +74,12 @@ test("the category-first role chips, multi-select locations, and optional settin
   await expect(backend).toHaveAttribute("aria-pressed", "true");
 
   await page.getByLabel("Locations").click();
-  await page.getByRole("option", { exact: true, name: "London" }).click();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "London" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await page.getByPlaceholder("Search cities or remote regions...").fill("London");
+  await page
+    .getByRole("option", { name: /^London/u })
+    .first()
+    .click();
+  await expect(page.getByRole("button", { name: "Remove London" })).toBeVisible();
 
   await remote.click();
   await expect(remote).toHaveAttribute("aria-pressed", "true");
@@ -150,9 +150,17 @@ test("choices persist across reload, optional salary saves, and browser zone is 
   await page.getByRole("button", { exact: true, name: "Product Manager" }).click();
 
   await page.getByLabel("Locations").click();
-  await page.getByRole("option", { exact: true, name: "London" }).click();
-  await page.getByRole("option", { exact: true, name: "Berlin" }).click();
-  await page.keyboard.press("Escape");
+  await page.getByPlaceholder("Search cities or remote regions...").fill("London");
+  await page
+    .getByRole("option", { name: /^London/u })
+    .first()
+    .click();
+  await page.getByLabel("Locations").click();
+  await page.getByPlaceholder("Search cities or remote regions...").fill("Berlin");
+  await page
+    .getByRole("option", { name: /^Berlin/u })
+    .first()
+    .click();
 
   await page.getByRole("button", { exact: true, name: "Remote" }).click();
   await page.getByRole("button", { name: "Hybrid" }).click();
@@ -185,7 +193,7 @@ test("choices persist across reload, optional salary saves, and browser zone is 
   const saved = targetsSchema.parse(await (await request.get("/api/profile/targets")).json());
 
   expect(saved.targets.roles).toEqual(["Product Manager"]);
-  expect(saved.targets.locations).toEqual(["London", "Berlin"]);
+  expect(saved.targets.locations).toEqual(["city:de:berlin", "city:gb:london"]);
   expect(saved.targets.workplaces).toEqual(["remote", "hybrid"]);
   expect(saved.targets.seniorities).toEqual(["senior"]);
   expect(saved.targets.employmentTypes).toEqual(["full_time"]);
@@ -198,14 +206,8 @@ test("choices persist across reload, optional salary saves, and browser zone is 
     "aria-pressed",
     "true",
   );
-  await expect(page.getByRole("button", { name: "London" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(page.getByRole("button", { name: "Berlin" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("button", { name: "Remove London" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Berlin" })).toBeVisible();
   await page.getByRole("button", { name: /Optional: minimum salary/u }).click();
   await expect(page.getByLabel("Minimum salary")).toHaveValue("120,000");
 
@@ -253,8 +255,11 @@ test("a fresh user is offered on-site work and sees matches only once every grou
 
   await page.getByRole("button", { exact: true, name: "DevOps / SRE / Platform Engineer" }).click();
   await page.getByLabel("Locations").click();
-  await page.getByRole("option", { exact: true, name: "London" }).click();
-  await page.keyboard.press("Escape");
+  await page.getByPlaceholder("Search cities or remote regions...").fill("London");
+  await page
+    .getByRole("option", { name: /^London/u })
+    .first()
+    .click();
   const held = Promise.withResolvers<undefined>();
 
   await page.route("**/api/onboarding/targets", async (route) => {

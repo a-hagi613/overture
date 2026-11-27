@@ -273,8 +273,17 @@ async function checkTarget(page: Page, target: Target, url: string, width: numbe
 
   if (expectedPath === "/profile" && width >= 768) {
     landing = "/profile/resume";
-  } else if (expectedPath === "/onboarding/trial") {
-    landing = ["/onboarding/matches", "/onboarding/resume"];
+  } else if (expectedPath.startsWith("/onboarding/")) {
+    landing = [
+      ...new Set([
+        ...[landing].flat(),
+        "/onboarding/resume",
+        "/onboarding/gaps",
+        "/onboarding/targets",
+        "/onboarding/matches",
+        "/home",
+      ]),
+    ];
   }
 
   await navigate(page, expectedPath, landing);

@@ -1,4 +1,4 @@
-import { and, desc, eq, exists, inArray, or } from "drizzle-orm";
+import { and, desc, eq, exists, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { AppDatabase } from "../platform/db/client.ts";
@@ -11,8 +11,9 @@ export type JobRow = typeof jobs.$inferSelect;
 const DEFAULT_LIMIT = 200;
 
 /**
- * The freehire-shaped read the matching path uses: open jobs whose category is one a user wants and whose places
- * intersect the user's countries or cities. Geography is OR here, exactly like freehire's own facets.
+ * The freehire-shaped read the matching path uses: open jobs whose category is one a user wants and whose canonical
+ * place ids intersect the user's. A job's remote scope is a place id too, so `Remote · Canada` matches only a remote
+ * job freehire lists Canada for (SPEC §6.4).
  * @param db The application database.
  * @returns The reader.
  */
@@ -24,44 +25,20 @@ export function createJobReader(db: AppDatabase) {
       conditions.push(inArray(jobs.category, [...preferences.categories]));
     }
 
-    const placeConditions = [
-      preferences.countries.length === 0
-        ? undefined
-        : exists(
-            db
-              .select({ one: jobPlaces.id })
-              .from(jobPlaces)
-              .where(
-                and(
-                  eq(jobPlaces.jobId, jobs.id),
-                  eq(jobPlaces.kind, "country"),
-                  inArray(jobPlaces.value, [...preferences.countries]),
-                ),
+    if (preferences.placeIds.length > 0) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: jobPlaces.placeId })
+            .from(jobPlaces)
+            .where(
+              and(
+                eq(jobPlaces.jobId, jobs.id),
+                inArray(jobPlaces.placeId, [...preferences.placeIds]),
               ),
-          ),
-      preferences.cities.length === 0
-        ? undefined
-        : exists(
-            db
-              .select({ one: jobPlaces.id })
-              .from(jobPlaces)
-              .where(
-                and(
-                  eq(jobPlaces.jobId, jobs.id),
-                  eq(jobPlaces.kind, "city"),
-                  inArray(
-                    jobPlaces.value,
-                    preferences.cities.map((city) => city.toLowerCase()),
-                  ),
-                ),
-              ),
-          ),
-    ].filter((condition): condition is SQL => condition !== undefined);
-
-    const place = or(...placeConditions);
-
-    if (place !== undefined) {
-      conditions.push(place);
+            ),
+        ),
+      );
     }
 
     return db

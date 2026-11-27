@@ -351,7 +351,7 @@ test("opening a posting scores it once, and manual apply works below the thresho
       roles: ["Backend"],
       seniorities: ["senior"],
       workplaces: ["remote"],
-      locations: ["Toronto, ON", "Vancouver, BC"],
+      locations: ["city:ca:toronto", "city:ca:vancouver"],
       employmentTypes: ["full_time"],
       salaryFloorMinor: 10_000_000,
       salaryCurrency: "CAD",
@@ -363,7 +363,9 @@ test("opening a posting scores it once, and manual apply works below the thresho
 
   expect(rescored.score).toBe(87);
   expect(matching.anthropic.requests()).toHaveLength(3);
-  expect(matching.anthropic.requests().at(2)?.user).toContain("Toronto, ON or Vancouver, BC");
+  expect(matching.anthropic.requests().at(2)?.user).toContain(
+    "Toronto, Ontario, Canada or Vancouver, British Columbia, Canada",
+  );
 
   const reopenedAgain = postingSchema.parse(
     await (await owner.get(`/api/postings/${strong}`)).json(),

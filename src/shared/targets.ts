@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { placeIdSchema } from "./places.ts";
 import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "./tag-taxonomy.ts";
 
 export const MAX_TARGET_ROLES = 20;
@@ -7,7 +8,8 @@ export const MAX_TARGET_LOCATIONS = 20;
 
 export const targetRoleSchema = z.string().trim().min(1).max(80);
 
-export const targetLocationSchema = z.string().trim().min(2).max(120);
+/** A saved location is a canonical place id; free text is never stored as one (issue #683). */
+export const targetLocationSchema = placeIdSchema;
 
 export const salaryCurrencySchema = z
   .string()
@@ -21,6 +23,10 @@ export const targetsInputSchema = z
     seniorities: z.array(z.enum(SENIORITIES)).max(SENIORITIES.length),
     workplaces: z.array(z.enum(WORKPLACES)).max(WORKPLACES.length),
     locations: z.array(targetLocationSchema).max(MAX_TARGET_LOCATIONS),
+    unresolvedLocations: z
+      .array(z.string().trim().min(2).max(120))
+      .max(MAX_TARGET_LOCATIONS)
+      .default([]),
     employmentTypes: z.array(z.enum(EMPLOYMENT_TYPES)).max(EMPLOYMENT_TYPES.length),
     salaryFloorMinor: z.number().int().nonnegative().max(100_000_000_000).nullable(),
     salaryCurrency: salaryCurrencySchema.nullable(),
@@ -52,6 +58,22 @@ export const targetsInputSchema = z
         code: "custom",
         message: "locations must be unique",
         path: ["locations"],
+      });
+    }
+
+    if (new Set(value.unresolvedLocations).size !== value.unresolvedLocations.length) {
+      context.addIssue({
+        code: "custom",
+        message: "unresolved locations must be unique",
+        path: ["unresolvedLocations"],
+      });
+    }
+
+    if (value.unresolvedLocations.some((location) => value.locations.includes(location))) {
+      context.addIssue({
+        code: "custom",
+        message: "a location is either resolved or unresolved, not both",
+        path: ["unresolvedLocations"],
       });
     }
   });
@@ -100,6 +122,7 @@ export const emptyTargets: Targets = {
   seniorities: [],
   workplaces: [],
   locations: [],
+  unresolvedLocations: [],
   employmentTypes: [],
   salaryFloorMinor: null,
   salaryCurrency: null,
