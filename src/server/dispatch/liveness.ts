@@ -1,9 +1,7 @@
 import { z } from "zod";
 
 import type { Ats as RegistryAts } from "../../shared/ats.ts";
-import { isBatchFourAts, isWaveTwoAts } from "../../shared/ats.ts";
 import type { BoardRegion } from "../catalog/board-feed.ts";
-import type { Env } from "../config/env.ts";
 
 import { ASHBY_DEFAULT_BASE_URL } from "../catalog/ashby-feed.ts";
 import { GREENHOUSE_DEFAULT_BASE_URL } from "../catalog/greenhouse-feed.ts";
@@ -13,6 +11,14 @@ import { limiterFor } from "../catalog/rate-limiter.ts";
 export const POSTING_LIVENESS = ["open", "closed", "unknown"] as const;
 
 export type PostingLiveness = (typeof POSTING_LIVENESS)[number];
+
+/** The feed base URLs the liveness checker may ask. Any board without one is unknown, never closed. */
+export interface LivenessEnv {
+  GREENHOUSE_FEED_BASE_URL?: string | undefined;
+  LEVER_EU_FEED_BASE_URL?: string | undefined;
+  LEVER_FEED_BASE_URL?: string | undefined;
+  ASHBY_FEED_BASE_URL?: string | undefined;
+}
 
 export interface LivenessTarget {
   ats: RegistryAts | "workable";
@@ -73,7 +79,7 @@ async function fetchJson(url: string) {
  * @param env The environment holding the feed base URLs.
  * @returns The liveness checker every dispatch tick uses.
  */
-export function createPostingLiveness(env: Env) {
+export function createPostingLiveness(env: LivenessEnv) {
   const greenhouseBase = (env.GREENHOUSE_FEED_BASE_URL ?? GREENHOUSE_DEFAULT_BASE_URL).replace(
     /\/+$/u,
     "",
@@ -135,23 +141,27 @@ export function createPostingLiveness(env: Env) {
 
   return {
     check: async (target) => {
-      if (target.ats === "workable") {
-        return "open";
-      }
+      switch (target.ats) {
+        case "workable": {
+          return "open";
+        }
 
-      if (target.ats === "personio" || isBatchFourAts(target.ats) || isWaveTwoAts(target.ats)) {
-        return "unknown";
-      }
+        case "greenhouse": {
+          return greenhouse(target);
+        }
 
-      if (target.ats === "greenhouse") {
-        return greenhouse(target);
-      }
+        case "lever": {
+          return lever(target);
+        }
 
-      if (target.ats === "lever") {
-        return lever(target);
-      }
+        case "ashby": {
+          return ashby(target);
+        }
 
-      return ashby(target);
+        default: {
+          return "unknown";
+        }
+      }
     },
   } satisfies PostingLivenessChecker;
 }

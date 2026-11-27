@@ -166,24 +166,21 @@ export const runGreenhouseAttempt: (
   const { resume } = plan;
   const resumeField = plan.fields.find((field) => isResumeField(field));
 
-  const fillFrom: (index: number) => Promise<boolean> = async (index) => {
+  const fillFrom: (index: number) => Promise<void> = async (index) => {
     const field = plan.fields[index];
 
     if (field === undefined) {
-      return true;
+      return;
     }
 
-    if (field.fieldType === "file") {
-      return fillFrom(index + 1);
+    if (field.fieldType !== "file") {
+      await fillSendPlanField(scope, field);
     }
 
-    const filled = await fillSendPlanField(scope, field);
-    const rest = await fillFrom(index + 1);
-
-    return filled && rest;
+    await fillFrom(index + 1);
   };
 
-  const fillFailed = !(await fillFrom(0));
+  await fillFrom(0);
 
   if (resume !== null) {
     const resumeFieldId =
@@ -230,23 +227,20 @@ export const runGreenhouseAttempt: (
     })),
   );
 
-  if (verdict.outcome !== "ok" || fillFailed) {
-    const problems =
-      verdict.outcome === "ok"
-        ? []
-        : verdict.problems.map((problem) => ({
-            answer: problem.answer,
-            fieldName: problem.fieldName,
-            fieldType: problem.fieldType,
-            kind: problem.kind,
-            label: problem.label,
-            options: problem.options,
-            unexpected: problem.unexpected,
-          }));
+  if (verdict.outcome !== "ok") {
+    const problems = verdict.problems.map((problem) => ({
+      answer: problem.answer,
+      fieldName: problem.fieldName,
+      fieldType: problem.fieldType,
+      kind: problem.kind,
+      label: problem.label,
+      options: problem.options,
+      unexpected: problem.unexpected,
+    }));
 
     return {
       confirmationSeen: false,
-      outcome: verdict.outcome === "ok" ? "form_changed" : verdict.outcome,
+      outcome: verdict.outcome,
       preflight: problems,
       submitMayHaveLanded: false,
       submitResponseStatus: null,

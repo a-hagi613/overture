@@ -2,6 +2,8 @@ import { and, asc, count, eq, gte, inArray, isNotNull, isNull, lte, sql } from "
 
 import { z } from "zod";
 
+import { isApplySupportedAts } from "../../shared/ats.ts";
+import type { ApplySupportedAts } from "../../shared/ats.ts";
 import type { BoardRegion } from "../catalog/board-feed.ts";
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -25,6 +27,7 @@ import { applicationsLeft, dailyUsageSince, isOnboardingTrial } from "../billing
 import { skipClosedPostingApplications } from "../catalog/posting-close.ts";
 import { enqueueJob } from "../platform/jobs/queue.ts";
 import { getSetting } from "../platform/settings/index.ts";
+import { logInfo } from "../platform/log.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { localDayStart } from "../platform/local-time.ts";
 import { approvalProblem, openApprovedPlan } from "../pipeline/approved-plan.ts";
@@ -68,27 +71,10 @@ interface Block {
   reason: string;
 }
 
-const DISPATCHABLE_ATS = [
-  "greenhouse",
-  "lever",
-  "ashby",
-  "workable",
-  "hiringthing",
-  "rippling",
-  "gem",
-  "isolved_hire",
-  "applicantpro",
-  "catsone",
-  "onlyfy",
-  "varbi",
-  "jobvite",
-  "herp",
-] as const;
-
-type DispatchAts = (typeof DISPATCHABLE_ATS)[number];
+type DispatchAts = ApplySupportedAts;
 
 function isDispatchAts(ats: string): ats is DispatchAts {
-  return DISPATCHABLE_ATS.some((name) => name === ats);
+  return isApplySupportedAts(ats);
 }
 
 interface Candidate {
@@ -660,9 +646,10 @@ export function createDispatcherTick(deps: DispatchDeps) {
       }
 
       if (status === "unknown") {
-        summary.blocked += 1;
-
-        continue;
+        logInfo(
+          "dispatch.liveness",
+          `application ${candidate.id} on ${candidate.ats}: posting liveness unknown; sending anyway`,
+        );
       }
 
       const approved = approvalPlans.get(candidate.id) ?? null;

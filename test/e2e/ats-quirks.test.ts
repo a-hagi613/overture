@@ -9,6 +9,7 @@ import {
   ashbyOverwritePage,
   ashbyResumePage,
   ashbyYesNoPage,
+  greenhouseLiveFormPage,
   greenhousePage,
   leverLocationPage,
   leverResumeAutofillPage,
@@ -139,6 +140,120 @@ test("Greenhouse fills and submits the classic application_form root, never the 
     });
     expect(server.posts[0]?.files).toEqual({ resume: "resume-board.pdf" });
     expect(server.posts.some((post) => post.path === "/decoy")).toBe(false);
+  } finally {
+    server.close();
+  }
+});
+
+test("a live-shaped Greenhouse form sends after the resume, selects and phone defaults settle", async ({
+  page,
+}) => {
+  const server = startAtsPage(greenhouseLiveFormPage("/example/jobs/1"));
+
+  try {
+    const plan = {
+      fields: [
+        answered("first_name", "text", "First name", "Maya"),
+        answered("email", "email", "Email", "maya.okafor@example.com"),
+        answered("phone", "phone", "Phone", "+1 416 555 0199"),
+        answered("country", "select", "Country", "Canada", {
+          options: ["Canada", "United States"],
+        }),
+        answered("candidate-location", "select", "Location (City)", "Ottawa", {
+          options: ["Ottawa", "Toronto"],
+        }),
+        field("", "file", "Resume/CV", {
+          answerKind: "fact",
+          file: "resume",
+          required: true,
+        }),
+      ],
+      identity: {
+        ats: "greenhouse" as const,
+        boardToken: "example",
+        companyName: "Example",
+        jobId: "1",
+        url: `${server.url}/example/jobs/1`,
+      },
+      resume: { ...resumeUpload, fieldName: "resume_upload" },
+    };
+
+    const run = await runGreenhouseAttempt(page, plan, {
+      ...silentHooks,
+      onCodeTyped: () => undefined,
+      requestCode: async () => {
+        await Promise.resolve();
+
+        return null;
+      },
+    });
+
+    expect(run.outcome).toBe("sent");
+    expect(server.posts).toHaveLength(1);
+    expect(server.posts[0]?.fields).toMatchObject({
+      candidate_location: "ottawa",
+      country_field: "CA",
+      email: "maya.okafor@example.com",
+      first_name: "Maya",
+      phone_number: "+1 416 555 0199",
+    });
+    expect(server.posts[0]?.files).toEqual({ resume_file: "resume-board.pdf" });
+  } finally {
+    server.close();
+  }
+});
+
+test("a genuinely changed live Greenhouse form still stops before Submit", async ({ page }) => {
+  const server = startAtsPage(greenhouseLiveFormPage("/example/jobs/1", { changed: true }));
+
+  try {
+    const plan = {
+      fields: [
+        answered("first_name", "text", "First name", "Maya"),
+        answered("email", "email", "Email", "maya.okafor@example.com"),
+        answered("phone", "phone", "Phone", "+1 416 555 0199"),
+        answered("country", "select", "Country", "Canada", {
+          options: ["Canada", "United States"],
+        }),
+        answered("candidate-location", "select", "Location (City)", "Ottawa", {
+          options: ["Ottawa", "Toronto"],
+        }),
+        field("", "file", "Resume/CV", {
+          answerKind: "fact",
+          file: "resume",
+          required: true,
+        }),
+      ],
+      identity: {
+        ats: "greenhouse" as const,
+        boardToken: "example",
+        companyName: "Example",
+        jobId: "1",
+        url: `${server.url}/example/jobs/1`,
+      },
+      resume: { ...resumeUpload, fieldName: "resume_upload" },
+    };
+
+    const run = await runGreenhouseAttempt(page, plan, {
+      ...silentHooks,
+      onCodeTyped: () => undefined,
+      requestCode: async () => {
+        await Promise.resolve();
+
+        return null;
+      },
+    });
+
+    expect(run.outcome).toBe("form_changed");
+    expect(server.posts).toHaveLength(0);
+    expect(
+      run.preflight?.map((problem) => `${problem.kind}:${problem.fieldName ?? problem.label}`),
+    ).toEqual(
+      expect.arrayContaining([
+        "option_not_selected:country",
+        "option_not_selected:candidate-location",
+      ]),
+    );
   } finally {
     server.close();
   }
