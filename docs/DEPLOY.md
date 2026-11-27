@@ -52,22 +52,33 @@ existing `workflow_run` trigger at the cost of a full CI run. A PAT or GitHub Ap
 
 Exactly once:
 
+- Each job sets its own `concurrency` group. The `arm` job's group cancels a superseded run
+  (`cancel-in-progress: true`), but the `deploy` job's group (`auto-merge-deploy-<number>`) never cancels a run in
+  progress: a push or label event during CI replaces the *pending* waiter, not the one watching. A workflow-level
+  concurrency group would cancel every job in the run, including that waiter, which is why there is none.
+- The `deploy` job does not depend on the `arm` job: a run created by an event on an already-merged pull request skips
+  `arm`, and the dispatch must still happen then. Its own condition is the base branch, a non-draft pull request and
+  no `do-not-auto-merge` label; the state check happens in the step.
+- A merge by a person or a user token is left to the push CI path: the step reads `mergedBy` and exits unless the
+  merge was completed by `app/github-actions`, because only that merge starts no run and needs the dispatch.
 - The dispatched deploy ships the squash commit whose tree passed `ci-ok` on the pull request: the ruleset requires a
   branch up to date with `main` and a squash merge, so the merge commit's tree is the tested tree and nothing untested
   reaches production.
-- The `deploy` job watches *its own* pull request. A pull request that closes without merging, or that has not
-  merged after 60 minutes, exits without dispatching.
+- The step watches *its own* pull request. A pull request that closes without merging, or that has not merged after
+  60 minutes, exits without dispatching.
 - It does not dispatch when `main` has moved past the merge commit: that later merge's own job deploys the newer
   HEAD, which contains this tree.
-- It skips when Deploy already has a run for that commit (`gh run list`), so a re-run or two merges in one window
-  cannot deploy one tree twice.
+- It skips when Deploy already has a run for that commit (`gh run list`), so a re-run, a superseded waiter or two
+  merges in one window cannot deploy one tree twice.
 - `deploy.yml` keeps `concurrency: group: deploy-main, cancel-in-progress: false`: only one `flyctl deploy` runs at
   a time, a queued run waits instead of cancelling, and it deploys whatever `main` is when it starts. A failed or
   cancelled Deploy is not retried automatically; an operator re-runs `gh workflow run deploy.yml --ref main`.
 
-Both workflows are checked by `bun test scripts/workflow-config-guard.test.ts`: the dispatch job may not gain
-`actions: write` at the workflow level, the deploy jobs must keep accepting a dispatched run, and the checkout ref
-must stay `github.event.workflow_run.head_sha || github.sha`.
+Both workflows are checked by `bun test scripts/workflow-config-guard.test.ts`: auto-merge may not gain a
+workflow-level concurrency group, `actions: write` may not move to the workflow level, the dispatch job may not depend
+on another job or require an open pull request, and its group must stay per-pull-request with
+`cancel-in-progress: false`; the deploy jobs must keep accepting a dispatched run, and the checkout ref must stay
+`github.event.workflow_run.head_sha || github.sha`.
 
 ## One-time human steps
 
