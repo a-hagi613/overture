@@ -7,10 +7,17 @@ import type { Clock } from "../platform/ports/clock.ts";
 
 import { catalogPostingFlags } from "../platform/db/schema.ts";
 
-export interface PostingFlagRow {
-  postingId: string;
-  flagReason: PostingFlagReason;
-  failCount: number;
+const FLAG_COLUMNS = {
+  failCount: catalogPostingFlags.failCount,
+  flagReason: catalogPostingFlags.flagReason,
+};
+
+function flagRow(db: AppDatabase, postingId: string) {
+  return db
+    .select(FLAG_COLUMNS)
+    .from(catalogPostingFlags)
+    .where(eq(catalogPostingFlags.postingId, postingId))
+    .get();
 }
 
 /**
@@ -45,19 +52,13 @@ export function recordPostingFailure(
     })
     .run();
 
-  const row = db
-    .select({
-      flagReason: catalogPostingFlags.flagReason,
-      failCount: catalogPostingFlags.failCount,
-    })
-    .from(catalogPostingFlags)
-    .where(eq(catalogPostingFlags.postingId, input.postingId))
-    .get();
-
+  const row = flagRow(db, input.postingId);
   const failCount = row?.failCount ?? 1;
-  const flagged = isPostingFlagged(row?.flagReason ?? input.reason, failCount);
 
-  return { failCount, flagged };
+  return {
+    failCount,
+    flagged: isPostingFlagged(row?.flagReason ?? input.reason, failCount),
+  };
 }
 
 /**
@@ -67,11 +68,7 @@ export function recordPostingFailure(
  */
 export function flaggedPostingIds(db: AppDatabase) {
   const rows = db
-    .select({
-      postingId: catalogPostingFlags.postingId,
-      flagReason: catalogPostingFlags.flagReason,
-      failCount: catalogPostingFlags.failCount,
-    })
+    .select({ postingId: catalogPostingFlags.postingId, ...FLAG_COLUMNS })
     .from(catalogPostingFlags)
     .all();
 
@@ -80,25 +77,6 @@ export function flaggedPostingIds(db: AppDatabase) {
       .filter((row) => isPostingFlagged(row.flagReason, row.failCount))
       .map((row) => row.postingId),
   );
-}
-
-/**
- * Whether one Posting is currently flagged out of candidate matching.
- * @param db the application database
- * @param postingId the catalog Posting id
- * @returns whether the Posting is flagged at or over its reason's threshold
- */
-export function isPostingFlaggedForMatching(db: AppDatabase, postingId: string) {
-  const row = db
-    .select({
-      flagReason: catalogPostingFlags.flagReason,
-      failCount: catalogPostingFlags.failCount,
-    })
-    .from(catalogPostingFlags)
-    .where(eq(catalogPostingFlags.postingId, postingId))
-    .get();
-
-  return row === undefined ? false : isPostingFlagged(row.flagReason, row.failCount);
 }
 
 /**

@@ -118,14 +118,19 @@ export function createResumeService(deps: {
     return rows.at(0);
   }
 
-  async function toRecord(userId: string, row: typeof resumes.$inferSelect) {
-    const filename =
+  async function filenameOf(userId: string, row: typeof resumes.$inferSelect) {
+    return (
       (await openOrNull({
         personal,
         scope: resumeScope(row.id, "filename_enc"),
         sealed: row.filenameEnc,
         userId,
-      })) ?? "resume.pdf";
+      })) ?? "resume.pdf"
+    );
+  }
+
+  async function toRecord(userId: string, row: typeof resumes.$inferSelect) {
+    const filename = await filenameOf(userId, row);
 
     const text =
       (await openOrNull({
@@ -236,15 +241,7 @@ export function createResumeService(deps: {
       return null;
     }
 
-    const filename =
-      (await openOrNull({
-        personal,
-        scope: resumeScope(row.id, "filename_enc"),
-        sealed: row.filenameEnc,
-        userId,
-      })) ?? "resume.pdf";
-
-    return { bytes: bytesFromBase64(base64), filename };
+    return { bytes: bytesFromBase64(base64), filename: await filenameOf(userId, row) };
   }
 
   return {

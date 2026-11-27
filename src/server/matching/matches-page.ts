@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 
-import { companies, postings } from "../platform/db/catalog-schema.ts";
-import { applications, jobs } from "../platform/db/schema.ts";
-import { matchBandOf, orderedMatches } from "./match-sort.ts";
+import { applications } from "../platform/db/schema.ts";
+import { matchBandOf, orderedMatchesWithPending } from "./match-sort.ts";
 import { readStoredMatches } from "./match-store.ts";
+import { openPostingDisplayRows } from "./posting-display.ts";
 
 /** One row of the Matches table: a stored score and its stored reasons, or "Scoring…". */
 export interface MatchesPageRow {
@@ -33,8 +33,9 @@ export interface MatchesPageView {
   totalPages: number;
 }
 
-const POSTING_CHUNK = 400;
 const MAX_REASONS = 3;
+
+const BAND_BY_LABEL = { Good: "good", Possible: "possible", Strong: "strong" } as const;
 
 const REASON_BOUNDARY = /(?<=[.!?])\s+/u;
 
@@ -86,56 +87,6 @@ export function reasonsOf(stored: string | null) {
     .slice(0, MAX_REASONS);
 }
 
-interface DisplayRow {
-  company: string;
-  id: string;
-  location: string | null;
-  postedAt: number | null;
-  title: string;
-}
-
-function displayRowsOf(
-  deps: { db: AppDatabase; catalogDb: CatalogDatabase },
-  ids: readonly string[],
-) {
-  const found = new Map<string, DisplayRow>();
-
-  for (let start = 0; start < ids.length; start += POSTING_CHUNK) {
-    const chunk = ids.slice(start, start + POSTING_CHUNK);
-
-    for (const row of deps.db
-      .select({
-        company: jobs.company,
-        id: jobs.id,
-        location: jobs.locationRaw,
-        postedAt: jobs.postedAt,
-        title: jobs.title,
-      })
-      .from(jobs)
-      .where(and(inArray(jobs.id, chunk), eq(jobs.status, "open")))
-      .all()) {
-      found.set(row.id, row);
-    }
-
-    for (const row of deps.catalogDb
-      .select({
-        company: companies.name,
-        id: postings.id,
-        location: postings.locationRaw,
-        postedAt: postings.postedAt,
-        title: postings.title,
-      })
-      .from(postings)
-      .innerJoin(companies, eq(companies.id, postings.companyId))
-      .where(and(inArray(postings.id, chunk), eq(postings.status, "open")))
-      .all()) {
-      found.set(row.id, row);
-    }
-  }
-
-  return found;
-}
-
 function applicationIdsOf(db: AppDatabase, userId: string, ids: readonly string[]) {
   if (ids.length === 0) {
     return new Map<string, string>();
@@ -153,15 +104,7 @@ function applicationIdsOf(db: AppDatabase, userId: string, ids: readonly string[
 function bandOf(score: number | null) {
   const band = score === null ? null : matchBandOf(score);
 
-  if (band === "Strong") {
-    return "strong";
-  }
-
-  if (band === "Good") {
-    return "good";
-  }
-
-  return band === "Possible" ? "possible" : null;
+  return band === null ? null : BAND_BY_LABEL[band];
 }
 
 function safePageSize(pageSize: number) {
@@ -179,34 +122,14 @@ function pageRowsOf(deps: { db: AppDatabase; catalogDb: CatalogDatabase }, userI
     return [];
   }
 
-  const display = displayRowsOf(
+  const display = openPostingDisplayRows(
     deps,
     stored.map((row) => row.id),
   );
 
-  const resolved = stored.flatMap((row) => {
-    const posting = display.get(row.id);
+  const ordered = orderedMatchesWithPending(stored.filter((row) => display.has(row.id)));
 
-    return posting === undefined ? [] : [{ display: posting, stored: row }];
-  });
-
-  const scored = orderedMatches(resolved.map((row) => row.stored));
-  const scoredIds = new Set(scored.map((row) => row.id));
-
-  const unscored = resolved
-    .map((row) => row.stored)
-    .filter((row) => row.score === null && row.blockers.length === 0 && !scoredIds.has(row.id))
-    .toSorted((left, right) => {
-      if (left.codeRank !== right.codeRank) {
-        return right.codeRank - left.codeRank;
-      }
-
-      const posted = (right.postedAt ?? 0) - (left.postedAt ?? 0);
-
-      return posted === 0 ? left.id.localeCompare(right.id) : posted;
-    });
-
-  const rows: MatchesPageRow[] = [...scored, ...unscored].flatMap((row) => {
+  const rows: MatchesPageRow[] = ordered.flatMap((row) => {
     const posting = display.get(row.id);
 
     return posting === undefined

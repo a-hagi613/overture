@@ -27,22 +27,24 @@ export function createLanguagesService(deps: { db: AppDatabase; clock: Clock }) 
   async function save(userId: string, input: z.input<typeof profileSettingsInputSchema>) {
     const { languages, timezone } = profileSettingsInputSchema.parse(input);
     const zone = await zones.plan(userId, timezone);
+    const stored = JSON.stringify(languages);
+    const at = new Date(clock.now());
 
     await db
       .insert(profiles)
       .values({
         userId,
-        languages: JSON.stringify(languages),
+        languages: stored,
         ...zone,
-        createdAt: new Date(clock.now()),
-        updatedAt: new Date(clock.now()),
+        createdAt: at,
+        updatedAt: at,
       })
       .onConflictDoUpdate({
         target: profiles.userId,
         set: {
-          languages: JSON.stringify(languages),
+          languages: stored,
           ...zone,
-          updatedAt: new Date(clock.now()),
+          updatedAt: at,
         },
       });
 
@@ -51,18 +53,20 @@ export function createLanguagesService(deps: { db: AppDatabase; clock: Clock }) 
 
   async function saveLanguages(userId: string, input: z.input<typeof languagesInputSchema>) {
     const { languages } = languagesInputSchema.parse(input);
+    const stored = JSON.stringify(languages);
+    const at = new Date(clock.now());
 
     await db
       .insert(profiles)
       .values({
         userId,
-        languages: JSON.stringify(languages),
-        createdAt: new Date(clock.now()),
-        updatedAt: new Date(clock.now()),
+        languages: stored,
+        createdAt: at,
+        updatedAt: at,
       })
       .onConflictDoUpdate({
         target: profiles.userId,
-        set: { languages: JSON.stringify(languages), updatedAt: new Date(clock.now()) },
+        set: { languages: stored, updatedAt: at },
       });
 
     return (await read(userId)).languages;

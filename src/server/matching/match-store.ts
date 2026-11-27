@@ -131,27 +131,19 @@ export function writePendingMatch(
     descriptionHash: string | null;
   },
 ) {
+  const fields = {
+    codeRank: input.codeRank,
+    companyKey: input.companyKey,
+    descriptionHash: input.descriptionHash,
+    exactRole: input.exactRole,
+    postedAt: input.postedAt,
+  };
+
   db.insert(matches)
-    .values({
-      codeRank: input.codeRank,
-      companyKey: input.companyKey,
-      descriptionHash: input.descriptionHash,
-      exactRole: input.exactRole,
-      postingId: input.jobId,
-      postedAt: input.postedAt,
-      userId: input.userId,
-    })
+    .values({ ...fields, postingId: input.jobId, userId: input.userId })
     .onConflictDoUpdate({
       target: [matches.userId, matches.postingId],
-      set: {
-        codeRank: input.codeRank,
-        companyKey: input.companyKey,
-        descriptionHash: input.descriptionHash,
-        exactRole: input.exactRole,
-        postedAt: input.postedAt,
-        scoredAt: null,
-        score: null,
-      },
+      set: { ...fields, scoredAt: null, score: null },
     })
     .run();
 }
@@ -181,49 +173,31 @@ export function writeScoredMatch(
   const score = scoreOf(input.reply);
   const scoredAt = clock.now();
 
+  const scored = {
+    blockers: JSON.stringify(input.reply.blockers),
+    codeRank: input.codeRank,
+    companyKey: input.companyKey,
+    descriptionHash: input.identity.descriptionHash,
+    exactRole: input.exactRole,
+    level: input.reply.level,
+    logistics: input.reply.logistics,
+    postedAt: input.postedAt,
+    reason: input.reply.reasons[0] ?? null,
+    reasons: JSON.stringify(input.reply.reasons),
+    resumeId: input.identity.resumeId,
+    roleFit: input.reply.role_fit,
+    score,
+    scoredAt,
+    scorerVersion: input.identity.scorerVersion,
+    skills: input.reply.skills,
+    targetsVersion: input.identity.targetsVersion,
+  };
+
   db.insert(matches)
-    .values({
-      blockers: JSON.stringify(input.reply.blockers),
-      codeRank: input.codeRank,
-      companyKey: input.companyKey,
-      descriptionHash: input.identity.descriptionHash,
-      exactRole: input.exactRole,
-      level: input.reply.level,
-      logistics: input.reply.logistics,
-      postingId: input.jobId,
-      postedAt: input.postedAt,
-      reason: input.reply.reasons[0] ?? null,
-      reasons: JSON.stringify(input.reply.reasons),
-      resumeId: input.identity.resumeId,
-      roleFit: input.reply.role_fit,
-      score,
-      scoredAt,
-      scorerVersion: input.identity.scorerVersion,
-      skills: input.reply.skills,
-      targetsVersion: input.identity.targetsVersion,
-      userId: input.userId,
-    })
+    .values({ ...scored, postingId: input.jobId, userId: input.userId })
     .onConflictDoUpdate({
       target: [matches.userId, matches.postingId],
-      set: {
-        blockers: JSON.stringify(input.reply.blockers),
-        codeRank: input.codeRank,
-        companyKey: input.companyKey,
-        descriptionHash: input.identity.descriptionHash,
-        exactRole: input.exactRole,
-        level: input.reply.level,
-        logistics: input.reply.logistics,
-        postedAt: input.postedAt,
-        reason: input.reply.reasons[0] ?? null,
-        reasons: JSON.stringify(input.reply.reasons),
-        resumeId: input.identity.resumeId,
-        roleFit: input.reply.role_fit,
-        score,
-        scoredAt,
-        scorerVersion: input.identity.scorerVersion,
-        skills: input.reply.skills,
-        targetsVersion: input.identity.targetsVersion,
-      },
+      set: scored,
     })
     .run();
 

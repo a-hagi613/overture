@@ -139,32 +139,38 @@ function reviewsAnsweredBy(
   );
 }
 
-const CURRENCY_BY_COUNTRY = {
-  AT: "EUR",
-  AU: "AUD",
-  BE: "EUR",
-  CA: "CAD",
-  CH: "CHF",
-  DE: "EUR",
-  DK: "DKK",
-  ES: "EUR",
-  FI: "EUR",
-  FR: "EUR",
-  GB: "GBP",
-  IE: "EUR",
-  IN: "INR",
-  IT: "EUR",
-  NL: "EUR",
-  NO: "NOK",
-  NZ: "NZD",
-  PT: "EUR",
-  SE: "SEK",
-  SG: "SGD",
-  US: "USD",
-} as const satisfies Record<string, string>;
+const CURRENCY_BY_COUNTRY = new Map<string, string>([
+  ["AT", "EUR"],
+  ["AU", "AUD"],
+  ["BE", "EUR"],
+  ["CA", "CAD"],
+  ["CH", "CHF"],
+  ["DE", "EUR"],
+  ["DK", "DKK"],
+  ["ES", "EUR"],
+  ["FI", "EUR"],
+  ["FR", "EUR"],
+  ["GB", "GBP"],
+  ["IE", "EUR"],
+  ["IN", "INR"],
+  ["IT", "EUR"],
+  ["NL", "EUR"],
+  ["NO", "NOK"],
+  ["NZ", "NZD"],
+  ["PT", "EUR"],
+  ["SE", "SEK"],
+  ["SG", "SGD"],
+  ["US", "USD"],
+]);
 
 function currencyForCountry(code: string) {
-  return Object.entries(CURRENCY_BY_COUNTRY).find(([country]) => country === code)?.[1];
+  return CURRENCY_BY_COUNTRY.get(code);
+}
+
+function addUnique(values: string[], value: string) {
+  if (!values.includes(value)) {
+    values.push(value);
+  }
 }
 
 export function currenciesFor(input: {
@@ -176,17 +182,15 @@ export function currenciesFor(input: {
   const currencies = [...input.queued];
 
   for (const currency of input.salaryCurrencies) {
-    if (!currencies.includes(currency)) {
-      currencies.push(currency);
-    }
+    addUnique(currencies, currency);
   }
 
   if (currencies.length === 0 && input.inferCountries) {
     for (const code of input.countryCodes) {
       const currency = currencyForCountry(code);
 
-      if (currency !== undefined && !currencies.includes(currency)) {
-        currencies.push(currency);
+      if (currency !== undefined) {
+        addUnique(currencies, currency);
       }
     }
   }
@@ -215,6 +219,27 @@ export function homeCountryCode(facts: readonly FactRecord[]) {
 
 function targetCountryCodes(targets: Targets) {
   return countryCodesOfPlaceIds(targets.locations);
+}
+
+function addCountryCode(countryCodes: string[], code: string) {
+  if (code !== "") {
+    addUnique(countryCodes, code);
+  }
+}
+
+function pushTextFact(
+  key: string,
+  value: string | undefined,
+  saved: { key: string; scope: string; value: string }[],
+  removed: { key: string; scope: string | null }[],
+) {
+  const trimmed = value?.trim() ?? "";
+
+  if (trimmed !== "") {
+    saved.push({ key, scope: "", value: trimmed });
+  } else if (value !== undefined) {
+    removed.push({ key, scope: null });
+  }
 }
 
 export function createOnboardingStepService(deps: {
@@ -314,22 +339,14 @@ export function createOnboardingStepService(deps: {
     const countryCodes = targetCountryCodes(targets);
 
     for (const review of open) {
-      if (
-        review.factKey === ONBOARDING_QUESTION_FACT_KEYS.workAuth &&
-        review.scope !== "" &&
-        !countryCodes.includes(review.scope)
-      ) {
-        countryCodes.push(review.scope);
+      if (review.factKey === ONBOARDING_QUESTION_FACT_KEYS.workAuth) {
+        addCountryCode(countryCodes, review.scope);
       }
     }
 
     for (const fact of facts) {
-      if (
-        fact.key === ONBOARDING_QUESTION_FACT_KEYS.workAuth &&
-        fact.scope !== "" &&
-        !countryCodes.includes(fact.scope)
-      ) {
-        countryCodes.push(fact.scope);
+      if (fact.key === ONBOARDING_QUESTION_FACT_KEYS.workAuth) {
+        addCountryCode(countryCodes, fact.scope);
       }
     }
 
@@ -424,21 +441,8 @@ export function createOnboardingStepService(deps: {
     const saved: { key: string; scope: string; value: string }[] = [];
     const removed: { key: string; scope: string | null }[] = [];
 
-    const jobTitle = input.jobTitle?.trim() ?? "";
-
-    if (jobTitle !== "") {
-      saved.push({ key: ONBOARDING_QUESTION_FACT_KEYS.jobTitle, scope: "", value: jobTitle });
-    } else if (input.jobTitle !== undefined) {
-      removed.push({ key: ONBOARDING_QUESTION_FACT_KEYS.jobTitle, scope: null });
-    }
-
-    const hear = input.hear?.trim() ?? "";
-
-    if (hear !== "") {
-      saved.push({ key: ONBOARDING_QUESTION_FACT_KEYS.hear, scope: "", value: hear });
-    } else if (input.hear !== undefined) {
-      removed.push({ key: ONBOARDING_QUESTION_FACT_KEYS.hear, scope: null });
-    }
+    pushTextFact(ONBOARDING_QUESTION_FACT_KEYS.jobTitle, input.jobTitle, saved, removed);
+    pushTextFact(ONBOARDING_QUESTION_FACT_KEYS.hear, input.hear, saved, removed);
 
     for (const answer of input.workAuth ?? []) {
       const value = answer.value.trim();

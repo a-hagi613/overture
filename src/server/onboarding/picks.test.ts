@@ -218,6 +218,28 @@ describe("the durable pick snapshot", () => {
   });
 });
 
+describe("the failure reason a pick view shows", () => {
+  test("shows a stored pick failure reason and drops one the contract does not know", () => {
+    const { db, picks } = seed();
+
+    picks.save("user-1", ["posting-0", "posting-1"]);
+
+    db.update(onboardingPicks)
+      .set({ statusReason: "prepare_failed" })
+      .where(eq(onboardingPicks.postingId, "posting-0"))
+      .run();
+    db.update(onboardingPicks)
+      .set({ statusReason: "not_a_reason" })
+      .where(eq(onboardingPicks.postingId, "posting-1"))
+      .run();
+
+    const byPosting = new Map(picks.view("user-1").picks.map((pick) => [pick.postingId, pick]));
+
+    expect(byPosting.get("posting-0")?.reason).toBe("prepare_failed");
+    expect(byPosting.get("posting-1")?.reason).toBeNull();
+  });
+});
+
 describe("the pick status each Application gives", () => {
   test("maps preparation through a question to a finished plan", () => {
     expect(pickStatusOfApplication("preparing", null)).toBe("preparing");

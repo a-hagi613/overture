@@ -75,6 +75,19 @@ export const ONBOARDING_PICK_FAILURE_REASONS = [
 
 export type OnboardingPickFailureReason = (typeof ONBOARDING_PICK_FAILURE_REASONS)[number];
 
+const PICK_FAILURE_REASONS: ReadonlySet<string> = new Set(ONBOARDING_PICK_FAILURE_REASONS);
+
+/**
+ * Whether a stored reason names one of a pick's failure outcomes.
+ * @param value The stored status reason, when the row has one.
+ * @returns True when the value is one of the pick failure reasons.
+ */
+export function isOnboardingPickFailureReason(
+  value: string | null,
+): value is OnboardingPickFailureReason {
+  return value !== null && PICK_FAILURE_REASONS.has(value);
+}
+
 const PICK_STATUS_BY_APPLICATION_STATUS = new Map<string, OnboardingPickStatus>([
   ["approved", "prepared"],
   ["confirming", "prepared"],
