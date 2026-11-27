@@ -9,6 +9,10 @@ import { getSetting } from "../src/server/platform/settings/index.ts";
 const DIAGNOSTIC_ERROR_MAX_CHARS = 2000;
 const LAST_RUNS = 10;
 
+function write(line: string) {
+  process.stdout.write(`${line}\n`);
+}
+
 const args = parseArgs({ options: { db: { type: "string" } }, strict: true });
 
 const databasePath =
@@ -52,4 +56,53 @@ try {
   );
 } finally {
   sqlite.close();
+}
+
+const probeUrl =
+  "https://freehire.me/api/v1/jobs/search?category=backend&countries=ca&cities=Toronto&limit=5&q=Platform+Engineer&q_fields=title";
+
+const apiKey = Bun.env.FREEHIRE_API_KEY ?? "";
+
+const probes: [label: string, headers: Record<string, string>][] = [
+  ["default", {}],
+  ["overture-ua", { "user-agent": "Overture/1.0 (+https://tryoverture.com)" }],
+  [
+    "chrome-ua",
+    {
+      "user-agent":
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    },
+  ],
+];
+
+if (apiKey !== "") {
+  probes.push([
+    "api-key+overture-ua",
+    { authorization: `Bearer ${apiKey}`, "user-agent": "Overture/1.0" },
+  ]);
+}
+
+write("freehire probe from this machine (GET, read-only)");
+
+const probeResults = await Promise.all(
+  probes.map(async ([label, headers]) => {
+    try {
+      const response = await fetch(probeUrl, { headers, signal: AbortSignal.timeout(20_000) });
+      const body = await response.text();
+
+      return {
+        body: body.slice(0, 120),
+        cf_mitigated: response.headers.get("cf-mitigated"),
+        label,
+        ratelimit: response.headers.get("x-ratelimit-limit"),
+        status: response.status,
+      };
+    } catch (error) {
+      return { error: String(error), label };
+    }
+  }),
+);
+
+for (const result of probeResults) {
+  write(JSON.stringify(result));
 }
