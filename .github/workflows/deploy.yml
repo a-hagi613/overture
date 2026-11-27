@@ -165,12 +165,19 @@ jobs:
           REQUIRE_EMAIL_SENDING: ${{ vars.REQUIRE_EMAIL_SENDING }}
         run: |
           set -uo pipefail
-          # A down or unresponsive machine must not hold the deploy-main concurrency group for six hours.
+          # A fresh app (or a zero-machine maintenance window) has nothing to inspect; the post-deploy health gate covers it.
+          started="$(flyctl machine list -a overture-web --json 2>/dev/null | jq -r '[.[] | select(.state == "started")] | length' 2>/dev/null || echo 0)"
+          if [ "${started:-0}" = "0" ]; then
+            echo "::notice::No started machine; skipping the sending-domain check until the app is running."
+            exit 0
+          fi
+          # A down or unresponsive machine must not hold the deploy-main concurrency group for six hours. The check runs
+          # with --smol so a 512 MB machine can start a second Bun alongside the server.
           status=0
-          output="$(timeout 45s flyctl ssh console -a overture-web -C "bun run /app/scripts/onboard-email-sending.ts --check" 2>&1)" || status=$?
+          output="$(timeout 120s flyctl ssh console -a overture-web -C "bun --smol run /app/scripts/onboard-email-sending.ts --check" 2>&1)" || status=$?
           printf '%s\n' "$output"
           if [ "$status" -eq 124 ]; then
-            echo "::warning::The email sending check did not answer within 45s (machine down or unresponsive); treating it as not ready."
+            echo "::warning::The email sending check did not answer within 120s (machine down or unresponsive); treating it as not ready."
           fi
           if grep -q "verdict: ready" <<<"$output"; then
             echo "Cloudflare Email Sending verified."
