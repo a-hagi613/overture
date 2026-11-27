@@ -83,6 +83,20 @@ if (apiKey !== "") {
   ]);
 }
 
+const diagnostics = sqlite
+  .query(
+    `select
+       (select count(*) from targets t left join users u on u.id = t.user_id where u.id is null) as orphan_targets,
+       (select count(*) from profiles p left join users u on u.id = p.user_id where u.id is null) as orphan_profiles,
+       (select count(*) from job_pull_state s left join users u on u.id = s.user_id where u.id is null) as orphan_pull_state,
+       (select count(*) from facts) as facts,
+       (select count(*) from llm_usage where purpose = 'resume_facts') as resume_facts_calls,
+       (select count(*) from llm_usage where purpose = 'resume_pdf') as resume_pdf_calls`,
+  )
+  .get();
+
+write(JSON.stringify({ diagnostics }, null, 2));
+
 write("freehire probe from this machine (GET, read-only)");
 
 const probeResults = await Promise.all(
