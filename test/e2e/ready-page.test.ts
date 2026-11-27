@@ -148,7 +148,7 @@ test("Ready sends only on approval, and the two layers, Edit, Skip, Undo and sav
   await skipToast.getByRole("button", { name: "Undo" }).click();
   await expect(halden).toBeVisible();
 
-  await drawer.getByRole("button", { name: "Close" }).click();
+  await drawer.getByRole("button", { name: "Close", exact: true }).click();
 
   const approved = page.waitForResponse(
     (candidate) =>
