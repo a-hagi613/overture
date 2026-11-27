@@ -4,12 +4,14 @@ import type { TargetsInput } from "../../shared/targets.ts";
 
 import { QUESTION_FIELD_TYPES } from "../../shared/questions.ts";
 import { TIER_2_FACT_KEYS } from "../../shared/facts.ts";
+import { placeSuggestionSchema } from "../../shared/places.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
 
 const targetsResponseSchema = z.object({
   targets: targetsInputSchema,
   version: z.number(),
   matchedCount: z.number(),
+  places: z.array(placeSuggestionSchema),
 });
 
 const matchCountSchema = z.object({ matchedCount: z.number() });

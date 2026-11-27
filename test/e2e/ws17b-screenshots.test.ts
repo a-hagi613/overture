@@ -231,6 +231,16 @@ test.describe("WS-17b review screenshots", () => {
         `profile-targets-${String(width)}-${theme}`,
         page.locator("#profile-targets"),
       );
+
+      await page
+        .getByRole("list", { name: "Locations" })
+        .getByRole("button", { name: "Add location" })
+        .click();
+      await page.getByPlaceholder("Search a city, country, or remote scope").fill("Ottawa");
+      await expect(page.getByRole("option", { name: /^Ottawa/u }).first()).toBeVisible();
+      await shoot(page, `profile-place-picker-${String(width)}-${theme}`, page.locator("body"));
+      await page.keyboard.press("Escape");
+
       await context.close();
     });
 

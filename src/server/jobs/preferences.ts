@@ -7,7 +7,7 @@ import type { AppDatabase } from "../platform/db/client.ts";
 
 import { grants } from "../platform/db/schema.ts";
 import { roleCategoryOf } from "../../shared/role-taxonomy.ts";
-import { countryCodesNamedIn, resolveLocation } from "../catalog/geo.ts";
+import { placeSearchFacets } from "../places/catalog.ts";
 import type { JobSearchQuery } from "./source.ts";
 
 /** The freehire category slugs each Overture role category reaches. One category maps to several freehire ones. */
@@ -71,6 +71,10 @@ export interface PullPreferences {
   regions: readonly string[];
   /** City names as freehire spells them. */
   cities: readonly string[];
+  /** freehire metro names. */
+  metros: readonly string[];
+  /** The canonical place ids the user picked, which the reader matches job places against. */
+  placeIds: readonly string[];
   /** Free-text role targets, searched as title words. */
   titleWords: readonly string[];
 }
@@ -121,37 +125,13 @@ export function titleWordsForRoles(roles: readonly string[]) {
 }
 
 /**
- * Turns saved location strings into freehire's geography facets. Geography is one OR group in freehire, so a user
- * with two places gets both in one query. A location that names no country contributes nothing; freehire is never
- * asked to guess.
- * @param locations The saved location targets.
- * @returns The country, region and city facets.
+ * Turns saved place ids into freehire's geography facets. Geography is one OR group in freehire, so a user with two
+ * places gets both in one query. The same ids are returned for the reader, so the pull and the match use one list.
+ * @param placeIds The saved canonical place ids.
+ * @returns The country, region, metro and city facets plus the ids.
  */
-export function placesForLocations(locations: readonly string[]) {
-  const countries = new Set<string>();
-  const cities = new Set<string>();
-
-  for (const location of locations) {
-    const resolved = resolveLocation(location);
-
-    if (resolved.countryCode === null) {
-      for (const code of countryCodesNamedIn(location)) {
-        countries.add(code.toLowerCase());
-      }
-    } else {
-      countries.add(resolved.countryCode.toLowerCase());
-    }
-
-    if (resolved.city !== null && resolved.city.trim() !== "") {
-      cities.add(resolved.city.trim());
-    }
-  }
-
-  return {
-    cities: [...cities].toSorted(),
-    countries: [...countries].toSorted(),
-    regions: [],
-  };
+export function placesForLocations(placeIds: readonly string[]) {
+  return placeSearchFacets(placeIds);
 }
 
 /**
@@ -166,6 +146,8 @@ export function pullPreferencesFor(targets: Pick<TargetsInput, "roles" | "locati
     categories: categoriesForRoles(targets.roles),
     cities: places.cities,
     countries: places.countries,
+    metros: places.metros,
+    placeIds: places.placeIds,
     regions: places.regions,
     titleWords: titleWordsForRoles(targets.roles),
   };
@@ -183,6 +165,8 @@ export function queryKeyOf(preferences: PullPreferences) {
     [...preferences.countries].toSorted(),
     [...preferences.regions].toSorted(),
     [...preferences.cities].toSorted(),
+    [...preferences.metros].toSorted(),
+    [...preferences.placeIds].toSorted(),
     [...preferences.titleWords].toSorted(),
   ]);
 }
@@ -199,6 +183,7 @@ export function searchQueryFor(preferences: PullPreferences) {
     cities: preferences.cities,
     countries: preferences.countries,
     keywords: preferences.titleWords,
+    metros: preferences.metros,
     regions: preferences.regions,
   } satisfies JobSearchQuery;
 }

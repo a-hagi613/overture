@@ -44,7 +44,7 @@ const baseTargets = {
   roles: ["Backend"],
   seniorities: ["senior"],
   workplaces: ["remote"],
-  locations: ["Ottawa, ON"],
+  locations: ["city:ca:ottawa"],
   employmentTypes: ["full_time"],
   salaryFloorMinor: null,
   salaryCurrency: null,
@@ -263,6 +263,77 @@ test("a granular Level-2 role can be searched and added from Profile targets, an
 
   await expect(page.getByRole("button", { name: "Registered Nurse" })).toBeVisible();
   await expect(page.getByTestId("targets-matched-count")).toHaveText("2");
+
+  const results = await new AxeBuilder({ page }).include("#profile-targets").analyze();
+
+  expect(results.violations).toEqual([]);
+
+  await context.close();
+  await request.dispose();
+});
+
+test("only a picked suggestion becomes a place pill, and an unresolved place can be resolved or dismissed", async ({
+  isolatedAppServer: { url: appServerUrl },
+  browser,
+}) => {
+  await seedPostings(appServerUrl);
+
+  const { request, storageState } = await ownerStorage(appServerUrl);
+
+  await request.put("/api/profile/languages", { data: { languages: ["en"] } });
+  await request.put("/api/profile/targets", {
+    data: { ...baseTargets, locations: [], unresolvedLocations: ["Victoria"] },
+  });
+
+  const context = await browser.newContext({ baseURL: appServerUrl, storageState });
+  const page = await context.newPage();
+
+  await page.goto("/profile/preferences");
+
+  await expect(page.getByText("Places we couldn't match exactly")).toBeVisible();
+  await expect(page.getByText("Victoria", { exact: true })).toBeVisible();
+
+  const add = page
+    .getByRole("list", { name: "Locations" })
+    .getByRole("button", { name: "Add location" });
+
+  await add.click();
+
+  const search = page.getByLabel("Search a city, country, or remote scope");
+
+  await search.fill("Nowhereville");
+  await expect(page.getByText("No matching places. Pick a suggestion to save it.")).toBeVisible();
+  await search.press("Enter");
+  await expect(page.getByRole("button", { name: "Remove Nowhereville" })).toHaveCount(0);
+
+  await search.press("Escape");
+  await expect(search).toHaveCount(0);
+
+  await add.click();
+
+  await search.fill("Ottawa");
+  await expect(search).toHaveValue("Ottawa");
+  await expect(page.getByRole("option", { name: /^Ottawa/u }).first()).toBeVisible();
+
+  await search.press("ArrowDown");
+  await search.press("Enter");
+
+  await expect(page.getByRole("button", { name: "Remove Ottawa" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Save targets" }).click();
+
+  await page.reload();
+
+  await expect(page.getByRole("button", { name: "Remove Ottawa" })).toBeVisible();
+  await expect(page.getByText("Victoria", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Dismiss Victoria" }).click();
+  await page.getByRole("button", { name: "Save targets" }).click();
+
+  await page.reload();
+
+  await expect(page.getByText("Victoria", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Remove Ottawa" })).toBeVisible();
 
   const results = await new AxeBuilder({ page }).include("#profile-targets").analyze();
 

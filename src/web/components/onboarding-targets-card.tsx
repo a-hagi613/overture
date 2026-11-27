@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Link } from "react-router";
 
 import type { OnboardingTargetChoices, OnboardingTargetsView } from "../../shared/onboarding.ts";
+import type { PlaceSuggestion } from "../../shared/places.ts";
 import type { RoleCategoryId } from "../../shared/role-taxonomy.ts";
 import type { Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
@@ -103,6 +104,7 @@ export function OnboardingTargetsCard({
   view: OnboardingTargetsView;
 }) {
   const [draft, setDraft] = useState<TargetsInput>(view.targets);
+  const [places, setPlaces] = useState<PlaceSuggestion[]>(view.places);
   const [salary, setSalary] = useState(() => salaryText(view.targets.salaryFloorMinor));
 
   const [category, setCategory] = useState<RoleCategoryId>(() =>
@@ -130,6 +132,7 @@ export function OnboardingTargetsCard({
 
       if (id === sequence.current) {
         setSavedMatchedCount(saved.matchedCount);
+        setPlaces(saved.places);
       }
 
       return true;
@@ -203,10 +206,25 @@ export function OnboardingTargetsCard({
         />
 
         <OnboardingTargetsLocations
-          catalogLocations={choices.locations}
-          onToggleLocation={(location) => {
-            void commit({ ...draft, locations: toggle(draft.locations, location) });
+          onPickLocation={(place) => {
+            if (draft.locations.includes(place.id)) {
+              return;
+            }
+
+            setPlaces((current) =>
+              current.some((candidate) => candidate.id === place.id)
+                ? current
+                : [...current, place],
+            );
+            void commit({ ...draft, locations: [...draft.locations, place.id] });
           }}
+          onRemoveLocation={(id) => {
+            void commit({
+              ...draft,
+              locations: draft.locations.filter((candidate) => candidate !== id),
+            });
+          }}
+          places={places}
           selectedLocations={draft.locations}
         />
 

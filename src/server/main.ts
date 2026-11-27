@@ -49,6 +49,7 @@ import { raiseAlert } from "./platform/alerts.ts";
 import { openCatalogDatabase, openDatabase } from "./platform/db/client.ts";
 import type { CatalogDatabase } from "./platform/db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "./platform/db/migrate.ts";
+import { promoteStoredTargetPlaces, rebuildStoredJobPlaces } from "./places/backfill.ts";
 import { createCatalogHotSwap } from "./catalog/hot-swap.ts";
 import type { CatalogHotSwap } from "./catalog/hot-swap.ts";
 import { createConfiguredObjectStore } from "./platform/object-store.ts";
@@ -304,6 +305,21 @@ logInfo(
   "boot",
   `application database migrations finished in ${String(Math.round(performance.now() - appMigrationStarted))} ms`,
 );
+
+const promotedTargetPlaces = promoteStoredTargetPlaces(db);
+
+if (promotedTargetPlaces > 0) {
+  logInfo(
+    "boot",
+    `promoted saved locations to place ids on ${String(promotedTargetPlaces)} targets`,
+  );
+}
+
+const rebuiltJobPlaces = rebuildStoredJobPlaces(db);
+
+if (rebuiltJobPlaces > 0) {
+  logInfo("boot", `rebuilt canonical place ids for ${String(rebuiltJobPlaces)} jobs`);
+}
 
 if (localCatalog === null) {
   logInfo("boot", "skipping local catalog database migrations: R2 hot-swap active");

@@ -8,6 +8,7 @@ import {
   resolveLocation,
   usStateNames,
 } from "./geo.ts";
+import { countryCodesOfPlaceIds } from "../places/catalog.ts";
 import { factPolarity, matchOption, normalizeOptionText } from "./question-normalize.ts";
 import { normalizeCompanyName } from "../profile/skip-companies.ts";
 
@@ -110,17 +111,7 @@ function countryCodeForOption(option: string) {
 }
 
 function targetCountryCodes(targets: Targets) {
-  const codes = new Set<string>();
-
-  for (const location of targets.locations) {
-    const code = resolveLocation(location).countryCode;
-
-    if (code !== null) {
-      codes.add(code);
-    }
-  }
-
-  return codes;
+  return new Set(countryCodesOfPlaceIds(targets.locations));
 }
 
 function deriveTargetCountries(input: DerivationInput) {

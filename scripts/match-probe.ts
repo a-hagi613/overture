@@ -27,6 +27,7 @@ function persona(
       employmentTypes: ["full_time"],
       locations,
       roles,
+      unresolvedLocations: [],
       salaryCurrency: null,
       salaryFloorMinor: null,
       salaryPeriod: "year",

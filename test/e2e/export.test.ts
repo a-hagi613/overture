@@ -140,7 +140,7 @@ async function seedOwner(owner: APIRequestContext) {
   const targets = await owner.put("/api/profile/targets", {
     data: {
       employmentTypes: ["full_time"],
-      locations: ["Toronto, ON"],
+      locations: ["city:ca:toronto"],
       roles: ["Platform Engineer"],
       salaryCurrency: "CAD",
       salaryFloorMinor: 14_000_000,

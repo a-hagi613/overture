@@ -17,6 +17,7 @@ import type {
 import { applications, reviewApplications, reviews } from "../platform/db/schema.ts";
 import { postings } from "../platform/db/catalog-schema.ts";
 import { countryCodesNamedIn, countryNameFor, resolveLocation } from "../catalog/geo.ts";
+import { countryCodesOfPlaceIds } from "../places/catalog.ts";
 import { currencyNamedIn, parseSalaryExpectation } from "../pipeline/answer-value.ts";
 import { createFactService } from "./facts.ts";
 import { EEO_PREFER_NOT_TO_SAY, WORK_AUTH_OPTIONS } from "../../shared/onboarding.ts";
@@ -222,17 +223,7 @@ export function homeCountryCode(facts: readonly FactRecord[]) {
 }
 
 function targetCountryCodes(targets: Targets) {
-  const codes: string[] = [];
-
-  for (const location of targets.locations) {
-    const code = resolveLocation(location).countryCode;
-
-    if (code !== null && !codes.includes(code)) {
-      codes.push(code);
-    }
-  }
-
-  return codes;
+  return countryCodesOfPlaceIds(targets.locations);
 }
 
 export function createOnboardingStepService(deps: {

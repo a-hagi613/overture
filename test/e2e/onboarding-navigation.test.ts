@@ -378,8 +378,10 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
 
   await page.getByRole("button", { exact: true, name: "DevOps / SRE / Platform Engineer" }).click();
   await page.getByLabel("Locations").click();
-  await page.getByRole("option", { exact: true, name: "Remote" }).click();
-  await page.keyboard.press("Escape");
+  await page
+    .getByRole("option", { name: /^Remote · Worldwide/u })
+    .first()
+    .click();
 
   const workplaceChipGroup = page.getByRole("group", { name: /Workplace/u });
 
@@ -433,9 +435,11 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   await page.getByRole("button", { exact: true, name: "Physical Therapist" }).click();
 
   await page.getByLabel("Locations").click();
-  await page.getByRole("option", { exact: true, name: "Remote" }).click();
-  await page.getByRole("option", { exact: true, name: "Toronto" }).click();
-  await page.keyboard.press("Escape");
+  await page.getByPlaceholder("Search cities or remote regions...").fill("Toronto");
+  await page
+    .getByRole("option", { name: /^Toronto/u })
+    .first()
+    .click();
 
   await page
     .getByRole("group", { name: /Workplace/u })

@@ -100,7 +100,7 @@ const personaFacts = [
 
 const personaTargets = {
   employmentTypes: ["full_time"],
-  locations: ["Toronto, ON", "United States", "United Kingdom", "Germany", "Australia"],
+  locations: ["city:ca:toronto", "country:us", "country:gb", "country:de", "country:au"],
   roles: ["Backend"],
   salaryCurrency: null,
   salaryFloorMinor: null,

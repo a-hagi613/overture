@@ -10,6 +10,7 @@ import { isKillSwitchEnabled } from "../platform/settings/index.ts";
 import { targets, users, workableIngests } from "../platform/db/schema.ts";
 import { companies, companyBoards, postings } from "../platform/db/catalog-schema.ts";
 import { contentHash } from "./content-hash.ts";
+import { locationTextsOfPlaceIds } from "../places/catalog.ts";
 import { retryWhenBusy } from "../platform/db/busy.ts";
 import { dedupeKeyFor } from "./dedupe-key.ts";
 import { normalizeApplyUrl, normalizeTitle } from "./normalize.ts";
@@ -80,7 +81,11 @@ export function buildWorkableTargets(db: AppDatabase, at: number) {
     version: 1,
     generatedAt: new Date(at).toISOString(),
     roles: union(rows.map((row) => stringArraySchema.parse(JSON.parse(row.roles)))),
-    locations: union(rows.map((row) => stringArraySchema.parse(JSON.parse(row.locations)))),
+    locations: union(
+      rows.map((row) =>
+        locationTextsOfPlaceIds(stringArraySchema.parse(JSON.parse(row.locations))),
+      ),
+    ),
     seniorities: union(rows.map((row) => stringArraySchema.parse(JSON.parse(row.seniorities)))),
     workplaces: union(rows.map((row) => stringArraySchema.parse(JSON.parse(row.workplaces)))),
     employmentTypes: union(

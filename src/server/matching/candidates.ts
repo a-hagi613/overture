@@ -23,6 +23,7 @@ import {
 import { ACTIVE_APPLICATION_STATUSES } from "./applications.ts";
 import { salaryMeetsFloor } from "./fx.ts";
 import { countryInRegion, remoteRegionOf } from "./regions.ts";
+import { locationTextsOfPlaceIds } from "../places/catalog.ts";
 import { skipMatches } from "./skip-match.ts";
 import { flaggedPostingIds } from "./posting-flags.ts";
 import {
@@ -118,7 +119,7 @@ function targetLocationCriteria(targets: TargetsInput) {
   const remoteRegions = new Set<string>();
   let remoteWorldwide = false;
 
-  for (const location of targets.locations) {
+  for (const location of locationTextsOfPlaceIds(targets.locations)) {
     const queries = resolveLocationQuery(location);
     const macro = remoteRegionOf(location);
 

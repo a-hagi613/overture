@@ -32,6 +32,7 @@ import type { TargetChoices } from "../profile/target-choices.ts";
 
 import { createTargetChoicesCache } from "../profile/target-choices.ts";
 import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
+import { describePlaceIds } from "../places/catalog.ts";
 import { env, masterKeyring } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { isDemoRole } from "../../shared/demo.ts";
@@ -148,6 +149,7 @@ export function createOnboardingRoutes(deps: {
       choices,
       currencies: (await step.read(userId, { inferCountries: false })).currencies,
       matchedCount: countMatchingPostings(deps.catalogDb, targets, languages),
+      places: describePlaceIds(targets.locations),
       targets,
     };
   }

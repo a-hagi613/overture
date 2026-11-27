@@ -28,6 +28,7 @@ import type { MailSender } from "./platform/mail/port.ts";
 import { readSession } from "./auth/session.ts";
 import { createHealthRoutes } from "./routes/health.ts";
 import { createSupplyRoutes } from "./routes/supply.ts";
+import { createPlaceRoutes } from "./routes/places.ts";
 import { createLabRoutes } from "./routes/lab.ts";
 import { createMeRoutes } from "./routes/me.ts";
 import { createWaitlistRoutes } from "./routes/waitlist.ts";
@@ -539,6 +540,14 @@ export function createApp(deps: AppDependencies) {
     }),
   );
   app.route("/api", createMeRoutes(deps.auth, deps.db, deps.clock));
+  app.route(
+    "/api",
+    createPlaceRoutes({
+      clientIpConfig,
+      clock: deps.clock,
+      db: deps.db,
+    }),
+  );
   app.route("/api", createWaitlistRoutes({ clientIpConfig, clock: deps.clock, db: deps.db }));
   app.route("/api", createSupportAccessRoutes(deps.db, deps.auth));
   app.route(

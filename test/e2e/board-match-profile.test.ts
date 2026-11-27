@@ -41,7 +41,7 @@ const boardTargets = {
   ],
   seniorities: ["senior", "staff"],
   workplaces: ["remote", "hybrid"],
-  locations: ["Toronto, ON", "Vancouver, BC", "Austin, TX"],
+  locations: ["city:ca:toronto", "city:ca:vancouver", "city:us:austin"],
   employmentTypes: ["full_time"],
   salaryFloorMinor: 14_000_000,
   salaryCurrency: "CAD",

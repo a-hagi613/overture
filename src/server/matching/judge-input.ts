@@ -2,6 +2,7 @@ import { gunzipSync } from "node:zlib";
 
 import type { TargetsInput } from "../../shared/targets.ts";
 
+import { describePlaceIds } from "../places/catalog.ts";
 import { legacyTargetToTaxonomy } from "../catalog/legacy-roles.ts";
 import { roleTaxonomyName } from "../../shared/role-taxonomy.ts";
 
@@ -98,7 +99,11 @@ export function targetsLine(targets: TargetsInput) {
   return [
     roles.length === 0 ? null : `roles: ${roles.join(", ")}`,
     targets.seniorities.length === 0 ? null : `level: ${targets.seniorities.join(", ")}`,
-    targets.locations.length === 0 ? null : `places: ${targets.locations.join(" or ")}`,
+    targets.locations.length === 0
+      ? null
+      : `places: ${describePlaceIds(targets.locations)
+          .map((place) => (place.meta === "" ? place.label : `${place.label}, ${place.meta}`))
+          .join(" or ")}`,
     targets.workplaces.length === 0 ? null : `workplace: ${targets.workplaces.join(", ")}`,
     pay === null ? null : `pay floor: ${pay}`,
   ]
