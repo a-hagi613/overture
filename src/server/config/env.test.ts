@@ -25,6 +25,7 @@ const {
   emailListFromValue,
   parseBetterAuthSecrets,
   resolveTurnstileHostnames,
+  sessionCookieOptions,
   turnstileDefaultHostnames,
 } = await import("./env.ts");
 
@@ -86,10 +87,24 @@ describe("production Turnstile hosts", () => {
     }).not.toThrow();
   });
 
-  test("neither origin configured is still refused before the local fallback is used", () => {
+  test("production refuses to boot without an app origin", () => {
     expect(() => {
       checkedEnvSchema.parse({ ...productionEnv, APP_ORIGIN: undefined });
-    }).toThrow("Production needs APP_ORIGIN or TURNSTILE_HOSTNAMES");
+    }).toThrow("Production needs APP_ORIGIN");
+  });
+
+  test("production refuses a plain-http app origin, so a session cookie is never sent unencrypted", () => {
+    expect(() => {
+      checkedEnvSchema.parse({ ...productionEnv, APP_ORIGIN: "http://tryoverture.com" });
+    }).toThrow("must be an https origin");
+
+    expect(() => {
+      checkedEnvSchema.parse({
+        ...productionEnv,
+        APP_ORIGIN: "http://tryoverture.com",
+        TURNSTILE_HOSTNAMES: "tryoverture.com",
+      });
+    }).toThrow("must be an https origin");
   });
 
   test("a localhost app origin is refused", () => {
@@ -102,6 +117,20 @@ describe("production Turnstile hosts", () => {
     expect(() => {
       checkedEnvSchema.parse({ ...productionEnv, ADMIN_ORIGIN: "http://127.0.0.1:3000" });
     }).toThrow("must not include 127.0.0.1");
+  });
+});
+
+describe("production session cookies", () => {
+  test("production pins Secure, HttpOnly and SameSite=lax on the session cookies", () => {
+    expect(sessionCookieOptions("production")).toEqual({
+      defaultCookieAttributes: { httpOnly: true, sameSite: "lax", secure: true },
+      useSecureCookies: true,
+    });
+  });
+
+  test("development and test keep Better Auth's origin-derived defaults", () => {
+    expect(sessionCookieOptions("development")).toEqual({});
+    expect(sessionCookieOptions("test")).toEqual({});
   });
 });
 

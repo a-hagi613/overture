@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AppDatabase } from "../platform/db/client.ts";
+import type { AdminEnv } from "../routes/admin-refusals.ts";
 
 import { openDatabase } from "../platform/db/client.ts";
 import { migrateDatabase } from "../platform/db/migrate.ts";
@@ -159,5 +160,49 @@ describe("resolveAdminAccessOwner", () => {
     });
 
     expect(resolved).toEqual({ code: "owner_required", ok: false });
+  });
+});
+
+describe("opening a Reveal", () => {
+  test("records the owner's real passkey assertion, never a fabricated one", async () => {
+    const { createPersonalCrypto } = await import("../profile/personal-crypto.ts");
+    const { masterKeyringFor } = await import("../platform/crypto.ts");
+    const { createAdminRevealRoutes } = await import("../routes/admin-reveal.ts");
+    const { Hono } = await import("hono");
+    const { eq } = await import("drizzle-orm");
+    const { adminAudit } = await import("../platform/db/schema.ts");
+
+    const db = freshDb();
+
+    insertUser(db, { email: "owner@example.test", id: "owner-1", role: "owner" });
+    insertUser(db, { email: "person@example.test", id: "user-42" });
+
+    const app = new Hono<AdminEnv>();
+
+    app.use("*", async (context, next) => {
+      context.set("owner", { email: "owner@example.test", userId: "owner-1" });
+      await next();
+    });
+
+    app.route(
+      "/",
+      createAdminRevealRoutes(
+        db,
+        clock,
+        createPersonalCrypto(db, masterKeyringFor(new Uint8Array(32).fill(9))),
+      ),
+    );
+
+    const response = await app.request("/users/user-42/reveal", {
+      body: JSON.stringify({ reason: "Support request 118" }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+
+    expect(response.status).toBe(201);
+
+    const row = db.select().from(adminAudit).where(eq(adminAudit.action, "reveal.open")).get();
+
+    expect(JSON.parse(row?.detail ?? "{}")).toMatchObject({ passkeyAssertedAt: null });
   });
 });

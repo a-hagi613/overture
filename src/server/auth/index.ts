@@ -12,7 +12,12 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { MailSender } from "../platform/mail/port.ts";
 
 import { copy } from "../../shared/copy.ts";
-import { authSecretConfig, betterAuthSecretOptions, env } from "../config/env.ts";
+import {
+  authSecretConfig,
+  betterAuthSecretOptions,
+  env,
+  sessionCookieOptions,
+} from "../config/env.ts";
 import {
   accounts,
   passkeys,
@@ -231,6 +236,7 @@ export function createAuth(
           },
     trustedOrigins,
     advanced: {
+      ...sessionCookieOptions(env.NODE_ENV),
       ipAddress: {
         ipAddressHeaders: clientIpHeaders({
           flyAppName: env.FLY_APP_NAME,

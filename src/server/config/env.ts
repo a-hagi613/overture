@@ -137,6 +137,25 @@ export function parseBetterAuthSecrets(source: {
 }
 
 /**
+ * The Better Auth `advanced` cookie hardening a deployment gets. Production pins the session cookies
+ * `Secure` (with the `__Secure-` prefix) whatever the origin looks like, so a misconfigured or
+ * downgraded boot can never hand a browser a session cookie over plain HTTP. Development keeps
+ * Better Auth's origin-derived default, which lets the local HTTP e2e servers sign in.
+ * @param nodeEnv The process environment.
+ * @returns The `advanced` fields to spread into `betterAuth`.
+ */
+export function sessionCookieOptions(nodeEnv: string) {
+  if (nodeEnv !== "production") {
+    return {};
+  }
+
+  return {
+    useSecureCookies: true,
+    defaultCookieAttributes: { httpOnly: true, sameSite: "lax" as const, secure: true },
+  };
+}
+
+/**
  * The Better Auth options that carry a secret chain: `secrets` first (current key first), with
  * the legacy single secret as the fallback for payloads written before versioned secrets.
  * @param config The parsed environment secrets.
@@ -396,6 +415,22 @@ const envSchema = z
         });
       }
 
+      if (value.APP_ORIGIN === undefined) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "Production needs APP_ORIGIN: it names the only allowed host and the origin session cookies are scoped to.",
+          path: ["APP_ORIGIN"],
+        });
+      } else if (new URL(value.APP_ORIGIN).protocol !== "https:") {
+        context.addIssue({
+          code: "custom",
+          message:
+            "Production APP_ORIGIN must be an https origin, so session cookies are Secure and sign-in links never travel over plain HTTP.",
+          path: ["APP_ORIGIN"],
+        });
+      }
+
       if (value.CF_ACCESS_AUD === undefined) {
         context.addIssue({
           code: "custom",
@@ -428,15 +463,6 @@ const envSchema = z
             path: ["TURNSTILE_HOSTNAMES"],
           });
         }
-      }
-
-      if (value.TURNSTILE_HOSTNAMES === undefined && value.APP_ORIGIN === undefined) {
-        context.addIssue({
-          code: "custom",
-          message:
-            "Production needs APP_ORIGIN or TURNSTILE_HOSTNAMES to name the Turnstile hostnames.",
-          path: ["TURNSTILE_HOSTNAMES"],
-        });
       }
     }
 

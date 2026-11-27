@@ -103,11 +103,25 @@ import { createFormSelfHealer, planFieldSignature } from "./forms/self-heal.ts";
 import { recordPostingFailure } from "../matching/posting-flags.ts";
 import { captureSubmitScreenshot } from "../applications/screenshots.ts";
 import { DrySubmitStoppedError, beforeSubmitStep } from "./dry-submit.ts";
+import { postingUrlProblem } from "./posting-url.ts";
+import type { PostingUrlProblem } from "./posting-url.ts";
+import { skipUnsendableApplication } from "./unsafe-posting.ts";
+import { env } from "../config/env.ts";
 
 class ReservationRefusedError extends Error {
   constructor() {
     super("no application credit is available");
     this.name = "ReservationRefusedError";
+  }
+}
+
+class UnsafePostingUrlError extends Error {
+  readonly problem: PostingUrlProblem;
+
+  constructor(problem: PostingUrlProblem) {
+    super(`the approved plan's posting URL is ${problem}`);
+    this.name = "UnsafePostingUrlError";
+    this.problem = problem;
   }
 }
 
@@ -372,6 +386,19 @@ export function createDispatcher(deps: DispatcherDeps) {
       idempotencyKey: `release:${attemptId}`,
       userId,
     });
+  }
+
+  function skipUnsendablePosting(input: {
+    applicationId: string;
+    attemptId: string;
+    errorCode: string;
+    statusReason: string;
+    userId: string;
+  }) {
+    skipUnsendableApplication(
+      { clock, db, markAttempt: (attemptId, values) => updateAttempt(attemptId, values) },
+      input,
+    );
   }
 
   function scheduleRetry(applicationId: string, userId: string, at: number, attemptId: string) {
@@ -830,6 +857,14 @@ export function createDispatcher(deps: DispatcherDeps) {
 
       attemptAts = plan.ats;
 
+      const postingProblem = postingUrlProblem(plan.postingUrl, {
+        allowFixtureHttp: env.NODE_ENV !== "production" && env.FLY_APP_NAME === undefined,
+      });
+
+      if (postingProblem !== null) {
+        throw new UnsafePostingUrlError(postingProblem);
+      }
+
       let resumeBytes: Uint8Array<ArrayBuffer> | null = null;
 
       if (plan.resume !== null) {
@@ -1171,33 +1206,12 @@ export function createDispatcher(deps: DispatcherDeps) {
       } else if (run.outcome === "identity_mismatch") {
         const reason = run.identityReason ?? "unreadable";
 
-        releaseAttempt(applicationId, claimed.userId, attemptId);
-
-        db.update(applications)
-          .set({
-            stage: null,
-            status: "skipped",
-            statusReason: `posting_identity:${reason}`,
-            updatedAt: clock.now(),
-          })
-          .where(eq(applications.id, applicationId))
-          .run();
-
-        recordApplicationEvent(db, clock, {
+        skipUnsendablePosting({
           applicationId,
           attemptId,
-          userId: claimed.userId,
-          kind: "status",
-          fromValue: "sending",
-          toValue: "skipped",
-          reason: `posting_identity:${reason}`,
-          source: "system",
-        });
-
-        updateAttempt(attemptId, {
-          endedAt: clock.now(),
           errorCode: reason,
-          outcome: "identity_mismatch",
+          statusReason: `posting_identity:${reason}`,
+          userId: claimed.userId,
         });
       } else if (run.outcome === "flagged_spam") {
         releaseAttempt(applicationId, claimed.userId, attemptId);
@@ -1339,6 +1353,18 @@ export function createDispatcher(deps: DispatcherDeps) {
         }
       }
     } catch (error) {
+      if (error instanceof UnsafePostingUrlError) {
+        skipUnsendablePosting({
+          applicationId,
+          attemptId,
+          errorCode: error.problem,
+          statusReason: `posting_url:${error.problem}`,
+          userId: claimed.userId,
+        });
+
+        return true;
+      }
+
       if (error instanceof DrySubmitStoppedError) {
         recordDrySubmitStop(applicationId, claimed.userId, attemptId);
 

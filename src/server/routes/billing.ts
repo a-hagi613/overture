@@ -16,6 +16,7 @@ import { stripeCustomerIdFor } from "../billing/customers.ts";
 import { currentSubscriptionOf, subscriptionBlocksCheckout } from "../billing/subscriptions.ts";
 import { verifyTrialCardForUser } from "../billing/trial-verify.ts";
 import { createPaymentsWebhookService } from "../billing/webhooks.ts";
+import { billingWriteRefusal } from "../billing/write-limit.ts";
 import { demoLocked } from "../demo/guard.ts";
 import { logError } from "../platform/log.ts";
 import { defaultMetrics } from "../platform/telemetry/metrics.ts";
@@ -102,6 +103,10 @@ export function createBillingRoutes(deps: {
     return access;
   }
 
+  function writeRefusal(userId: string) {
+    return billingWriteRefusal(db, clock, userId);
+  }
+
   routes.get("/billing", async (context) => {
     const access = await signedInAccount(context.req.raw);
 
@@ -133,6 +138,12 @@ export function createBillingRoutes(deps: {
 
     if ("refusal" in access) {
       return access.refusal;
+    }
+
+    const limited = writeRefusal(access.account.id);
+
+    if (limited !== null) {
+      return limited;
     }
 
     if (checkout === null) {
@@ -181,6 +192,12 @@ export function createBillingRoutes(deps: {
       return access.refusal;
     }
 
+    const limited = writeRefusal(access.account.id);
+
+    if (limited !== null) {
+      return limited;
+    }
+
     if (payments === null || cardFingerprintSecret === null) {
       return context.json({ error: "billing_disabled" }, 503);
     }
@@ -211,6 +228,12 @@ export function createBillingRoutes(deps: {
 
     if ("refusal" in access) {
       return access.refusal;
+    }
+
+    const limited = writeRefusal(access.account.id);
+
+    if (limited !== null) {
+      return limited;
     }
 
     if (payments === null || cardFingerprintSecret === null) {
@@ -260,6 +283,12 @@ export function createBillingRoutes(deps: {
 
     if ("refusal" in access) {
       return access.refusal;
+    }
+
+    const limited = writeRefusal(access.account.id);
+
+    if (limited !== null) {
+      return limited;
     }
 
     if (payments === null) {

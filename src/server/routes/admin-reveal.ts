@@ -57,7 +57,7 @@ export function createAdminRevealRoutes(db: AppDatabase, clock: Clock, personal:
       actorId: owner.userId,
       targetUserId: target.id,
       reason,
-      passkeyAssertedAt: assertedAt?.getTime() ?? clock.now(),
+      passkeyAssertedAt: assertedAt?.getTime() ?? null,
     });
 
     return context.json({ reveal: revealViewOf(session, clock.now()) }, 201);
