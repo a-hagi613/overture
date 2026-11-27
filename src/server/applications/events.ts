@@ -22,6 +22,12 @@ export interface ApplicationEventInput {
   fromValue: string | null;
   toValue: string | null;
   source: ApplicationEventSource;
+  /**
+   * The moment to stamp. One action that writes two events (a Stage move and the
+   * Check-in answer that caused it) passes the same read so both share a time.
+   * Defaults to a fresh clock read.
+   */
+  at?: number;
   /** Why the move happened. Stored in the event detail beside any structured extra fields. */
   reason?: string | null;
   /** The send attempt this event belongs to, when one was running. */
@@ -123,7 +129,7 @@ export function recordApplicationEvent(
   db.insert(applicationEvents)
     .values({
       applicationId: input.applicationId,
-      at: clock.now(),
+      at: input.at ?? clock.now(),
       detail: applicationEventDetail(input),
       fromValue: input.fromValue,
       id: crypto.randomUUID(),
