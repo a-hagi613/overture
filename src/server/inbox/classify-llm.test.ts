@@ -4,9 +4,7 @@ import type {
   LlmBatchCall,
   LlmPort,
   LlmRequest,
-  LlmSingleCall,
   LlmSingleRequest,
-  LlmStructuredCall,
   LlmStructuredRequest,
 } from "../platform/ports/llm.ts";
 
@@ -32,7 +30,6 @@ const NOW = 1_800_000_000_000;
 
 const testClock = { now: () => NOW };
 
-/** Mirrors the provider: a custom_id over 64 characters rejects the whole batch with a 400. */
 class FakeLlm implements LlmPort {
   readonly batchCalls: LlmRequest[][] = [];
 
@@ -81,7 +78,7 @@ class FakeLlm implements LlmPort {
     return 100;
   }
 
-  async runSingle(_request: LlmSingleRequest): Promise<LlmSingleCall> {
+  async runSingle(_request: LlmSingleRequest) {
     await Promise.resolve();
 
     return {
@@ -99,7 +96,7 @@ class FakeLlm implements LlmPort {
     return 100;
   }
 
-  async runStructured(_request: LlmStructuredRequest): Promise<LlmStructuredCall> {
+  async runStructured(_request: LlmStructuredRequest) {
     await Promise.resolve();
 
     return {
