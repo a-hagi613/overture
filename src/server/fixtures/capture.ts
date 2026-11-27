@@ -89,7 +89,8 @@ export const FORM_FIELD_SELECTORS = {
   paylocity: "form#applicationForm input:not([type='hidden'])",
   manatal: "form#application-form input:not([type='hidden'])",
   careerplug: "form#new_application input:not([type='hidden'])",
-  jazzhr: "form#application-form input:not([type='hidden'])",
+  jazzhr:
+    "form#application-form input:not([type='hidden']), form#form_submit_new_resume input:not([type='hidden'])",
   hiringthing: `${HIRINGTHING_FORM_SELECTOR} input:not([type='hidden'])`,
   rippling: `${RIPPLING_FORM_SELECTOR} input:not([type='hidden'])`,
   gem: `${GEM_FORM_SELECTOR} input:not([type='hidden'])`,

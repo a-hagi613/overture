@@ -14,7 +14,12 @@ import {
   waitForStableForm,
   watchApplicationResponse,
 } from "../forms/engine.ts";
-import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
+import type {
+  FillFailure,
+  FormScope,
+  LiveFormExpectation,
+  LiveFormProblem,
+} from "../forms/engine.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
 
 import type { PostingIdentity, PostingIdentityMismatch } from "../posting-identity.ts";
@@ -26,6 +31,7 @@ const RESUME_FIELD = "resume";
 const RESUME_READ_MS = 15_000;
 const LOCATION_FIELD = "location";
 const SELECTED_LOCATION_FIELD = "selectedLocation";
+const LOCATION_SUGGESTION_MS = 8000;
 
 const LEVER_UPLOAD_NOISE =
   ".resume-upload-working, .resume-upload-success, .resume-upload-failure, .resume-upload-oversize, .filename, .default-label, [class*='upload-label'], [class*='upload-status']";
@@ -60,6 +66,8 @@ export interface LeverRun {
   identityReason?: PostingIdentityMismatch;
   preflight?: LiveFormProblem[];
   unexpectedRequired?: LiveFormProblem[];
+  /** The planned field the filler could not write, when it returned `fill_failed`. */
+  fillFailure?: FillFailure;
 }
 
 export const LEVER_SKIP_NAMES = [
@@ -265,45 +273,137 @@ async function committedLocation(scope: FormScope) {
   });
 }
 
-async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
-  let locationFailed = false;
+function locationSuggestionIndex(suggestions: readonly string[], wanted: string) {
+  const target = normText(wanted);
+  const city = (target.split(",")[0] ?? "").trim();
 
-  const fillFrom: (index: number) => Promise<void> = async (index) => {
+  if (city === "") {
+    return -1;
+  }
+
+  const exact = suggestions.findIndex((label) => normText(label) === target);
+
+  if (exact !== -1) {
+    return exact;
+  }
+
+  const cityMatches = suggestions.flatMap((label, index) => {
+    const normalised = normText(label);
+    const [name] = normalised.split(",");
+
+    return (name ?? "").trim() === city ? [{ index, normalised }] : [];
+  });
+
+  if (cityMatches.length === 0) {
+    return -1;
+  }
+
+  const regions = target
+    .split(",")
+    .slice(1)
+    .map((part) => part.trim())
+    .filter((part) => part !== "");
+
+  const withRegion = cityMatches.find(({ normalised }) => {
+    const offered = normalised.split(",").slice(1);
+
+    return regions.some((region) =>
+      offered.some((part) => part === region || part.startsWith(region) || region.startsWith(part)),
+    );
+  });
+
+  return (withRegion ?? cityMatches[0])?.index ?? -1;
+}
+
+async function fillLeverLocation(scope: FormScope, field: SendPlanField) {
+  const { answer } = field;
+  const fieldName = field.fieldName ?? LOCATION_FIELD;
+
+  if (answer === null) {
+    return true;
+  }
+
+  const input = scope.root.locator("input.location-input");
+  const backing = scope.root.locator(`input[name="${SELECTED_LOCATION_FIELD}"]`);
+
+  if ((await input.count()) === 0 || (await backing.count()) === 0) {
+    return fillField(scope, fieldName, answer);
+  }
+
+  if ((await input.first().getAttribute("role")) === "combobox") {
+    return (await fillField(scope, fieldName, answer))
+      ? verifyLocationCommitted(scope, answer)
+      : false;
+  }
+
+  const target = input.first();
+
+  try {
+    await target.click({ timeout: 5000 });
+    await target.fill("", { timeout: 5000 });
+    await target.pressSequentially(answer, { delay: 20, timeout: 15_000 });
+  } catch {
+    return false;
+  }
+
+  const suggestions = scope.root.locator(".dropdown-results .dropdown-location");
+
+  await suggestions
+    .first()
+    .waitFor({ state: "visible", timeout: LOCATION_SUGGESTION_MS })
+    .catch(() => undefined);
+
+  const labels = await suggestions.allTextContents();
+  const index = locationSuggestionIndex(labels, answer);
+
+  if (index < 0) {
+    return false;
+  }
+
+  await suggestions.nth(index).click();
+  await scope.page.waitForTimeout(250);
+
+  return verifyLocationCommitted(scope, answer);
+}
+
+const fillFailureOf = (field: SendPlanField) =>
+  ({
+    fieldName: field.fieldName,
+    fieldType: field.fieldType,
+    label: field.label,
+  }) satisfies FillFailure;
+
+async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
+  const fillFrom: (
+    index: number,
+  ) => Promise<{ ok: true } | { ok: false; failure: FillFailure }> = async (index) => {
     const field = fields[index];
 
     if (field === undefined) {
-      return;
+      return { ok: true };
     }
 
     if (field.fieldType === "file" || field.answer === null) {
-      await fillFrom(index + 1);
-
-      return;
+      return fillFrom(index + 1);
     }
 
     if (field.fieldName === null || field.fieldName === "") {
-      await fillFrom(index + 1);
-
-      return;
+      return fillFrom(index + 1);
     }
 
-    await fillField(scope, field.fieldName, field.answer);
+    const filled =
+      normText(field.fieldName) === LOCATION_FIELD
+        ? await fillLeverLocation(scope, field)
+        : await fillField(scope, field.fieldName, field.answer);
 
-    if (
-      normText(field.fieldName) === LOCATION_FIELD &&
-      !(await verifyLocationCommitted(scope, field.answer))
-    ) {
-      locationFailed = true;
-
-      return;
+    if (!filled) {
+      return { failure: fillFailureOf(field), ok: false };
     }
 
-    await fillFrom(index + 1);
+    return fillFrom(index + 1);
   };
 
-  await fillFrom(0);
-
-  return !locationFailed;
+  return fillFrom(0);
 }
 
 async function waitForResumeRead(page: Page) {
@@ -356,9 +456,12 @@ export const runLeverAttempt: (
     };
   }
 
-  if (!(await fillPlannedFields(scope, plan.fields))) {
+  const filled = await fillPlannedFields(scope, plan.fields);
+
+  if (!filled.ok) {
     return {
       confirmationSeen: false,
+      fillFailure: filled.failure,
       outcome: "fill_failed",
       submitMayHaveLanded: false,
       submitResponseStatus: null,

@@ -103,6 +103,7 @@ import { createFormSelfHealer, planFieldSignature } from "./forms/self-heal.ts";
 import { recordPostingFailure } from "../matching/posting-flags.ts";
 import { captureSubmitScreenshot } from "../applications/screenshots.ts";
 import { DrySubmitStoppedError, beforeSubmitStep } from "./dry-submit.ts";
+import { fillErrorCode, fillFailureNote } from "./fill-failure.ts";
 import { postingUrlProblem } from "./posting-url.ts";
 import type { PostingUrlProblem } from "./posting-url.ts";
 import { skipUnsendableApplication } from "./unsafe-posting.ts";
@@ -1328,13 +1329,17 @@ export function createDispatcher(deps: DispatcherDeps) {
           updateAttempt(attemptId, { endedAt: clock.now(), outcome: "interrupted" });
         } else {
           const preflight = "preflight" in run ? (run.preflight ?? []) : [];
+          const fillFailure = "fillFailure" in run ? run.fillFailure : undefined;
+          const fillChanges = fillFailure === undefined ? [] : [fillFailureNote(fillFailure)];
 
           finishBeforeSubmit({
             applicationId,
             attempts: claimed.attempts,
             at: clock.now(),
             attemptId,
-            ...(run.outcome === "form_changed" && { changes: changeNotes(preflight) }),
+            ...(run.outcome === "form_changed" && {
+              changes: [...changeNotes(preflight), ...fillChanges],
+            }),
             outcome: outcomeOf(run.outcome),
             userId: claimed.userId,
           });
@@ -1344,7 +1349,7 @@ export function createDispatcher(deps: DispatcherDeps) {
             endedAt: clock.now(),
             errorCode:
               preflight.length === 0
-                ? null
+                ? fillErrorCode(fillFailure, run.outcome)
                 : `preflight:${preflight
                     .map((problem) => `${problem.kind}:${problem.fieldName ?? problem.label}`)
                     .join(",")}`,

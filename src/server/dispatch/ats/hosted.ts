@@ -13,7 +13,12 @@ import {
   norm,
   preflightForm,
 } from "../forms/engine.ts";
-import type { FormScope, LiveFormExpectation, LiveFormProblem } from "../forms/engine.ts";
+import type {
+  FillFailure,
+  FormScope,
+  LiveFormExpectation,
+  LiveFormProblem,
+} from "../forms/engine.ts";
 import { detectLoginWall } from "../../pipeline/login-wall.ts";
 import { checkPostingIdentity } from "../posting-identity.ts";
 
@@ -33,9 +38,13 @@ const HOSTED_FIELD_TYPE_ENTRIES: readonly [string, QuestionFieldType][] = [...FI
 export interface HostedFormConfig {
   /** The one selector that identifies the board's application form. */
   formSelector: string;
+  /** Overrides the board's Submit control when it is not a real submit button. */
+  submitSelector?: string;
   /** Run the WS-2b login-wall pre-flight before anything is filled (Paylocity). */
   loginWall?: boolean;
 }
+
+const DEFAULT_SUBMIT_SELECTOR = "button[type='submit'], input[type='submit']";
 
 export interface HostedRunPlan {
   identity: PostingIdentity;
@@ -70,6 +79,8 @@ export interface HostedRun {
   identityReason?: PostingIdentityMismatch;
   preflight?: LiveFormProblem[];
   unexpectedRequired?: LiveFormProblem[];
+  /** The planned field the filler could not write, when it returned `fill_failed`. */
+  fillFailure?: FillFailure;
 }
 
 const answered = (field: SendPlanField) =>
@@ -344,25 +355,41 @@ async function fillPlannedField(scope: FormScope, field: SendPlanField) {
   return true;
 }
 
+const fillFailureOf = (field: SendPlanField) =>
+  ({
+    fieldName: field.fieldName,
+    fieldType: field.fieldType,
+    label: field.label,
+  }) satisfies FillFailure;
+
 async function fillPlannedFields(scope: FormScope, fields: readonly SendPlanField[]) {
-  const fillFrom: (index: number) => Promise<boolean> = async (index) => {
+  let failure: FillFailure | undefined;
+
+  const fillFrom: (index: number) => Promise<void> = async (index) => {
     const field = fields[index];
 
     if (field === undefined) {
-      return true;
+      return;
     }
 
     if (!answered(field)) {
-      return fillFrom(index + 1);
+      await fillFrom(index + 1);
+
+      return;
     }
 
     const filled = await fillPlannedField(scope, field);
-    const rest = await fillFrom(index + 1);
 
-    return (filled || !field.required) && rest;
+    if (!filled && field.required && failure === undefined) {
+      failure = fillFailureOf(field);
+    }
+
+    await fillFrom(index + 1);
   };
 
-  return fillFrom(0);
+  await fillFrom(0);
+
+  return failure === undefined ? { ok: true as const } : { failure, ok: false as const };
 }
 
 interface FileInputFact {
@@ -482,8 +509,8 @@ async function uploadResume(scope: FormScope, fieldName: string | null, resume: 
   return { fieldName: liveName, uploaded: true };
 }
 
-function submitControl(scope: FormScope) {
-  return scope.root.locator("button[type='submit'], input[type='submit']").first();
+function submitControl(scope: FormScope, selector: string = DEFAULT_SUBMIT_SELECTOR) {
+  return scope.root.locator(selector).first();
 }
 
 async function listenForSubmit(page: Page, origin: string) {
@@ -660,9 +687,10 @@ export const runHostedAttempt: (
   const preflight = expectationsFor(plan, liveResumeField);
   const verdict = await preflightForm(scope, preflight.expectations);
 
-  if (verdict.outcome !== "ok" || !filled) {
+  if (verdict.outcome !== "ok" || !filled.ok) {
     return {
       confirmationSeen: false,
+      ...(!filled.ok && { fillFailure: filled.failure }),
       outcome: verdict.outcome === "ok" ? "fill_failed" : verdict.outcome,
       preflight: verdict.outcome === "ok" ? [] : verdict.problems,
       submitMayHaveLanded: false,
@@ -674,7 +702,7 @@ export const runHostedAttempt: (
   await hooks.onWillSubmit();
 
   const settled = await Promise.allSettled([
-    submitControl(scope).click({ timeout: APPLICATION_RESPONSE_MS }),
+    submitControl(scope, config.submitSelector).click({ timeout: APPLICATION_RESPONSE_MS }),
     listenForSubmit(page, new URL(plan.identity.url).origin),
   ]);
 
