@@ -9,9 +9,11 @@ import { dsMetric } from "./ui/ds.ts";
 const text = copy.onboarding.matches;
 
 export function OnboardingMatchBlurred({
+  body,
   matches,
   remainingCount,
 }: {
+  body?: string | undefined;
   matches: readonly OnboardingMatchView[];
   remainingCount: number;
 }) {
@@ -53,7 +55,7 @@ export function OnboardingMatchBlurred({
             <span>{text.moreMatchesTitle(remainingCount)}</span>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {text.moreMatchesBody}
+            {body ?? text.moreMatchesBody}
           </p>
         </div>
       </div>

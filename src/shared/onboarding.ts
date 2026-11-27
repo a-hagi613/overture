@@ -32,6 +32,14 @@ export function onboardingPickLimitFor(planKind: OnboardingPlanKind | null) {
     : ONBOARDING_MAX_PICKS;
 }
 
+export const onboardingPlanInputSchema = z.object({
+  planKind: z.enum(ONBOARDING_PLAN_KINDS),
+});
+
+export const onboardingCheckoutInputSchema = z.object({
+  plan: z.enum(["week", "month"]),
+});
+
 /** One pick's status, from chosen through preparation to a closed or failed posting. */
 export const ONBOARDING_PICK_STATUSES = [
   "picked",
@@ -127,6 +135,8 @@ export interface OnboardingPickView {
 export interface OnboardingPicksView {
   batchStatus: OnboardingBatchStatus;
   pickLimit: number;
+  /** The plan the person chose, or null while the last onboarding step has not decided yet. */
+  planKind: OnboardingPlanKind | null;
   picks: OnboardingPickView[];
   selected: string[];
 }
@@ -170,8 +180,11 @@ export interface OnboardingMatchView {
 export interface OnboardingMatchesView {
   matches: OnboardingMatchView[];
   pickLimit: number;
+  planKind: OnboardingPlanKind | null;
   poolCount: number;
   selected: string[];
+  /** True until this account has ever claimed the one-time trial, so only then is it offered. */
+  trialAvailable: boolean;
 }
 
 export interface OnboardingTargetsView {

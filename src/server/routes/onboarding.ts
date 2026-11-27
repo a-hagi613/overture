@@ -13,6 +13,7 @@ import type { MatchingService } from "../matching/score.ts";
 import type { SpendGate } from "../billing/spend.ts";
 
 import { retryWhenBusy } from "../platform/db/busy.ts";
+import { logError } from "../platform/log.ts";
 import { applicationsLeft } from "../billing/ledger.ts";
 import { startOnboarding } from "../profile/onboarding-start.ts";
 import { enqueueUserPull } from "../jobs/pull.ts";
@@ -31,17 +32,24 @@ import { countMatchingJobs, createTargetsService } from "../profile/targets.ts";
 import { createOnboardingPicks } from "../onboarding/picks.ts";
 import type { OnboardingPicksService } from "../onboarding/picks.ts";
 import { verifyTrialCardForUser } from "../billing/trial-verify.ts";
+import { hasTrialGrant } from "../billing/card-fingerprint.ts";
+import { createCheckoutCoordinator } from "../billing/checkout.ts";
+import { stripePriceId } from "../billing/index.ts";
+import { currentSubscriptionOf, subscriptionBlocksCheckout } from "../billing/subscriptions.ts";
 import { publishEvent } from "../platform/sse/stream.ts";
 import { describePlaceIds } from "../places/catalog.ts";
 import { masterKeyring } from "../config/env.ts";
 import { demoLocked } from "../demo/guard.ts";
 import {
-  ONBOARDING_MATCH_PICK_LIMIT,
+  ONBOARDING_MAX_PICKS,
   ONBOARDING_STEP_COUNT,
+  onboardingCheckoutInputSchema,
   onboardingCurrentEmployerInputSchema,
   onboardingFactsInputSchema,
   onboardingGapsInputSchema,
   onboardingMatchSelectionInputSchema,
+  onboardingPickLimitFor,
+  onboardingPlanInputSchema,
   onboardingPrepareInputSchema,
   onboardingSettleInputSchema,
   onboardingTimezoneInputSchema,
@@ -80,12 +88,15 @@ export function createOnboardingRoutes(deps: {
   reviews: ReviewService;
   spendGate?: SpendGate | undefined;
   matching: MatchingService;
+  appOrigin?: string | undefined;
 }) {
   const { db, clock, auth, llm, objects, reviews: reviewService } = deps;
 
   const personal = deps.personal ?? createPersonalCrypto(db, masterKeyring);
   const payments = deps.payments ?? null;
   const cardFingerprintSecret = deps.cardFingerprintSecret ?? null;
+  const appOrigin = (deps.appOrigin ?? "http://localhost:3000").replace(/\/+$/u, "");
+  const checkout = payments === null ? null : createCheckoutCoordinator({ clock, db, payments });
   const picks = createOnboardingPicks({ catalogDb: deps.catalogDb, clock, db });
 
   const targetsService = createTargetsService({ db, clock });
@@ -159,19 +170,19 @@ export function createOnboardingRoutes(deps: {
   }
 
   async function matchesView(userId: string) {
-    const preview = await deps.matching.preview(userId, 9);
+    const preview = await deps.matching.preview(userId, ONBOARDING_MAX_PICKS);
     const durable = picks.view(userId);
 
-    const selectableIds = new Set(
-      preview.items.slice(0, ONBOARDING_MATCH_PICK_LIMIT).map((item) => item.id),
-    );
+    const selectableIds = new Set(preview.items.slice(0, durable.pickLimit).map((item) => item.id));
 
     return {
       matches: preview.items,
       pickLimit: durable.pickLimit,
       picks: durable,
+      planKind: durable.planKind,
       poolCount: preview.poolCount,
       selected: durable.selected.filter((id) => selectableIds.has(id)),
+      trialAvailable: durable.planKind === "free_trial" || !hasTrialGrant(db, userId),
     };
   }
 
@@ -271,7 +282,14 @@ export function createOnboardingRoutes(deps: {
         return context.json({ error: "already_onboarded" }, 409);
       }
 
-      const saved = picks.save(account.id, context.req.valid("json").postingIds);
+      const postingIds = [...new Set(context.req.valid("json").postingIds)];
+      const limit = onboardingPickLimitFor(picks.planKindOf(account.id));
+
+      if (postingIds.length > limit) {
+        return context.json({ error: "pick_limit", limit }, 409);
+      }
+
+      const saved = picks.save(account.id, postingIds);
 
       if (saved === null) {
         return context.json({ error: API_ERRORS.notFound }, 404);
@@ -282,6 +300,124 @@ export function createOnboardingRoutes(deps: {
       return context.json(await matchesView(account.id));
     },
   );
+
+  routes.put("/onboarding/plan", validJson(onboardingPlanInputSchema), async (context) => {
+    const account = await readSessionUser(auth, context.req.raw.headers);
+
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    const state = await progress.read(account.id);
+
+    if (state.onboardedAt !== null) {
+      return context.json({ error: "already_onboarded" }, 409);
+    }
+
+    const { planKind } = context.req.valid("json");
+
+    if (planKind === "free_trial") {
+      const alreadyOnTrial = picks.planKindOf(account.id) === "free_trial";
+
+      if (!alreadyOnTrial && hasTrialGrant(db, account.id)) {
+        return context.json({ error: "trial_used" }, 409);
+      }
+    }
+
+    const limit = onboardingPickLimitFor(planKind);
+
+    if (picks.forPreparation(account.id).length > limit) {
+      return context.json({ error: "pick_limit", limit }, 409);
+    }
+
+    picks.setPlanKind(account.id, planKind);
+
+    context.header("Cache-Control", "no-store");
+
+    return context.json(await matchesView(account.id));
+  });
+
+  routes.post("/onboarding/checkout", validJson(onboardingCheckoutInputSchema), async (context) => {
+    const account = await readSessionUser(auth, context.req.raw.headers);
+
+    if (account === null) {
+      return context.json({ error: API_ERRORS.signInRequired }, 401);
+    }
+
+    if (!account.emailVerified) {
+      return context.json({ error: "email_unverified" }, 403);
+    }
+
+    const locked = demoLocked(account.role);
+
+    if (locked !== null) {
+      return locked;
+    }
+
+    const state = await progress.read(account.id);
+
+    if (state.onboardedAt !== null) {
+      return context.json({ error: "already_onboarded" }, 409);
+    }
+
+    const consentState = consent.read(account.id);
+
+    if (consentState.accepted?.version !== consentState.current.version) {
+      return context.json({ error: "consent_required" }, 409);
+    }
+
+    if (checkout === null) {
+      return context.json({ error: "billing_disabled" }, 503);
+    }
+
+    const stored = picks.forPreparation(account.id);
+
+    if (stored.length === 0) {
+      return context.json({ error: "no_picks" }, 409);
+    }
+
+    const { plan } = context.req.valid("json");
+
+    if (stored.length > onboardingPickLimitFor(plan)) {
+      return context.json({ error: "pick_limit", limit: onboardingPickLimitFor(plan) }, 409);
+    }
+
+    const existing = currentSubscriptionOf(db, account.id);
+
+    if (existing !== null && subscriptionBlocksCheckout(existing.status)) {
+      return context.json(
+        { error: "plan_active", plan: existing.plan, status: existing.status },
+        409,
+      );
+    }
+
+    const priceId = stripePriceId(plan);
+
+    if (priceId === null) {
+      return context.json({ error: "billing_not_configured" }, 503);
+    }
+
+    picks.setPlanKind(account.id, plan);
+
+    try {
+      const session = await checkout.create({
+        cancelUrl: `${appOrigin}/onboarding/matches?card=cancelled`,
+        email: account.email,
+        plan,
+        priceId,
+        successUrl: `${appOrigin}/tracker?billing=success&plan=${plan}`,
+        userId: account.id,
+      });
+
+      context.header("Cache-Control", "no-store");
+
+      return context.json({ url: session.url });
+    } catch (error) {
+      logError("onboarding.checkout", error);
+
+      return context.json({ error: "stripe_error" }, 502);
+    }
+  });
 
   routes.post(
     "/onboarding/current-employer",
@@ -327,12 +463,18 @@ export function createOnboardingRoutes(deps: {
     }
 
     const postingIds = [...new Set(context.req.valid("json").postingIds)];
+    const stored = picks.forPreparation(account.id);
+    const limit = onboardingPickLimitFor(picks.planKindOf(account.id));
 
-    if (postingIds.length === 0 && picks.forPreparation(account.id).length === 0) {
+    if (postingIds.length > limit || stored.length > limit) {
+      return context.json({ error: "pick_limit", limit }, 409);
+    }
+
+    if (postingIds.length === 0 && stored.length === 0) {
       return context.json({ error: "selection_required" }, 409);
     }
 
-    if (picks.forPreparation(account.id).length === 0) {
+    if (stored.length === 0) {
       const saved = picks.save(account.id, postingIds);
 
       if (saved === null) {
@@ -363,6 +505,10 @@ export function createOnboardingRoutes(deps: {
     context.header("Cache-Control", "no-store");
 
     const stored = picks.forPreparation(account.id);
+
+    if (stored.length > onboardingPickLimitFor(picks.planKindOf(account.id))) {
+      return context.json({ error: "pick_limit" }, 409);
+    }
 
     if (stored.length === 0) {
       return context.json(

@@ -56,6 +56,27 @@ export const SEND_RULES = {
   maxPerDay: 10,
 } as const;
 
+/**
+ * The plan name plus what it includes, the one line every screen after onboarding repeats.
+ * @param kind The plan the person is on.
+ * @returns The one-line plan summary, or that no plan is chosen yet.
+ */
+export function planSummaryText(kind: PlanKind) {
+  if (kind === "trial") {
+    return `Free trial · ${String(TRIAL.applications)} applications`;
+  }
+
+  if (kind === "week") {
+    return `Weekly · ${String(PLANS.week.applications)} applications this week · ${String(SEND_RULES.maxPerDay)} a day`;
+  }
+
+  if (kind === "month") {
+    return `Monthly · ${String(PLANS.month.applications)} applications this month · ${String(SEND_RULES.maxPerDay)} a day`;
+  }
+
+  return "No plan yet";
+}
+
 /** The hiring systems Overture fills. Workday is out of scope (ADR 0017). */
 export const PUBLIC_ATS = ["Greenhouse", "Lever", "Ashby", "Personio", "Workable"] as const;
 

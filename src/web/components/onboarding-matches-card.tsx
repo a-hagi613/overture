@@ -1,4 +1,5 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 
 import type { OnboardingMatches } from "../lib/onboarding-api.ts";
@@ -17,19 +18,27 @@ export function OnboardingMatchesCard({
   allowEmptyContinue = false,
   backTo,
   busy,
+  ctaLabel,
   failed,
+  intro,
   matches,
   onContinue,
   onToggle,
+  paidPlan = false,
+  planSlot,
   selected,
 }: {
   allowEmptyContinue?: boolean | undefined;
   backTo: string;
   busy: boolean;
+  ctaLabel?: string | undefined;
   failed: boolean;
+  intro?: string | undefined;
   matches: OnboardingMatches;
   onContinue: () => Promise<void> | void;
   onToggle: (id: string) => void;
+  paidPlan?: boolean | undefined;
+  planSlot?: ReactNode;
   selected: readonly string[];
 }) {
   const full = selected.length >= matches.pickLimit;
@@ -48,7 +57,9 @@ export function OnboardingMatchesCard({
       <h2 className={dsCardTitle} id="ob-h">
         {text.titlePlain}
       </h2>
-      <p className={`${dsBody} mt-1.5 max-w-xl`}>{text.intro}</p>
+      <p className={`${dsBody} mt-1.5 max-w-xl`}>{intro ?? text.intro}</p>
+
+      {planSlot}
 
       {matches.matches.length === 0 ? (
         <OnboardingMatchesEmpty backTo={backTo} />
@@ -77,7 +88,11 @@ export function OnboardingMatchesCard({
             })}
           </ul>
 
-          <OnboardingMatchBlurred matches={blurredPreview} remainingCount={remainingCount} />
+          <OnboardingMatchBlurred
+            body={paidPlan ? text.moreMatchesBodyPaid : text.moreMatchesBody}
+            matches={blurredPreview}
+            remainingCount={remainingCount}
+          />
         </>
       )}
 
@@ -104,7 +119,8 @@ export function OnboardingMatchesCard({
           variant="primary"
         >
           <span>
-            {selected.length > 0 ? text.applyFree(selected.length) : text.continueFallback}
+            {ctaLabel ??
+              (selected.length > 0 ? text.applyFree(selected.length) : text.continueFallback)}
           </span>
           <ArrowRight aria-hidden="true" size={16} />
         </Button>

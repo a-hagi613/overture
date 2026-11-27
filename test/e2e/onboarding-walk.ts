@@ -97,7 +97,7 @@ export async function walkOnboardingSteps1To4(page: Page, baseUrl: string) {
   await expect(page.getByRole("heading", { level: 2, name: /Your matches/u })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("3 of 3 selected");
 
-  await page.getByRole("button", { name: /Apply to these 3 roles for free/u }).click();
+  await page.getByRole("button", { name: /Start my 3 free applications/u }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: /Your first 3 applications are free/u }),

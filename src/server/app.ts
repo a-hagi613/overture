@@ -579,6 +579,7 @@ export function createApp(deps: AppDependencies) {
   app.route(
     "/api",
     createOnboardingRoutes({
+      appOrigin: env.APP_ORIGIN ?? "http://localhost:3000",
       auth: deps.auth,
       cardFingerprintSecret: env.CARD_FINGERPRINT_SECRET ?? null,
       catalogDb: deps.catalogDb,

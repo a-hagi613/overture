@@ -15,6 +15,23 @@ type BillingDb = BaseSQLiteDatabase<"sync", void>;
 export const TRIAL_APPLICATIONS = 3;
 
 /**
+ * Whether an account has ever claimed the one-time trial. Any trial grant counts, even one whose period has
+ * ended, so reopening onboarding cannot offer the trial again.
+ * @param db The billing database.
+ * @param userId The account whose grants are read.
+ * @returns True when a trial grant exists for the account.
+ */
+export function hasTrialGrant(db: BillingDb, userId: string) {
+  return (
+    db
+      .select({ id: grants.id })
+      .from(grants)
+      .where(and(eq(grants.userId, userId), eq(grants.source, "trial")))
+      .get() !== undefined
+  );
+}
+
+/**
  * HMAC-SHA256 of Stripe's card fingerprint, keyed by a server secret.
  *
  * @param secret The server key (CARD_FINGERPRINT_SECRET).
