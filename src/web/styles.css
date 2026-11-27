@@ -1537,3 +1537,23 @@ dialog[data-sheet-backdrop="lift"]::backdrop {
   border-radius: 9999px;
   background-color: var(--color-signal);
 }
+
+/*
+ * Sonner fades a toast in from `opacity: 0` over 400ms. While that fade runs, the toast's text and
+ * its action button are painted below WCAG AA (the Review screen's "Open Ready" action measured
+ * 3.34:1 at 49% opacity), so axe catches them whenever a toast is on screen during a scan.
+ * DESIGN.md gives toasts a rise over 300ms with no fade, so the toast is opaque from its first
+ * paint and only the movement animates; the exit keeps its fade. The selectors outrank Sonner's
+ * own `[data-sonner-toast]` rules, which Sonner injects at runtime after this stylesheet.
+ */
+[data-sonner-toaster] [data-sonner-toast] {
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    opacity var(--duration-base) var(--ease-out),
+    height var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-quick) var(--ease-out);
+}
+
+[data-sonner-toaster] [data-sonner-toast]:not([data-removed="true"]):not([data-visible="false"]) {
+  opacity: 1;
+}
