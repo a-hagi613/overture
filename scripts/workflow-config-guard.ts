@@ -404,9 +404,13 @@ const RESET_DIAGNOSTICS_STEP =
 const RESET_DELETE_STEP = "Delete only the catalog database files on the overture-web volume";
 const RESET_RESTART_STEP = "Restart overture-web onto an empty catalog database";
 const RESET_WAIT_STEP = "Wait for overture-web to serve health after the catalog reset";
-const SYNC_STEP = "Sync the ops secrets and flags to overture-web";
+
+/** The manual step that reads a repository secret and imports it onto `overture-web`. */
+export const SYNC_OPS_SECRETS_STEP = "Sync the ops secrets and flags to overture-web";
+
+const SYNC_STEP = SYNC_OPS_SECRETS_STEP;
 const SYNC_HEALTH_STEP = "Verify the production health route after the ops secrets sync";
-const SYNC_SECRET_NAMES = ["ALERT_NTFY_URL", "CATALOG_REFRESH_SECRET"] as const;
+const SYNC_SECRET_NAMES = ["ALERT_NTFY_URL", "CATALOG_REFRESH_SECRET", "FREEHIRE_API_KEY"] as const;
 
 function workflowInputBlock(source: string, name: string) {
   const marker = `\n      ${name}:`;
@@ -977,6 +981,140 @@ export function findWorkersDeployProblems(input: WorkersDeployInput) {
 
   if (printsToken) {
     problems.push("deploy-workers prints the Cloudflare API token");
+  }
+
+  return problems;
+}
+
+/** The step that checks the required Fly secret names before a deploy (docs/DEPLOY.md, step 5). */
+export const DEPLOY_SECRET_GATE_STEP =
+  "Refuse to deploy while a required Fly secret is missing (docs/DEPLOY.md, step 5)";
+
+const FREEHIRE_OPT_IN_CONDITION = /if \[ "\$\{REQUIRE_FREEHIRE_API_KEY:-\}" = "true" \]; then/u;
+const FREEHIRE_PRESENT_CONDITION = /if \[ -n "\$\{FREEHIRE_API_KEY:-\}" \]; then/u;
+
+/**
+ * The `run:` body of one workflow step, with the YAML block indentation removed, so a test can execute it with bash
+ * exactly as GitHub Actions does.
+ * @param step The step source from {@link readWorkflowStep}.
+ * @returns The script, empty when the step has no `run: |` block.
+ */
+export function readStepScript(step: string) {
+  const lines = step.split("\n");
+  const start = lines.findIndex((line) => line.trim() === "run: |");
+
+  if (start === -1) {
+    return "";
+  }
+
+  return lines
+    .slice(start + 1)
+    .map((line) => line.replace(/^ {10}/u, ""))
+    .join("\n");
+}
+
+function shellBlockAfter(script: string, condition: RegExp) {
+  const match = condition.exec(script);
+
+  if (match === null) {
+    return null;
+  }
+
+  const rest = script.slice(match.index);
+  const end = rest.indexOf("\nfi");
+
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+export interface FreehireLaunchSecretInput {
+  readonly deploy: string;
+  readonly opsLive: string;
+}
+
+/**
+ * Checks the freehire API plan key (#708) is synced and gated without blocking today's deploys. The owner buys the
+ * $29/month plan only after #710 passes, so `FREEHIRE_API_KEY` joins the deploy gate behind the
+ * `REQUIRE_FREEHIRE_API_KEY` repository variable and the manual sync imports it only when the repository secret is
+ * set. The deploy job also runs on every `workflow_run`, so it must never read the secret value itself: only the
+ * manual sync holds the key, and the gate reads the name from `flyctl secrets list`.
+ * @param input The deploy and ops-live workflow sources.
+ * @returns Every freehire launch-secret rule the workflows break, empty when they are safe.
+ */
+export function findFreehireLaunchSecretProblems(input: FreehireLaunchSecretInput) {
+  const problems: string[] = [];
+  const gate = readWorkflowStep(input.deploy, DEPLOY_SECRET_GATE_STEP) ?? "";
+
+  if (gate === "") {
+    problems.push(
+      "deploy.yml has no required-Fly-secret gate, so a missing FREEHIRE_API_KEY could only fail at boot",
+    );
+  } else {
+    if (!gate.includes(`REQUIRE_FREEHIRE_API_KEY: \${{ vars.REQUIRE_FREEHIRE_API_KEY }}`)) {
+      problems.push(
+        "deploy.yml does not read the REQUIRE_FREEHIRE_API_KEY repository variable, so the freehire key cannot be opt-in",
+      );
+    }
+
+    const unconditional = gate
+      .split("\n")
+      .filter((line) => /^\s*required="/u.test(line) && !line.includes("$required"))
+      .some((line) => line.includes("FREEHIRE_API_KEY"));
+
+    if (unconditional) {
+      problems.push(
+        "deploy.yml requires FREEHIRE_API_KEY on every deploy; it must stay behind REQUIRE_FREEHIRE_API_KEY until the owner buys the freehire API plan",
+      );
+    }
+
+    const optIn = shellBlockAfter(gate, FREEHIRE_OPT_IN_CONDITION);
+
+    if (optIn === null) {
+      problems.push(
+        "deploy.yml does not gate FREEHIRE_API_KEY behind REQUIRE_FREEHIRE_API_KEY, so the deploy fails before the plan is bought",
+      );
+    } else if (!optIn.includes('required="$required FREEHIRE_API_KEY"')) {
+      problems.push(
+        "deploy.yml does not add FREEHIRE_API_KEY to the required list inside the REQUIRE_FREEHIRE_API_KEY gate",
+      );
+    }
+
+    if (/secrets(?:\.|\[\s*['"]?)FREEHIRE_API_KEY\b/u.test(input.deploy)) {
+      problems.push(
+        "deploy.yml reads the FREEHIRE_API_KEY secret value; the automatic deploy only checks names, and an automatic workflow must never hold a spend key",
+      );
+    }
+  }
+
+  const sync = readWorkflowStep(input.opsLive, SYNC_OPS_SECRETS_STEP) ?? "";
+
+  if (sync === "") {
+    problems.push(
+      "ops-live.yml has no sync-ops-secrets step, so FREEHIRE_API_KEY never reaches overture-web",
+    );
+  } else {
+    if (!sync.includes(`FREEHIRE_API_KEY: \${{ secrets.FREEHIRE_API_KEY }}`)) {
+      problems.push(
+        "ops-live.yml sync-ops-secrets does not read FREEHIRE_API_KEY from the repository secrets",
+      );
+    }
+
+    if (!sync.includes("::add-mask::$FREEHIRE_API_KEY")) {
+      problems.push(
+        "ops-live.yml sync-ops-secrets does not mask FREEHIRE_API_KEY before it reaches a command",
+      );
+    }
+
+    const conditional = shellBlockAfter(sync, FREEHIRE_PRESENT_CONDITION);
+
+    if (conditional === null) {
+      problems.push(
+        "ops-live.yml sync-ops-secrets does not guard FREEHIRE_API_KEY with a non-empty check, so an unset secret would be sent as an empty value",
+      );
+    } else if (!conditional.includes('set_args+=("FREEHIRE_API_KEY=$FREEHIRE_API_KEY")')) {
+      problems.push(
+        "ops-live.yml sync-ops-secrets does not import FREEHIRE_API_KEY inside the non-empty check",
+      );
+    }
   }
 
   return problems;
