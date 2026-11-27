@@ -9,7 +9,6 @@ import { mapQuestionByRules } from "./question-rules.ts";
 const canadianProfile = {
   ...emptyTargets,
   locations: ["city:ca:toronto", "country:us", "country:gb", "country:de", "country:au"],
-  workplaces: ["remote" as const, "hybrid" as const, "onsite" as const],
 };
 
 const torontoFacts = new Map<string, DerivationFact>([
@@ -86,65 +85,6 @@ describe("target countries", () => {
   test("does not answer when the option list lacks the target country", () => {
     expect(
       deriveAnswer("target_countries", input({ fieldType: "multiselect", options: ["France"] })),
-    ).toBeNull();
-  });
-});
-
-describe("target workplace", () => {
-  test("answers a remote question from a remote target", () => {
-    expect(
-      deriveAnswer(
-        "target_workplace",
-        input({
-          options: [
-            "Yes, I intend to work remotely.",
-            "No, I intend to work from an office location.",
-          ],
-          questionText:
-            "If this role offers the option to work from a remote location, do you plan to work remotely?",
-        }),
-      ),
-    ).toBe("Yes, I intend to work remotely.");
-  });
-
-  test("answers no to remote when only office work is wanted", () => {
-    expect(
-      deriveAnswer(
-        "target_workplace",
-        input({
-          options: [
-            "Yes, I intend to work remotely.",
-            "No, I intend to work from an office location.",
-          ],
-          questionText:
-            "If this role offers the option to work from a remote location, do you plan to work remotely?",
-          targets: { ...canadianProfile, workplaces: ["onsite"] },
-        }),
-      ),
-    ).toBe("No, I intend to work from an office location.");
-  });
-
-  test("answers an office question from a hybrid target", () => {
-    expect(
-      deriveAnswer(
-        "target_workplace",
-        input({
-          questionText:
-            "Are you open to working from the South San Francisco office at least 2-3 days per week?",
-        }),
-      ),
-    ).toBe("Yes");
-  });
-
-  test("does not answer when Targets name no workplace", () => {
-    expect(
-      deriveAnswer(
-        "target_workplace",
-        input({
-          questionText: "Are you open to working from the Sydney office on a hybrid schedule?",
-          targets: { ...canadianProfile, workplaces: [] },
-        }),
-      ),
     ).toBeNull();
   });
 });
@@ -374,24 +314,6 @@ describe("question rules for derivations", () => {
         "Please select the country or countries you anticipate working in for the role in which you are applying.",
       ),
     ).toEqual({ answerKind: "target", factKey: "target_countries" });
-
-    expect(
-      mapQuestionByRules(
-        "If this role offers the option to work from a remote location, do you plan to work remotely?",
-      ),
-    ).toEqual({ answerKind: "target", factKey: "target_workplace" });
-
-    expect(
-      mapQuestionByRules(
-        "Are you open to working from the South San Francisco office at least 2-3 days per week?",
-      ),
-    ).toEqual({ answerKind: "target", factKey: "target_workplace" });
-
-    expect(
-      mapQuestionByRules(
-        "This role is Sydney based. Are you willing to work out of our Sydney office on a hybrid schedule, 3 days a week?",
-      ),
-    ).toEqual({ answerKind: "target", factKey: "target_workplace" });
 
     expect(
       mapQuestionByRules(

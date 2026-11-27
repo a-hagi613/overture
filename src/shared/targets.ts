@@ -1,56 +1,48 @@
 import { z } from "zod";
 
 import { placeIdSchema } from "./places.ts";
-import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "./tag-taxonomy.ts";
 
 export const MAX_TARGET_ROLES = 20;
 export const MAX_TARGET_LOCATIONS = 20;
 
+/** A role target is a freehire category id or a free-text title word. */
 export const targetRoleSchema = z.string().trim().min(1).max(80);
 
 /** A saved location is a canonical place id; free text is never stored as one (issue #683). */
 export const targetLocationSchema = placeIdSchema;
 
-export const salaryCurrencySchema = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .regex(/^[A-Z]{3}$/u);
-
 export const targetsInputSchema = z
   .object({
+    /** freehire category ids, plus the title words the person typed. */
     roles: z.array(targetRoleSchema).max(MAX_TARGET_ROLES),
-    seniorities: z.array(z.enum(SENIORITIES)).max(SENIORITIES.length),
-    workplaces: z.array(z.enum(WORKPLACES)).max(WORKPLACES.length),
+    /** Legacy role targets that named more than one freehire category, kept for the person to resolve. */
+    unresolvedRoles: z.array(z.string().trim().min(1).max(120)).max(MAX_TARGET_ROLES).default([]),
     locations: z.array(targetLocationSchema).max(MAX_TARGET_LOCATIONS),
     unresolvedLocations: z
       .array(z.string().trim().min(2).max(120))
       .max(MAX_TARGET_LOCATIONS)
       .default([]),
-    employmentTypes: z.array(z.enum(EMPLOYMENT_TYPES)).max(EMPLOYMENT_TYPES.length),
-    salaryFloorMinor: z.number().int().nonnegative().max(100_000_000_000).nullable(),
-    salaryCurrency: salaryCurrencySchema.nullable(),
-    salaryPeriod: z.enum(["year", "month", "hour"]).default("year"),
   })
+  .strict()
   .superRefine((value, context) => {
-    if (value.salaryFloorMinor === null && value.salaryCurrency !== null) {
-      context.addIssue({
-        code: "custom",
-        message: "a currency needs a salary floor",
-        path: ["salaryCurrency"],
-      });
-    }
-
-    if (value.salaryFloorMinor !== null && value.salaryCurrency === null) {
-      context.addIssue({
-        code: "custom",
-        message: "a salary floor needs a currency",
-        path: ["salaryFloorMinor"],
-      });
-    }
-
     if (new Set(value.roles).size !== value.roles.length) {
       context.addIssue({ code: "custom", message: "roles must be unique", path: ["roles"] });
+    }
+
+    if (new Set(value.unresolvedRoles).size !== value.unresolvedRoles.length) {
+      context.addIssue({
+        code: "custom",
+        message: "unresolved roles must be unique",
+        path: ["unresolvedRoles"],
+      });
+    }
+
+    if (value.unresolvedRoles.some((role) => value.roles.includes(role))) {
+      context.addIssue({
+        code: "custom",
+        message: "a role is either resolved or unresolved, not both",
+        path: ["unresolvedRoles"],
+      });
     }
 
     if (new Set(value.locations).size !== value.locations.length) {
@@ -119,12 +111,7 @@ export type Targets = TargetsInput;
 
 export const emptyTargets: Targets = {
   roles: [],
-  seniorities: [],
-  workplaces: [],
+  unresolvedRoles: [],
   locations: [],
   unresolvedLocations: [],
-  employmentTypes: [],
-  salaryFloorMinor: null,
-  salaryCurrency: null,
-  salaryPeriod: "year",
 };

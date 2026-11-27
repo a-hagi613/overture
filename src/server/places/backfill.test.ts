@@ -35,18 +35,12 @@ function insertTargets(
 ) {
   db.insert(targets)
     .values({
-      employmentTypes: "[]",
       locations: JSON.stringify(locations),
       roles: "[]",
-      salaryCurrency: null,
-      salaryFloorMinor: null,
-      salaryPeriod: "year",
-      seniorities: "[]",
       unresolvedLocations: JSON.stringify(unresolved),
       updatedAt: new Date(NOW),
       userId: "user-1",
       version: 1,
-      workplaces: "[]",
     })
     .run();
 }

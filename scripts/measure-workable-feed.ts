@@ -57,39 +57,21 @@ const profiles = [
         "Infrastructure Engineer",
         "Site Reliability Engineer",
       ],
-      seniorities: ["senior", "staff"],
-      workplaces: ["remote", "hybrid"],
       locations: ["Toronto, ON", "Vancouver, BC", "Austin, TX"],
-      employmentTypes: ["full_time"],
-      salaryFloorMinor: 14_000_000,
-      salaryCurrency: "CAD",
-      salaryPeriod: "year",
     }),
   },
   {
     name: "frontend-us",
     targets: targetsInputSchema.parse({
       roles: ["Frontend Engineer", "Full-stack Engineer", "Software Engineer"],
-      seniorities: ["mid", "senior"],
-      workplaces: ["remote", "hybrid"],
       locations: ["New York, NY", "San Francisco, CA", "Seattle, WA", "United States"],
-      employmentTypes: ["full_time"],
-      salaryFloorMinor: null,
-      salaryCurrency: null,
-      salaryPeriod: "year",
     }),
   },
   {
     name: "data-ml-europe",
     targets: targetsInputSchema.parse({
       roles: ["Data Scientist", "Data Engineer", "Machine Learning Engineer"],
-      seniorities: ["mid", "senior", "staff"],
-      workplaces: ["remote"],
       locations: ["United Kingdom", "Germany", "Netherlands", "Ireland"],
-      employmentTypes: ["full_time"],
-      salaryFloorMinor: null,
-      salaryCurrency: null,
-      salaryPeriod: "year",
     }),
   },
   {
@@ -111,13 +93,7 @@ const profiles = [
         "Security",
         "QA",
       ],
-      seniorities: ["mid", "senior", "staff", "principal"],
-      workplaces: ["remote", "hybrid", "onsite"],
       locations: ["United States", "Canada", "United Kingdom", "Germany", "Netherlands", "Ireland"],
-      employmentTypes: ["full_time"],
-      salaryFloorMinor: null,
-      salaryCurrency: null,
-      salaryPeriod: "year",
     }),
   },
 ];
@@ -165,22 +141,10 @@ function targetConditions(
 ) {
   const { targets } = profile;
 
-  const salaryMeets =
-    targets.salaryFloorMinor === null ||
-    targets.salaryCurrency === null ||
-    tags.salaryMinMinor === null ||
-    tags.salaryCurrency === null ||
-    tags.salaryCurrency.toUpperCase() !== targets.salaryCurrency ||
-    tags.salaryMinMinor >= targets.salaryFloorMinor;
-
   return {
-    workplace: targets.workplaces.includes(tags.workplace),
-    employment: targets.employmentTypes.includes(tags.employmentType),
     language: tags.language !== null && languages.has(tags.language),
-    seniority: tags.seniority !== null && targets.seniorities.includes(tags.seniority),
     role: workableRoleMatches({ ...job, tags }, targets.roles, committedRoleLabels()),
     location: targets.locations.some((place) => locationMatches(place, tags, locationRaw)),
-    salary: salaryMeets,
   };
 }
 
@@ -367,7 +331,6 @@ function handleJob(fields: Record<string, string>) {
       region: tags.region ?? "",
       taggedCity: tags.city ?? "",
       salaryMinMinor: tags.salaryMinMinor,
-      salaryCurrency: tags.salaryCurrency ?? "",
     });
 
     taggedLines.push(taggedLine);
@@ -528,8 +491,6 @@ const report = {
       .map(([name, count]) => [name, Number((count / Math.max(jobs, 1)).toFixed(4))]),
   ),
   roles: Object.fromEntries([...roleCounts.entries()].toSorted((a, b) => b[1] - a[1])),
-  seniorities: Object.fromEntries([...seniorityCounts.entries()].toSorted((a, b) => b[1] - a[1])),
-  workplaces: Object.fromEntries([...workplaceCounts.entries()].toSorted((a, b) => b[1] - a[1])),
   employmentTypes: Object.fromEntries(
     [...employmentCounts.entries()].toSorted((a, b) => b[1] - a[1]),
   ),

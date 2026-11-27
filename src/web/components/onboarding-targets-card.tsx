@@ -2,82 +2,23 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useRef, useState } from "react";
 import { Link } from "react-router";
 
-import type { OnboardingTargetChoices, OnboardingTargetsView } from "../../shared/onboarding.ts";
+import type { OnboardingTargetsView } from "../../shared/onboarding.ts";
 import type { PlaceSuggestion } from "../../shared/places.ts";
-import type { RoleCategoryId } from "../../shared/role-taxonomy.ts";
-import type { Seniority, Workplace } from "../../shared/tag-taxonomy.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 import type { SkipCompany } from "../lib/profile-api.ts";
 
 import { copy } from "../../shared/copy.ts";
-import {
-  DEFAULT_ONBOARDING_CATEGORY,
-  ONBOARDING_SENIORITIES,
-  onboardingCategoryForRole,
-} from "../../shared/onboarding-options.ts";
-import { OnboardingTargetChip } from "./onboarding-target-chip.tsx";
-import { OnboardingTargetChipGroup } from "./onboarding-target-chip-group.tsx";
+import { OnboardingBlockedEmployers } from "./onboarding-blocked-employers.tsx";
 import { OnboardingTargetsLocations } from "./onboarding-targets-locations.tsx";
-import { OnboardingTargetsOptional } from "./onboarding-targets-optional.tsx";
-import { OnboardingTargetsRoles } from "./onboarding-targets-roles.tsx";
+import { RoleTargetsEditor } from "./role-targets-editor.tsx";
 import { Button } from "./ui/button.tsx";
 import { Card } from "./ui/card.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
 
-const moneyFormat = new Intl.NumberFormat("en-US");
-
-const seniorityLabels: Record<Seniority, string> = {
-  director: "Director",
-  entry: "Junior",
-  intern: "Intern",
-  manager: "Manager",
-  mid: copy.profile.targets.mid,
-  principal: copy.profile.targets.lead,
-  senior: copy.profile.targets.senior,
-  staff: copy.profile.targets.staff,
-};
-
-const workplaceLabels: Record<Workplace, string> = {
-  hybrid: copy.profile.targets.hybrid,
-  onsite: copy.profile.targets.onSite,
-  remote: copy.profile.targets.remote,
-  unknown: "Unknown",
-};
-
-function toggle<T extends string>(values: readonly T[], value: T) {
-  if (values.includes(value)) {
-    return values.filter((candidate) => candidate !== value);
-  }
-
-  return [...values, value];
-}
-
-function choicesWithSelected<T extends string>(choices: readonly T[], selected: readonly T[]) {
-  const merged = [...choices];
-
-  for (const value of selected) {
-    if (!merged.includes(value)) {
-      merged.push(value);
-    }
-  }
-
-  return merged;
-}
-
-function salaryText(floorMinor: number | null) {
-  return floorMinor === null ? "" : moneyFormat.format(floorMinor / 100);
-}
-
-function floorFromInput(raw: string) {
-  const digits = raw.replaceAll(/[^0-9]/gu, "");
-
-  return digits === "" ? null : Number(digits) * 100;
-}
-
-function initialCategoryFor(roles: readonly string[]) {
-  const [first] = roles;
-
-  return first === undefined ? DEFAULT_ONBOARDING_CATEGORY : onboardingCategoryForRole(first);
+function toggleCategory(roles: readonly string[], categoryId: string) {
+  return roles.includes(categoryId)
+    ? roles.filter((role) => role !== categoryId)
+    : [...roles, categoryId];
 }
 
 export function OnboardingTargetsCard({
@@ -105,19 +46,11 @@ export function OnboardingTargetsCard({
 }) {
   const [draft, setDraft] = useState<TargetsInput>(view.targets);
   const [places, setPlaces] = useState<PlaceSuggestion[]>(view.places);
-  const [salary, setSalary] = useState(() => salaryText(view.targets.salaryFloorMinor));
-
-  const [category, setCategory] = useState<RoleCategoryId>(() =>
-    initialCategoryFor(view.targets.roles),
-  );
-
   const [savedMatchedCount, setSavedMatchedCount] = useState<number | null>(null);
   const matchedCount = savedMatchedCount ?? view.matchedCount;
   const [failed, setFailed] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const sequence = useRef(0);
-
-  const currency = draft.salaryCurrency ?? view.currencies[0] ?? "CAD";
 
   const commit = async (next: TargetsInput) => {
     setDraft(next);
@@ -147,25 +80,7 @@ export function OnboardingTargetsCard({
     }
   };
 
-  const choices: OnboardingTargetChoices = view.choices;
-  const workplaces = choicesWithSelected(choices.workplaces, draft.workplaces);
-  const seniorities = choicesWithSelected(ONBOARDING_SENIORITIES, draft.seniorities);
-
-  const complete =
-    draft.roles.length > 0 &&
-    draft.locations.length > 0 &&
-    draft.workplaces.length > 0 &&
-    draft.seniorities.length > 0;
-
-  const commitSalary = (raw: string) => {
-    const floor = floorFromInput(raw);
-
-    void commit({
-      ...draft,
-      salaryCurrency: floor === null ? null : currency,
-      salaryFloorMinor: floor,
-    });
-  };
+  const complete = draft.roles.length > 0 && draft.locations.length > 0;
 
   const continueOn = async () => {
     if (continuing) {
@@ -195,14 +110,38 @@ export function OnboardingTargetsCard({
       <p className={`${dsBody} mt-1.5 max-w-xl`}>{copy.onboarding.wantIntro}</p>
 
       <div className="mt-6 space-y-5">
-        <OnboardingTargetsRoles
-          category={category}
-          onCategoryChange={setCategory}
-          onToggleRole={(role) => {
-            void commit({ ...draft, roles: toggle(draft.roles, role) });
+        <RoleTargetsEditor
+          idPrefix="onboarding"
+          onAddCategory={(categoryId) => {
+            void commit({ ...draft, roles: toggleCategory(draft.roles, categoryId) });
           }}
-          roleCounts={choices.roleCounts}
-          selectedRoles={draft.roles}
+          onAddTitleWord={(word) => {
+            void commit({
+              ...draft,
+              roles: draft.roles.includes(word) ? draft.roles : [...draft.roles, word],
+            });
+          }}
+          onDismissRole={(role) => {
+            void commit({
+              ...draft,
+              unresolvedRoles: draft.unresolvedRoles.filter((candidate) => candidate !== role),
+            });
+          }}
+          onRemoveCategory={(categoryId) => {
+            void commit({ ...draft, roles: draft.roles.filter((role) => role !== categoryId) });
+          }}
+          onRemoveTitleWord={(word) => {
+            void commit({ ...draft, roles: draft.roles.filter((role) => role !== word) });
+          }}
+          onResolveRole={(role, categoryId) => {
+            void commit({
+              ...draft,
+              roles: draft.roles.includes(categoryId) ? draft.roles : [...draft.roles, categoryId],
+              unresolvedRoles: draft.unresolvedRoles.filter((candidate) => candidate !== role),
+            });
+          }}
+          roles={draft.roles}
+          unresolvedRoles={draft.unresolvedRoles}
         />
 
         <OnboardingTargetsLocations
@@ -229,72 +168,31 @@ export function OnboardingTargetsCard({
         />
 
         <div className="border-t border-border pt-5">
-          <OnboardingTargetChipGroup
-            headingId="w-work"
-            label={copy.onboarding.workplace}
-            note={copy.onboarding.atLeastOne}
-          >
-            {workplaces.map((workplace) => (
-              <OnboardingTargetChip
-                key={workplace}
-                on={draft.workplaces.includes(workplace)}
-                onClick={() => {
-                  void commit({ ...draft, workplaces: toggle(draft.workplaces, workplace) });
-                }}
-              >
-                {workplaceLabels[workplace]}
-              </OnboardingTargetChip>
-            ))}
-          </OnboardingTargetChipGroup>
-        </div>
-
-        <div className="border-t border-border pt-5">
-          <OnboardingTargetChipGroup
-            headingId="w-sen"
-            label={copy.onboarding.seniority}
-            note={copy.onboarding.atLeastOne}
-          >
-            {seniorities.map((seniority) => (
-              <OnboardingTargetChip
-                key={seniority}
-                on={draft.seniorities.includes(seniority)}
-                onClick={() => {
-                  void commit({ ...draft, seniorities: toggle(draft.seniorities, seniority) });
-                }}
-              >
-                {seniorityLabels[seniority]}
-              </OnboardingTargetChip>
-            ))}
-          </OnboardingTargetChipGroup>
-        </div>
-
-        <OnboardingTargetsOptional
-          currentEmployer={currentEmployer}
-          onCommitSalary={commitSalary}
-          onSalaryChange={setSalary}
-          onSaveCurrentEmployer={async (name) => {
-            try {
-              await saveCurrentEmployer(name);
-            } catch {
-              if (!preview) {
-                setFailed(true);
+          <OnboardingBlockedEmployers
+            currentEmployer={currentEmployer}
+            onSaveCurrentEmployer={async (name) => {
+              try {
+                await saveCurrentEmployer(name);
+              } catch {
+                if (!preview) {
+                  setFailed(true);
+                }
               }
-            }
-          }}
-          onSaveSkip={async (next) => {
-            try {
-              return await saveSkip(next);
-            } catch (error) {
-              if (!preview) {
-                setFailed(true);
-              }
+            }}
+            onSaveSkip={async (next) => {
+              try {
+                return await saveSkip(next);
+              } catch (error) {
+                if (!preview) {
+                  setFailed(true);
+                }
 
-              throw error;
-            }
-          }}
-          salary={salary}
-          skipCompanies={skipCompanies}
-        />
+                throw error;
+              }
+            }}
+            skipCompanies={skipCompanies}
+          />
+        </div>
       </div>
 
       {failed ? (

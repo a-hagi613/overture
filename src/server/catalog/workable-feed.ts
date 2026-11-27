@@ -1,12 +1,7 @@
 import { Parser } from "htmlparser2";
 import { z } from "zod";
 
-import {
-  EMPLOYMENT_TYPES,
-  SENIORITIES,
-  WORKPLACES,
-  postingTagsSchema,
-} from "../../shared/tag-taxonomy.ts";
+import { postingTagsSchema } from "../../shared/tag-taxonomy.ts";
 import { taxonomyRoleTags } from "./taxonomy-tags.ts";
 import { planRoleTargets, roleMatchScore } from "../matching/role-targets.ts";
 import { locationTextsOfPlaceIds } from "../places/catalog.ts";
@@ -26,9 +21,6 @@ export const workableTargetsSchema = z.object({
   generatedAt: z.string().min(1),
   roles: z.array(z.string().min(1)),
   locations: z.array(z.string().min(1)),
-  seniorities: z.array(z.enum(SENIORITIES)),
-  workplaces: z.array(z.enum(WORKPLACES)),
-  employmentTypes: z.array(z.enum(EMPLOYMENT_TYPES)),
 });
 
 export type WorkableTargets = z.infer<typeof workableTargetsSchema>;
@@ -217,24 +209,6 @@ export function workableTargetMatches(
   const { tags } = job;
 
   if (targets.roles.length === 0 || !workableRoleMatches(job, targets.roles, labels)) {
-    return false;
-  }
-
-  if (
-    targets.seniorities.length > 0 &&
-    (tags.seniority === null || !targets.seniorities.includes(tags.seniority))
-  ) {
-    return false;
-  }
-
-  if (targets.workplaces.length > 0 && !targets.workplaces.includes(tags.workplace)) {
-    return false;
-  }
-
-  if (
-    targets.employmentTypes.length > 0 &&
-    !targets.employmentTypes.includes(tags.employmentType)
-  ) {
     return false;
   }
 

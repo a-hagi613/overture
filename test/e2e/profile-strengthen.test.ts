@@ -71,13 +71,7 @@ const jobsResponseSchema = z.object({
 
 const targets = {
   roles: ["Platform Engineer", "DevOps Engineer"],
-  seniorities: ["senior"],
-  workplaces: ["remote"],
   locations: ["city:ca:toronto"],
-  employmentTypes: ["full_time"],
-  salaryFloorMinor: null,
-  salaryCurrency: null,
-  salaryPeriod: "year",
 };
 
 const applications = [

@@ -99,14 +99,10 @@ const personaFacts = [
 ];
 
 const personaTargets = {
-  employmentTypes: ["full_time"],
   locations: ["city:ca:toronto", "country:us", "country:gb", "country:de", "country:au"],
   roles: ["Backend"],
-  salaryCurrency: null,
-  salaryFloorMinor: null,
-  salaryPeriod: "year",
-  seniorities: ["senior"],
-  workplaces: ["remote", "hybrid", "onsite"],
+  unresolvedLocations: [],
+  unresolvedRoles: [],
 };
 
 const allQuestions = recordedQuestions("stripe", "8172510");
@@ -225,14 +221,33 @@ async function seedStripePosting(
 }
 
 async function prepare(owner: APIRequestContext, applicationId: string) {
-  const response = await owner.post("/__test__/jobs/run-now", {
-    data: {
-      kind: "application.prepare",
-      payload: JSON.stringify({ applicationId }),
-    },
-  });
+  const runPrepare = async () => {
+    const response = await owner.post("/__test__/jobs/run-now", {
+      data: {
+        kind: "application.prepare",
+        payload: JSON.stringify({ applicationId }),
+      },
+    });
 
-  expect(response.ok()).toBe(true);
+    expect(response.ok()).toBe(true);
+  };
+
+  await runPrepare();
+
+  const openReviews = z
+    .object({ reviews: z.array(z.looseObject({ id: z.string(), prompt: z.string() })) })
+    .parse(await (await owner.get("/api/reviews")).json());
+
+  const remote = openReviews.reviews.find((review) => review.prompt.includes("remote location"));
+
+  if (remote !== undefined) {
+    const answered = await owner.post(`/api/reviews/${remote.id}/answer`, {
+      data: { value: "Yes, I intend to work remotely." },
+    });
+
+    expect(answered.ok()).toBe(true);
+    await runPrepare();
+  }
 }
 
 async function runSend(owner: APIRequestContext, applicationId: string) {

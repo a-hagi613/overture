@@ -44,13 +44,9 @@ export type UpNext = z.infer<typeof upNextSchema>;
 
 export const defaultTargets = {
   roles: ["Backend"],
-  seniorities: ["senior"],
-  workplaces: ["remote"],
+  unresolvedRoles: [],
   locations: ["city:ca:toronto"],
-  employmentTypes: ["full_time"],
-  salaryFloorMinor: 10_000_000,
-  salaryCurrency: "CAD",
-  salaryPeriod: "year",
+  unresolvedLocations: [],
 };
 
 export const basePosting = {

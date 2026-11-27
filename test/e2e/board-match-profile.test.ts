@@ -33,19 +33,16 @@ const test = appTest.extend<{ boardServer: AppServer }>({
 
 const boardTargets = {
   roles: [
+    "backend",
     "Platform Engineer",
     "Senior Backend Engineer",
     "DevOps Engineer",
     "Infrastructure Engineer",
     "Site Reliability Engineer",
   ],
-  seniorities: ["senior", "staff"],
-  workplaces: ["remote", "hybrid"],
+  unresolvedRoles: [],
   locations: ["city:ca:toronto", "city:ca:vancouver", "city:us:austin"],
-  employmentTypes: ["full_time"],
-  salaryFloorMinor: 14_000_000,
-  salaryCurrency: "CAD",
-  salaryPeriod: "year",
+  unresolvedLocations: [],
 };
 
 const createdSchema = z.object({ id: z.string() });
@@ -85,6 +82,19 @@ async function seedOwner(request: APIRequestContext, appServerUrl: string) {
   });
 
   await request.put("/api/profile/targets", { data: boardTargets });
+}
+
+function jobPage(offset: number, count: number) {
+  return {
+    jobs: Array.from({ length: count }, (_, index) => ({
+      category: "backend",
+      cities: ["Toronto"],
+      company: "Board Seed Co",
+      countries: ["ca"],
+      public_slug: `board-job-${String(offset + index)}`,
+      title: `Senior Backend Engineer ${String(offset + index)}`,
+    })),
+  };
 }
 
 async function seedMatchingPostings(request: APIRequestContext) {
@@ -130,6 +140,13 @@ async function seedMatchingPostings(request: APIRequestContext) {
 
   if (!seeded.ok()) {
     throw new Error(`posting seed failed: ${String(seeded.status())}`);
+  }
+
+  const firstJobs = await request.post("/__test__/jobs/seed", { data: jobPage(0, 200) });
+  const secondJobs = await request.post("/__test__/jobs/seed", { data: jobPage(200, 13) });
+
+  if (!firstJobs.ok() || !secondJobs.ok()) {
+    throw new Error("job seed failed");
   }
 }
 

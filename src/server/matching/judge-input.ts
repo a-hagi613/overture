@@ -3,15 +3,13 @@ import { gunzipSync } from "node:zlib";
 import type { TargetsInput } from "../../shared/targets.ts";
 
 import { describePlaceIds } from "../places/catalog.ts";
-import { legacyTargetToTaxonomy } from "../catalog/legacy-roles.ts";
+import { freehireCategoryName, isFreehireCategory } from "../../shared/freehire-categories.ts";
 import { roleTaxonomyName } from "../../shared/role-taxonomy.ts";
 
 const SUMMARY_WORDS = 200;
 const SUMMARY_CHARS = 2000;
 
 const ROLE_TAG_DIMENSIONS = ["granular_role", "subrole", "role"] as const;
-
-const MONEY = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 /**
  * The most specific role a Posting's tags name, as a readable name: its role, else its subcategory, else its category.
@@ -71,41 +69,27 @@ export function descriptionSummary(descriptionGz: Uint8Array | null) {
   }
 }
 
-function payFloor(targets: TargetsInput) {
-  if (targets.salaryFloorMinor === null || targets.salaryCurrency === null) {
-    return null;
-  }
-
-  return `${targets.salaryCurrency} ${MONEY.format(Math.round(targets.salaryFloorMinor / 100))}/${targets.salaryPeriod}`;
-}
-
 /**
  * The `targets:` line the scorer reads, so it judges the Posting against what the person asked for and not only the
- * resume: role names, levels, places, workplaces and the pay floor.
- * @param targets The person's saved targets.
- * @returns One line such as `roles: Registered Nurse; level: mid; places: Houston, TX; pay floor: USD 70,000/year`.
+ * resume: the role categories they picked and the title words they typed, plus their places. Role and place are the
+ * only hard filters (issue #684); level, workplace and pay are not preferences any more.
+ * @param targets The person's saved preferences.
+ * @returns One line such as `roles: Healthcare, ICU charge nurse; places: Houston, TX`.
  */
 export function targetsLine(targets: TargetsInput) {
   const roles = [
     ...new Set(
-      targets.roles.flatMap((role) =>
-        legacyTargetToTaxonomy(role).map((value) => roleTaxonomyName(value)),
-      ),
+      targets.roles.map((role) => (isFreehireCategory(role) ? freehireCategoryName(role) : role)),
     ),
   ];
 
-  const pay = payFloor(targets);
-
   return [
     roles.length === 0 ? null : `roles: ${roles.join(", ")}`,
-    targets.seniorities.length === 0 ? null : `level: ${targets.seniorities.join(", ")}`,
     targets.locations.length === 0
       ? null
       : `places: ${describePlaceIds(targets.locations)
           .map((place) => (place.meta === "" ? place.label : `${place.label}, ${place.meta}`))
           .join(" or ")}`,
-    targets.workplaces.length === 0 ? null : `workplace: ${targets.workplaces.join(", ")}`,
-    pay === null ? null : `pay floor: ${pay}`,
   ]
     .filter((part) => part !== null)
     .join("; ");

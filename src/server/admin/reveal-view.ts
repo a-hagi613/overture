@@ -259,11 +259,10 @@ export async function buildActAsView(
       targetRow === undefined
         ? null
         : {
-            employmentTypes: readStringList(targetRow.employmentTypes),
             locations: readStringList(targetRow.locations),
             roles: readStringList(targetRow.roles),
-            seniorities: readStringList(targetRow.seniorities),
-            workplaces: readStringList(targetRow.workplaces),
+            unresolvedLocations: readStringList(targetRow.unresolvedLocations),
+            unresolvedRoles: readStringList(targetRow.unresolvedRoles),
           },
     resume: await resumeView(db, personal, targetUserId),
     facts: await readRevealedFacts(db, personal, targetUserId),

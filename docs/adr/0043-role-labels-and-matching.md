@@ -8,6 +8,16 @@ Issue #660 replaces the 28 tech-leaning role groups and the word-overlap role ma
 taxonomy (`src/shared/role-taxonomy.ts`, #661). This records how Postings get their role, how a person's targets meet
 it, and what the scorer reads, and the measurements that chose each part.
 
+> **Superseded in part (2026-11-26, #684).** The owner moved matching to freehire's own job data. Roles are now
+> freehire's ~55 job categories (`src/shared/freehire-categories.ts`) plus optional title words the person types, and
+> a job matches when its freehire `category` is picked **or** its title contains a picked word. The 29-category
+> taxonomy, its 272 roles and the AI role labelling pass are retired for new matching. Work mode, salary, seniority
+> and employment type are no longer saved preferences or code filters; they stay read-only data on a job and the
+> scorer reads level from the resume and the description. Saved targets are migrated: a value that names exactly one
+> freehire category is converted, and an ambiguous legacy value is kept in `unresolved_roles` for the person to
+> resolve. Role and location remain the only hard filters (SPEC §6.4, §8.1). The sections below record the retired
+> design and why it was replaced.
+
 ## Context
 
 About 4.5% of the catalog passed the old match filters, and the role match was a word overlap (`Backend` matched any

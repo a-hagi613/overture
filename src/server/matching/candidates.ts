@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 
 import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
@@ -21,19 +21,11 @@ import {
   sameRegion,
 } from "../catalog/geo.ts";
 import { ACTIVE_APPLICATION_STATUSES } from "./applications.ts";
-import { salaryMeetsFloor } from "./fx.ts";
 import { countryInRegion, remoteRegionOf } from "./regions.ts";
 import { locationTextsOfPlaceIds } from "../places/catalog.ts";
 import { skipMatches } from "./skip-match.ts";
 import { flaggedPostingIds } from "./posting-flags.ts";
-import {
-  employmentAccepted,
-  languageAccepted,
-  nearestSeniorityDistance,
-  optionalFieldConditions,
-  seniorityAccepted,
-  workplaceAccepted,
-} from "./optional-fields.ts";
+import { languageAccepted } from "./optional-fields.ts";
 import { planRoleTargets, roleMatchScore, roleTargetCondition } from "./role-targets.ts";
 
 import type { SkipTarget } from "./skip-match.ts";
@@ -256,19 +248,6 @@ function locationMatch(
   return { matched: best > 0, score: best };
 }
 
-function seniorityScore(posting: CandidatePosting, targetSeniorities: readonly string[]) {
-  const distance = nearestSeniorityDistance(
-    posting.tags.filter((tag) => tag.dimension === "seniority").map((tag) => tag.value),
-    targetSeniorities,
-  );
-
-  if (distance === 0) {
-    return 20;
-  }
-
-  return distance === 1 ? 10 : 0;
-}
-
 function recencyScore(postedAt: number | null, at: number) {
   if (postedAt === null) {
     return 0;
@@ -323,12 +302,8 @@ type FilterReason =
   | "closed"
   | "apply_unsupported"
   | "role"
-  | "seniority"
-  | "workplace"
-  | "employment_type"
   | "language"
   | "location"
-  | "salary"
   | "skip_list"
   | "current_employer"
   | "already_applied"
@@ -344,33 +319,11 @@ interface Verdict {
   reason: FilterReason | null;
   roleScore: number;
   locationScore: number;
-  salaryKnown: boolean;
-  seniority: number;
 }
 
-function targetBasicsMatch(
-  posting: CandidatePosting,
-  targets: TargetsInput,
-  rolePlan: RoleTargetPlan,
-) {
-  if (!workplaceAccepted(posting.workplace, targets.workplaces)) {
-    return "workplace" satisfies FilterReason;
-  }
-
-  if (!employmentAccepted(posting.employmentType, targets.employmentTypes)) {
-    return "employment_type" satisfies FilterReason;
-  }
-
+function targetBasicsMatch(posting: CandidatePosting, rolePlan: RoleTargetPlan) {
   if (roleMatchScore(rolePlan, posting) === 0) {
     return "role" satisfies FilterReason;
-  }
-
-  const postingSeniorities = posting.tags
-    .filter((tag) => tag.dimension === "seniority")
-    .map((tag) => tag.value);
-
-  if (!seniorityAccepted(postingSeniorities, targets.seniorities)) {
-    return "seniority" satisfies FilterReason;
   }
 
   return null;
@@ -453,13 +406,7 @@ export function createCandidateService(deps: CandidateDeps) {
     const rolePlan = planRoleTargets(targets.roles);
     const roleCondition = roleTargetCondition(rolePlan);
 
-    if (
-      roleCondition === null ||
-      targets.seniorities.length === 0 ||
-      targets.workplaces.length === 0 ||
-      targets.employmentTypes.length === 0 ||
-      languages.length === 0
-    ) {
+    if (roleCondition === null || languages.length === 0) {
       return [];
     }
 
@@ -472,7 +419,14 @@ export function createCandidateService(deps: CandidateDeps) {
           isNull(postings.closedAt),
           eq(postings.status, "open"),
           eq(postings.applySupported, true),
-          ...optionalFieldConditions(catalogDb, { ...targets, languages }),
+          or(
+            isNull(postings.language),
+            eq(postings.language, ""),
+            inArray(
+              sql`lower(${postings.language})`,
+              languages.map((language) => language.toLowerCase()),
+            ),
+          ),
           roleCondition,
         ),
       )
@@ -505,9 +459,6 @@ export function createCandidateService(deps: CandidateDeps) {
   function pool(targets: TargetsInput, languages: readonly string[]) {
     const key = JSON.stringify([
       targets.roles.toSorted(),
-      targets.seniorities.toSorted(),
-      targets.workplaces.toSorted(),
-      targets.employmentTypes.toSorted(),
       languages.map((language) => language.toLowerCase()).toSorted(),
     ]);
 
@@ -713,8 +664,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "closed",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -723,8 +672,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "apply_unsupported",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -733,8 +680,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "language",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -747,8 +692,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "kill_switch",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -757,8 +700,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "hidden",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -767,20 +708,16 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "flagged",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
-    const basics = targetBasicsMatch(posting, context.targets, context.rolePlan);
+    const basics = targetBasicsMatch(posting, context.rolePlan);
 
     if (basics !== null) {
       return {
         reason: basics,
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -789,8 +726,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "already_applied",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -799,8 +734,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "open_application_company",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -809,8 +742,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "company_cooldown",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -819,8 +750,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "repost_guard",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -832,8 +761,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "crowd_limit",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -844,30 +771,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: "location",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
-      } satisfies Verdict;
-    }
-
-    const salary =
-      context.targets.salaryFloorMinor === null || context.targets.salaryCurrency === null
-        ? { known: false, meets: true }
-        : salaryMeetsFloor(
-            db,
-            context.at,
-            posting,
-            context.targets.salaryFloorMinor,
-            context.targets.salaryCurrency,
-            context.targets.salaryPeriod,
-          );
-
-    if (!salary.meets) {
-      return {
-        reason: "salary",
-        roleScore: 0,
-        locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -891,8 +794,6 @@ export function createCandidateService(deps: CandidateDeps) {
         reason: skip.reason === "current_employer" ? "current_employer" : "skip_list",
         roleScore: 0,
         locationScore: 0,
-        salaryKnown: false,
-        seniority: 0,
       } satisfies Verdict;
     }
 
@@ -900,8 +801,6 @@ export function createCandidateService(deps: CandidateDeps) {
       reason: null,
       roleScore: roleMatchScore(context.rolePlan, posting),
       locationScore: location.score,
-      salaryKnown: salary.known,
-      seniority: seniorityScore(posting, context.targets.seniorities),
     } satisfies Verdict;
   }
 
@@ -924,11 +823,7 @@ export function createCandidateService(deps: CandidateDeps) {
       rankedRows.push({
         ...posting,
         codeRank:
-          verdict.roleScore +
-          verdict.seniority +
-          verdict.locationScore +
-          (verdict.salaryKnown ? 10 : 0) +
-          recencyScore(posting.postedAt, context.at),
+          verdict.roleScore + verdict.locationScore + recencyScore(posting.postedAt, context.at),
       });
     }
 

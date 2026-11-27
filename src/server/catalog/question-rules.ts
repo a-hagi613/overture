@@ -77,15 +77,6 @@ const RULES: readonly { pattern: RegExp; mapping: RuleMapping }[] = [
     mapping: { answerKind: "target", factKey: "target_countries" },
   },
   {
-    pattern: /\b(?:option to work from a remote location|plan to work remotely|work remotely)\b/u,
-    mapping: { answerKind: "target", factKey: "target_workplace" },
-  },
-  {
-    pattern:
-      /\bopen to working from\b.*\boffice\b|\bwork out of\b.*\boffice\b|\bhybrid schedule\b/u,
-    mapping: { answerKind: "target", factKey: "target_workplace" },
-  },
-  {
     pattern: /\bwilling to relocate\b|\bcurrently located in one of\b.*\bhub/u,
     mapping: { answerKind: "target", factKey: "target_relocation" },
   },

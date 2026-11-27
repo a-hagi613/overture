@@ -52,6 +52,7 @@ import { openCatalogDatabase, openDatabase } from "./platform/db/client.ts";
 import type { CatalogDatabase } from "./platform/db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "./platform/db/migrate.ts";
 import { promoteStoredTargetPlaces, rebuildStoredJobPlaces } from "./places/backfill.ts";
+import { promoteStoredTargetRoles } from "./profile/role-migration.ts";
 import { createCatalogHotSwap } from "./catalog/hot-swap.ts";
 import type { CatalogHotSwap } from "./catalog/hot-swap.ts";
 import { createConfiguredObjectStore } from "./platform/object-store.ts";
@@ -314,6 +315,15 @@ if (promotedTargetPlaces > 0) {
   logInfo(
     "boot",
     `promoted saved locations to place ids on ${String(promotedTargetPlaces)} targets`,
+  );
+}
+
+const promotedTargetRoles = promoteStoredTargetRoles(db);
+
+if (promotedTargetRoles > 0) {
+  logInfo(
+    "boot",
+    `migrated saved roles to freehire categories on ${String(promotedTargetRoles)} targets`,
   );
 }
 

@@ -50,7 +50,7 @@ export const marketingCopy = {
       {
         label: "Step 1",
         title: "Set your Targets",
-        body: "Roles, locations, workplaces and the salary floor you want. Overture matches Postings against them.",
+        body: "The roles and places you want. Overture matches every job against them.",
       },
       {
         label: "Step 2",

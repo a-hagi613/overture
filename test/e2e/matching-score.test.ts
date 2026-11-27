@@ -182,11 +182,11 @@ test("the daily run fills the free Ready slots in rank order and never scores tw
   expect(scored).toHaveLength(10);
   expect(matching.anthropic.requests()).toHaveLength(10);
 
-  for (const id of paid) {
+  for (const id of unpaid) {
     expect(scored.some((row) => row.postingId === id)).toBe(true);
   }
 
-  for (const id of unpaid) {
+  for (const id of paid) {
     expect(scored.some((row) => row.postingId === id)).toBe(false);
   }
 
@@ -349,13 +349,9 @@ test("opening a posting scores it once, and manual apply works below the thresho
   await owner.put("/api/profile/targets", {
     data: {
       roles: ["Backend"],
-      seniorities: ["senior"],
-      workplaces: ["remote"],
+      unresolvedRoles: [],
       locations: ["city:ca:toronto", "city:ca:vancouver"],
-      employmentTypes: ["full_time"],
-      salaryFloorMinor: 10_000_000,
-      salaryCurrency: "CAD",
-      salaryPeriod: "year",
+      unresolvedLocations: [],
     },
   });
 

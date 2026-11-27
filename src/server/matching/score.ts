@@ -6,7 +6,6 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmOutputSchema, LlmPort, LlmRequest } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { RankedCandidate } from "./candidates.ts";
-import type { Targets } from "../../shared/targets.ts";
 
 import {
   applications,
@@ -89,21 +88,12 @@ function truncateReason(reason: string) {
 
 const SALARY_FORMAT = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
-function titleCase(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function whyBullets(candidate: RankedCandidate, targets: Targets) {
+function whyBullets(candidate: RankedCandidate) {
   const bullets: string[] = [];
   const role = postingRoleName(candidate.tags);
-  const seniority = candidate.tags.find((tag) => tag.dimension === "seniority")?.value;
 
   if (role !== null) {
     bullets.push(`Matches your ${role} target`);
-  }
-
-  if (seniority !== undefined && targets.seniorities.some((target) => target === seniority)) {
-    bullets.push(`${titleCase(seniority)} level, as you asked`);
   }
 
   if (candidate.workplace === "remote") {
@@ -724,7 +714,7 @@ export function createMatchingService(deps: MatchDeps) {
           company: candidate.companyName,
           workplace: candidate.workplace,
           reason: matched?.reason ?? null,
-          why: whyBullets(candidate, settings.targets),
+          why: whyBullets(candidate),
         };
       }),
     };

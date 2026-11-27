@@ -29,7 +29,6 @@ const test = appTest.extend<{ resumeServer: AppServer }>({
   ],
 });
 
-const createdSchema = z.object({ id: z.string() });
 const countSchema = z.object({ matchedCount: z.number() });
 const languagesSchema = z.object({ languages: z.array(z.string()) });
 
@@ -41,14 +40,10 @@ const profileSettingsSchema = z.object({
 });
 
 const baseTargets = {
-  roles: ["Backend"],
-  seniorities: ["senior"],
-  workplaces: ["remote"],
+  roles: ["backend"],
+  unresolvedRoles: [],
   locations: ["city:ca:ottawa"],
-  employmentTypes: ["full_time"],
-  salaryFloorMinor: null,
-  salaryCurrency: null,
-  salaryPeriod: "year",
+  unresolvedLocations: [],
 };
 
 async function ownerStorage(appServerUrl: string) {
@@ -65,73 +60,48 @@ async function ownerStorage(appServerUrl: string) {
   return { request, storageState };
 }
 
-async function seedPostings(appServerUrl: string) {
-  const company = createdSchema.parse(
-    await (
-      await fetch(`${appServerUrl}/__test__/catalog/companies`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Ui Target Co", domain: "ui-target.example" }),
-      })
-    ).json(),
-  );
-
-  const board = createdSchema.parse(
-    await (
-      await fetch(`${appServerUrl}/__test__/catalog/boards`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ companyId: company.id, ats: "greenhouse", boardToken: "ui-target" }),
-      })
-    ).json(),
-  );
-
-  const common = {
-    boardId: board.id,
-    companyId: company.id,
-    ats: "greenhouse",
-    employmentType: "full_time",
-    language: "en",
-    countryCode: "CA",
-    region: "Ontario",
-    city: "Ottawa",
-    tags: [
-      { dimension: "subrole", value: "Backend" },
-      { dimension: "seniority", value: "senior" },
-    ],
-  };
-
-  const response = await fetch(`${appServerUrl}/__test__/catalog/postings/bulk`, {
+async function seedJobs(appServerUrl: string) {
+  const response = await fetch(`${appServerUrl}/__test__/jobs/seed`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      postings: [
+      jobs: [
         {
-          ...common,
-          atsJobId: "ui-1",
-          url: "https://ui-target.example/1",
+          category: "backend",
+          cities: ["Ottawa"],
+          company: "Ui Target Co",
+          countries: ["ca"],
+          public_slug: "ui-senior-backend",
           title: "Senior Backend Engineer",
-          workplace: "remote",
         },
         {
-          ...common,
-          atsJobId: "ui-2",
-          url: "https://ui-target.example/2",
-          title: "Senior Backend Engineer",
-          workplace: "hybrid",
+          category: "backend",
+          cities: ["Ottawa"],
+          company: "Ui Target Co",
+          countries: ["ca"],
+          public_slug: "ui-backend",
+          title: "Backend Engineer",
+        },
+        {
+          category: "healthcare",
+          cities: ["Ottawa"],
+          company: "Ui Target Co",
+          countries: ["ca"],
+          public_slug: "ui-registered-nurse",
+          title: "Registered Nurse",
         },
       ],
     }),
   });
 
-  expect(response.ok).toBe(true);
+  expect(response.status).toBe(200);
 }
 
-test("the live count updates as targets are edited, and Save stores them", async ({
+test("the live count updates as title words are added, and Save stores them", async ({
   isolatedAppServer: { url: appServerUrl },
   browser,
 }) => {
-  await seedPostings(appServerUrl);
+  await seedJobs(appServerUrl);
 
   const { request, storageState } = await ownerStorage(appServerUrl);
 
@@ -142,99 +112,37 @@ test("the live count updates as targets are edited, and Save stores them", async
   const page = await context.newPage();
 
   await page.goto("/profile/preferences");
-  await expect(page.getByTestId("targets-matched-count")).toHaveText("1");
-
-  await page.getByRole("button", { name: "Hybrid" }).click();
   await expect(page.getByTestId("targets-matched-count")).toHaveText("2");
 
-  await page.getByRole("button", { name: "Remote" }).click();
-  await expect(page.getByTestId("targets-matched-count")).toHaveText("1");
+  await page.getByRole("textbox", { name: "Title words" }).fill("Registered");
+  await page.getByRole("button", { name: "Add word" }).click();
+  await expect(page.getByRole("button", { name: "Remove Registered" })).toBeVisible();
+  await expect(page.getByTestId("targets-matched-count")).toHaveText("3");
 
-  await page.getByRole("button", { name: "Remote" }).click();
+  await page.getByRole("button", { name: "Remove Registered" }).click();
   await expect(page.getByTestId("targets-matched-count")).toHaveText("2");
 
-  await page.getByRole("button", { name: "Save targets" }).click();
+  await page.getByRole("button", { name: "Save preferences" }).click();
 
   await page.reload();
   await expect(page.getByTestId("targets-matched-count")).toHaveText("2");
-  await expect(page.getByRole("button", { name: "Hybrid" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("button", { name: "Remove Backend" })).toBeVisible();
 
   const saved = countSchema.parse(
     await (await request.post("/api/profile/targets/match-count", { data: baseTargets })).json(),
   );
 
-  expect(saved.matchedCount).toBe(1);
+  expect(saved.matchedCount).toBe(2);
 
   await context.close();
   await request.dispose();
 });
 
-async function seedGranularPosting(appServerUrl: string) {
-  const company = createdSchema.parse(
-    await (
-      await fetch(`${appServerUrl}/__test__/catalog/companies`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Granular Target Co", domain: "granular-target.example" }),
-      })
-    ).json(),
-  );
-
-  const board = createdSchema.parse(
-    await (
-      await fetch(`${appServerUrl}/__test__/catalog/boards`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          companyId: company.id,
-          ats: "greenhouse",
-          boardToken: "granular-target",
-        }),
-      })
-    ).json(),
-  );
-
-  const response = await fetch(`${appServerUrl}/__test__/catalog/postings/bulk`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      postings: [
-        {
-          ats: "greenhouse",
-          atsJobId: "granular-1",
-          boardId: board.id,
-          city: "Ottawa",
-          companyId: company.id,
-          countryCode: "CA",
-          employmentType: "full_time",
-          language: "en",
-          locationRaw: "Ottawa, ON",
-          region: "Ontario",
-          tags: [
-            { dimension: "role", value: "Healthcare" },
-            { dimension: "granular_role", value: "Registered Nurse" },
-            { dimension: "seniority", value: "senior" },
-          ],
-          title: "Registered Nurse",
-          url: "https://granular-target.example/1",
-          workplace: "remote",
-        },
-      ],
-    }),
-  });
-
-  expect(response.ok).toBe(true);
-}
-
-test("a granular Level-2 role can be searched and added from Profile targets, and the count follows", async ({
+test("a freehire category can be searched and added from Profile, and the count follows", async ({
   isolatedAppServer: { url: appServerUrl },
   browser,
 }) => {
-  await seedPostings(appServerUrl);
-  await seedGranularPosting(appServerUrl);
+  await seedJobs(appServerUrl);
 
   const { request, storageState } = await ownerStorage(appServerUrl);
 
@@ -245,24 +153,20 @@ test("a granular Level-2 role can be searched and added from Profile targets, an
   const page = await context.newPage();
 
   await page.goto("/profile/preferences");
-  await expect(page.getByTestId("targets-matched-count")).toHaveText("1");
-
-  await page.getByLabel("Category", { exact: true }).selectOption("Healthcare");
-
-  const role = page.getByLabel("Add a specific role", { exact: true });
-
-  await role.fill("Registered Nurse");
-  await role.press("Enter");
-
-  await expect(page.getByRole("button", { name: "Registered Nurse" })).toBeVisible();
   await expect(page.getByTestId("targets-matched-count")).toHaveText("2");
 
-  await page.getByRole("button", { name: "Save targets" }).click();
+  await page.getByRole("button", { name: /^Add a role category/u }).click();
+  await page.getByRole("option", { exact: true, name: "Healthcare" }).click();
+
+  await expect(page.getByRole("button", { name: "Remove Healthcare" })).toBeVisible();
+  await expect(page.getByTestId("targets-matched-count")).toHaveText("3");
+
+  await page.getByRole("button", { name: "Save preferences" }).click();
 
   await page.reload();
 
-  await expect(page.getByRole("button", { name: "Registered Nurse" })).toBeVisible();
-  await expect(page.getByTestId("targets-matched-count")).toHaveText("2");
+  await expect(page.getByRole("button", { name: "Remove Healthcare" })).toBeVisible();
+  await expect(page.getByTestId("targets-matched-count")).toHaveText("3");
 
   const results = await new AxeBuilder({ page }).include("#profile-targets").analyze();
 
@@ -276,8 +180,6 @@ test("only a picked suggestion becomes a place pill, and an unresolved place can
   isolatedAppServer: { url: appServerUrl },
   browser,
 }) => {
-  await seedPostings(appServerUrl);
-
   const { request, storageState } = await ownerStorage(appServerUrl);
 
   await request.put("/api/profile/languages", { data: { languages: ["en"] } });
@@ -320,7 +222,7 @@ test("only a picked suggestion becomes a place pill, and an unresolved place can
 
   await expect(page.getByRole("button", { name: "Remove Ottawa" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Save targets" }).click();
+  await page.getByRole("button", { name: "Save preferences" }).click();
 
   await page.reload();
 
@@ -328,7 +230,7 @@ test("only a picked suggestion becomes a place pill, and an unresolved place can
   await expect(page.getByText("Victoria", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Dismiss Victoria" }).click();
-  await page.getByRole("button", { name: "Save targets" }).click();
+  await page.getByRole("button", { name: "Save preferences" }).click();
 
   await page.reload();
 
@@ -343,7 +245,7 @@ test("only a picked suggestion becomes a place pill, and an unresolved place can
   await request.dispose();
 });
 
-test("the skip list is prefilled from the resume, and companies add and remove", async ({
+test("the current employer and excluded employers are in the one Preferences card", async ({
   resumeServer: { url: appServerUrl },
   browser,
 }) => {
@@ -364,27 +266,27 @@ test("the skip list is prefilled from the resume, and companies add and remove",
 
   await page.goto("/profile/preferences");
 
-  const skip = page.locator("#profile-skip");
+  const card = page.locator("#profile-targets");
 
-  await expect(skip.getByText("Brightwave Analytics")).toBeVisible();
-  await expect(skip.getByText("Current employer", { exact: true })).toBeVisible();
+  await expect(card.getByText("Brightwave Analytics")).toBeVisible();
+  await expect(card.getByText("Current employer", { exact: true })).toBeVisible();
 
-  await page.getByLabel("Add a company to skip").fill("Quillon Payments");
-  await page.getByLabel("Add a company to skip").press("Enter");
+  await page.getByLabel("Add an employer to exclude").fill("Quillon Payments");
+  await page.getByRole("button", { name: "Add", exact: true }).last().click();
 
-  await expect(skip.getByText("Quillon Payments")).toBeVisible();
+  await expect(card.getByText("Quillon Payments")).toBeVisible();
 
   await page.reload();
-  await expect(skip.getByText("Quillon Payments")).toBeVisible();
+  await expect(card.getByText("Quillon Payments")).toBeVisible();
 
   await page.getByRole("button", { name: "Remove Quillon Payments" }).click();
 
-  await expect(skip.getByText("Quillon Payments")).toHaveCount(0);
-  await expect(skip.getByText("Brightwave Analytics")).toBeVisible();
+  await expect(card.getByText("Quillon Payments")).toHaveCount(0);
+  await expect(card.getByText("Brightwave Analytics")).toBeVisible();
 
   await page.reload();
-  await expect(skip.getByText("Quillon Payments")).toHaveCount(0);
-  await expect(skip.getByText("Current employer", { exact: true })).toBeVisible();
+  await expect(card.getByText("Quillon Payments")).toHaveCount(0);
+  await expect(card.getByText("Current employer", { exact: true })).toBeVisible();
 
   await context.close();
   await request.dispose();

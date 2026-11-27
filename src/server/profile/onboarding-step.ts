@@ -170,7 +170,6 @@ function currencyForCountry(code: string) {
 export function currenciesFor(input: {
   queued: readonly string[];
   salaryCurrencies: readonly string[];
-  targetCurrency: string | null;
   countryCodes: readonly string[];
   inferCountries: boolean;
 }) {
@@ -180,14 +179,6 @@ export function currenciesFor(input: {
     if (!currencies.includes(currency)) {
       currencies.push(currency);
     }
-  }
-
-  if (
-    input.targetCurrency !== null &&
-    isCurrencyCode(input.targetCurrency) &&
-    !currencies.includes(input.targetCurrency)
-  ) {
-    currencies.push(input.targetCurrency);
   }
 
   if (currencies.length === 0 && input.inferCountries) {
@@ -355,7 +346,6 @@ export function createOnboardingStepService(deps: {
       inferCountries: options.inferCountries !== false,
       queued: queuedCurrencies(userId),
       salaryCurrencies: salaryAnswers.map((answer) => answer.currency),
-      targetCurrency: targets.salaryCurrency,
     });
 
     const stepAnswers = {

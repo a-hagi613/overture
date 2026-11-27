@@ -37,14 +37,17 @@ function seedUser(db: ReturnType<typeof migrated>, id: string) {
 }
 
 describe("preferences become a freehire search", () => {
-  test("a taxonomy category reaches its freehire categories, and free text becomes a title word", () => {
-    expect(categoriesForRoles(["software-it"])).toContain("backend");
-    expect(categoriesForRoles(["education"])).toEqual(["education"]);
-    expect(categoriesForRoles(["software-it", "Registered Nurse"])).toContain("healthcare");
+  test("freehire ids become categories and free text becomes a title word", () => {
+    expect(categoriesForRoles(["backend", "education"])).toEqual(["backend", "education"]);
+    expect(categoriesForRoles(["backend", "Registered Nurse"])).toEqual(["backend"]);
+    expect(categoriesForRoles(["sw.backend"])).toEqual([]);
 
     expect(pullPreferencesFor({ locations: [], roles: ["Night baker"] }).titleWords).toEqual([
       "Night baker",
     ]);
+    expect(
+      pullPreferencesFor({ locations: [], roles: ["backend", "Night baker"] }).titleWords,
+    ).toEqual(["Night baker"]);
   });
 
   test("place ids become freehire facets, and a remote country still names its country", () => {

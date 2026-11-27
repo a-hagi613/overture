@@ -25,7 +25,7 @@ import { clearBlockerIfRecovered } from "../profile/running-state.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createSkipCompanyService } from "../profile/skip-companies.ts";
 import { createStrengthenService } from "../profile/strengthen.ts";
-import { countMatchingPostings, createTargetsService } from "../profile/targets.ts";
+import { countMatchingJobs, createTargetsService } from "../profile/targets.ts";
 import { describePlaceIds } from "../places/catalog.ts";
 import { enqueueUserPull } from "../jobs/pull.ts";
 import { enqueueMatchRescore, enqueueMatchScorePool } from "../matching/match-jobs.ts";
@@ -353,11 +353,10 @@ export function createProfileRoutes(deps: {
     }
 
     const saved = await targetsService.read(account.id);
-    const { languages } = await languagesService.read(account.id);
 
     return context.json({
       ...saved,
-      matchedCount: countMatchingPostings(deps.catalogDb, saved.targets, languages),
+      matchedCount: countMatchingJobs(deps.db, saved.targets),
       places: describePlaceIds(saved.targets.locations),
     });
   });
@@ -377,11 +376,9 @@ export function createProfileRoutes(deps: {
       enqueueMatchScorePool(db, clock, account.id);
     }
 
-    const { languages } = await languagesService.read(account.id);
-
     return context.json({
       ...saved,
-      matchedCount: countMatchingPostings(deps.catalogDb, saved.targets, languages),
+      matchedCount: countMatchingJobs(deps.db, saved.targets),
       places: describePlaceIds(saved.targets.locations),
     });
   });
@@ -393,10 +390,8 @@ export function createProfileRoutes(deps: {
       return context.json({ error: API_ERRORS.signInRequired }, 401);
     }
 
-    const { languages } = await languagesService.read(account.id);
-
     return context.json({
-      matchedCount: countMatchingPostings(deps.catalogDb, context.req.valid("json"), languages),
+      matchedCount: countMatchingJobs(deps.db, context.req.valid("json")),
     });
   });
 

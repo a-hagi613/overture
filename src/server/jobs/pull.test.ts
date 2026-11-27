@@ -99,17 +99,11 @@ function seedUser(
 
   db.insert(targets)
     .values({
-      employmentTypes: JSON.stringify(["full_time"]),
-      locations: JSON.stringify(options.locations ?? ["Toronto, Canada"]),
-      roles: JSON.stringify(options.roles ?? ["software-it"]),
-      salaryCurrency: null,
-      salaryFloorMinor: null,
-      salaryPeriod: "year",
-      seniorities: JSON.stringify(["senior"]),
+      locations: JSON.stringify(options.locations ?? ["city:ca:toronto"]),
+      roles: JSON.stringify(options.roles ?? ["software_engineering"]),
       updatedAt: new Date(NOW),
       userId: options.id,
       version: 1,
-      workplaces: JSON.stringify(["remote"]),
     })
     .run();
 }

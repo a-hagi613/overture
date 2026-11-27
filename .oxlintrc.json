@@ -362,7 +362,7 @@
           "src/server/profile/personal-crypto.test.ts",
           "src/server/profile/resume.test.ts",
           "src/server/profile/running-state.test.ts",
-          "src/server/profile/target-choices.test.ts",
+          "src/server/profile/role-migration.test.ts",
           "src/server/profile/targets.test.ts",
           "src/server/profile/time-zone.test.ts",
           "src/server/profile/v1-import.test.ts",

@@ -71,26 +71,6 @@ export function OnboardingTargetsPage() {
     );
   }
 
-  const { choices, targets: saved } = targets.data;
-
-  const nothingToPick =
-    choices.roles.length === 0 &&
-    choices.locations.length === 0 &&
-    saved.roles.length === 0 &&
-    saved.locations.length === 0;
-
-  if (nothingToPick) {
-    return (
-      <OnboardingShell step={3}>
-        <OnboardingLoadState
-          onRetry={retry}
-          retrying={targets.isFetching || state.isFetching}
-          state="empty"
-        />
-      </OnboardingShell>
-    );
-  }
-
   return (
     <OnboardingShell step={3}>
       <OnboardingTargetsCard

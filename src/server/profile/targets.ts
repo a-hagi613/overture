@@ -1,50 +1,29 @@
-import { and, count, eq, gte, isNull, or, sql } from "drizzle-orm";
+import { and, count, eq, exists, inArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
+import type { AppDatabase } from "../platform/db/client.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
-import { targets } from "../platform/db/schema.ts";
-import { postings } from "../platform/db/catalog-schema.ts";
-import { resolveLocation } from "../catalog/geo.ts";
-import { resolvedLocationCondition } from "../catalog/location-filter.ts";
-import { locationTextsOfPlaceIds } from "../places/catalog.ts";
-import { catalogRevision } from "../catalog/revision.ts";
-import { optionalFieldConditions } from "../matching/optional-fields.ts";
-import { planRoleTargets, roleTargetCondition } from "../matching/role-targets.ts";
+import { jobPlaces, jobs, targets } from "../platform/db/schema.ts";
+import { isFreehireCategory } from "../../shared/freehire-categories.ts";
 import { emptyTargets, targetsInputSchema } from "../../shared/targets.ts";
 import { promotePlaceValues } from "../places/resolve.ts";
 
 const storedSchema = z.object({
   roles: z.string(),
-  seniorities: z.string(),
-  workplaces: z.string(),
+  unresolvedRoles: z.string(),
   locations: z.string(),
   unresolvedLocations: z.string(),
-  employmentTypes: z.string(),
-  salaryFloorMinor: z.number().nullable(),
-  salaryCurrency: z.string().nullable(),
-  salaryPeriod: z.enum(["year", "month", "hour"]),
   version: z.number(),
 });
 
 const MATCH_COUNT_CACHE_MAX = 512;
 
-interface LocationFilter {
-  key: string;
-  condition: SQL;
-}
-
 interface MatchFilters {
-  roles: string[];
-  seniorities: string[];
-  workplaces: (typeof postings.$inferSelect)["workplace"][];
-  employmentTypes: (typeof postings.$inferSelect)["employmentType"][];
-  locations: LocationFilter[];
-  salaryFloorMinor: number | null;
-  salaryCurrency: string | null;
-  languages: string[];
+  categories: string[];
+  titleWords: string[];
+  placeIds: string[];
 }
 
 interface MatchCountCache {
@@ -52,161 +31,113 @@ interface MatchCountCache {
   entries: Map<string, number>;
 }
 
-const matchCountCaches = new WeakMap<CatalogDatabase, MatchCountCache>();
+const matchCountCaches = new WeakMap<AppDatabase, MatchCountCache>();
 
 function stringArrayFromColumn(value: string) {
-  const parsed: unknown = JSON.parse(value);
-
-  return z.array(z.string()).parse(parsed);
+  return z.array(z.string()).parse(JSON.parse(value));
 }
 
 function sortedUnique<T extends string>(values: readonly T[]) {
   return [...new Set(values)].toSorted((left, right) => left.localeCompare(right));
 }
 
-function locationFilter(db: CatalogDatabase, raw: string) {
-  const resolved = resolveLocation(raw);
-  const condition = resolvedLocationCondition(db, raw);
-
-  if (resolved.countryCode === null) {
-    return { condition, key: `raw:${raw.toLowerCase()}` } satisfies LocationFilter;
-  }
-
-  if (resolved.city !== null) {
-    return {
-      condition,
-      key: `city:${resolved.countryCode}:${resolved.city.toLowerCase()}`,
-    } satisfies LocationFilter;
-  }
-
-  if (resolved.region !== null) {
-    return {
-      condition,
-      key: `region:${resolved.countryCode}:${resolved.region.toLowerCase()}`,
-    } satisfies LocationFilter;
-  }
-
-  return { condition, key: `country:${resolved.countryCode}` } satisfies LocationFilter;
-}
-
-function normalizeFilters(
-  db: CatalogDatabase,
-  parsed: z.infer<typeof targetsInputSchema>,
-  languages: readonly string[],
-) {
-  const locations = new Map<string, SQL>();
-
-  for (const location of locationTextsOfPlaceIds(parsed.locations)) {
-    const filter = locationFilter(db, location);
-
-    if (!locations.has(filter.key)) {
-      locations.set(filter.key, filter.condition);
-    }
-  }
+function normalizeFilters(parsed: z.infer<typeof targetsInputSchema>) {
+  const roles = sortedUnique(parsed.roles.map((role) => role.trim()).filter(Boolean));
 
   return {
-    roles: sortedUnique(parsed.roles.map((role) => role.trim())),
-    seniorities: sortedUnique(parsed.seniorities),
-    workplaces: sortedUnique(parsed.workplaces),
-    employmentTypes: sortedUnique(parsed.employmentTypes),
-    locations: [...locations.entries()]
-      .toSorted(([left], [right]) => left.localeCompare(right))
-      .map(([key, condition]) => ({ condition, key })),
-    salaryFloorMinor: parsed.salaryFloorMinor,
-    salaryCurrency: parsed.salaryCurrency,
-    languages: sortedUnique(languages.map((language) => language.trim().toLowerCase())),
+    categories: roles.filter((role) => isFreehireCategory(role)),
+    placeIds: sortedUnique(parsed.locations),
+    titleWords: roles.filter((role) => !isFreehireCategory(role)),
   } satisfies MatchFilters;
 }
 
-function cacheKeyOf(filters: MatchFilters) {
-  return JSON.stringify([
-    filters.roles.map((role) => role.toLowerCase()),
-    filters.seniorities,
-    filters.workplaces,
-    filters.employmentTypes,
-    filters.locations.map((location) => location.key),
-    filters.salaryFloorMinor,
-    filters.salaryCurrency,
-    filters.languages,
-  ]);
-}
+function roleCondition(filters: MatchFilters) {
+  const parts: SQL[] = [];
 
-function salaryCondition(floorMinor: number | null, currency: string | null) {
-  if (floorMinor === null || currency === null) {
-    return null;
+  if (filters.categories.length > 0) {
+    parts.push(inArray(jobs.category, filters.categories));
   }
 
-  return or(
-    isNull(postings.salaryMinMinor),
-    isNull(postings.salaryCurrency),
-    sql`lower(${postings.salaryCurrency}) <> ${currency.toLowerCase()}`,
-    gte(postings.salaryMinMinor, floorMinor),
-  );
+  for (const word of filters.titleWords) {
+    parts.push(sql`instr(${jobs.titleNorm}, ${word.toLowerCase()}) > 0`);
+  }
+
+  return parts.length === 0 ? null : or(...parts);
 }
 
-function countMatches(db: CatalogDatabase, filters: MatchFilters) {
-  const roleCondition = roleTargetCondition(planRoleTargets(filters.roles));
+function countMatches(db: AppDatabase, filters: MatchFilters) {
+  const role = roleCondition(filters);
 
-  if (roleCondition === null) {
+  if (role === null || filters.placeIds.length === 0) {
     return 0;
   }
 
-  const conditions: (SQL | null | undefined)[] = [
-    isNull(postings.closedAt),
-    eq(postings.status, "open"),
-    eq(postings.applySupported, true),
-    ...optionalFieldConditions(db, filters),
-    roleCondition,
-    or(...filters.locations.map((location) => location.condition)),
-    salaryCondition(filters.salaryFloorMinor, filters.salaryCurrency),
-  ];
-
-  const usable = conditions.filter((condition) => condition !== undefined && condition !== null);
-
   const rows = db
     .select({ total: count() })
-    .from(postings)
-    .where(and(...usable))
+    .from(jobs)
+    .where(
+      and(
+        eq(jobs.status, "open"),
+        role,
+        exists(
+          db
+            .select({ one: jobPlaces.placeId })
+            .from(jobPlaces)
+            .where(and(eq(jobPlaces.jobId, jobs.id), inArray(jobPlaces.placeId, filters.placeIds))),
+        ),
+      ),
+    )
     .all();
 
   return rows.at(0)?.total ?? 0;
 }
 
-/**
- * Counts the open Postings a candidate's Targets match, caching per catalog handle.
- *
- * The cache key is the normalized filters (roles reduced to their meaningful words, arrays sorted and deduplicated,
- * locations reduced to the geo tuple they resolve to, languages lowercased) plus the catalog revision: `PRAGMA
- * data_version` moves when another connection — the sweep worker — commits, and `total_changes()` moves when this
- * connection writes, so either kind of catalog change invalidates every entry. The store is a 512-entry LRU, so
- * memory is capped, and the call is synchronous: two requests can never interleave inside one count, so the second
- * of a burst reads the entry the first stored rather than starting another scan.
- * @param db The catalog database.
- * @param input The candidate's Targets.
- * @param languages The profile's posting languages.
- * @returns How many open Postings pass the catalog filters, or 0 when a filter is empty.
- */
-export function countMatchingPostings(
-  db: CatalogDatabase,
-  input: z.input<typeof targetsInputSchema>,
-  languages: readonly string[],
-) {
-  const parsed = targetsInputSchema.parse(input);
+function cacheKeyOf(filters: MatchFilters) {
+  return JSON.stringify([filters.categories, filters.titleWords, filters.placeIds]);
+}
 
-  if (
-    parsed.roles.length === 0 ||
-    parsed.seniorities.length === 0 ||
-    parsed.workplaces.length === 0 ||
-    parsed.locations.length === 0 ||
-    parsed.employmentTypes.length === 0 ||
-    languages.length === 0 ||
-    (parsed.salaryFloorMinor !== null && parsed.salaryCurrency === null)
-  ) {
+function databaseRevision(db: AppDatabase) {
+  const client = db.$client;
+
+  const dataVersion = client
+    .query<{ data_version: number }, []>("PRAGMA data_version")
+    .get()?.data_version;
+
+  const totalChanges = client
+    .query<{ total: number }, []>("SELECT total_changes() AS total")
+    .get()?.total;
+
+  if (dataVersion === undefined || totalChanges === undefined) {
+    return null;
+  }
+
+  return `${String(dataVersion)}:${String(totalChanges)}`;
+}
+
+/**
+ * Counts the open jobs a candidate's preferences match. Role and location are the only hard filters (issue #684):
+ * a job passes when its freehire category is picked or its title contains a picked title word, and one of its place
+ * ids is picked. The store keeps only jobs with an apply adapter, so every open row is apply-supported.
+ *
+ * The cache key is the normalized filters plus a cheap database revision (`PRAGMA data_version` plus
+ * `total_changes()`), so any write to the job tables invalidates every entry. The store is a 512-entry LRU.
+ * @param db The application database.
+ * @param input The candidate's preferences.
+ * @returns How many open jobs pass the filters, or 0 when a required filter is empty.
+ */
+export function countMatchingJobs(db: AppDatabase, input: z.input<typeof targetsInputSchema>) {
+  const parsed = targetsInputSchema.parse(input);
+  const filters = normalizeFilters(parsed);
+
+  if (filters.categories.length === 0 && filters.titleWords.length === 0) {
     return 0;
   }
 
-  const filters = normalizeFilters(db, parsed, languages);
-  const revision = catalogRevision(db);
+  if (filters.placeIds.length === 0) {
+    return 0;
+  }
+
+  const revision = databaseRevision(db);
 
   if (revision === null) {
     return countMatches(db, filters);
@@ -265,14 +196,9 @@ export function createTargetsService(deps: { db: AppDatabase; clock: Clock }) {
     return {
       targets: targetsInputSchema.parse({
         roles: stringArrayFromColumn(stored.roles),
-        seniorities: stringArrayFromColumn(stored.seniorities),
-        workplaces: stringArrayFromColumn(stored.workplaces),
+        unresolvedRoles: stringArrayFromColumn(stored.unresolvedRoles),
         locations: places.ids,
         unresolvedLocations: places.unresolved,
-        employmentTypes: stringArrayFromColumn(stored.employmentTypes),
-        salaryFloorMinor: stored.salaryFloorMinor,
-        salaryCurrency: stored.salaryCurrency,
-        salaryPeriod: stored.salaryPeriod,
       }),
       version: stored.version,
     };
@@ -288,14 +214,9 @@ export function createTargetsService(deps: { db: AppDatabase; clock: Clock }) {
       .values({
         userId,
         roles: JSON.stringify(parsed.roles),
-        seniorities: JSON.stringify(parsed.seniorities),
-        workplaces: JSON.stringify(parsed.workplaces),
+        unresolvedRoles: JSON.stringify(parsed.unresolvedRoles),
         locations: JSON.stringify(parsed.locations),
         unresolvedLocations: JSON.stringify(parsed.unresolvedLocations),
-        employmentTypes: JSON.stringify(parsed.employmentTypes),
-        salaryFloorMinor: parsed.salaryFloorMinor,
-        salaryCurrency: parsed.salaryCurrency,
-        salaryPeriod: parsed.salaryPeriod,
         version,
         updatedAt: new Date(clock.now()),
       })
@@ -303,14 +224,9 @@ export function createTargetsService(deps: { db: AppDatabase; clock: Clock }) {
         target: targets.userId,
         set: {
           roles: JSON.stringify(parsed.roles),
-          seniorities: JSON.stringify(parsed.seniorities),
-          workplaces: JSON.stringify(parsed.workplaces),
+          unresolvedRoles: JSON.stringify(parsed.unresolvedRoles),
           locations: JSON.stringify(parsed.locations),
           unresolvedLocations: JSON.stringify(parsed.unresolvedLocations),
-          employmentTypes: JSON.stringify(parsed.employmentTypes),
-          salaryFloorMinor: parsed.salaryFloorMinor,
-          salaryCurrency: parsed.salaryCurrency,
-          salaryPeriod: parsed.salaryPeriod,
           version,
           updatedAt: new Date(clock.now()),
         },

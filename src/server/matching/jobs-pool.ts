@@ -7,12 +7,8 @@ import type { TargetsInput } from "../../shared/targets.ts";
 import { applications, jobPlaces, jobs, skipCompanies } from "../platform/db/schema.ts";
 import { getSettingNumber } from "../platform/settings/index.ts";
 import { normalizeCompanyName } from "../profile/skip-companies.ts";
-import { roleCategoryOf } from "../../shared/role-taxonomy.ts";
-import {
-  TAXONOMY_TO_FREEHIRE,
-  categoriesForRoles,
-  placesForLocations,
-} from "../jobs/preferences.ts";
+import { isFreehireCategory } from "../../shared/freehire-categories.ts";
+import { placesForLocations } from "../jobs/preferences.ts";
 
 const DAY_MS = 86_400_000;
 const POOL_QUERY_LIMIT = 5000;
@@ -28,8 +24,6 @@ const NON_JOB_TITLES = [
   "test job",
   "placeholder",
 ] as const;
-
-const FREEHIRE_CATEGORIES = new Set<string>(Object.values(TAXONOMY_TO_FREEHIRE).flat());
 
 export interface JobPoolCriteria {
   categories: readonly string[];
@@ -129,19 +123,9 @@ function roleCriteria(roles: readonly string[]) {
       continue;
     }
 
-    const asCategory = normalizeWord(trimmed).replaceAll(" ", "_");
-
-    if (FREEHIRE_CATEGORIES.has(asCategory)) {
-      categories.add(asCategory);
-      exactCategories.add(asCategory);
-
-      continue;
-    }
-
-    if (roleCategoryOf(trimmed) !== null) {
-      for (const category of categoriesForRoles([trimmed])) {
-        categories.add(category);
-      }
+    if (isFreehireCategory(trimmed)) {
+      categories.add(trimmed);
+      exactCategories.add(trimmed);
 
       continue;
     }

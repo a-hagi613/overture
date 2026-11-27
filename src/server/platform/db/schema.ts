@@ -434,16 +434,9 @@ export const browserProfiles = sqliteTable(
 export const targets = sqliteTable("targets", {
   userId: cascadeUserId().primaryKey(),
   roles: text("roles").notNull(),
-  seniorities: text("seniorities").notNull(),
-  workplaces: text("workplaces").notNull(),
+  unresolvedRoles: text("unresolved_roles").notNull().default("[]"),
   locations: text("locations").notNull(),
   unresolvedLocations: text("unresolved_locations").notNull().default("[]"),
-  employmentTypes: text("employment_types").notNull(),
-  salaryFloorMinor: integer("salary_floor_minor"),
-  salaryCurrency: text("salary_currency"),
-  salaryPeriod: text("salary_period", { enum: ["year", "month", "hour"] })
-    .notNull()
-    .default("year"),
   version: integer("version").notNull().default(1),
   updatedAt: timestamp("updated_at").notNull(),
 });

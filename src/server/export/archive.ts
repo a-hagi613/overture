@@ -296,13 +296,9 @@ export async function* exportEntries(deps: ExportArchiveDeps, userId: string) {
               ? null
               : {
                   roles: parsed(target.roles),
-                  seniorities: parsed(target.seniorities),
-                  workplaces: parsed(target.workplaces),
+                  unresolvedRoles: parsed(target.unresolvedRoles),
                   locations: parsed(target.locations),
-                  employmentTypes: parsed(target.employmentTypes),
-                  salaryFloorMinor: target.salaryFloorMinor,
-                  salaryCurrency: target.salaryCurrency,
-                  salaryPeriod: target.salaryPeriod,
+                  unresolvedLocations: parsed(target.unresolvedLocations),
                 },
           skipCompanies: skips.map((row) => ({
             name: row.name,
