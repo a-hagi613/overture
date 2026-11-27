@@ -60,3 +60,6 @@ The owner pays $5 a month for Workers Paid and wants no spend above $5 a month i
 - The synthetic lab's Browser Run probe (`scripts/measure-browser-run-lab.ts`) drives the production lab driver under
   Browser Run's request identity and prints the table and the price arithmetic quoted in
   `docs/research/cloudflare-paid-plan.md` §6, so the measurement can be rerun rather than trusted.
+
+*Amendment of 2026-11-26 (#700, #706): the sentinel Worker no longer watches a Workable snapshot's age, because there
+is no snapshot; freehire is the only job source (ADR 0047), and a repeated pull failure raises the `jobs.pull` alert.*

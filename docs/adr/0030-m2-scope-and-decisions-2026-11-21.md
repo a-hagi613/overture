@@ -44,3 +44,8 @@ M2 row in SPEC §2 and spec #6 carry the details.
 - **A separate 08:00 digest next to the recap email.** Two daily emails for one purpose; the recap already lists what
   happened.
 - **Keep four new ATSes.** Two of them are barred by their own terms or need per-company tokens (ADR 0028).
+
+*Amendment of 2026-11-26 (#678, #679): the M2 scope above is history. The rebuild replaced the forwarding address with
+an apply alias created at sign-up (#693), batched notifications replaced per-event mail (#705), and freehire replaced
+the ATS feeds and the Workable snapshot (#700). The onboarding, Ready, Review, Tracker and page work of Waves 0–4
+supersedes the flow described here; SPEC §15 is the current product.*

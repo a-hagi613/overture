@@ -227,8 +227,6 @@
           "src/server/catalog/location-filter.test.ts",
           "src/server/catalog/question-normalize.test.ts",
           "src/server/catalog/salary-usd.test.ts",
-          "src/server/catalog/supply-facets.test.ts",
-          "src/server/catalog/supply.test.ts",
           "src/server/catalog/tag-rules.test.ts",
           "src/server/catalog/taxonomy-tags.test.ts",
           "src/server/config/env.test.ts",

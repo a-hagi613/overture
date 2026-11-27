@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 
-import type { AppDatabase, CatalogDatabase } from "../platform/db/client.ts";
+import type { AppDatabase } from "../platform/db/client.ts";
 import type { ClientIpConfig } from "../auth/client-ip.ts";
 import type { Clock } from "../platform/ports/clock.ts";
 
 import { clientIp } from "../auth/client-ip.ts";
 import { suggestLocations } from "../catalog/geo-suggest.ts";
-import { countSupportedSupply } from "../catalog/supply.ts";
+import { countSupportedJobs } from "../jobs/supply.ts";
 import { consumeRateLimit } from "../platform/rate-limit.ts";
 import { defaultMetrics } from "../platform/telemetry/metrics.ts";
 import { measureSqliteQuery } from "../platform/telemetry/sqlite-metrics.ts";
@@ -22,20 +22,19 @@ const SUPPLY_RATE_LIMIT = { windowMs: 60_000, max: 120 } as const;
 const SHARED_CLIENT_KEY = "shared";
 
 /**
- * The public, read-only supply count behind the landing's supply preview (issue #567). No session is
- * read and no user row is touched: the whole answer is an aggregate over the open, apply-supported
- * catalog, so it is safe to cache at the edge and safe to serve to a stranger.
- * @param deps The application database that stores the rate limit, the catalog database that holds the
- * counts, the clock, and the proxy configuration that makes a client IP trustworthy.
+ * The public, read-only supply count behind the landing's supply preview (issues #567, #742). No session is
+ * read and no user row is touched: the whole answer is an aggregate over the open, apply-supported freehire
+ * jobs, so it is safe to cache at the edge and safe to serve to a stranger.
+ * @param deps The application database that stores the jobs and the rate limit, the clock, and the proxy
+ * configuration that makes a client IP trustworthy.
  * @returns The Hono routes mounted at `/api`.
  */
 export function createSupplyRoutes(deps: {
   db: AppDatabase;
-  catalogDb: CatalogDatabase;
   clock: Clock;
   clientIpConfig: ClientIpConfig;
 }) {
-  const { db, catalogDb, clock, clientIpConfig } = deps;
+  const { db, clock, clientIpConfig } = deps;
 
   const routes = new Hono();
 
@@ -50,8 +49,8 @@ export function createSupplyRoutes(deps: {
 
     const startedAt = performance.now();
 
-    const totals = measureSqliteQuery("catalog", "select", () =>
-      countSupportedSupply(catalogDb, supplyFiltersOf(context.req.valid("query"))),
+    const totals = measureSqliteQuery("app", "select", () =>
+      countSupportedJobs(db, supplyFiltersOf(context.req.valid("query")), clock.now()),
     );
 
     defaultMetrics().recordSupplyQuery(performance.now() - startedAt);

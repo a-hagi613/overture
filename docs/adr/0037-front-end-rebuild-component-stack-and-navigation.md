@@ -87,3 +87,9 @@ The rebuild did not record its reasons; these are the shapes it replaced.
 - A server response that only removed screens read (`upNext` and `readyToSend` on `GET /api/home`, the signed-out
   `GET /api/search`) is dead weight until a screen uses it or it is removed.
 - About 29 web files have no importer after the rebuild and should be deleted with it.
+
+*Amendment of 2026-11-26 (#688, #697, #707): the sidebar is eight destinations — Home · Tracker · Ready · Review ·
+Matches · Inbox · Profile · Settings — and the Tracker is the three-column Queue · Applied · Interviews board described
+in the #688 amendment above. "Board" is the Tracker in current copy; no separate Board lane exists. The apply alias
+lives on Profile → Account (the "Your application email" card), not on Saved answers, and `/inbox/address` redirects
+there. The phone tab bar keeps Home, Tracker, Ready, Review and Inbox.*
