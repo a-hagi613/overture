@@ -58,8 +58,9 @@ try {
   sqlite.close();
 }
 
-const probeUrl =
-  "https://freehire.me/api/v1/jobs/search?category=backend&countries=ca&cities=Toronto&limit=5&q=Platform+Engineer&q_fields=title";
+const probeBase = (Bun.env.FREEHIRE_BASE_URL ?? "https://freehire.me").replace(/\/+$/u, "");
+
+const probeUrl = `${probeBase}/api/v1/jobs/search?category=backend&countries=ca&cities=Toronto&limit=5&q=Platform+Engineer&q_fields=title`;
 
 const apiKey = Bun.env.FREEHIRE_API_KEY ?? "";
 

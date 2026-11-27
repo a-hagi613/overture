@@ -32,6 +32,8 @@ REQUIRE_EMAIL_SENDING = "true"
 METRICS_ENABLED = "true"
 METRICS_PORT = "9091"
 METRICS_HOST = "::"
+# Pulls route through the Cloudflare Worker because freehire's edge challenges Fly's egress.
+FREEHIRE_BASE_URL = "https://overture-freehire-proxy.abdullahi-hagi98.workers.dev"
 
 [metrics]
 port = 9091

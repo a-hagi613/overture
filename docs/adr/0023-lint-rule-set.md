@@ -133,7 +133,7 @@ compares this table with `.oxlintrc.json`.
 
 | Rule | Where | Reason |
 |---|---|---|
-| `import/no-default-export` | `**/*.config.{ts,mts,mjs,js}`, `test/e2e/global-setup.ts`, `tools/oxlint/architecture/index.ts`, `workers/inbound-mail/src/index.ts`, `workers/sentinel/src/index.ts` | Vite, Vitest, Playwright and Drizzle config files, Playwright's global setup hook, the Oxc plugin registration and the Cloudflare Worker entries (the Email Worker and the cron sentinel) all require a default export |
+| `import/no-default-export` | `**/*.config.{ts,mts,mjs,js}`, `test/e2e/global-setup.ts`, `tools/oxlint/architecture/index.ts`, `workers/freehire-proxy/src/index.ts`, `workers/inbound-mail/src/index.ts`, `workers/sentinel/src/index.ts` | Vite, Vitest, Playwright and Drizzle config files, Playwright's global setup hook, the Oxc plugin registration and the Cloudflare Worker entries (the freehire proxy, the Email Worker and the cron sentinel) all require a default export |
 | `node/no-process-env` | `src/server/config/env.ts`, `drizzle.config.ts`, `drizzle-catalog.config.ts`, `test/e2e/**` | `src/server/config/env.ts` is the one module that reads the process environment inside the app; the two Drizzle CLI configs and the e2e harness read it from outside the app |
 | `unicorn/no-process-exit` | `src/server/main.ts` | The graceful-shutdown path ends the process deterministically after it drains the job worker, stops the catalog worker, closes both SQLite handles and clears the hard-exit timer; returning would let a stray handle keep the process alive |
 
