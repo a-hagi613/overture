@@ -26,6 +26,7 @@ import { TrackerColumn } from "../components/tracker-column.tsx";
 import { TrackerList } from "../components/tracker-list.tsx";
 import { TrackerMobileTab } from "../components/tracker-mobile-tab.tsx";
 import { TrackerOverlayCard } from "../components/tracker-overlay-card.tsx";
+import { TrackerPlanBanner } from "../components/tracker-plan-banner.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Card } from "../components/ui/card.tsx";
 import { SegmentedControl } from "../components/ui/segmented-control.tsx";
@@ -572,6 +573,8 @@ export function BoardPage({
         }
         titleNode={`${copy.board.trackerTitlePlain} ${copy.board.trackerTitleItalic}`}
       />
+
+      <TrackerPlanBanner />
 
       {boardPending ? (
         <Card ariaBusy className="mt-3 flex-1 p-5">

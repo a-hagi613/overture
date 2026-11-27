@@ -107,6 +107,7 @@ export interface InvoiceInput {
   periodStart: number;
   periodEnd: number;
   plan?: string;
+  priceId?: string;
 }
 
 function renderInvoice(template: string, input: InvoiceInput) {
@@ -115,7 +116,7 @@ function renderInvoice(template: string, input: InvoiceInput) {
     .replaceAll("__INVOICE_ID__", input.invoiceId)
     .replaceAll("__USER_ID__", input.userId)
     .replaceAll("__PLAN__", input.plan ?? "month")
-    .replaceAll("__PRICE_ID__", BILLING_PRICE_MONTH)
+    .replaceAll("__PRICE_ID__", input.priceId ?? BILLING_PRICE_MONTH)
     .replaceAll('"__PERIOD_START__"', String(input.periodStart))
     .replaceAll('"__PERIOD_END__"', String(input.periodEnd));
 }

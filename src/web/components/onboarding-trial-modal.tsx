@@ -5,11 +5,13 @@ import { Link } from "react-router";
 
 import { copy } from "../../shared/copy.ts";
 import type { OnboardingMatchView } from "../lib/onboarding-api.ts";
+import type { OnboardingPlanKind } from "../../shared/onboarding.ts";
 import { Badge } from "./ui/badge.tsx";
 import { Button } from "./ui/button.tsx";
 import { dsBody, dsCardTitle } from "./ui/ds.ts";
 
 const text = copy.onboarding.trial;
+const planText = copy.onboarding.plan;
 
 export type TrialCardState = "verify" | "declined" | "used" | "pending";
 
@@ -22,6 +24,7 @@ export function OnboardingTrialModal({
   onOpenChange,
   onVerify,
   open,
+  planKind = "free_trial",
   returned,
   selectedMatches,
   state,
@@ -34,16 +37,29 @@ export function OnboardingTrialModal({
   onOpenChange: (open: boolean) => void;
   onVerify: () => void;
   open: boolean;
+  planKind?: OnboardingPlanKind | undefined;
   returned: boolean;
   selectedMatches: readonly OnboardingMatchView[];
   state: TrialCardState;
 }) {
+  const paid = planKind === "week" || planKind === "month";
+  const planName = planKind === "week" ? planText.weekName : planText.monthName;
+  const planPrice = planKind === "week" ? planText.weekPrice : planText.monthPrice;
+  const planUnit = planKind === "week" ? planText.weekUnit : planText.monthUnit;
+
+  const planApplications =
+    planKind === "week" ? planText.weekApplications : planText.monthApplications;
+
   let badgeVariant: "ok" | "need" | "signal" = "ok";
   let badgeLabel: string = text.modalBadge;
   let titleText: string = text.modalTitle;
   let leadText: string = text.modalReassurance;
 
-  if (state === "declined") {
+  if (paid) {
+    badgeLabel = planName;
+    titleText = planText.modalPaidTitle(planName);
+    leadText = planText.modalPaidLead(planPrice, planUnit, planApplications);
+  } else if (state === "declined") {
     badgeVariant = "need";
     badgeLabel = text.declinedTitle;
     titleText = text.declinedTitle;
@@ -66,11 +82,18 @@ export function OnboardingTrialModal({
     ctaLabel = text.ctaDirectButton;
   }
 
+  if (paid) {
+    ctaLabel =
+      planKind === "week"
+        ? planText.ctaWeek(selectedMatches.length)
+        : planText.ctaMonth(selectedMatches.length);
+  }
+
   if (busy) {
     ctaLabel = text.ctaBusy;
   }
 
-  const showStripeCopy = !hasApplications || returned;
+  const showStripeCopy = paid || !hasApplications || returned;
 
   let footerSlot = (
     <>
@@ -89,7 +112,7 @@ export function OnboardingTrialModal({
       {showStripeCopy ? (
         <p className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
           <Lock aria-hidden="true" size={12} />
-          <span>{text.stripeNote}</span>
+          <span>{paid ? text.stripePaidNote : text.stripeNote}</span>
         </p>
       ) : null}
       {disabled ? (
@@ -100,7 +123,7 @@ export function OnboardingTrialModal({
     </>
   );
 
-  if (state === "declined") {
+  if (!paid && state === "declined") {
     footerSlot = (
       <div className="mt-5 flex flex-wrap gap-2.5">
         <Button disabled={busy} onClick={onVerify} size="default" variant="primary">
@@ -111,7 +134,7 @@ export function OnboardingTrialModal({
         </Button>
       </div>
     );
-  } else if (state === "used") {
+  } else if (!paid && state === "used") {
     footerSlot = (
       <div className="mt-5 flex flex-wrap gap-2.5">
         <Button asChild size="default" variant="primary">
@@ -122,7 +145,7 @@ export function OnboardingTrialModal({
         </Button>
       </div>
     );
-  } else if (state === "pending") {
+  } else if (!paid && state === "pending") {
     footerSlot = (
       <div className="mt-5 flex flex-col gap-2.5">
         <Button disabled={busy} onClick={onVerify} size="default" variant="primary">

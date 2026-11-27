@@ -158,6 +158,7 @@ export function createOnboardingPicks(deps: {
     return {
       batchStatus: batch?.status ?? "picking",
       pickLimit: onboardingPickLimitFor(batch?.planKind ?? null),
+      planKind: batch?.planKind ?? null,
       picks,
       selected: picks.map((pick) => pick.postingId),
     };

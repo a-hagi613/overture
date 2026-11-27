@@ -6,7 +6,7 @@ import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
 import { migrateCatalogDatabase, migrateDatabase } from "../platform/db/migrate.ts";
 import { createClock } from "../platform/ports/clock.ts";
 import { applications, onboardingPicks, users } from "../platform/db/schema.ts";
-import { pickStatusOfApplication } from "../../shared/onboarding.ts";
+import { onboardingPickLimitFor, pickStatusOfApplication } from "../../shared/onboarding.ts";
 import { createOnboardingPicks } from "./picks.ts";
 
 const NOW = 1_795_735_200_000;
@@ -16,6 +16,13 @@ const TITLES = [
   "Site Reliability Engineer",
   "Backend Engineer",
   "Data Engineer",
+  "DevOps Engineer",
+  "AI Engineer",
+  "Security Engineer",
+  "Mobile Engineer",
+  "Frontend Engineer",
+  "Infrastructure Engineer",
+  "Staff Engineer",
 ];
 
 function seedCatalog() {
@@ -179,6 +186,35 @@ describe("the durable pick snapshot", () => {
       picks.save("user-1", ["posting-0", "posting-1", "posting-2", "posting-3"]),
     ).not.toBeNull();
     expect(picks.view("user-1").pickLimit).toBe(10);
+    expect(picks.view("user-1").planKind).toBe("week");
+  });
+
+  test("the trial refuses a fourth pick and keeps the first three", () => {
+    const { picks } = seed();
+
+    picks.setPlanKind("user-1", "free_trial");
+
+    expect(onboardingPickLimitFor("free_trial")).toBe(3);
+    expect(picks.save("user-1", ["posting-0", "posting-1", "posting-2", "posting-3"])).toBeNull();
+
+    const saved = picks.save("user-1", ["posting-0", "posting-1", "posting-2"]);
+
+    expect(saved?.picks).toHaveLength(3);
+    expect(saved?.pickLimit).toBe(3);
+    expect(saved?.planKind).toBe("free_trial");
+  });
+
+  test("a paid plan refuses an eleventh pick and accepts ten", () => {
+    const { picks } = seed();
+
+    picks.setPlanKind("user-1", "month");
+
+    const eleven = Array.from({ length: 11 }, (_, index) => `posting-${String(index)}`);
+    const ten = eleven.slice(0, 10);
+
+    expect(onboardingPickLimitFor("month")).toBe(10);
+    expect(picks.save("user-1", eleven)).toBeNull();
+    expect(picks.save("user-1", ten)?.picks).toHaveLength(10);
   });
 });
 

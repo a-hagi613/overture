@@ -425,7 +425,7 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   await expect(page.getByText("Remote Platform Engineer (Global)")).toHaveCount(0);
   await expect(page.getByRole("status")).toContainText("3 of 3 selected");
 
-  await page.getByRole("button", { name: /Apply to these 3 roles for free/u }).click();
+  await page.getByRole("button", { name: /Start my 3 free applications/u }).click();
   const dialog = page.getByRole("dialog");
 
   await expect(dialog).toBeVisible();
@@ -463,7 +463,7 @@ test("new user navigates forward and back across steps 1-4 with fake PDF and rea
   expect(granted.ok()).toBe(true);
 
   await page.reload();
-  await page.getByRole("button", { name: /Apply to these 3 roles for free/u }).click();
+  await page.getByRole("button", { name: /Start my 3 free applications/u }).click();
   await expect(dialog).toBeVisible();
   await dialog.getByRole("checkbox").check();
 

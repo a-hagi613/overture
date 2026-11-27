@@ -141,6 +141,33 @@ test("the onboarding trial's three Applications all go at once", () => {
   }
 });
 
+test("ten paid onboarding picks are queued five minutes apart up to the daily cap", () => {
+  const { db, sqlite } = freshDatabase();
+
+  try {
+    addUser(db, "paid-picks");
+    grant(db, "paid-picks", "admin", 50);
+
+    for (let index = 0; index < 10; index += 1) {
+      addApproved(db, "paid-picks", `pick-${String(index)}`, AT + index);
+    }
+
+    plannedPlanner(db).plan("paid-picks");
+
+    const slots = slotsOf(db, "paid-picks");
+
+    expect(slots).toHaveLength(10);
+    expect(slots.at(0)).toBe(AT);
+    expect(slots.at(9)).toBe(AT + 9 * 5 * MINUTE_MS);
+
+    for (const [index, slot] of slots.entries()) {
+      expect(slot).toBe(AT + index * 5 * MINUTE_MS);
+    }
+  } finally {
+    sqlite.close();
+  }
+});
+
 test("one person's spacing never delays another person's send", () => {
   const { db, sqlite } = freshDatabase();
 

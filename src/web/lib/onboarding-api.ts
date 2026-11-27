@@ -6,6 +6,7 @@ import type { OnboardingTargetsView } from "../../shared/onboarding.ts";
 import type { TargetsInput } from "../../shared/targets.ts";
 
 import { KEY_DETAIL_FACT_KEYS } from "../../shared/key-details.ts";
+import { ONBOARDING_PLAN_KINDS } from "../../shared/onboarding.ts";
 import { placeSuggestionSchema } from "../../shared/places.ts";
 import { targetsInputSchema } from "../../shared/targets.ts";
 import { saveSkipCompanies } from "./profile-api.ts";
@@ -80,6 +81,7 @@ const onboardingPickSchema = z.object({
 const onboardingPicksSchema = z.object({
   batchStatus: z.enum(["picking", "awaiting_card", "preparing", "prepared", "failed"]),
   pickLimit: z.number(),
+  planKind: z.enum(ONBOARDING_PLAN_KINDS).nullable(),
   picks: z.array(onboardingPickSchema),
   selected: z.array(z.string()),
 });
@@ -88,8 +90,10 @@ const onboardingMatchesSchema = z.object({
   matches: z.array(onboardingMatchSchema),
   pickLimit: z.number(),
   picks: onboardingPicksSchema.optional(),
+  planKind: z.enum(ONBOARDING_PLAN_KINDS).nullable(),
   poolCount: z.number(),
   selected: z.array(z.string()),
+  trialAvailable: z.boolean(),
 });
 
 const settleSchema = z.object({
@@ -231,6 +235,34 @@ export async function saveOnboardingMatches(postingIds: string[]) {
       }),
     ),
   );
+}
+
+export type OnboardingPlanKind = (typeof ONBOARDING_PLAN_KINDS)[number];
+
+export async function saveOnboardingPlan(planKind: OnboardingPlanKind) {
+  return onboardingMatchesSchema.parse(
+    await jsonFrom(
+      await fetch("/api/onboarding/plan", {
+        body: JSON.stringify({ planKind }),
+        headers: { "content-type": "application/json" },
+        method: "PUT",
+      }),
+    ),
+  );
+}
+
+const checkoutUrlSchema = z.object({ url: z.url() });
+
+export async function startOnboardingCheckout(plan: "week" | "month") {
+  return checkoutUrlSchema.parse(
+    await jsonFrom(
+      await fetch("/api/onboarding/checkout", {
+        body: JSON.stringify({ plan }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      }),
+    ),
+  ).url;
 }
 
 export async function saveCurrentEmployer(name: string) {
@@ -451,6 +483,29 @@ export function useSaveOnboardingMatches() {
       client.setQueryData(matchesKey, view);
     },
   });
+}
+
+/**
+ * Persists the plan chosen on the last onboarding step, so the server enforces its pick limit before Stripe.
+ * @returns The mutation, which stores the refreshed matches view (new pick limit) on success.
+ */
+export function useSaveOnboardingPlan() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveOnboardingPlan,
+    onSuccess: (view) => {
+      client.setQueryData(matchesKey, view);
+    },
+  });
+}
+
+/**
+ * Sends a paid onboarding plan to Stripe Checkout; the picks are already durable on the server.
+ * @returns The mutation, resolving to the Checkout URL.
+ */
+export function useStartOnboardingCheckout() {
+  return useMutation({ mutationFn: startOnboardingCheckout });
 }
 
 export function usePrepareOnboarding() {

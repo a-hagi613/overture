@@ -2932,6 +2932,8 @@ export const copy = {
       titlePlain: "Your matches",
       intro:
         "Real open roles ranked against your resume and preferences. Start with your top 3 for free.",
+      introPaid:
+        "Real open roles ranked against your resume and preferences. Pick up to 10 for your paid plan.",
       loadFailed: "Your matches could not load. Try again in a moment.",
       emptyTitle: "No open roles match those preferences yet",
       emptyBody:
@@ -2956,6 +2958,8 @@ export const copy = {
         `+${String(count)} more matched ${plural(count, "opening", "openings")} waiting in your workspace`,
       moreMatchesBody:
         "Unlock your full match list as soon as you start your first 3 free applications.",
+      moreMatchesBodyPaid:
+        "Your paid plan unlocks your full match list as soon as you start applying.",
       applyFree: (count: number) =>
         count === 1
           ? "Apply to this role for free"
@@ -3006,6 +3010,7 @@ export const copy = {
       ctaDirectButton: "Start preparing applications",
       ctaBusy: "Confirming…",
       stripeNote: "Secured by Stripe · No charge",
+      stripePaidNote: "Secured by Stripe · Cancel anytime",
       cancelledNote: "No card was checked and nothing was charged.",
       returnReadyNote: "Card confirmed. Click below to start your first 3 free applications.",
       declinedTitle: "Card could not be confirmed",
@@ -3026,6 +3031,49 @@ export const copy = {
       picksKeptNote: "Your picks are saved. Refresh in a moment to see them on the Tracker.",
       settleFailed: "We could not finish setting up your picks. They are safe; try again.",
       loadFailed: "Could not complete the confirmation. Try again in a moment.",
+    },
+    plan: {
+      title: "Choose how you start",
+      intro:
+        "Your picks are saved first. Pick the free trial or a paid plan; every screen after this matches it.",
+      legend: "Your plan",
+      trialName: "Free trial",
+      trialPrice: "$0",
+      trialApplications: "3 applications",
+      trialCard: "Card check only · nothing charged",
+      trialSending: "All 3 sent at once",
+      trialPreselected: "Preselected because this card has not used the trial.",
+      trialUsedNotice:
+        "This card has already used the free trial. Weekly and Monthly are available instead.",
+      weekName: "Weekly",
+      weekPrice: "$9.99",
+      weekUnit: "a week",
+      weekApplications: "50 applications a week",
+      monthName: "Monthly",
+      monthPrice: "$29.99",
+      monthUnit: "a month",
+      monthApplications: "250 applications a month",
+      paidDaily: "10 a day",
+      paidSending: "Sent 5 minutes apart",
+      ctaTrial: "Start my 3 free applications",
+      ctaWeek: (count: number) =>
+        `Start Weekly and apply to ${String(count)} ${plural(count, "job", "jobs")}`,
+      ctaMonth: (count: number) =>
+        `Start Monthly and apply to ${String(count)} ${plural(count, "job", "jobs")}`,
+      saving: "Saving your plan…",
+      saveFailed: "That plan did not save. Try again.",
+      checkoutFailed: "Stripe could not start the checkout. Your picks are safe; try again.",
+      returnTrial: "Free trial active · 3 applications. They are on your Tracker.",
+      returnWeek:
+        "Weekly plan active · 50 applications this week · 10 a day. Your picks are on your Tracker.",
+      returnMonth:
+        "Monthly plan active · 250 applications this month · 10 a day. Your picks are on your Tracker.",
+      returnPending:
+        "Stripe is still confirming your plan. Your picks are safe; this settles on its own.",
+      trialUsedAction: "Choose Weekly or Monthly",
+      modalPaidTitle: (name: string) => `Start ${name}`,
+      modalPaidLead: (price: string, unit: string, applications: string) =>
+        `${price} ${unit} for ${applications}, 10 a day. Applications go out 5 minutes apart.`,
     },
     signOut: "Sign out",
     saveFailed: "That did not save. Try again.",

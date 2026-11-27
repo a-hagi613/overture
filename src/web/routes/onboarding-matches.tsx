@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-import type { OnboardingMatchView } from "../../shared/onboarding.ts";
+import type { OnboardingMatchView, OnboardingPlanKind } from "../../shared/onboarding.ts";
 import type { BoardResponse } from "../lib/board-api.ts";
 import type { OnboardingMatches } from "../lib/onboarding-api.ts";
 import type { TrialCardState } from "../components/onboarding-trial-modal.tsx";
@@ -11,6 +11,7 @@ import type { TrialCardState } from "../components/onboarding-trial-modal.tsx";
 import { copy } from "../../shared/copy.ts";
 import { OnboardingLoadState } from "../components/onboarding-load-state.tsx";
 import { OnboardingMatchesCard } from "../components/onboarding-matches-card.tsx";
+import { OnboardingPlanChoice } from "../components/onboarding-plan-choice.tsx";
 import { OnboardingShell } from "../components/onboarding-shell.tsx";
 import { OnboardingTrialModal } from "../components/onboarding-trial-modal.tsx";
 import { fetchBoard } from "../lib/board-api.ts";
@@ -21,10 +22,13 @@ import {
   useOnboardingState,
   usePrepareOnboarding,
   useSaveOnboardingMatches,
+  useSaveOnboardingPlan,
+  useStartOnboardingCheckout,
 } from "../lib/onboarding-api.ts";
 import { startCardSetup, verifyTrialCard } from "../lib/trial-api.ts";
 
 const trialText = copy.onboarding.trial;
+const planText = copy.onboarding.plan;
 
 function salaryPeriodFor(value: string | null | undefined) {
   if (value === "year" || value === "month" || value === "hour") {
@@ -58,8 +62,10 @@ function previewMatchesFromBoard(board: BoardResponse, base: OnboardingMatches) 
   return {
     matches: mapped,
     pickLimit: base.pickLimit,
+    planKind: base.planKind,
     poolCount: board.total,
     selected: base.selected,
+    trialAvailable: base.trialAvailable,
   };
 }
 
@@ -73,14 +79,21 @@ export function OnboardingMatchesPage() {
   const cancelledParam = cardParam === "cancelled";
   const sessionId = params.get("session");
   const returned = cardParam === "verified" && sessionId !== null;
+  const trialUsedParam = params.get("plan") === "trial_used";
   const suffix = preview ? "?preview=1" : "";
 
   const state = useOnboardingState();
   const matches = useOnboardingMatches();
   const save = useSaveOnboardingMatches();
+  const savePlan = useSaveOnboardingPlan();
+  const checkout = useStartOnboardingCheckout();
   const consent = useConsent();
   const acceptConsent = useAcceptConsent();
   const prepare = usePrepareOnboarding();
+
+  const [planOverride, setPlanOverride] = useState<OnboardingPlanKind | null>(null);
+  const [planFailed, setPlanFailed] = useState(false);
+  const [checkoutFailed, setCheckoutFailed] = useState(false);
 
   const [selectionState, setSelectionState] = useState<{ ids: string[]; signature: string } | null>(
     null,
@@ -110,6 +123,21 @@ export function OnboardingMatchesPage() {
     }
   }, [cancelledParam, preview]);
 
+  const serverPlan = matches.data?.planKind ?? null;
+  const trialAvailable = !trialUsedParam && (matches.data?.trialAvailable ?? true);
+  const defaultPlan: OnboardingPlanKind = trialAvailable ? "free_trial" : "week";
+  const planKind = planOverride ?? serverPlan ?? defaultPlan;
+
+  const persistDefaultPlan = savePlan.mutate;
+
+  useEffect(() => {
+    if (preview || matches.data === undefined || serverPlan !== null || planOverride !== null) {
+      return;
+    }
+
+    persistDefaultPlan(defaultPlan);
+  }, [defaultPlan, matches.data, persistDefaultPlan, planOverride, preview, serverPlan]);
+
   useEffect(() => {
     if (preview || state.data === undefined) {
       return;
@@ -138,6 +166,34 @@ export function OnboardingMatchesPage() {
 
       if (consent.data !== undefined && !consentAccepted) {
         await acceptConsent.mutateAsync(consent.data.current.version);
+      }
+
+      await savePlan.mutateAsync(planKind);
+
+      if (planKind !== "free_trial") {
+        const current = await fetchOnboardingMatches();
+
+        const targetIds =
+          currentPicks.length > 0
+            ? [...currentPicks]
+            : current.selected.slice(0, current.pickLimit);
+
+        if (targetIds.length === 0) {
+          return "empty_selection" as const;
+        }
+
+        await save.mutateAsync(targetIds);
+        completingRef.current = true;
+
+        try {
+          globalThis.location.assign(await checkout.mutateAsync(planKind));
+        } catch {
+          completingRef.current = false;
+
+          return "checkout_failed" as const;
+        }
+
+        return "redirect" as const;
       }
 
       if (!hasApplications && !returned) {
@@ -197,6 +253,14 @@ export function OnboardingMatchesPage() {
         ]);
 
         await navigate("/tracker", { replace: true });
+
+        return;
+      }
+
+      if (outcome === "checkout_failed") {
+        completingRef.current = false;
+        setCheckoutFailed(true);
+        toast.error(planText.checkoutFailed);
 
         return;
       }
@@ -268,7 +332,40 @@ export function OnboardingMatchesPage() {
       : fallbackPicks;
 
   const selectedMatches = topMatches.filter((match) => picks.includes(match.id));
-  const busy = save.isPending || openingModal;
+  const busy = save.isPending || openingModal || savePlan.isPending;
+
+  const selectPlan = async (next: OnboardingPlanKind) => {
+    if (next === planKind || preview) {
+      return;
+    }
+
+    setPlanOverride(next);
+    setPlanFailed(false);
+
+    try {
+      if (next === "free_trial" && picks.length > 3) {
+        const trimmed = picks.slice(0, 3);
+
+        setSelectionState({ ids: trimmed, signature: matchesSignature });
+        await save.mutateAsync(trimmed);
+      }
+
+      const view = await savePlan.mutateAsync(next);
+
+      if (next !== "free_trial") {
+        const topIds = view.matches.slice(0, view.pickLimit).map((match) => match.id);
+
+        if (picks.length < topIds.length) {
+          setSelectionState({ ids: topIds, signature: topIds.join(",") });
+          await save.mutateAsync(topIds);
+        }
+      }
+    } catch {
+      setPlanOverride(serverPlan);
+      setPlanFailed(true);
+      toast.error(planText.saveFailed);
+    }
+  };
 
   const toggle = (id: string) => {
     const next = picks.includes(id)
@@ -282,8 +379,7 @@ export function OnboardingMatchesPage() {
     }
   };
 
-  const autoModalOpen =
-    !modalDismissed && (trialParam || (!preview && (returned || cancelledParam)));
+  const autoModalOpen = !modalDismissed && (trialParam || (!preview && returned));
 
   const effectiveModalOpen = modalOpen || autoModalOpen;
 
@@ -293,6 +389,7 @@ export function OnboardingMatchesPage() {
     }
 
     setOpeningModal(true);
+    setCheckoutFailed(false);
 
     try {
       if (!preview && picks.length > 0) {
@@ -354,16 +451,51 @@ export function OnboardingMatchesPage() {
     </label>
   );
 
+  let ctaLabel = planText.ctaMonth(picks.length);
+
+  if (planKind === "free_trial") {
+    ctaLabel = planText.ctaTrial;
+  } else if (planKind === "week") {
+    ctaLabel = planText.ctaWeek(picks.length);
+  }
+
   return (
     <OnboardingShell step={4}>
       <OnboardingMatchesCard
         allowEmptyContinue={preview && effectiveMatches.matches.length === 0}
         backTo={`/onboarding/targets${suffix}`}
         busy={busy}
+        ctaLabel={ctaLabel}
         failed={save.isError}
+        intro={planKind === "free_trial" ? undefined : copy.onboarding.matches.introPaid}
         matches={effectiveMatches}
         onContinue={openTrialModal}
         onToggle={toggle}
+        paidPlan={planKind !== "free_trial"}
+        planSlot={
+          preview ? undefined : (
+            <>
+              {cancelledParam ? (
+                <output className="mt-4 block rounded-lg border border-need/40 bg-need-soft/40 p-3 text-xs font-medium text-need">
+                  {trialText.cancelledNote}
+                </output>
+              ) : null}
+              <OnboardingPlanChoice
+                disabled={busy}
+                onSelect={(next) => {
+                  void selectPlan(next);
+                }}
+                planKind={planKind}
+                trialAvailable={trialAvailable}
+              />
+              {planFailed ? (
+                <output className="mt-3 block text-xs font-semibold text-need">
+                  {planText.saveFailed}
+                </output>
+              ) : null}
+            </>
+          )
+        }
         selected={picks}
       />
 
@@ -371,7 +503,7 @@ export function OnboardingMatchesPage() {
         busy={verify.isPending || restart.isPending || prepare.isPending}
         consentSlot={consentCheckbox}
         disabled={verifyDisabled}
-        error={verify.isError || restart.isError || prepare.isError}
+        error={verify.isError || restart.isError || prepare.isError || checkoutFailed}
         hasApplications={hasApplications}
         onOpenChange={(nextOpen) => {
           setModalOpen(nextOpen);
@@ -384,6 +516,7 @@ export function OnboardingMatchesPage() {
 
               next.delete("trial");
               next.delete("card");
+              next.delete("plan");
               next.delete("session");
               setParams(next, { replace: true });
             }
@@ -397,6 +530,7 @@ export function OnboardingMatchesPage() {
           }
         }}
         open={effectiveModalOpen}
+        planKind={planKind}
         returned={returned}
         selectedMatches={selectedMatches}
         state={trialState}
