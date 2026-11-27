@@ -994,24 +994,36 @@ export function createPlainFormReader(
     const posting = input.applyUrl ?? input.url;
     const applyUrl = manatalApplyUrl(posting) ?? posting;
 
-    return await fetchFormPage(applyUrl, async (html) => {
+    const read = await fetchFormPage(applyUrl, async (html) => {
       const jobId = manatalJobIdFromPage(html);
 
       if (jobId !== null) {
         const { origin } = new URL(applyUrl);
 
-        const read = await fetchJson(
+        const form = await fetchJson(
           `${origin}/api/v1.0/jobs/${jobId}/application-form/`,
           readManatalFormJson,
         );
 
-        if (read !== null) {
-          return read;
+        if (form !== null) {
+          return form;
         }
       }
 
       return await readHostedFormHtml("manatal", html);
     });
+
+    const reachedApplyPage =
+      read !== null &&
+      (isLoginWallRead(read) ||
+        read.questions.length > 0 ||
+        ("formLoaded" in read && read.formLoaded));
+
+    if (reachedApplyPage || applyUrl === posting) {
+      return read;
+    }
+
+    return await fetchFormPage(posting, async (html) => await readHostedFormHtml("manatal", html));
   }
 
   async function recruitee(input: FormReadTarget) {

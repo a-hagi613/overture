@@ -297,6 +297,40 @@ describe("the plain reader's JSON form routes", () => {
   });
 });
 
+describe("the Manatal route fallback", () => {
+  test("reads the posting page when the apply route is unavailable", async () => {
+    const page = `<!doctype html><html><body><form id="application-form">
+      <label for="first_name">First name</label><input id="first_name" name="first_name" required>
+      <label for="resume">Resume</label><input id="resume" name="resume" type="file" required>
+      <button type="submit">Apply</button>
+    </form></body></html>`;
+
+    const fetcher = async (input: RequestInfo | URL) => {
+      const href = input instanceof Request ? input.url : input.toString();
+
+      if (href.endsWith("/apply")) {
+        return await Promise.resolve(new Response("not found", { status: 404 }));
+      }
+
+      return await Promise.resolve(new Response(page, { status: 200 }));
+    };
+
+    const read = await createPlainFormReader({ fetcher }).read({
+      applyUrl: null,
+      ats: "manatal",
+      atsJobId: "55001",
+      boardToken: "example",
+      region: "us",
+      url: "https://www.careers-page.com/example/jobs/55001",
+    });
+
+    expect(isLoginWallRead(read)).toBe(false);
+    expect(
+      isLoginWallRead(read) ? null : read?.questions.map((question) => question.fieldName),
+    ).toEqual(["first_name", "resume"]);
+  });
+});
+
 describe("empty and unreadable application forms", () => {
   test("an empty but readable form keeps a signature so preparation can continue", () => {
     const bamboo = readBambooHRFormJson(JSON.stringify({ result: { formFields: {} } }));
