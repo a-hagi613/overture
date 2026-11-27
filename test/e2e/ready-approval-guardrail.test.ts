@@ -216,13 +216,13 @@ test("drafted prose expands, saved answers collapse, and A, E and S triage one c
   await drawer.getByRole("button", { name: /Show more/u }).click();
   await expect(drawer.getByText("maya-okafor-2026.pdf")).toBeVisible();
 
-  await drawer.getByRole("button", { name: "Close" }).click();
+  await drawer.getByRole("button", { name: "Close", exact: true }).click();
   await queue.getByRole("button", { name: "Inspect Cobalt Freight" }).click();
   await expect(drawer.getByText("Saved answers only")).toBeVisible();
   await expect(drawer.getByText("maya-okafor-2026.pdf")).toBeVisible();
   await expect(drawer.getByRole("button", { name: /Show more/u })).toHaveCount(0);
 
-  await drawer.getByRole("button", { name: "Close" }).click();
+  await drawer.getByRole("button", { name: "Close", exact: true }).click();
 
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 
@@ -239,7 +239,7 @@ test("drafted prose expands, saved answers collapse, and A, E and S triage one c
   await expect(page.getByRole("button", { name: "Approve & schedule" })).toHaveCount(0);
   await expect(textbox).toHaveValue("typed herea");
   await drawer.getByRole("button", { name: "Cancel" }).click();
-  await drawer.getByRole("button", { name: "Close" }).click();
+  await drawer.getByRole("button", { name: "Close", exact: true }).click();
 
   await page.getByRole("heading", { level: 1 }).click();
   await page.keyboard.press("s");

@@ -56,6 +56,7 @@ export function SignInForm({
         <p
           className="text-left text-xs font-semibold leading-relaxed text-need"
           id="signin-email-error"
+          role="alert"
         >
           {copy.signIn.refusedField}
         </p>

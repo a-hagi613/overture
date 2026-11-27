@@ -1,3 +1,4 @@
+import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { AnimatedBeam } from "../ui/animated-beam.tsx";
@@ -18,8 +19,13 @@ export function LandingWhereItApplies() {
   const bambooRef = useRef<HTMLDivElement>(null);
 
   const [activeIdx, setActiveIdx] = useState(0);
+  const reduceMotion = useReducedMotion() === true;
 
   useEffect(() => {
+    if (reduceMotion) {
+      return () => undefined;
+    }
+
     const timer = globalThis.setInterval(() => {
       setActiveIdx((current) => (current + 1) % 8);
     }, 2400);
@@ -27,7 +33,7 @@ export function LandingWhereItApplies() {
     return () => {
       globalThis.clearInterval(timer);
     };
-  }, []);
+  }, [reduceMotion]);
 
   return (
     <figure

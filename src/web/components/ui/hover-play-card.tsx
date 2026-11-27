@@ -46,8 +46,8 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const prevMutedRef = useRef<boolean | null>(null);
-
   const [isHovering, setIsHovering] = useState(false);
+  const [hasFocus, setHasFocus] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [userStarted, setUserStarted] = useState(false);
 
@@ -144,6 +144,16 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
   return (
     <div
       className={cn("group relative overflow-hidden rounded-xl shadow-sm", className)}
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+
+        if (!(next instanceof Node) || !event.currentTarget.contains(next)) {
+          setHasFocus(false);
+        }
+      }}
+      onFocus={() => {
+        setHasFocus(true);
+      }}
       onMouseEnter={() => {
         setIsHovering(true);
       }}
@@ -183,7 +193,7 @@ export function HoverPlayCard(props: HoverPlayCardProps) {
       />
 
       <AnimatePresence>
-        {isHovering || !isPlaying ? (
+        {isHovering || hasFocus || !isPlaying ? (
           <motion.div
             animate={{ opacity: 1 }}
             className="pointer-events-none absolute inset-0 flex items-center justify-center"

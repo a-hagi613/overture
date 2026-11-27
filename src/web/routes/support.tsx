@@ -32,20 +32,28 @@ export function SupportPage() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState<{ message: boolean; subject: boolean } | null>(null);
   const [referenceId, setReferenceId] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     const trimmedSubject = subject.trim();
     const trimmedMessage = message.trim();
+    const subjectInvalid = trimmedSubject.length < 3;
+    const messageInvalid = trimmedMessage.length < 10;
 
-    if (trimmedSubject.length < 3 || trimmedMessage.length < 10) {
+    if (subjectInvalid || messageInvalid) {
+      setInvalid({ message: messageInvalid, subject: subjectInvalid });
       setError(sp.validationError);
+      globalThis.document
+        .querySelector<HTMLElement>(subjectInvalid ? "#support-subject" : "#support-message")
+        ?.focus();
 
       return;
     }
 
     setSending(true);
     setError(null);
+    setInvalid(null);
 
     try {
       const response = await fetch("/api/support", {
@@ -135,9 +143,13 @@ export function SupportPage() {
                 {sp.subjectLabel}
               </label>
               <Input
+                ariaDescribedBy={invalid?.subject === true ? "support-error" : undefined}
                 id="support-subject"
+                invalid={invalid?.subject === true}
                 onInput={(event) => {
                   setSubject(event.currentTarget.value);
+                  setInvalid(null);
+                  setError(null);
                 }}
                 placeholder={sp.subjectPlaceholder}
                 type="text"
@@ -153,10 +165,14 @@ export function SupportPage() {
                 {sp.messageLabel}
               </label>
               <Textarea
+                ariaDescribedBy={invalid?.message === true ? "support-error" : undefined}
                 className="min-h-36"
                 id="support-message"
+                invalid={invalid?.message === true}
                 onChange={(event) => {
                   setMessage(event.currentTarget.value);
+                  setInvalid(null);
+                  setError(null);
                 }}
                 placeholder={sp.messagePlaceholder}
                 value={message}
@@ -164,7 +180,7 @@ export function SupportPage() {
             </div>
 
             {error === null ? null : (
-              <p className="text-xs font-semibold text-need" role="alert">
+              <p className="text-xs font-semibold text-need" id="support-error" role="alert">
                 {error}
               </p>
             )}

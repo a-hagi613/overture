@@ -62,10 +62,10 @@ export function InboxThreadListRow({
         <span className="flex items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1.5">
             {row.unread ? (
-              <span
-                aria-label={copy.inbox.unreadAria}
-                className="h-2 w-2 shrink-0 rounded-full bg-signal"
-              />
+              <>
+                <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-signal" />
+                <span className="sr-only">{copy.inbox.unreadAria}</span>
+              </>
             ) : null}
             <span
               className={`truncate text-sm ${

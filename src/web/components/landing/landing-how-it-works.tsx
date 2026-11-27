@@ -1,3 +1,4 @@
+import { useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "../ui/badge.tsx";
@@ -69,8 +70,13 @@ const STEP_INTERVAL_MS = 3200;
 export function LandingHowItWorks() {
   const [activeStep, setActiveStep] = useState(0);
   const [hoverStep, setHoverStep] = useState<number | null>(null);
+  const reduceMotion = useReducedMotion() === true;
 
   useEffect(() => {
+    if (reduceMotion) {
+      return () => undefined;
+    }
+
     const stepTimer = globalThis.setInterval(() => {
       setActiveStep((current) => (current + 1) % STEP_COUNT);
     }, STEP_INTERVAL_MS);
@@ -78,7 +84,7 @@ export function LandingHowItWorks() {
     return () => {
       globalThis.clearInterval(stepTimer);
     };
-  }, []);
+  }, [reduceMotion]);
 
   const current = hoverStep ?? activeStep;
 

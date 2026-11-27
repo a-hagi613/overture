@@ -293,7 +293,7 @@ test("mobile Review drawer opens from the list and Close returns without hiding 
   await expect(dialog.getByText(firstPrompt)).toBeVisible();
   await expect(page).toHaveURL(/[?&]application=/u);
 
-  await dialog.getByRole("button", { name: "Close" }).click();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(firstApplicationButton).toBeVisible();

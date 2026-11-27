@@ -61,18 +61,20 @@ export function registerTopLayerHost(element: HTMLElement, requestClose: () => v
 }
 
 /**
- * Closes the sheet that owns the top layer, before an app-level overlay opens.
+ * Closes every sheet that owns the top layer, before an app-level overlay opens.
  *
- * @returns True when a sheet was open and asked to close.
+ * A native modal `<dialog>` sits above the document and makes everything outside it inert, so a
+ * command palette or another app overlay cannot open on top of one. Closing all of them also
+ * handles a confirmation dialog stacked over a sheet.
+ *
+ * @returns The number of sheets that were asked to close.
  */
-export function closeTopLayerHost() {
-  const host = hosts.at(-1);
+export function closeAllTopLayerHosts() {
+  const open = hosts.toReversed();
 
-  if (host === undefined) {
-    return false;
+  for (const host of open) {
+    host.requestClose();
   }
 
-  host.requestClose();
-
-  return true;
+  return open.length;
 }

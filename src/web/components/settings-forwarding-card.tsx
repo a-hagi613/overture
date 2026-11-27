@@ -1,5 +1,5 @@
 import { Check, Copy, Mail } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { copy } from "../../shared/copy.ts";
@@ -17,6 +17,16 @@ export function SettingsForwardingCard() {
   const { data, isError, isPending, refetch } = useMailbox();
   const [provider, setProvider] = useState<ProviderTab>("gmail");
   const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copiedTimer.current !== null) {
+        globalThis.clearTimeout(copiedTimer.current);
+      }
+    },
+    [],
+  );
 
   const address = data?.address ?? "";
   let addressText = address;
@@ -34,7 +44,13 @@ export function SettingsForwardingCard() {
       await navigator.clipboard.writeText(address);
       setCopied(true);
       toast.success(copy.inbox.addressCopied);
-      globalThis.setTimeout(() => {
+
+      if (copiedTimer.current !== null) {
+        globalThis.clearTimeout(copiedTimer.current);
+      }
+
+      copiedTimer.current = globalThis.setTimeout(() => {
+        copiedTimer.current = null;
         setCopied(false);
       }, 2500);
     } catch {

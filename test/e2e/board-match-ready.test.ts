@@ -67,7 +67,7 @@ async function expectReadyMatches(
   await expect(drawer.getByText("Saved answer").first()).toBeVisible();
   await drawer.getByRole("button", { name: /Show more/u }).click();
   await expect(drawer.getByText("maya-okafor-2026.pdf").first()).toBeVisible();
-  await drawer.getByRole("button", { name: "Close" }).click();
+  await drawer.getByRole("button", { name: "Close", exact: true }).click();
 
   await page.evaluate(async () => {
     await Promise.all([
