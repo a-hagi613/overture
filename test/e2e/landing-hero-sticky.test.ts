@@ -113,9 +113,9 @@ test.describe("landing sticky header and hero", () => {
     await page.goto(`${appServerUrl}/`);
 
     const animations = await page.evaluate(() =>
-      [...document.querySelectorAll("output span[aria-hidden='true'] span")].map(
-        (element) => getComputedStyle(element).animationName,
-      ),
+      [
+        ...document.querySelectorAll("[data-testid='hero-counter'] span[aria-hidden='true'] span"),
+      ].map((element) => getComputedStyle(element).animationName),
     );
 
     expect(animations).toContain("ov-live-ping");
