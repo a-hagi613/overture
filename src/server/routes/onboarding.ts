@@ -18,6 +18,7 @@ import { postingUserState } from "../platform/db/schema.ts";
 import { postings } from "../platform/db/catalog-schema.ts";
 import { startOnboarding } from "../profile/onboarding-start.ts";
 import { enqueueUserPull } from "../jobs/pull.ts";
+import { enqueueMatchScorePool } from "../matching/match-jobs.ts";
 import { preferencesChanged } from "../jobs/preferences.ts";
 import { createConsentService } from "../profile/consent.ts";
 import { createLanguagesService } from "../profile/languages.ts";
@@ -427,6 +428,7 @@ export function createOnboardingRoutes(deps: {
 
     if (preferencesChanged(before.targets, after.targets)) {
       enqueueUserPull(db, clock, account.id);
+      enqueueMatchScorePool(db, clock, account.id);
     }
 
     return context.json(await targetsView(account.id, false));

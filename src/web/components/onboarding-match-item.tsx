@@ -34,6 +34,16 @@ export function OnboardingMatchItem({
   on: boolean;
   onToggle: (id: string) => void;
 }) {
+  const scoreText = match.score === null ? text.scoring : String(match.score);
+
+  let scoreDetail: string = text.scoreLabel;
+
+  if (match.score === null) {
+    scoreDetail = "";
+  } else if (match.strong) {
+    scoreDetail = text.strong;
+  }
+
   return (
     <li
       className={`rounded-lg border p-4 transition ${
@@ -51,16 +61,12 @@ export function OnboardingMatchItem({
           </div>
         </div>
         <div
-          aria-label={text.scoreAria(match.score)}
+          aria-label={match.score === null ? text.scoringAria : text.scoreAria(match.score)}
           className="flex shrink-0 items-center gap-2 rounded-lg border border-signal/30 bg-signal-soft/70 px-2.5 py-1"
         >
-          <span className="text-sm font-bold text-signal-text tabular-nums">
-            {String(match.score)}
-          </span>
+          <span className="text-sm font-bold text-signal-text tabular-nums">{scoreText}</span>
           <span aria-hidden="true" className="h-3.5 w-px bg-signal/30" />
-          <span className="text-xs font-medium text-foreground">
-            {match.strong ? text.strong : text.scoreLabel}
-          </span>
+          <span className="text-xs font-medium text-foreground">{scoreDetail}</span>
         </div>
       </div>
 

@@ -709,7 +709,7 @@ export function createMatchingService(deps: MatchDeps) {
       poolCount: list.length,
       items: chosen.map((candidate) => {
         const matched = scores.get(candidate.id);
-        const score = matched?.score ?? Math.min(100, Math.round(candidate.codeRank));
+        const score = matched?.score ?? null;
 
         return {
           employmentType: candidate.employmentType,
@@ -719,7 +719,7 @@ export function createMatchingService(deps: MatchDeps) {
           salaryMinMinor: candidate.salaryMinMinor,
           salaryPeriod: candidate.salaryPeriod,
           score,
-          strong: score >= threshold,
+          strong: score !== null && score >= threshold,
           title: candidate.title,
           company: candidate.companyName,
           workplace: candidate.workplace,

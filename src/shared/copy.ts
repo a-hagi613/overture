@@ -2930,6 +2930,8 @@ export const copy = {
       whyTitle: "Why this fits",
       scoreLabel: "Match score",
       scoreAria: (score: number) => `Match score ${String(score)} out of 100`,
+      scoring: "Scoring…",
+      scoringAria: "Match score is still being worked out",
       noSalary: "Salary not listed",
       remote: "Remote",
       strong: "Strong match",

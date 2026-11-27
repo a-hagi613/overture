@@ -17,8 +17,15 @@ import { resolveApplyTarget } from "./apply-link.ts";
 import { promotePlaceValues } from "../places/resolve.ts";
 import type { JobSearchPage, JobSource } from "./source.ts";
 import type { PullPreferences } from "./preferences.ts";
-import { paidUserIds, pullPreferencesFor, queryKeyOf, searchQueryFor } from "./preferences.ts";
+import {
+  isPaidUser,
+  paidUserIds,
+  pullPreferencesFor,
+  queryKeyOf,
+  searchQueryFor,
+} from "./preferences.ts";
 import type { JobStore } from "./store.ts";
+import { enqueueMatchScoreNew } from "../matching/match-jobs.ts";
 
 export const JOBS_PULL_JOB_KIND = "jobs.pull";
 export const JOBS_PULL_USER_JOB_KIND = "jobs.pull.user";
@@ -649,8 +656,11 @@ export function createPullJobHandlers(db: AppDatabase, clock: Clock, service: Pu
     },
     [JOBS_PULL_USER_JOB_KIND]: async (payload) => {
       const { userId } = userPullPayload.parse(JSON.parse(payload));
+      const result = await service.runUser(userId);
 
-      await service.runUser(userId);
+      if (result !== null && isPaidUser(db, userId, clock.now())) {
+        enqueueMatchScoreNew(db, clock, userId);
+      }
     },
   } satisfies JobHandlers;
 }

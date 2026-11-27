@@ -96,6 +96,19 @@ difference average ≤ 5 and maximum ≤ 15; wrong-field jobs in the visible lis
 "would apply" for King Kong and three test people. If Haiku 5.5 misses it, Sonnet 5.5 is measured on the same set and
 the numbers are reported before the model changes.
 
+### 7. Implementation notes (2026-11-26)
+
+The score, the store and the sort live in `src/server/matching/`: `prompts/score-v1.ts` (the exact system prompt, the
+two worked examples and the JSON schema), `score-schema.ts` (the zod reply), `jobs-pool.ts` (the code pool over
+`jobs`/`job_places`), `match-store.ts` (the stored row), `match-sort.ts` (the order and banding), `match-scoring.ts`
+(live and Batch runs) and `match-jobs.ts` (the preference-save, fresh-pull, resume-change and description-change
+triggers). The candidate resume and targets travel in `LlmRequest.cachePrefix`, a cached block before the per-job text,
+so one person's pool shares the cache prefix across every call.
+
+The gate is `scripts/eval-match-scoring.ts`. It refuses to run unless `OVERTURE_MATCH_EVAL=1`, is never imported by CI,
+and prints the repeat-run average and maximum, the visible wrong-field rate and the ordered top three for the owner to
+rate by hand against the #685 set.
+
 ## Consequences
 
 - The Matches page and the Tracker can disagree about a card's band only if the card's `posting_id` or version changed;

@@ -69,7 +69,7 @@ const onboardingMatchSchema = z.object({
   salaryCurrency: z.string().nullable(),
   salaryMinMinor: z.number().nullable(),
   salaryPeriod: z.enum(["year", "month", "hour"]).nullable(),
-  score: z.number(),
+  score: z.number().nullable(),
   strong: z.boolean(),
   title: z.string(),
   why: z.array(z.string()),
