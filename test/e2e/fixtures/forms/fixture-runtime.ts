@@ -8,10 +8,16 @@ interface RecordedOption {
   value: string;
 }
 
+interface RecordedLocation {
+  id: string;
+  name: string;
+}
+
 interface FixtureMeta {
   options: Record<string, RecordedOption[]>;
   autocompletes?: string[];
   jobLocation: string;
+  locations?: RecordedLocation[];
   confirmationMessage: string;
   confirmationPath?: string;
 }
@@ -281,8 +287,95 @@ const recordFieldValues = (form: HTMLFormElement) => {
   void fetch("/__fixture__/values", { method: "POST", body: JSON.stringify(fieldValues(form)) });
 };
 
+const attachLeverLocation = (form: HTMLFormElement, meta: FixtureMeta) => {
+  const input = form.querySelector<HTMLInputElement>("input.location-input");
+  const hidden = form.querySelector<HTMLInputElement>("#selected-location");
+
+  const results = input
+    ?.closest(".application-field")
+    ?.querySelector<HTMLElement>(".dropdown-results");
+
+  const container = input
+    ?.closest(".application-field")
+    ?.querySelector<HTMLElement>(".dropdown-container");
+
+  if (
+    input === null ||
+    hidden === null ||
+    results === null ||
+    results === undefined ||
+    container === null ||
+    container === undefined ||
+    meta.locations === undefined
+  ) {
+    return;
+  }
+
+  const clear = () => {
+    results.replaceChildren();
+    container.style.display = "none";
+  };
+
+  const render = (query: string) => {
+    const city = query.split(",")[0]?.trim().toLowerCase() ?? "";
+
+    const matched =
+      city === ""
+        ? []
+        : (meta.locations ?? []).filter((location) => location.name.toLowerCase().startsWith(city));
+
+    results.replaceChildren();
+
+    for (const [index, location] of matched.entries()) {
+      const option = document.createElement("div");
+
+      option.className = "break-word dropdown-location width-full py1 px2";
+      option.id = `location-${String(index)}`;
+      option.textContent = location.name;
+      option.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        input.value = location.name;
+        hidden.value = JSON.stringify(location);
+        clear();
+      });
+      results.append(option);
+    }
+
+    container.style.display = matched.length === 0 ? "none" : "flex";
+  };
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  input.addEventListener("input", () => {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+
+    timer = setTimeout(() => {
+      render(input.value);
+    }, 500);
+  });
+
+  input.addEventListener("blur", () => {
+    if (container.style.display !== "none") {
+      clear();
+      input.value = "";
+      hidden.value = "";
+    }
+  });
+};
+
 const attachSubmitBehaviour = (form: HTMLFormElement, meta: FixtureMeta) => {
   attachResumeEcho(form);
+
+  const anchor = form.querySelector<HTMLAnchorElement>("a#resumator-submit-resume");
+
+  if (anchor !== null) {
+    anchor.addEventListener("click", (event) => {
+      event.preventDefault();
+      form.requestSubmit();
+    });
+  }
 
   const search = new URLSearchParams(globalThis.location.search);
 
@@ -458,6 +551,7 @@ const run = () => {
 
   mutateForm(form, meta);
   attachComboboxes(form, meta);
+  attachLeverLocation(form, meta);
   attachSubmitBehaviour(form, meta);
 };
 

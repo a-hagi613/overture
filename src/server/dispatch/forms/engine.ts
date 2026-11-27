@@ -510,6 +510,16 @@ export interface LiveFormProblem {
   unexpected: boolean;
 }
 
+/**
+ * The one planned field a filler could not write before preflight ran. Kept on
+ * the attempt so a fill failure names the field instead of ending silently.
+ */
+export interface FillFailure {
+  fieldName: string | null;
+  fieldType: QuestionFieldType | null;
+  label: string;
+}
+
 export type LiveFormCheck = { ok: true; problems: [] } | { ok: false; problems: LiveFormProblem[] };
 
 export type LiveFormVerdict =
