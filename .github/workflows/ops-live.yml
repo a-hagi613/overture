@@ -597,6 +597,7 @@ jobs:
           ALERT_NTFY_URL: ${{ secrets.ALERT_NTFY_URL }}
           CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
           ALLOWED_SIGNUP_EMAILS: ${{ secrets.ALLOWED_SIGNUP_EMAILS }}
+          FREEHIRE_API_KEY: ${{ secrets.FREEHIRE_API_KEY }}
           ENABLE_CATALOG_R2_HOT_SWAP: ${{ inputs.enable_catalog_r2_hot_swap }}
         run: |
           set -euo pipefail
@@ -616,6 +617,13 @@ jobs:
             echo "::add-mask::$ALLOWED_SIGNUP_EMAILS"
             set_args+=("ALLOWED_SIGNUP_EMAILS=$ALLOWED_SIGNUP_EMAILS")
             key_names+=("ALLOWED_SIGNUP_EMAILS")
+          fi
+          # The freehire API plan is bought only after the #710 live walk passes (#708). An unset repository secret
+          # is skipped, so a sync before the purchase leaves the app on the free plan instead of clearing anything.
+          if [ -n "${FREEHIRE_API_KEY:-}" ]; then
+            echo "::add-mask::$FREEHIRE_API_KEY"
+            set_args+=("FREEHIRE_API_KEY=$FREEHIRE_API_KEY")
+            key_names+=("FREEHIRE_API_KEY")
           fi
           if [ "${ENABLE_CATALOG_R2_HOT_SWAP:-false}" = "true" ]; then
             set_args+=("CATALOG_R2_HOT_SWAP=true")

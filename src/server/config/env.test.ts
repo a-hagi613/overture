@@ -170,6 +170,25 @@ describe("ALLOWED_SIGNUP_EMAILS", () => {
   });
 });
 
+describe("FREEHIRE_API_KEY", () => {
+  test("the free plan boots with the key unset or empty, and the API plan carries a value", () => {
+    expect(
+      checkedEnvSchema.parse({ ...productionEnv, NODE_ENV: "test" }).FREEHIRE_API_KEY,
+    ).toBeUndefined();
+    expect(
+      checkedEnvSchema.parse({ ...productionEnv, FREEHIRE_API_KEY: "", NODE_ENV: "test" })
+        .FREEHIRE_API_KEY,
+    ).toBe("");
+    expect(
+      checkedEnvSchema.parse({
+        ...productionEnv,
+        FREEHIRE_API_KEY: "fh_live_test_key",
+        NODE_ENV: "test",
+      }).FREEHIRE_API_KEY,
+    ).toBe("fh_live_test_key");
+  });
+});
+
 describe("better-auth secrets", () => {
   const oldSecret = "old-secret-value-0123456789";
   const newSecret = "new-secret-value-9876543210";

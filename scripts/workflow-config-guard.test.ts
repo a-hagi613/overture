@@ -12,6 +12,7 @@ import {
 import {
   findAdminHostWorkflowProblems,
   findBunVersionDrift,
+  findFreehireLaunchSecretProblems,
   findRecoveryWorkflowProblems,
   findScheduledSpendProblems,
   findVacuumWorkflowProblems,
@@ -23,6 +24,13 @@ import {
   readBunVersions,
   readWorkflowStep,
 } from "./workflow-config-guard.ts";
+import {
+  deploySecretGateScript,
+  launchSecretSandbox,
+  opsSecretSyncScript,
+  removeLaunchSecretSandboxes,
+  REQUIRED_FLY_SECRETS,
+} from "./launch-secret-sandbox.ts";
 
 const pinned = "1.4.5";
 
@@ -1090,4 +1098,141 @@ test("the unwrapped marketing sync fails loudly instead of extracting a frame", 
   expect(output).toMatch(/unexpected end of file/u);
   expect(existsSync(join(sandbox.workDirectory, "dist-marketing", "index.html"))).toBe(false);
   expect(readdirSync(sandbox.remoteTmp)).toStrictEqual([]);
+});
+
+afterEach(removeLaunchSecretSandboxes);
+
+test("the shipped deploy gate and ops sync carry the freehire key behind its opt-in", () => {
+  expect(
+    findFreehireLaunchSecretProblems({
+      deploy: readFileSync(".github/workflows/deploy.yml", "utf8"),
+      opsLive: recoveryWorkflow(),
+    }),
+  ).toStrictEqual([]);
+});
+
+test("a deploy gate that requires FREEHIRE_API_KEY on every deploy is reported", () => {
+  const deploy = readFileSync(".github/workflows/deploy.yml", "utf8").replace(
+    'required="R2_ACCOUNT_ID',
+    'required="FREEHIRE_API_KEY R2_ACCOUNT_ID',
+  );
+
+  expect(
+    findFreehireLaunchSecretProblems({ deploy, opsLive: recoveryWorkflow() }).some((problem) =>
+      problem.includes("must stay behind REQUIRE_FREEHIRE_API_KEY"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy gate without the REQUIRE_FREEHIRE_API_KEY variable is reported", () => {
+  const deploy = readFileSync(".github/workflows/deploy.yml", "utf8").replace(
+    "          REQUIRE_FREEHIRE_API_KEY: ${{ vars.REQUIRE_FREEHIRE_API_KEY }}\n",
+    "",
+  );
+
+  expect(
+    findFreehireLaunchSecretProblems({ deploy, opsLive: recoveryWorkflow() }).some((problem) =>
+      problem.includes("does not read the REQUIRE_FREEHIRE_API_KEY repository variable"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy gate that reads the FREEHIRE_API_KEY value is reported", () => {
+  const deploy = readFileSync(".github/workflows/deploy.yml", "utf8").replace(
+    "REQUIRE_FREEHIRE_API_KEY: ${{ vars.REQUIRE_FREEHIRE_API_KEY }}",
+    "FREEHIRE_API_KEY: ${{ secrets.FREEHIRE_API_KEY }}",
+  );
+
+  expect(
+    findFreehireLaunchSecretProblems({ deploy, opsLive: recoveryWorkflow() }).some((problem) =>
+      problem.includes("reads the FREEHIRE_API_KEY secret value"),
+    ),
+  ).toBe(true);
+});
+
+test("an ops sync that does not mask FREEHIRE_API_KEY is reported", () => {
+  const opsLive = recoveryWorkflow().replace('echo "::add-mask::$FREEHIRE_API_KEY"\n', "");
+
+  expect(
+    findFreehireLaunchSecretProblems({
+      deploy: readFileSync(".github/workflows/deploy.yml", "utf8"),
+      opsLive,
+    }).some((problem) => problem.includes("mask FREEHIRE_API_KEY")),
+  ).toBe(true);
+});
+
+test("an ops sync that would send an empty FREEHIRE_API_KEY is reported", () => {
+  const opsLive = recoveryWorkflow().replace(
+    '          if [ -n "${FREEHIRE_API_KEY:-}" ]; then',
+    "          if true; then",
+  );
+
+  expect(
+    findFreehireLaunchSecretProblems({
+      deploy: readFileSync(".github/workflows/deploy.yml", "utf8"),
+      opsLive,
+    }).some((problem) => problem.includes("non-empty check")),
+  ).toBe(true);
+});
+
+test("the deploy gate passes while the freehire opt-in is off and the key is missing", () => {
+  const sandbox = launchSecretSandbox();
+
+  const { output, status } = sandbox.run(
+    deploySecretGateScript(readFileSync(".github/workflows/deploy.yml", "utf8")),
+    { flySecrets: REQUIRED_FLY_SECRETS },
+  );
+
+  expect(status).toBe(0);
+  expect(output).not.toContain("::error::");
+});
+
+test("the deploy gate refuses when FREEHIRE_API_KEY is required and missing", () => {
+  const sandbox = launchSecretSandbox();
+
+  const { output, status, summary } = sandbox.run(
+    deploySecretGateScript(readFileSync(".github/workflows/deploy.yml", "utf8")),
+    { flySecrets: REQUIRED_FLY_SECRETS, vars: { REQUIRE_FREEHIRE_API_KEY: "true" } },
+  );
+
+  expect(status).not.toBe(0);
+  expect(output).toContain("::error::Fly secrets missing on overture-web");
+  expect(output).toContain("FREEHIRE_API_KEY");
+  expect(summary).toContain("FREEHIRE_API_KEY");
+});
+
+test("the deploy gate passes when the required FREEHIRE_API_KEY is present", () => {
+  const sandbox = launchSecretSandbox();
+
+  const { output, status } = sandbox.run(
+    deploySecretGateScript(readFileSync(".github/workflows/deploy.yml", "utf8")),
+    {
+      flySecrets: [...REQUIRED_FLY_SECRETS, "FREEHIRE_API_KEY"],
+      vars: { REQUIRE_FREEHIRE_API_KEY: "true" },
+    },
+  );
+
+  expect(status).toBe(0);
+  expect(output).not.toContain("::error::");
+});
+
+test("the ops sync imports FREEHIRE_API_KEY only when the repository secret is set", () => {
+  const sandbox = launchSecretSandbox();
+  const sync = opsSecretSyncScript(recoveryWorkflow());
+
+  const withKey = sandbox.run(sync, { vars: { FREEHIRE_API_KEY: "fh_live_test_key" } });
+
+  expect(withKey.status).toBe(0);
+  expect(withKey.imported).toContain("FREEHIRE_API_KEY=fh_live_test_key");
+  expect(withKey.summary).toContain("FREEHIRE_API_KEY");
+  expect(withKey.summary).not.toContain("fh_live_test_key");
+
+  const withoutKey = sandbox.run(sync, {
+    vars: { ALERT_NTFY_URL: "https://ntfy.example/topic" },
+  });
+
+  expect(withoutKey.status).toBe(0);
+  expect(withoutKey.imported).toContain("ALERT_NTFY_URL=https://ntfy.example/topic");
+  expect(withoutKey.imported).not.toContain("FREEHIRE_API_KEY");
+  expect(withoutKey.summary).not.toContain("FREEHIRE_API_KEY");
 });

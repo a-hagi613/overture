@@ -18,9 +18,9 @@ to Fly), against names only.
 | Deleted accounts in backups | The 35-day lifecycle on `overture-backups` (`app.sqlite/`) and the 30-day snapshot retention are the replay window for an erased account: only keyless ciphertext can come back, because `user_keys` is destroyed first (SPEC §13.2). R2 object deletes are not part of a replay |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_signal = "SIGTERM"`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health`; `PUBLIC_SIGNUP_ENABLED = "false"` keeps production invite-only (owner, invited and verified users, and the demo account) until M3 public sign-up ships, while `ALLOWED_SIGNUP_EMAILS` can name comma-separated tester addresses that may still sign up, and `DEMO_LOGIN_ENABLED = "true"` keeps the demo account |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
-| `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets, runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
+| `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets (the freehire key only when `REQUIRE_FREEHIRE_API_KEY` is on), runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
-| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ALLOWED_SIGNUP_EMAILS`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `match-probe` (read-only: ranks the live catalog for five sample Targets with the real matcher and prints each count and top five titles; it reads no user's data and writes nothing), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ALLOWED_SIGNUP_EMAILS` and `FREEHIRE_API_KEY`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `match-probe` (read-only: ranks the live catalog for five sample Targets with the real matcher and prints each count and top five titles; it reads no user's data and writes nothing), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
 | `.github/workflows/ops-admin-host.yml` | `workflow_dispatch` only, for the admin host: `status` (certificate table, Fly secret names only, app status), `add-cert` (idempotent certificate for `admin.tryoverture.com`, then the same report), `set-access-secrets` (pushes the Cloudflare Access values held as repository secrets to Fly, names only afterwards). Fails with a clear message while `FLY_API_TOKEN` is unset |
 | `.github/workflows/stapply-daily.yml` | Daily at 15:30 UTC (one hour after Stapply's 14:30 snapshot) and on `workflow_dispatch`; skips with a green notice until the R2 repository secrets or `CATALOG_REFRESH_SECRET` are configured. Builds `catalog.sqlite` with DuckDB from the 28 per-board `jobs.parquet` files, delta-syncs it against the previous R2 snapshot, tags it, vacuums and compresses it, then publishes `catalog/latest.sqlite.zst`, `catalog/latest.json` and `catalog/snapshots/<version>.sqlite.zst` to R2 or relays the signed refresh to `overture-web` |
 | `.github/workflows/vacuum-db.yml` | Weekly (Sundays 05:00 UTC, also `workflow_dispatch` with `dry_run` and `force`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise dry-runs `/data/app.sqlite`, and only when its freelist exceeds 50 MB (or `force` is set) restarts the one machine in maintenance mode, vacuums it, restarts the server and polls `/api/health` |
@@ -78,8 +78,10 @@ Run from an authenticated `flyctl` (the org examples below use Fly.io's defaults
    The server refuses to boot without the required ones, so the **Deploy** workflow checks each required
    name with `fly secrets list` first and fails before deploying when one is missing; production keeps its
    current release. The OAuth names are not in that check, and the Cloudflare mail names join it only once
-   `REQUIRE_CLOUDFLARE_EMAIL_SECRETS` is set (M1-90 section below). Later milestones add their own secrets the same way and to that list; nothing
-   else exists in `fly.toml`.
+   `REQUIRE_CLOUDFLARE_EMAIL_SECRETS` is set (M1-90 section below). `FREEHIRE_API_KEY` stays out of the required
+   list until `REQUIRE_FREEHIRE_API_KEY` is set, so deploys keep working on the free plan until the owner buys the
+   API plan after the #710 walk (launch runbook below). Later milestones add their own secrets the same way and to
+   that list; nothing else exists in `fly.toml`.
 6. Create a deploy token (Full permissions on the app) and store it as a repository secret:
    `gh secret set FLY_API_TOKEN -b <token-in-your-terminal> -R a-hagi613/overture`
 7. Point DNS at the app in Cloudflare: `tryoverture.com` (proxied) → `overture-web.fly.dev`, then
@@ -548,6 +550,120 @@ with the drift message.
 
 Against a test key this creates test-mode products, prices, a webhook and a portal; delete them in the dashboard when
 you are done. `--rotate-webhook` replaces the endpoint and writes the new `STRIPE_WEBHOOK_SECRET` to the env file.
+
+## Launch: freehire API plan, live Stripe and public sign-up (owner runbook, issue #708)
+
+The launch code ships before the owner steps, so `main` keeps deploying while the plan, live Stripe and the public
+switch are still pending (`Part of #708`; the owner steps close it). `FREEHIRE_API_KEY` is optional in
+`src/server/config/env.ts`: unset or empty keeps the free plan, a value sends `Authorization: Bearer …` on every
+freehire search and change-feed request. No test, CI job or scheduled job calls freehire with the key.
+
+### 1. Wait for #710, then buy the freehire API plan
+
+- Owner: finish the #710 live walk with three users first. The plan is bought only after it passes (owner,
+  2026-11-26).
+- Buy the $29/month API plan from freehire and copy the key once. The price rises to $39/month after 2026-12-01, so
+  buying before then avoids the increase.
+- Store it as a repository secret (never in the repo, a log or the step summary):
+
+```sh
+gh secret set FREEHIRE_API_KEY -b <key-from-freehire> -R a-hagi613/overture
+```
+
+### 2. Sync the key, then turn the deploy gate on
+
+```sh
+gh workflow run ops-live.yml -f action=sync-ops-secrets -R a-hagi613/overture
+gh variable set REQUIRE_FREEHIRE_API_KEY -b true -R a-hagi613/overture
+```
+
+`sync-ops-secrets` masks `FREEHIRE_API_KEY`, imports it in the same single `flyctl secrets import -a overture-web`
+call as the other ops secrets, lists only the name in the step summary, and finishes by polling the health route. An
+unset repository secret is skipped, so a sync before the purchase never clears a value on the app.
+
+`REQUIRE_FREEHIRE_API_KEY=true` makes the **Deploy** secret gate refuse any release whose Fly secret list lacks
+`FREEHIRE_API_KEY` (step 5 above, `.github/workflows/deploy.yml`). Leave the variable unset until step 1 is done: the
+gate then does not name the key, so deploys stay green on the free plan. The deploy job runs on every CI success and
+only reads the secret names from `flyctl secrets list`; it never receives the key, and the key reaches Fly only
+through the manual sync.
+
+Verify names only (values are never printed):
+
+```sh
+gh workflow run ops-live.yml -f action=check-secrets -R a-hagi613/overture
+```
+
+`FREEHIRE_API_KEY` must appear in the list, and `/api/health` must answer. If a later freehire call returns 401 or 403,
+the key is wrong or expired; set it again and re-run the sync.
+
+### 3. Live-mode Stripe checklist (from the old #254 list)
+
+Run the setup against the Production account and confirm each object in the Stripe dashboard:
+
+```sh
+gh workflow run ops-live.yml -f action=setup-stripe -f stripe_env=production -R a-hagi613/overture
+```
+
+- **Products and prices:** `Overture Week` at $9.99 USD recurring weekly (lookup key `overture_week_usd`) and
+  `Overture Month` at $29.99 USD recurring monthly (`overture_month_usd`), both with tax code `txcd_10103000` (SaaS,
+  personal use). A drifted price is replaced with `-f reconcile_prices=true`, never guessed.
+- **Webhook:** one endpoint `https://tryoverture.com/webhooks/stripe` subscribed to the nine events in
+  `src/server/billing/webhooks.ts`; `STRIPE_WEBHOOK_SECRET` is set on the app in the same run. A sandbox ↔ production
+  switch rotates it automatically.
+- **Billing portal:** cancels at period end, updates payment methods, shows invoices, switches Week ↔ Month with no
+  proration, returns to `https://tryoverture.com/profile/billing` and links the privacy and terms pages.
+- **Tax settings (dashboard, owner only):** turn on Stripe Tax in the Production account and add the registrations
+  for the places you sell to. The repo sets each product's tax code and does not send an automatic-tax parameter, so
+  confirm the tax line on a sandbox Checkout before the live keys go on. Overture is the seller; Stripe is the
+  processor (ADR 0031).
+- **Keys:** `check-secrets` must list `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_WEEK`,
+  `STRIPE_PRICE_MONTH` and `CARD_FINGERPRINT_SECRET`; a half-set pair stops the server at boot by design.
+- **No real charges for testing:** use test cards and `stripe_env=sandbox` for every rehearsal. Nothing in CI or a
+  scheduled job ever charges a card.
+
+### 4. Turn public sign-up on
+
+The flag is `PUBLIC_SIGNUP_ENABLED` (`src/server/config/env.ts`; default `true`). `fly.toml` sets it to `"false"` on
+purpose today, and this launch keeps it there until the owner's cutover.
+
+- **Preferred:** a one-line launch PR flips `fly.toml` to `PUBLIC_SIGNUP_ENABLED = "true"`. The repo then shows what
+  runs, and the next Deploy ships it.
+- **Immediate alternative, no code change:** `fly secrets set -a overture-web PUBLIC_SIGNUP_ENABLED=true`. The secret
+  overrides `[env]` on the next machine restart, but it hides the switch from `fly.toml`, so a reader of the repo would
+  think sign-up is still closed.
+
+Either way, confirm with `gh workflow run ops-live.yml -f action=live-diagnostics -R a-hagi613/overture`: the step
+prints `PUBLIC_SIGNUP_ENABLED=true` along with the other non-secret flags. The landing is already live on the marketing
+Worker (`https://tryoverture.com/`); a signed-in visitor still gets the app at `/home`.
+
+Only do this after step 3: with billing configured and public sign-up on, preparation, scoring and sending stay
+gated for accounts with no Applications left (fail-closed), and Turnstile plus the per-IP rate limits are what protect
+the free trial. `ALLOWED_SIGNUP_EMAILS` is only the M2 tester allowlist; it can be unset once anyone may sign up:
+
+```sh
+fly secrets unset -a overture-web ALLOWED_SIGNUP_EMAILS
+```
+
+### 5. Post-launch watch: first 20 paying users, 30 days of reconciliation
+
+- **Acceptance walk:** a fresh public user signs up, gets freehire matches through the paid key, uses the 3-application
+  trial and sees the Tracker. Record it in the launch note on #708.
+- **First hour after the cutover:** watch `/api/health`, the admin Users page (`/admin/users`) for sign-up volume and
+  Turnstile challenges, and the job list (`/admin/jobs`) for failed preparation. If sign-ups are abusive or error
+  rates jump, unset `PUBLIC_SIGNUP_ENABLED` (or revert the `fly.toml` PR): the machine restarts onto the invite-only
+  gate in minutes.
+- **First 20 paying users:** for each, check the Stripe payment, the grant and ledger row, and that the Tracker shows
+  the plan's Applications. The admin billing pages are `/admin/billing` and `/admin/billing/reconciliation`.
+- **30-day Stripe-to-ledger gate (old #255):** the `billing.reconcile` job runs ten minutes after UTC midnight and
+  records `clean` or the mismatch kinds (`invoice_without_grant`, `grant_without_invoice`, `refund_without_ledger`,
+  `ledger_without_refund`, `refund_ledger_missing`). A day that is not `clean` raises the `billing.mismatch` alert.
+  Launch close-out needs **30 clean days** after the first 20 paying users; a mismatch is investigated, never
+  dismissed.
+- **freehire spend:** the key is only spent by real user pulls (paid users every 3 hours, the trial on demand); watch
+  the plan's usage in the freehire dashboard for the first days.
+- **Roll back:** `fly secrets unset -a overture-web FREEHIRE_API_KEY` returns to the free plan; `gh variable unset
+  REQUIRE_FREEHIRE_API_KEY -R a-hagi613/overture` stops the deploy gate naming the key. For sign-up, unset the secret
+  (or revert the `fly.toml` PR) and restart the machine; `PUBLIC_SIGNUP_ENABLED=false` restores the invite-only gate.
 
 ## Signup allowlist for regular testers (optional, owner runbook)
 

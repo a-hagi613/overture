@@ -13,6 +13,7 @@ import { dirname, join, relative } from "node:path";
 import {
   flyctlRemoteCommands,
   MARKETING_SYNC_STEP,
+  readStepScript,
   readWorkflowStep,
 } from "./workflow-config-guard.ts";
 
@@ -156,18 +157,8 @@ export function removeMarketingSyncSandboxes() {
  */
 export function marketingSyncScript(deploy: string) {
   const step = readWorkflowStep(deploy, MARKETING_SYNC_STEP) ?? "";
-  const lines = step.split("\n");
-  const start = lines.findIndex((line) => line.trim() === "run: |");
 
-  const body =
-    start === -1
-      ? ""
-      : lines
-          .slice(start + 1)
-          .map((line) => line.replace(/^ {10}/u, ""))
-          .join("\n");
-
-  return { body, remote: flyctlRemoteCommands(step)[0] ?? "" };
+  return { body: readStepScript(step), remote: flyctlRemoteCommands(step)[0] ?? "" };
 }
 
 function listFiles(root: string) {
