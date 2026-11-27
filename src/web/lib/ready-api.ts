@@ -186,7 +186,7 @@ function useInvalidateReady() {
 }
 
 export function useReady() {
-  return useQuery({ queryFn: fetchReady, queryKey: ["ready"] });
+  return useQuery({ queryFn: fetchReady, queryKey: ["ready"], retry: 1 });
 }
 
 export function useApprove() {

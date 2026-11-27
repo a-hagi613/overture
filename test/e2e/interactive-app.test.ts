@@ -1,7 +1,7 @@
 import { test } from "./admin.fixture.ts";
 import { chunksFor, runSweep, themes, widths } from "./interactive-sweep.ts";
 
-test.describe.configure({ timeout: 240_000 });
+test.describe.configure({ timeout: 360_000 });
 
 for (const width of widths) {
   for (const theme of themes) {

@@ -157,8 +157,7 @@ async function expectPausedHomeMatchesBoard(
   await expect(page.getByText("Paused", { exact: true })).toBeVisible();
   await expect(page.getByText("Nothing new will send until you resume.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume sending" })).toBeVisible();
-  await expect(page.getByText("3rd in line")).toBeVisible();
-  await expect(page.getByText("Next send around 14:20 once sending resumes.")).toBeVisible();
+  await expect(page.getByText("Queued · sends at 2:20 PM", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Not sent", { exact: true })).toBeVisible();
   await expect(
     page.getByText("The form changed after we had filled it in, so we stopped before sending."),

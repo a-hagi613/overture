@@ -96,7 +96,7 @@ async function expectHomeMatchesBoard(
   await expect(page.getByRole("main").locator('a[href="/review"]').first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Applications sent" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ready to send" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Needs review" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Needs your answer" })).toBeVisible();
 
   await page.evaluate(async () => {
     await document.fonts.ready;

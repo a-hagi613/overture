@@ -34,6 +34,24 @@ const inboxRowSchema = z.object({
   id: z.string(),
   kind: z.string(),
   text: z.string(),
+  threadId: z.string(),
+  unread: z.boolean(),
+});
+
+const inProgressRowSchema = z.object({
+  company: z.string(),
+  id: z.string(),
+  sendsAt: z.number().nullable(),
+  status: z.enum(["preparing", "approved", "sending", "confirming"]),
+  title: z.string(),
+});
+
+const newMatchRowSchema = z.object({
+  company: z.string(),
+  id: z.string(),
+  location: z.string().nullable(),
+  score: z.number().nullable(),
+  title: z.string(),
 });
 
 const checkinSchema = z.object({
@@ -73,6 +91,8 @@ const homeResponseSchema = z.object({
   checkIns: z.array(checkinSchema),
   dailyCap: z.number(),
   endingGrant: z.object({ applicationsLeft: z.number(), expiresAt: z.number() }).nullable(),
+  inProgress: z.object({ items: z.array(inProgressRowSchema), total: z.number() }),
+  newMatches: z.object({ items: z.array(newMatchRowSchema), total: z.number() }),
   nextPrepAt: z.number(),
   nextSendAt: z.number().nullable(),
   now: z.number(),
@@ -117,6 +137,10 @@ export type HomeActivitySentRow = HomeResponse["activity"]["sent"][number];
 
 export type HomeActivityFailedRow = HomeResponse["activity"]["failed"][number];
 
+export type HomeInProgressRow = z.infer<typeof inProgressRowSchema>;
+
+export type HomeNewMatchRow = z.infer<typeof newMatchRowSchema>;
+
 export type HomePauseReason = z.infer<typeof homeResponseSchema>["pauseReason"];
 
 async function loadHome() {
@@ -130,7 +154,7 @@ async function loadHome() {
 }
 
 export function useHomeData() {
-  return useQuery({ queryKey: ["home"], queryFn: loadHome });
+  return useQuery({ queryFn: loadHome, queryKey: ["home"], retry: 1 });
 }
 
 const runningSchema = z.object({ pauseReason: z.string().nullable(), running: z.boolean() });

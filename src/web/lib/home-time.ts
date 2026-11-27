@@ -9,6 +9,14 @@ export function timeText(at: number, zone: string) {
   }).format(new Date(at));
 }
 
+export function sendTimeText(at: number, zone: string) {
+  return new Intl.DateTimeFormat(copy.home.dateLocale, {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: zone,
+  }).format(new Date(at));
+}
+
 export function dateKey(at: number, zone: string) {
   return new Intl.DateTimeFormat(copy.home.dateLocale, {
     day: "2-digit",
