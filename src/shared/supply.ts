@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isFreehireCategory } from "./freehire-categories.ts";
 import { ROLE_GROUPS } from "./tag-taxonomy.ts";
 import { isEscoRole } from "./esco-roles.ts";
 import { isRoleTaxonomyValue } from "./role-taxonomy.ts";
@@ -8,19 +9,21 @@ const roleFilterValue = (accepts: (value: string) => boolean, message: string) =
   z.string().trim().min(1).max(80).refine(accepts, { message }).optional();
 
 const isCategoryValue = (value: string) =>
-  ROLE_GROUPS.some((group) => group === value) || isRoleTaxonomyValue(value);
+  isFreehireCategory(value) ||
+  ROLE_GROUPS.some((group) => group === value) ||
+  isRoleTaxonomyValue(value);
 
 const isRoleValue = (value: string) => isEscoRole(value) || isRoleTaxonomyValue(value);
 
 /**
  * The filters the public supply preview accepts (issue #567, WS-17b). They stay deliberately small and closed:
- * the landing asks about a Level-1 category, an optional Level-2 granular role and a place, and every value is one
- * the catalog's own tags use, so a stranger cannot make the server scan arbitrary columns.
+ * the landing asks about a category, an optional granular role and a place, and every value is one the job data
+ * uses, so a stranger cannot make the server scan arbitrary columns.
  *
  * `role` is the original category parameter and `category` its explicit alias; `granularRole` names a role or
- * subcategory (issue #629). Each takes a role-taxonomy id or name (issue #660) or a retired category or ESCO role name,
- * which the server reads as taxonomy ids. A granular role is more specific than its category, so when both arrive the
- * granular role is the filter and the category is only a UI hint.
+ * subcategory (issue #629). Each takes a freehire category id (issue #684), a role-taxonomy id or name (issue #660)
+ * or a retired category or ESCO role name, which the server reads as a freehire category. A granular role is more
+ * specific than its category, so when both arrive the granular role is the filter and the category is only a UI hint.
  */
 export const supplyQuerySchema = z.object({
   role: roleFilterValue(isCategoryValue, "unknown role category"),
@@ -35,9 +38,9 @@ export const supplyQuerySchema = z.object({
 export type SupplyQuery = z.infer<typeof supplyQuerySchema>;
 
 export interface SupplyFilters {
-  /** The category (a role-taxonomy id or name, or a retired category name), or null for every category. */
+  /** A freehire category id, or a retired category/role-group label the server maps to its freehire categories. */
   role: string | null;
-  /** The role or subcategory (a role-taxonomy id or name, or a retired ESCO name), or null. It wins over `role`. */
+  /** A role or subcategory (a role-taxonomy id or name, or retired ESCO name), or null. It wins over `role`. */
   granularRole: string | null;
   location: string | null;
   radiusKm: number | null;
@@ -45,7 +48,7 @@ export interface SupplyFilters {
 }
 
 /**
- * Turns the validated query string into the filter object the catalog count reads.
+ * Turns the validated query string into the filter object the job count reads.
  * @param query The validated `/api/supply` query.
  * @returns The same filters with `remote` as a boolean and absent values as null.
  */

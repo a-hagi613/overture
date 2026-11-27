@@ -104,3 +104,16 @@ storage/system reports. Every new Application is created from a freehire `jobs` 
 and carries its own display snapshot, so no new user data depends on
 `catalog.sqlite`. Removing those readers, and then the file, is a separate change
 once no catalog-backed Application remains.
+
+## Amendment (2026-11-27, issue #742)
+
+`/api/supply` now counts the open, apply-supported freehire `jobs` and `job_places`
+rows in `app.sqlite` (ADR 0047), with the reader's non-job exclusion, freehire
+category, canonical place ids and `remote` flag, grouped by ATS `system`. The
+`catalog.sqlite` count and its `supply_facets` rollup are retired: the count helper
+and rollup builder are removed, nothing rebuilds or reads the rollup, and the
+`supply_facets` table stays in the legacy file only so an older `catalog.sqlite`
+still opens and passes `bun run db:verify` unchanged. The legacy file still answers
+the stored-match fallback, preparation/review/dispatch for catalog-backed
+Applications, the demo seed and the admin reports; the public count is one fewer
+reader that depends on it.
