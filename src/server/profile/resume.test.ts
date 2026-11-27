@@ -32,7 +32,7 @@ Bun.env.TURNSTILE_SECRET ??= "turnstile-secret";
 
 Bun.env.TURNSTILE_SITE_KEY ??= "turnstile-site";
 
-const { createResumeService } = await import("./resume.ts");
+const { createResumeService, ResumeUnreadableError } = await import("./resume.ts");
 
 const USER_ID = "resume-rollback-user";
 const NOW = 1_800_000_000_000;
@@ -40,6 +40,10 @@ const NOW = 1_800_000_000_000;
 const countSchema = z.object({ total: z.number() });
 
 const scratchDirectories: string[] = [];
+
+type TestClock = ReturnType<typeof createClock>;
+
+type TestDb = ReturnType<typeof openDatabase>["db"];
 
 afterEach(() => {
   for (const directory of scratchDirectories.splice(0)) {
@@ -85,6 +89,31 @@ function fresh() {
   return { clock, db, sqlite };
 }
 
+function serviceFor(clock: TestClock, db: TestDb, directory: string) {
+  const objects = createDiskObjectStore(directory);
+  const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
+
+  const config = {
+    apiKey: undefined,
+    baseUrl: "http://127.0.0.1:9",
+    model: DEFAULT_ANTHROPIC_MODEL,
+  };
+
+  const llm = createAnthropicLlmPort(
+    config,
+    createDurableBatches({
+      clock,
+      db,
+      maxWaitMs: 1000,
+      model: config.model,
+      pollIntervalMs: 1000,
+      provider: createAnthropicBatchProvider(config),
+    }),
+  );
+
+  return createResumeService({ clock, db, llm, objects, personal });
+}
+
 describe("the resume replacement transaction", () => {
   test("keeps the previous resume current when the insert fails", async () => {
     const { clock, db, sqlite } = fresh();
@@ -92,28 +121,7 @@ describe("the resume replacement transaction", () => {
 
     scratchDirectories.push(directory);
 
-    const objects = createDiskObjectStore(directory);
-    const personal = createPersonalCrypto(db, masterKeyringFor(MASTER));
-
-    const config = {
-      apiKey: undefined,
-      baseUrl: "http://127.0.0.1:9",
-      model: DEFAULT_ANTHROPIC_MODEL,
-    };
-
-    const llm = createAnthropicLlmPort(
-      config,
-      createDurableBatches({
-        clock,
-        db,
-        maxWaitMs: 1000,
-        model: config.model,
-        pollIntervalMs: 1000,
-        provider: createAnthropicBatchProvider(config),
-      }),
-    );
-
-    const service = createResumeService({ clock, db, llm, objects, personal });
+    const service = serviceFor(clock, db, directory);
     const pdf = new Uint8Array(readFileSync("test/e2e/fixtures/resume-text.pdf"));
 
     sqlite.run(
@@ -137,6 +145,35 @@ describe("the resume replacement transaction", () => {
           .get(USER_ID),
       ).total,
     ).toBe(1);
+    expect(
+      db
+        .select({ id: resumes.id })
+        .from(resumes)
+        .where(and(eq(resumes.userId, USER_ID), eq(resumes.isCurrent, true)))
+        .all(),
+    ).toEqual([{ id: "resume-current" }]);
+
+    sqlite.close();
+  });
+
+  test("keeps the previous resume current when the PDF cannot be read", async () => {
+    const { clock, db, sqlite } = fresh();
+    const directory = mkdtempSync(join(tmpdir(), "resume-unreadable-"));
+
+    scratchDirectories.push(directory);
+
+    const service = serviceFor(clock, db, directory);
+    const corrupt = new TextEncoder().encode("%PDF-1.4\nthis is not a real pdf\n%%EOF\n");
+
+    let caught: Error | null = null;
+
+    try {
+      await service.upload(USER_ID, { bytes: corrupt, name: "broken.pdf" });
+    } catch (error) {
+      caught = error instanceof Error ? error : null;
+    }
+
+    expect(caught).toBeInstanceOf(ResumeUnreadableError);
     expect(
       db
         .select({ id: resumes.id })

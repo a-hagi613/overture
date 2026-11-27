@@ -182,7 +182,7 @@ export const copy = {
     profileMenu: {
       label: "Profile sections",
       resume: "Resume & Cover Letter",
-      details: "Application Answers",
+      details: "Saved answers",
       preferences: "Job Preferences",
       billing: "Billing",
       account: "Account",
@@ -206,11 +206,7 @@ export const copy = {
       detailsTitle: "Saved answers",
       detailsTitlePlain: "Saved ",
       detailsTitleItalic: "answers",
-      detailsLead: "Your saved answers and your dedicated job-search email address.",
-      tier3EmptyTitle: "No Review answers saved yet",
-      tier3EmptyBody:
-        "Answers you save in Review appear here and are reused automatically on future applications.",
-      tier3OpenReview: "Open Review",
+      detailsLead: "Answers Overture applies with, reused on every application.",
       preferencesTitle: "Job Preferences",
       preferencesTitlePlain: "Job ",
       preferencesTitleItalic: "Preferences",
@@ -1905,6 +1901,10 @@ export const copy = {
   profileWorkspace: {
     resumeUploadedToast: "Resume uploaded and saved.",
     resumePdfOnlyError: "Please select a PDF file.",
+    resumeFileInputLabel: "Resume PDF file",
+    resumeReplaceFailed:
+      "That PDF could not be read. Your current resume is still saved and used on every application.",
+    resumeRetry: "Try again",
     resumeNoFileLabel: "No resume on file",
     resumeUploadHint: "Upload a PDF up to 10 MB",
     resumeOpenLabel: "Open PDF",
@@ -2071,7 +2071,6 @@ export const copy = {
       facts: "Saved answers",
       targets: "Targets",
       skipList: "Skip list",
-      address: "Job-search address",
     },
     resume: {
       sub: "One resume, sent exactly as you uploaded it.",
@@ -2089,21 +2088,12 @@ export const copy = {
         "Answers Overture uses to fill out application forms. Questions not covered here go to Review.",
       titlePlain: "Your",
       titleItalic: "saved answers",
-      tiersLabel: "Saved answers by tier",
-      tier1: {
-        label: "Tier 1 · Needed to start",
-        note: "Core facts reused across application forms. Open any saved answer to edit it.",
-        foot: "Every saved Tier 1 fact synced to your account is shown above.",
-      },
-      tier2: {
-        label: "Tier 2 · Strengthen your profile",
-      },
-      tier3: {
-        label: "Tier 3 · Learned from Reviews",
-      },
+      coreNote: "Core facts reused across application forms. Open any saved answer to edit it.",
+      foot: "Every saved answer synced to your account is shown above.",
       strengthen: {
-        empty:
-          "You are all caught up. Optional questions will appear here when they can unblock queued applications.",
+        heading: "Strengthen your profile",
+        empty: "You're all caught up.",
+        emptyBody: "Optional questions appear here when they can unblock queued applications.",
         unlocks: (count: number) =>
           `Unlocks ${String(count)} queued ${plural(count, "application", "applications")}`,
         note: "Optional questions that unblock multiple queued applications at once.",
@@ -2112,6 +2102,13 @@ export const copy = {
         saveAria: (label: string) => `Save answer: ${label}`,
         saving: "Saving",
       },
+      learned: {
+        heading: "Learned from Reviews",
+        emptyTitle: "No Review answers saved yet",
+        emptyBody:
+          "Answers you save in Review appear here and are reused automatically on future applications.",
+        openReview: "Open Review",
+      },
       fromResume: "From your resume",
       typedHere: "Typed here",
       notSet: "Not set",
@@ -2119,7 +2116,6 @@ export const copy = {
       keyDetailsNote:
         "The same fields, in the same order, as the fill-the-gaps step at setup. Every application reuses them.",
       otherSaved: "Other saved answers",
-      assignedBy: "Assigned by Overture",
       readOnly: "Read-only",
       edit: "Edit",
       aria: (label: string, action: string) => `${action}: ${label}`,
@@ -2174,17 +2170,6 @@ export const copy = {
       addLabel: "Add a company to skip",
       add: "Add",
       note: "Skipped companies never receive applications, even for strong matches.",
-    },
-    address: {
-      intro: "Used on application forms so employer replies land in your Inbox.",
-      titlePlain: "Job-search",
-      titleItalic: "address",
-      chip: "Read-only",
-      onEveryForm: "On every form",
-      onEveryFormValue: "Used on forms instead of your sign-in email.",
-      repliesTo: "Replies go to",
-      repliesToValue: "Your Inbox",
-      changeNote: "Contact support if you need to change this address.",
     },
   },
   ready: {

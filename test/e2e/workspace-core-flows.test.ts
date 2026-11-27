@@ -138,16 +138,9 @@ test.describe("core workspace flows on the rebuilt Ember UI", () => {
       await expect(page.getByRole("heading", { level: 1, name: "Saved answers" })).toBeVisible();
 
       await inSequence(
-        [
-          /Tier 2 · Strengthen your profile/u,
-          /Tier 3 · Learned from Reviews/u,
-          /Tier 1 · Needed to start/u,
-        ],
-        async (tierName) => {
-          const tab = page.getByRole("button", { name: tierName });
-
-          await tab.click();
-          await expect(tab).toHaveAttribute("aria-pressed", "true");
+        ["Key details", "Strengthen your profile", "Learned from Reviews"],
+        async (sectionName) => {
+          await expect(page.getByRole("heading", { name: sectionName })).toBeVisible();
         },
       );
 

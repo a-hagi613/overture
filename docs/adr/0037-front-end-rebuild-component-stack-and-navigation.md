@@ -68,7 +68,8 @@ The rebuild did not record its reasons; these are the shapes it replaced.
 ## Open items (close before this is accepted)
 
 - **Removed routes need redirects** (audit H5): `/settings/*` → the matching Profile page, `/pricing` → `/#pricing`,
-  `/search` → `/home`, `/inbox/address` → `/profile/details#profile-address` (the job-search address card). Links, push and email URLs, the PWA `start_url`
+  `/search` → `/home`, `/inbox/address` → `/profile/account#forwarding` (the apply-email card; Profile → Saved answers
+  no longer carries it, #697). Links, push and email URLs, the PWA `start_url`
   and the Stripe portal's default return URL (`scripts/setup-stripe.ts`) still point at `/` or `/settings/billing`.
 - **The e2e suite still targets the removed routes and Home at `/`** (audit H8).
 - **Support access lost its screen** (audit H7): ADR 0015 requires the user to see support access and the Reveal log.

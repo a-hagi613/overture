@@ -198,7 +198,7 @@ async function openStrengthen(
 
   await page.goto(`${appServerUrl}/profile/details`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: /Tier 2/u }).click();
+  await expect(page.getByRole("heading", { name: "Strengthen your profile" })).toBeVisible();
   await expect(page.getByTestId("strengthen-security_clearance")).toBeVisible();
 
   return { context, page };
@@ -334,10 +334,7 @@ test("answering a Tier 2 Fact saves it, resolves its Reviews and drops the unloc
     .toBe("drivers_license,none");
 
   await page.goto(`${strengthenServer.url}/profile/details#profile-strengthen`);
-  await expect(page.getByRole("button", { name: /Tier 2/u })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("heading", { name: "Strengthen your profile" })).toBeVisible();
   await expect(page.getByTestId("strengthen-security_clearance")).toHaveCount(0);
   await expect(page.getByTestId("strengthen-drivers_license")).toBeVisible();
 

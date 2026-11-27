@@ -20,6 +20,26 @@ export const MAX_RESUME_BYTES = 10 * 1024 * 1024;
 export const RESUME_PDF_PURPOSE = "resume_pdf";
 const MIN_UNPDF_TEXT_CHARS = 200;
 
+/**
+ * A PDF that passes the header check but whose body unpdf cannot read; the previous resume stays current.
+ */
+export class ResumeUnreadableError extends Error {
+  constructor() {
+    super("The PDF could not be read.");
+    this.name = "ResumeUnreadableError";
+  }
+}
+
+async function parsePdf(pdf: Uint8Array<ArrayBuffer>) {
+  try {
+    const document = await getDocumentProxy(new Uint8Array(pdf));
+
+    return await extractText(document, { mergePages: true });
+  } catch {
+    throw new ResumeUnreadableError();
+  }
+}
+
 const RESUME_PDF_PROMPT =
   "Extract the full text of this resume PDF in reading order. Return only the text.";
 
@@ -129,9 +149,7 @@ export function createResumeService(deps: {
   }
 
   async function extractResumeText(userId: string, pdf: Uint8Array<ArrayBuffer>) {
-    const document = await getDocumentProxy(new Uint8Array(pdf));
-
-    const extracted = await extractText(document, { mergePages: true });
+    const extracted = await parsePdf(pdf);
 
     if (extracted.text.trim().length >= MIN_UNPDF_TEXT_CHARS) {
       return {

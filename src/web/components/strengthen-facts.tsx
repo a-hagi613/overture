@@ -64,15 +64,20 @@ export function StrengthenFacts() {
   const facts = strengthenQuery.data?.facts ?? [];
 
   if (strengthenQuery.isPending) {
-    return <p className="mt-4 text-sm text-muted-foreground">{strengthen.note}</p>;
+    return <p className="mt-2 text-sm text-muted-foreground">{strengthen.note}</p>;
   }
 
   if (facts.length === 0) {
-    return <p className="mt-4 max-w-2xl text-sm text-muted-foreground">{strengthen.empty}</p>;
+    return (
+      <div className="mt-2" data-testid="strengthen-empty">
+        <p className="text-sm font-semibold text-foreground">{strengthen.empty}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{strengthen.emptyBody}</p>
+      </div>
+    );
   }
 
   return (
-    <div className="mt-4">
+    <div className="mt-2">
       <p className="max-w-2xl text-xs text-muted-foreground">{strengthen.note}</p>
       <div className="mt-3 divide-y divide-border">
         {facts.map((fact) => {
