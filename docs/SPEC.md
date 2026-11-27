@@ -963,8 +963,7 @@ stateDiagram-v2
   interview or a code is collected and sent as one notice on a short interval instead of one message per event; it
   comes from `no-reply@tryoverture.com` through Cloudflare Email Sending (§11.2) to the user's verified email and
   carries one link to the page that shows the work. Opening a link only shows the page, because mail scanners open
-  links; nothing is ever approved or sent by a GET. There is no per-application email and no daily digest, because
-  there is no daily preparation run.
+  links; nothing is ever approved or sent by a GET. There is no per-application email.
 
 > Considered for later, out of scope: an opt-in "send without asking" switch per user, off by default and
 > admin-gated (ADR 0029). Nothing is built for it.
@@ -1645,7 +1644,7 @@ each item with one link to the page that holds the work.
 - Each kind's switch is stored per user and read again when a push is dispatched and when a row is written, so
   turning a kind off stops both. Settings holds the switches.
 - **A code wait is the one thing that goes at once**, because a code expires in ten minutes; everything else batches.
-- There is no daily digest and no per-application email, because there is no daily preparation run.
+- There is no per-application email.
 
 An authenticated employer message that says none of the stages (a human reply, not a receipt and not a code) raises
 the reply notice; mail that moves the card raises the interview or offer notice instead, and a move that is not one of
