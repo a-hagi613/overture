@@ -380,6 +380,7 @@ test("the Calendar shows a Check-in on its due day and the day it is answered", 
 
   const answerDay = await calendarOf(owner, SERVER_NOW, SERVER_NOW + DAY);
 
+  expect(answerDay.items[0]?.at).toBe(answerDay.items[1]?.at);
   expect(answerDay.items.map((item) => [item.kind, item.stage, item.source])).toEqual([
     ["checkin", "closed", "user"],
     ["stage", "closed", "checkin"],

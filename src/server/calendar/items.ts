@@ -33,6 +33,17 @@ export interface CalendarItemView {
   source: CalendarSource | null;
 }
 
+/**
+ * Orders Calendar items oldest first. Items at the same moment break the tie by
+ * id, so the events one action wrote in a single statement keep a stable order:
+ * an answered Check-in (`checkin:…`) before the Stage move (`stage:…`) it caused.
+ * @param items The items to order.
+ * @returns The same items, oldest first.
+ */
+export function sortCalendarItems(items: CalendarItemView[]) {
+  return items.toSorted((left, right) => left.at - right.at || left.id.localeCompare(right.id));
+}
+
 const STAGE_FOR_ANSWER: Readonly<Record<CheckinAnswer, CalendarStage>> = {
   interviewing: "interviewing",
   rejected: "closed",

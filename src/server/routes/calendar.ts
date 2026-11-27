@@ -7,7 +7,7 @@ import type { Auth } from "../auth/index.ts";
 
 import { validJson, validQuery } from "./validators.ts";
 import { readSession, readSessionUser } from "../auth/session.ts";
-import { calendarItemsOf } from "../calendar/items.ts";
+import { calendarItemsOf, sortCalendarItems } from "../calendar/items.ts";
 import {
   createCalendarCustomEvent,
   deleteCalendarCustomEvent,
@@ -102,9 +102,7 @@ export function createCalendarRoutes(deps: { auth: Auth; clock: Clock; db: AppDa
       return context.json({ error: "range_too_wide" }, 400);
     }
 
-    const items = calendarItemsOf(db, userId, start, end);
-
-    items.sort((left, right) => left.at - right.at || left.id.localeCompare(right.id));
+    const items = sortCalendarItems(calendarItemsOf(db, userId, start, end));
 
     return context.json({ items, timeZone });
   });

@@ -215,6 +215,7 @@ function closeAsNoResponse(
 
     recordApplicationEvent(tx, clock, {
       applicationId: row.id,
+      at: now,
       fromValue: "applied",
       kind: "stage",
       reason: "checkin:no_response",
@@ -225,6 +226,7 @@ function closeAsNoResponse(
 
     recordApplicationEvent(tx, clock, {
       applicationId: row.id,
+      at: now,
       fromValue: "open",
       kind: "checkin",
       reason: "checkin:no_response",
@@ -310,6 +312,7 @@ export function answerCheckin(
 
       recordApplicationEvent(tx, clock, {
         applicationId: row.applicationId,
+        at: now,
         fromValue: "open",
         kind: "checkin",
         reason: `checkin:${input.answer}`,
@@ -353,6 +356,7 @@ export function answerCheckin(
 
     recordApplicationEvent(tx, clock, {
       applicationId: row.applicationId,
+      at: now,
       fromValue: row.stage,
       kind: "stage",
       reason: `checkin:${input.answer}`,
@@ -363,6 +367,7 @@ export function answerCheckin(
 
     recordApplicationEvent(tx, clock, {
       applicationId: row.applicationId,
+      at: now,
       fromValue: "open",
       kind: "checkin",
       reason: `checkin:${input.answer}`,
