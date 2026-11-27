@@ -10,8 +10,15 @@ import {
   snapshotTree,
 } from "./fly-marketing-sync-sandbox.ts";
 import {
+  autoMergeDispatchScript,
+  deployDispatchSandbox,
+  removeDeployDispatchSandboxes,
+} from "./deploy-dispatch-sandbox.ts";
+import type { DispatchRunInput } from "./deploy-dispatch-sandbox.ts";
+import {
   findAdminHostWorkflowProblems,
   findBunVersionDrift,
+  findDeployTriggerProblems,
   findFreehireLaunchSecretProblems,
   findRecoveryWorkflowProblems,
   findScheduledSpendProblems,
@@ -21,6 +28,8 @@ import {
   MARKETING_POST_DEPLOY_VERIFY_STEP,
   MARKETING_PRE_DEPLOY_VERIFY_STEP,
   MARKETING_SYNC_STEP,
+  AUTO_MERGE_DISPATCH_STEP,
+  DEPLOY_CHECKOUT_REF,
   readBunVersions,
   readWorkflowStep,
 } from "./workflow-config-guard.ts";
@@ -1040,10 +1049,7 @@ test("a deploy workflow that prints the Cloudflare API token is reported", () =>
 });
 
 test("a deploy workflow that does not check out the CI run's head SHA is reported", () => {
-  const deploy = workersDeployWorkflow().replaceAll(
-    `ref: \${{ github.event.workflow_run.head_sha }}`,
-    "ref: main",
-  );
+  const deploy = workersDeployWorkflow().replaceAll(DEPLOY_CHECKOUT_REF, "ref: main");
 
   expect(
     findWorkersDeployProblems({ deploy }).some((problem) => problem.includes("head SHA")),
@@ -1245,4 +1251,229 @@ test("the ops sync imports FREEHIRE_API_KEY only when the repository secret is s
   expect(withoutKey.imported).toContain("ALERT_NTFY_URL=https://ntfy.example/topic");
   expect(withoutKey.imported).not.toContain("FREEHIRE_API_KEY");
   expect(withoutKey.summary).not.toContain("FREEHIRE_API_KEY");
+});
+
+function autoMergeWorkflow() {
+  return readFileSync(".github/workflows/auto-merge.yml", "utf8");
+}
+
+function deployTriggerProblems(autoMerge: string, deploy = workersDeployWorkflow()) {
+  return findDeployTriggerProblems({ deploy, autoMerge });
+}
+
+test("the shipped workflows deploy an auto-merged pull request exactly once", () => {
+  expect(deployTriggerProblems(autoMergeWorkflow())).toStrictEqual([]);
+});
+
+test("a deploy workflow without a dispatch entry point is reported", () => {
+  const deploy = workersDeployWorkflow().replace("  workflow_dispatch:\n", "");
+
+  expect(
+    deployTriggerProblems(autoMergeWorkflow(), deploy).some((problem) =>
+      problem.includes("has no workflow_dispatch trigger"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy job that skips a dispatched run is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    "if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'",
+    "if: github.event.workflow_run.conclusion == 'success'",
+  );
+
+  expect(
+    deployTriggerProblems(autoMergeWorkflow(), deploy).some((problem) =>
+      problem.includes("deploy job skips a dispatched run"),
+    ),
+  ).toBe(true);
+});
+
+test("a deploy job that stops running for the CI workflow_run is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    "if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'",
+    "if: github.event_name == 'workflow_dispatch'",
+  );
+
+  expect(
+    deployTriggerProblems(autoMergeWorkflow(), deploy).some((problem) =>
+      problem.includes("no longer runs for the CI workflow_run"),
+    ),
+  ).toBe(true);
+});
+
+test("a dispatched run that only exists for the Fly job is reported", () => {
+  const deploy = workersDeployWorkflow().replace(
+    "if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.deploy.outputs.skip != 'true'",
+    "if: github.event.workflow_run.conclusion == 'success' && needs.deploy.outputs.skip != 'true'",
+  );
+
+  expect(
+    deployTriggerProblems(autoMergeWorkflow(), deploy).some((problem) =>
+      problem.includes("deploy-workers job skips a dispatched run"),
+    ),
+  ).toBe(true);
+});
+
+test("an auto-merge workflow with no dispatch job is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace("  deploy:\n", "  deploy-disabled:\n");
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) => problem.includes("never dispatches Deploy")),
+  ).toBe(true);
+});
+
+test("an auto-merge dispatch without actions: write is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace("      actions: write\n", "");
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) => problem.includes("lacks actions: write")),
+  ).toBe(true);
+});
+
+test("actions: write at the auto-merge workflow level is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    "permissions:\n  contents: write",
+    "permissions:\n  actions: write\n  contents: write",
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("workflow level; only the deploy job"),
+    ),
+  ).toBe(true);
+});
+
+test("a dispatch that does not wait for the merge is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    'if [ "$state" = "MERGED" ]; then',
+    'if [ "$state" = "OPEN" ]; then',
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("does not wait for the pull request to merge"),
+    ),
+  ).toBe(true);
+});
+
+test("a dispatch that does not skip a closed, unmerged pull request is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    'if [ "$state" = "CLOSED" ]; then',
+    'if [ "$state" = "OPEN" ]; then',
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("does not skip a pull request that closed without merging"),
+    ),
+  ).toBe(true);
+});
+
+test("a dispatch that would deploy one tree twice is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace("gh run list", "true");
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("does not skip a tree that already has a Deploy run"),
+    ),
+  ).toBe(true);
+});
+
+test("dispatching Deploy from the arm job is reported", () => {
+  const autoMerge = autoMergeWorkflow().replace(
+    '          gh pr merge "$PR_URL" --auto --squash',
+    '          gh pr merge "$PR_URL" --auto --squash\n          gh workflow run deploy.yml --ref main',
+  );
+
+  expect(
+    deployTriggerProblems(autoMerge).some((problem) =>
+      problem.includes("dispatches Deploy from the arm job"),
+    ),
+  ).toBe(true);
+});
+
+test("the dispatch step reads as the merge watcher it must be", () => {
+  const dispatch = readWorkflowStep(autoMergeWorkflow(), AUTO_MERGE_DISPATCH_STEP) ?? "";
+
+  expect(dispatch).toContain('gh workflow run "$DEPLOY_WORKFLOW" --ref main');
+});
+
+afterEach(removeDeployDispatchSandboxes);
+
+function runDispatch(input: DispatchRunInput = {}) {
+  return deployDispatchSandbox().run(autoMergeDispatchScript(autoMergeWorkflow()), input);
+}
+
+function dispatches(calls: readonly string[]) {
+  return calls.filter((call) => call.startsWith("workflow run"));
+}
+
+test("a merged auto-merge dispatches Deploy for main exactly once", () => {
+  const { calls, output, status } = runDispatch({
+    states: ["MERGED"],
+    mergeSha: "abc1234",
+    mainSha: "abc1234",
+  });
+
+  expect(status).toBe(0);
+  expect(dispatches(calls)).toStrictEqual(["workflow run deploy.yml --ref main"]);
+  expect(output).toContain("Dispatched Deploy for main at abc1234");
+});
+
+test("the dispatch waits for the merge instead of leaving when the arm job ends", () => {
+  const { calls, status } = runDispatch({
+    states: ["OPEN", "MERGED"],
+    mergeSha: "abc1234",
+    mainSha: "abc1234",
+  });
+
+  expect(status).toBe(0);
+  expect(
+    calls.filter((call) => call.startsWith("pr view") && call.includes("--json state")),
+  ).toHaveLength(2);
+  expect(dispatches(calls)).toHaveLength(1);
+});
+
+test("a pull request that closes without merging dispatches nothing", () => {
+  const { calls, output, status } = runDispatch({ states: ["CLOSED"] });
+
+  expect(status).toBe(0);
+  expect(dispatches(calls)).toStrictEqual([]);
+  expect(output).toContain("closed without merging");
+});
+
+test("a merge that main has moved past dispatches nothing", () => {
+  const { calls, output, status } = runDispatch({
+    states: ["MERGED"],
+    mergeSha: "abc1234",
+    mainSha: "def5678",
+  });
+
+  expect(status).toBe(0);
+  expect(dispatches(calls)).toStrictEqual([]);
+  expect(output).toContain("main moved to def5678");
+});
+
+test("a tree that already has a Deploy run is not deployed twice", () => {
+  const { calls, output, status } = runDispatch({
+    deployRuns: ["abc1234"],
+    states: ["MERGED"],
+    mergeSha: "abc1234",
+    mainSha: "abc1234",
+  });
+
+  expect(status).toBe(0);
+  expect(dispatches(calls)).toStrictEqual([]);
+  expect(output).toContain("already has a run for abc1234");
+});
+
+test("an unmerged pull request stops waiting at its bounded deadline", () => {
+  const { calls, output, status } = runDispatch({
+    states: ["OPEN"],
+    vars: { MERGE_WAIT_SECONDS: "0" },
+  });
+
+  expect(status).toBe(0);
+  expect(dispatches(calls)).toStrictEqual([]);
+  expect(output).toContain("did not land within 0 seconds");
 });

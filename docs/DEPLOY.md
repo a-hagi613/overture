@@ -18,7 +18,7 @@ to Fly), against names only.
 | Deleted accounts in backups | The 35-day lifecycle on `overture-backups` (`app.sqlite/`) and the 30-day snapshot retention are the replay window for an erased account: only keyless ciphertext can come back, because `user_keys` is destroyed first (SPEC §13.2). R2 object deletes are not part of a replay |
 | `fly.toml` | App `overture-web`, region `yyz`, `kill_signal = "SIGTERM"`, `kill_timeout = 300`, `shared-cpu-2x` / 2 GB, volume `data` (10 GB) on `/data`, health check on `/api/health`; `PUBLIC_SIGNUP_ENABLED = "false"` keeps production invite-only (owner, invited and verified users, and the demo account) until M3 public sign-up ships, while `ALLOWED_SIGNUP_EMAILS` can name comma-separated tester addresses that may still sign up, and `DEMO_LOGIN_ENABLED = "true"` keeps the demo account |
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
-| `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets (the freehire key only when `REQUIRE_FREEHIRE_API_KEY` is on), runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
+| `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`, or when dispatched by an auto-merge (see [How a merge reaches production](#how-a-merge-reaches-production)): checks the Fly secrets (the freehire key only when `REQUIRE_FREEHIRE_API_KEY` is on), runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
 | `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ALLOWED_SIGNUP_EMAILS` and `FREEHIRE_API_KEY`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
 | `.github/workflows/ops-admin-host.yml` | `workflow_dispatch` only, for the admin host: `status` (certificate table, Fly secret names only, app status), `add-cert` (idempotent certificate for `admin.tryoverture.com`, then the same report), `set-access-secrets` (pushes the Cloudflare Access values held as repository secrets to Fly, names only afterwards). Fails with a clear message while `FLY_API_TOKEN` is unset |
@@ -26,6 +26,48 @@ to Fly), against names only.
 | `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
 | `litestream-drill.yml` | Restore-only Litestream config for drills: same bucket, dedicated read-only `R2_DRILL_*` credential |
+
+## How a merge reaches production
+
+`main` is protected, and every pull request merges itself with a squash commit once CI is green
+(`.github/workflows/auto-merge.yml`). Two event chains reach `flyctl deploy`, and both deploy `main`:
+
+| Merge | What GitHub fires | What deploys |
+|---|---|---|
+| `gh pr merge` by a human, or by a user or `gh` token | a `push` to `main`, so CI runs on the merge commit; its success then fires `Deploy` through `workflow_run` | Deploy checks out that CI run's head SHA |
+| an armed auto-merge, completed by `app/github-actions` | nothing: GitHub starts no workflow for an event caused by `GITHUB_TOKEN` | the auto-merge workflow's `deploy` job waits for the merge, then runs `gh workflow run deploy.yml --ref main` |
+
+The dispatch exists because GitHub suppresses workflow runs for events caused by the repository's `GITHUB_TOKEN`;
+the only exceptions are `workflow_dispatch` and `repository_dispatch`. An auto-merge completed by
+`app/github-actions` is exactly that case. On 2026-11-27, PR #762 merged at 13:09:40 and started no CI run on
+`main`, so the `workflow_run` trigger never fired: production stayed on `d6e9271e` while `main` moved on. (The
+deploy that finally shipped it came from CI dispatched by hand at 13:10.) `workflow_dispatch` always creates a run,
+so the dispatch closes the gap without a personal access token or a GitHub App.
+
+The dispatch needs the `actions: write` scope, and `auto-merge.yml` grants it to the `deploy` job alone (`contents:
+read`, `pull-requests: read`); the `arm` job keeps the `contents: write` it needs to merge. If the repository ever
+capped the workflow token so that `actions: write` were unavailable, the smallest alternative is to dispatch CI on
+`main` instead (`gh workflow run ci.yml --ref main`), which needs the same scope and then fires Deploy through the
+existing `workflow_run` trigger at the cost of a full CI run. A PAT or GitHub App token is not needed and not used.
+
+Exactly once:
+
+- The dispatched deploy ships the squash commit whose tree passed `ci-ok` on the pull request: the ruleset requires a
+  branch up to date with `main` and a squash merge, so the merge commit's tree is the tested tree and nothing untested
+  reaches production.
+- The `deploy` job watches *its own* pull request. A pull request that closes without merging, or that has not
+  merged after 60 minutes, exits without dispatching.
+- It does not dispatch when `main` has moved past the merge commit: that later merge's own job deploys the newer
+  HEAD, which contains this tree.
+- It skips when Deploy already has a run for that commit (`gh run list`), so a re-run or two merges in one window
+  cannot deploy one tree twice.
+- `deploy.yml` keeps `concurrency: group: deploy-main, cancel-in-progress: false`: only one `flyctl deploy` runs at
+  a time, a queued run waits instead of cancelling, and it deploys whatever `main` is when it starts. A failed or
+  cancelled Deploy is not retried automatically; an operator re-runs `gh workflow run deploy.yml --ref main`.
+
+Both workflows are checked by `bun test scripts/workflow-config-guard.test.ts`: the dispatch job may not gain
+`actions: write` at the workflow level, the deploy jobs must keep accepting a dispatched run, and the checkout ref
+must stay `github.event.workflow_run.head_sha || github.sha`.
 
 ## One-time human steps
 
@@ -997,9 +1039,10 @@ recorded run are in `docs/research/production-verification-2026-11-23.md`.
 ## Verifying the acceptance criteria
 
 - **A merge to `main` deploys `overture-web` and the health route answers in production**
-  The Deploy workflow (`.github/workflows/deploy.yml`) runs only after the CI workflow succeeds on
-  `main`, deploys with `flyctl deploy --remote-only`, and fails if `https://overture-web.fly.dev/api/health`
-  does not answer. Verify: green Deploy run, and in a terminal
+  The Deploy workflow (`.github/workflows/deploy.yml`) starts after the CI workflow succeeds on `main` (a `push`
+  merge) or when an auto-merge dispatches it (see [How a merge reaches production](#how-a-merge-reaches-production)),
+  deploys with `flyctl deploy --remote-only`, and fails if `https://overture-web.fly.dev/api/health` does not
+  answer. Verify: green Deploy run, and in a terminal
   `curl -fsS https://overture-web.fly.dev/api/health` → `{"status":"ok","database":"ok",...}`. A failed run ends with
   the `Show Fly status and logs after a failed deploy` step, so the machine status and last 120 log lines are in the
   job log; the Email Sending SSH guard is capped at 45 s so a down machine cannot stall the run.

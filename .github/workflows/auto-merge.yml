@@ -1,7 +1,7 @@
 name: Auto-merge
 
 # `pull_request_target` runs this workflow from `main`, never from the pull request, so no untrusted code can change
-# it or reach the write token. The job only talks to the GitHub API through `gh pr merge`; it checks nothing out.
+# it or reach the write token. The jobs only talk to the GitHub API: `gh pr merge` arms, and the last job starts Deploy.
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
@@ -35,6 +35,75 @@ jobs:
             exit 0
           fi
           gh pr merge "$PR_URL" --auto --squash
+
+  deploy:
+    name: Dispatch Deploy after the merge
+    # GitHub completes an armed auto-merge later, as `app/github-actions`, and starts no workflow for an event caused
+    # by `GITHUB_TOKEN`: the merge creates no push CI run on `main`, so Deploy's `workflow_run` trigger never fires and
+    # the merge never reaches production. `workflow_dispatch` is the event `GITHUB_TOKEN` may always trigger, so this
+    # job waits for the merge and dispatches Deploy for `main`. Deploy's `deploy-main` concurrency group serializes it
+    # with the `workflow_run` path. Cancel-on-new-run above means only the newest run waits, and the
+    # already-dispatched check below keeps a second merge in the same window from deploying one tree twice.
+    needs: arm
+    runs-on: ubuntu-latest
+    # The wait is bounded: a pull request that never merges (checks red, or behind `main`) must not hold a runner for
+    # six hours. GitHub's job limit is 6 h; 75 min covers the full e2e suite plus a slow queue.
+    timeout-minutes: 75
+    # The dispatch API needs `actions: write`; this job writes nothing else. It reads the pull request it watches and
+    # `main`'s HEAD, and it never touches contents, so `contents` stays `read` here even though `arm` needs `write`.
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Wait for the merge, then dispatch Deploy for main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REPO: ${{ github.repository }}
+          DEPLOY_WORKFLOW: deploy.yml
+          # The bounded wait, in seconds; `timeout-minutes` above is the hard cap if this step ever hangs.
+          MERGE_WAIT_SECONDS: "3600"
+        run: |
+          set -euo pipefail
+          # `gh pr merge --auto` returns once auto-merge is armed; GitHub completes the merge when the required checks
+          # pass, and that completion starts no workflow. Watching this pull request is the only way to know.
+          deadline=$((SECONDS + MERGE_WAIT_SECONDS))
+          while :; do
+            state="$(gh pr view "$PR_URL" --json state --jq .state)"
+            if [ "$state" = "MERGED" ]; then
+              break
+            fi
+            if [ "$state" = "CLOSED" ]; then
+              echo "::notice::The pull request closed without merging; Deploy is not dispatched."
+              exit 0
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::warning::Auto-merge did not land within ${MERGE_WAIT_SECONDS} seconds (state ${state}); Deploy is not dispatched. A later merge or CI run on main deploys this tree."
+              exit 0
+            fi
+            sleep 30
+          done
+
+          main_sha="$(gh api "repos/${REPO}/commits/main" --jq .sha)"
+          merged_sha="$(gh pr view "$PR_URL" --json mergeCommit --jq '.mergeCommit.oid // empty')"
+          if [ -n "$merged_sha" ] && [ "$merged_sha" != "$main_sha" ]; then
+            # Another merge landed on top. That pull request's own run dispatches Deploy for the newer HEAD, which
+            # contains this tree, so dispatching here would deploy a commit that is no longer `main`.
+            echo "::notice::main moved to ${main_sha} after ${merged_sha} merged; that merge's job dispatches Deploy, so this one does not."
+            exit 0
+          fi
+
+          # Exactly once: a re-run, or a second auto-merge in the same window, must not start a second deploy of a tree
+          # that already has one. A failed or cancelled Deploy for this SHA is not retried here; an operator re-runs it.
+          deployed="$(gh run list --workflow "$DEPLOY_WORKFLOW" --branch main --limit 30 --json headSha --jq '.[].headSha')"
+          if grep -qx "$main_sha" <<<"$deployed"; then
+            echo "::notice::Deploy already has a run for ${main_sha}; not dispatching a second one."
+            exit 0
+          fi
+
+          gh workflow run "$DEPLOY_WORKFLOW" --ref main
+          echo "::notice::Dispatched Deploy for main at ${main_sha}."
 
   disarm:
     # A PR labelled do-not-auto-merge never merges on its own, even when it was armed before the label arrived.

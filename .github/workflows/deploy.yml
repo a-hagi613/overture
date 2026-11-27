@@ -1,12 +1,23 @@
 name: Deploy
 
+# Two ways in, and both deploy `main`:
+# - `workflow_run`: a human (or `gh pr merge` with a user token) merges to `main`, the push starts CI, and CI's success
+#   starts this workflow.
+# - `workflow_dispatch`: an auto-merge is attributed to `app/github-actions`, and GitHub starts no workflow for an event
+#   caused by `GITHUB_TOKEN`, so the merge creates no CI run on `main` and the `workflow_run` trigger never fires.
+#   `.github/workflows/auto-merge.yml` waits for the merge and dispatches this workflow instead. `workflow_dispatch` is
+#   one of the two events `GITHUB_TOKEN` may always trigger.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
+  # One deploy at a time, and a queued deploy is never cancelled: the two entry points above, plus several merges in one
+  # window, must never run two `flyctl deploy` calls at once. A queued run starts after the previous one finishes and
+  # deploys whatever `main` is then, so a burst of merges still reaches production in order.
   group: deploy-main
   cancel-in-progress: false
 
@@ -15,7 +26,7 @@ permissions:
 
 jobs:
   deploy:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
       skip: ${{ steps.guard.outputs.skip }}
@@ -41,7 +52,9 @@ jobs:
       - uses: actions/checkout@v7
         if: steps.guard.outputs.skip != 'true'
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          # The CI run's commit for a `workflow_run` deploy; for a dispatched deploy there is no `workflow_run`, so the
+          # event's own SHA is `main` at dispatch time (auto-merge.yml dispatches with `--ref main`).
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
         if: steps.guard.outputs.skip != 'true'
         uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
@@ -165,7 +178,7 @@ jobs:
   deploy-workers:
     # The marketing Worker serves the pages built from this commit, so it ships only after the Fly release that
     # matches it, and only when the Fly deploy was not skipped for a missing FLY_API_TOKEN.
-    if: github.event.workflow_run.conclusion == 'success' && needs.deploy.outputs.skip != 'true'
+    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.deploy.outputs.skip != 'true'
     needs: deploy
     runs-on: ubuntu-latest
     steps:
@@ -192,7 +205,7 @@ jobs:
       - uses: actions/checkout@v7
         if: steps.guard.outputs.skip != 'true'
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
         if: steps.guard.outputs.skip != 'true'
         uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
