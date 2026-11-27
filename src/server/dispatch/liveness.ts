@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import type { Ats as RegistryAts } from "../../shared/ats.ts";
 import type { BoardRegion } from "../catalog/board-feed.ts";
-import type { Env } from "../config/env.ts";
 
 import { ASHBY_DEFAULT_BASE_URL } from "../catalog/ashby-feed.ts";
 import { GREENHOUSE_DEFAULT_BASE_URL } from "../catalog/greenhouse-feed.ts";
@@ -12,6 +11,14 @@ import { limiterFor } from "../catalog/rate-limiter.ts";
 export const POSTING_LIVENESS = ["open", "closed", "unknown"] as const;
 
 export type PostingLiveness = (typeof POSTING_LIVENESS)[number];
+
+/** The feed base URLs the liveness checker may ask. Any board without one is unknown, never closed. */
+export interface LivenessEnv {
+  GREENHOUSE_FEED_BASE_URL?: string | undefined;
+  LEVER_EU_FEED_BASE_URL?: string | undefined;
+  LEVER_FEED_BASE_URL?: string | undefined;
+  ASHBY_FEED_BASE_URL?: string | undefined;
+}
 
 export interface LivenessTarget {
   ats: RegistryAts | "workable";
@@ -72,7 +79,7 @@ async function fetchJson(url: string) {
  * @param env The environment holding the feed base URLs.
  * @returns The liveness checker every dispatch tick uses.
  */
-export function createPostingLiveness(env: Env) {
+export function createPostingLiveness(env: LivenessEnv) {
   const greenhouseBase = (env.GREENHOUSE_FEED_BASE_URL ?? GREENHOUSE_DEFAULT_BASE_URL).replace(
     /\/+$/u,
     "",
@@ -136,7 +143,6 @@ export function createPostingLiveness(env: Env) {
     check: async (target) => {
       switch (target.ats) {
         case "workable": {
-          // Its daily snapshot is the closure signal; a form that 404s at send ends as a form change.
           return "open";
         }
 
@@ -153,9 +159,6 @@ export function createPostingLiveness(env: Env) {
         }
 
         default: {
-          // Personio and every later-wave board have no per-posting liveness source. Asking Ashby
-          // (the old fallthrough) turned another board's 404 into a false `closed`, so an unsupported
-          // board is honestly unknown and dispatch sends it (issue #756).
           return "unknown";
         }
       }

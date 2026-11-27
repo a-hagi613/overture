@@ -218,7 +218,13 @@ async function seedApplication(input: {
 
       return `job-${applicationId}`;
     },
-    liveness: { check: async () => input.liveness },
+    liveness: {
+      check: async () => {
+        await Promise.resolve();
+
+        return input.liveness;
+      },
+    },
     personal,
     providerId: "local",
   });
@@ -293,17 +299,20 @@ describe("dispatch claims an approved application whose liveness is unknown", ()
 
 describe("createPostingLiveness only asks a source it has", () => {
   test("a board with no liveness source is unknown, never a false closed from Ashby", async () => {
-    const realFetch = globalThis.fetch;
+    const server = Bun.serve({
+      fetch: () => new Response(null, { status: 404 }),
+      port: 0,
+    });
 
-    globalThis.fetch = (async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+    const base = server.url.toString().replace(/\/$/u, "");
 
     try {
       const check = createPostingLiveness({
-        ASHBY_FEED_BASE_URL: "https://ashby.example.test",
-        GREENHOUSE_FEED_BASE_URL: "https://greenhouse.example.test",
-        LEVER_EU_FEED_BASE_URL: "https://lever-eu.example.test",
-        LEVER_FEED_BASE_URL: "https://lever.example.test",
-      } as unknown as Parameters<typeof createPostingLiveness>[0]);
+        ASHBY_FEED_BASE_URL: base,
+        GREENHOUSE_FEED_BASE_URL: base,
+        LEVER_EU_FEED_BASE_URL: base,
+        LEVER_FEED_BASE_URL: base,
+      });
 
       const target = { atsJobId: "1", boardToken: "board", region: "us" } as const;
 
@@ -312,7 +321,7 @@ describe("createPostingLiveness only asks a source it has", () => {
       expect(await check.check({ ...target, ats: "personio" })).toBe("unknown");
       expect(await check.check({ ...target, ats: "greenhouse" })).toBe("closed");
     } finally {
-      globalThis.fetch = realFetch;
+      void server.stop(true);
     }
   });
 });
