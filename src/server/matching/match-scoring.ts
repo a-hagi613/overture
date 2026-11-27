@@ -101,10 +101,14 @@ function identityOf(candidate: ScoreCandidate, job: RankedJob) {
   } satisfies ScoreIdentity;
 }
 
-function requestFor(candidate: ScoreCandidate, job: RankedJob) {
+function batchCustomId(index: number) {
+  return `score-${String(index)}`;
+}
+
+function requestFor(candidate: ScoreCandidate, job: RankedJob, customId: string) {
   return scoreRequestFor({
     candidate: { resume: candidate.resumeText, targets: candidate.targetsLine },
-    customId: `score-${job.id}`,
+    customId,
     job: {
       company: job.company,
       description: jobDescription(job.description),
@@ -272,7 +276,7 @@ export function createMatchScoringService(deps: MatchScoringDeps) {
     job: RankedJob,
     codeRank: number,
   ) {
-    const request = structuredFrom(requestFor(candidate, job));
+    const request = structuredFrom(requestFor(candidate, job, "score-live"));
     const first = await askOnce(userId, request);
 
     if (!first.budget) {
@@ -363,7 +367,7 @@ export function createMatchScoringService(deps: MatchScoringDeps) {
     }
 
     const requests = affordable(
-      chunk.map((job) => requestFor(candidate, job)),
+      chunk.map((job, index) => requestFor(candidate, job, batchCustomId(index))),
       userId,
       jobs.length - start,
     );
@@ -372,14 +376,14 @@ export function createMatchScoringService(deps: MatchScoringDeps) {
       return result;
     }
 
-    const byId = new Map(chunk.map((job) => [job.id, job]));
+    const byCustomId = new Map(chunk.map((job, index) => [batchCustomId(index), job]));
     const calls = await llm.runBatch(requests);
     const invalid: RankedJob[] = [];
 
     for (const call of calls) {
       recordCall(userId, call);
 
-      const job = byId.get(call.customId.replace(/^score-/u, ""));
+      const job = byCustomId.get(call.customId);
 
       if (job === undefined) {
         continue;

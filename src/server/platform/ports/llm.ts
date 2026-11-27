@@ -29,6 +29,7 @@ export interface LlmOutputSchema {
 
 export interface LlmRequest {
   purpose: string;
+  /** The reply's correlation id: at most 64 characters, so the Message Batches API accepts it. */
   customId: string;
   system: string;
   /** Text every request from the same conversation shares, cached before the per-call `user` block. */
