@@ -120,12 +120,12 @@ split (`catalog-split.test.ts`: `litestream.yml` replicates only `/data/app.sqli
 holds `app.sqlite`'s write lock, deleting and recreating `catalog.sqlite` leaves every user and Application row intact,
 and a closed Posting a crashed sweep never reported is still reconciled; the browser half is
 `test/e2e/catalog-split.test.ts`, where an approval and `/api/health` answer while a real catalog write lock is held,
-#423), the Stapply classifier (`classification-key.test.ts`, `stapply-fields.test.ts`,
-`esco-taxonomy.test.ts`, `classifier.test.ts`, `haiku-classifier.test.ts` and `classification-cache.test.ts`: the
-classification key preserves seniority and level while dropping gender markers and a trailing location, the Pass-2
-dedupe never collapses two same-board openings, the baked ESCO v1.2.1 dataset carries the Administrative roles, the
-three tiers and the Haiku strict-JSON contract behave, and a corrupt, missing or version-mismatched cache is an empty
-cache, #628), the role taxonomy bridge (`legacy-roles.test.ts`: every retired category, Level-2 role and subrole maps
+#423), the retired Stapply classifier (`classification-key.test.ts`, `stapply-fields.test.ts`,
+`esco-taxonomy.test.ts`, `classifier.test.ts`, `haiku-classifier.test.ts` and `classification-cache.test.ts`, which
+#706 deleted with the classifier itself: the classification key preserved seniority and level while dropping gender
+markers and a trailing location, the Pass-2 dedupe never collapsed two same-board openings, the baked ESCO v1.2.1
+dataset carried the Administrative roles, the three tiers and the Haiku strict-JSON contract behaved, and a corrupt,
+missing or version-mismatched cache was an empty cache, #628), the role taxonomy bridge (`legacy-roles.test.ts`: every retired category, Level-2 role and subrole maps
 to a real role or category id, an ambiguous old category is never guessed onto a tag, a vague old role only reaches a
 broad role, and level words such as `Senior` or `II` do not hide a role's name), the role taxonomy rewrite and
 matching (`taxonomy-tags.test.ts`, `role-targets.test.ts` and `judge-input.test.ts` over a real migrated catalog and

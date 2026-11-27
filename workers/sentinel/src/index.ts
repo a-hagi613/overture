@@ -15,11 +15,9 @@ import {
   warnMetrics,
   writeDegradedFlag,
 } from "./usage.ts";
-import { describeAge, manifestFreshness } from "./workable.ts";
 
 import type { SentinelRunRecord, SentinelState } from "./state.ts";
 import type { UsageMetric, UsageResult } from "./usage.ts";
-import type { ManifestFreshness } from "./workable.ts";
 
 export interface SentinelEnv {
   FILES: R2BucketBinding;
@@ -40,7 +38,6 @@ export interface SentinelRunOptions {
 
 export interface SentinelRun {
   health: "ok" | "failing";
-  manifest: ManifestFreshness;
   usage: UsageResult | "unconfigured" | "failed";
   /** Present only when the signed ops endpoint is configured. */
   ops?: "ok" | "failing" | "failed";
@@ -195,55 +192,6 @@ async function checkHealth(context: SentinelContext) {
   context.state.health = "failing";
 
   return "failing" as const;
-}
-
-function manifestProblem(freshness: ManifestFreshness) {
-  if (freshness.state === "missing") {
-    return "the Workable snapshot manifest is missing from R2";
-  }
-
-  if (freshness.state === "unreadable") {
-    return `the Workable snapshot manifest cannot be read: ${freshness.detail}`;
-  }
-
-  if (freshness.state === "stale") {
-    return `the Workable snapshot is ${describeAge(freshness.ageMs)} old (limit 26 h)`;
-  }
-
-  return null;
-}
-
-async function checkManifest(context: SentinelContext) {
-  const freshness = await manifestFreshness(r2Bucket(context.env.FILES), context.at);
-  const problem = manifestProblem(freshness);
-
-  if (problem === null) {
-    if (context.state.manifest === "failing" && freshness.state === "fresh") {
-      await notify(context, {
-        key: "workable.recovered",
-        windowMs: CONDITION_REPEAT_MS,
-        title: "Workable snapshot fresh again",
-        body: `the manifest is ${describeAge(freshness.ageMs)} old`,
-        tags: "white_check_mark",
-      });
-    }
-
-    context.state.manifest = "ok";
-
-    return freshness;
-  }
-
-  await notify(context, {
-    key: "workable",
-    windowMs: CONDITION_REPEAT_MS,
-    title: "Workable snapshot stale",
-    body: problem,
-    tags: "rotating_light",
-  });
-
-  context.state.manifest = "failing";
-
-  return freshness;
 }
 
 function percent(metric: { used: number; allowance: number }) {
@@ -430,14 +378,12 @@ export async function runSentinel(env: SentinelEnv, options: SentinelRunOptions)
   };
 
   const health = await checkHealth(context);
-  const manifest = await checkManifest(context);
   const { usage, degraded, flag } = await checkUsage(context);
   const ops = await checkOpsHealth(context);
 
   const record: SentinelRunRecord = {
     at: new Date(context.at).toISOString(),
     health,
-    manifest: manifest.state,
     usage: usageSummary(usage),
     degraded,
     flag,
@@ -455,7 +401,6 @@ export async function runSentinel(env: SentinelEnv, options: SentinelRunOptions)
 
   const result: SentinelRun = {
     health,
-    manifest,
     usage,
     degraded,
     flag,

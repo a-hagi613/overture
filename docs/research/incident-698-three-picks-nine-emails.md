@@ -19,7 +19,7 @@ Investigated 2026-11-26 against `main` at `e2c378f1`.
   What the walk does prove is where three real picks get stuck, and the code paths that hold them.
 - **Pick 1** (Lever) was approved, failed its first attempt with `form_changed`, bounced back to Ready with
   `The plan could not be read`, was approved again, and was stopped by the harness's no-submit switch
-  (`fh_walk_ready_to_submit`). Final status `skipped`; both credit reservations were released, so it cost nothing.
+  (`harness_no_submit`). Final status `skipped`; both credit reservations were released, so it cost nothing.
 - **Pick 2** (Greenhouse) prepared and was approved, was booked two seconds later, and never dispatched because the
   walk process stopped. **Pick 3** (Ashby) never prepared: the form reader returned no questions twice and the job
   died, leaving the Application in `preparing` with no event and no user-facing reason.
@@ -40,7 +40,7 @@ Investigated 2026-11-26 against `main` at `e2c378f1`.
 | Cloudflare Email Sending activity | Cloudflare dashboard/API | **No** — no `CLOUDFLARE_EMAIL_API_TOKEN`, no wrangler auth | Provider-side sends, bounces |
 | Inbound-mail Worker logs | `wrangler tail overture-inbound-mail` | **No** — no Cloudflare auth | Forwards to `OWNER_FORWARD_TO` |
 | GitHub Actions logs | `gh run view` | Yes | Deploy and health only; no message content |
-| Local walk DB | `~/.local/share/overture-orchestrator/fh-walk/app/overture.db` | **Yes** (read-only) | Three picks, events, attempts, ledger, mail counters |
+| Local walk DB | the orchestrator local walk database | **Yes** (read-only) | Three picks, events, attempts, ledger, mail counters |
 | Demo DB | `.../dashboard-ui-iteration/.tmp-dev/app.sqlite` | **Yes** (read-only) | Synthetic `demo` role, 41 seeded Applications, 0 attempts |
 | Production health | `https://tryoverture.com/api/health` | Yes, unauthenticated | Liveness only |
 
@@ -56,7 +56,7 @@ database and readable by the owner only.
 
 | Pick | System | Final status | Attempts | Ledger | Outcome |
 |---|---|---|---|---|---|
-| 1 | Lever | `skipped` / `fh_walk_ready_to_submit` | 2 | 2 reserves, 2 releases, 0 commits | Stopped before Submit by the harness, deliberately |
+| 1 | Lever | `skipped` / `harness_no_submit` | 2 | 2 reserves, 2 releases, 0 commits | Stopped before Submit by the harness, deliberately |
 | 2 | Greenhouse | `approved` | 0 | none | Booked for 19:54:17 UTC, never dispatched; the walk stopped |
 | 3 | Ashby | `preparing` | 0 | none | Preparation died as `form_unreadable`; stuck with no event |
 
@@ -74,7 +74,7 @@ database and readable by the owner only.
   bounce records `from: approved` — one approval is missing from the events table.
 - `19:50:57` approved again by the walk.
 - `19:51:12` attempt 2 opens the correct `/apply` page, reaches the Submit button, and the harness's no-submit patch
-  stops it (`outcome: blocked`, `error_code: fh_walk_ready_to_submit`); the Application becomes `skipped` with the
+  stops it (`outcome: blocked`, `error_code: harness_no_submit`); the Application becomes `skipped` with the
   same reason. Ledger: reserve/release again, net zero.
 
 Two facts stand out here: the first attempt's `form_missing` on the posting's base URL (the `/apply` page worked),

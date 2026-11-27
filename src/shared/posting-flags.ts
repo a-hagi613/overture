@@ -1,7 +1,7 @@
 /**
- * Runtime reasons that take a Posting out of candidate matching without changing the read-only catalog (issue #576).
- * The catalog itself never records a runtime failure: `catalog.sqlite` is a hot-swapped artifact the app only reads,
- * so a posting that keeps failing on the live form is flagged in `app.sqlite` instead.
+ * Runtime reasons that take a Posting out of candidate matching without changing the catalog (issue #576).
+ * The catalog is legacy read-only job data for Applications created before freehire (#700), so a posting that keeps
+ * failing on the live form is flagged in `app.sqlite` instead.
  */
 export const POSTING_FLAG_REASONS = ["unsupported_login_required", "employer_form_failed"] as const;
 

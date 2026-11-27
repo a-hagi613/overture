@@ -78,3 +78,9 @@ alert catches a missed run.
 *Amendment of 2026-11-26 (#679, #700): the Workable bulk feed ingest is retired with the old job source. freehire is
 the only job source, so the app no longer fetches, stages or ingests a Workable snapshot; the Workable apply adapter
 (its form read over plain HTTP) stays. See SPEC §6.*
+
+*Amendment of 2026-11-27 (#706): the retired ingest is deleted, not just stopped. The
+`workable-feed.yml` pass, the `workable-ingest`/`workable-job` worker path, the
+`workable.feed` alert and the sentinel's manifest-freshness check are removed, so
+nothing reads or writes `workable/manifest.json` any more. The Workable **apply**
+adapter is untouched and still sends Applications from freehire jobs.*

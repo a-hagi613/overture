@@ -1,6 +1,7 @@
 # Sentinel Worker
 
 An independent watcher for Overture's Cloudflare usage and for the app's own health (#283, ADR 0033).
+Its Workable-snapshot check was removed with the retired feed (#706).
 It runs on a cron trigger, so it does not depend on Fly or on GitHub Actions being up.
 
 Every ten minutes it does three things:
@@ -9,11 +10,7 @@ Every ten minutes it does three things:
    `"status":"ok"` is healthy; a 5xx, a Cloudflare error page, a timeout, a non-JSON body or any
    other status is a failure and pushes to `ALERT_NTFY_URL` once, then at most every six hours while
    it stays down. Recovery pushes once.
-2. **Workable freshness.** Reads `workable/manifest.json` from R2 (written by the Workable Action,
-   ADR 0032) and alerts when its `fetchedAt` is older than 26 hours, when the object is missing, or
-   when it cannot be parsed or read. Row-count drops stay with the app's ingest, which already
-   alerts.
-3. **Usage watchdog.** Reads month-to-date usage from the Cloudflare GraphQL Analytics API —   R2 Class A and Class B operations, Queues billable operations, Workers requests and Workers CPU —
+2. **Usage watchdog.** Reads month-to-date usage from the Cloudflare GraphQL Analytics API —   R2 Class A and Class B operations, Queues billable operations, Workers requests and Workers CPU —
    and compares each with its monthly allowance:
 
    | Metric | Allowance |
@@ -29,19 +26,19 @@ Every ten minutes it does three things:
    Below 90 % it deletes the flag and pushes a recovery note. The app reads that flag
    (`src/server/platform/degraded.ts`): `email_classify` runs rules-only and the live-check R2 round
    trip is skipped, and it logs each change of state.
-4. **Signed ops health (#634).** When `OVERTURE_OPS_HEALTH_SECRET` is set, the sentinel also polls
+3. **Signed ops health (#634).** When `OVERTURE_OPS_HEALTH_SECRET` is set, the sentinel also polls
    `GET /internal/ops/health` on the app with an HMAC-SHA256 signature over
    `METHOD\npath\ntimestamp`. It pages when RAM is above 80 %, NVMe `/data` above 75 %, event-loop
    lag p95 above 500 ms, or the last hour's ATS apply failure rate is above 30 % of at least five
-   attempts. Without the secret the check is skipped and the three checks above behave exactly as
+   attempts. Without the secret the check is skipped and the two checks above behave exactly as
    before, so a test environment without the secret keeps working. The thresholds alert body points
    at `docs/runbooks/ops-resource-ceilings.md`.
 
 The sentinel **never revokes the R2 token**. Revoking it would stop Litestream and lose the backups;
 ADR 0033 rejects that guard explicitly. R2 is bounded by design, lifecycle rules and these alerts.
 
-Alert state lives in R2 at `ops/sentinel-state.json` (last health result, last manifest result,
-degraded start, last alert per kind), so a ten-minute cron does not flood the phone. The state
+Alert state lives in R2 at `ops/sentinel-state.json` (last health result, degraded start, last
+alert per kind), so a ten-minute cron does not flood the phone. The state
 object is a Class A write on each run: about 4,300 a month. The degraded flag is **not** rewritten
 while it is unchanged, because during a degraded period a Class A write every ten minutes would add
 load exactly where the watchdog is asking the app to shed it.
@@ -62,7 +59,6 @@ it already writes:
   "lastRun": {
     "at": "2026-11-21T15:00:00.000Z",
     "health": "ok",
-    "manifest": "fresh",
     "usage": "ok",
     "degraded": false,
     "flag": "absent",
@@ -125,8 +121,7 @@ CI runs that on every build.
 `test/e2e/sentinel-worker.test.ts` runs the real `runSentinel` handler against local Bun servers
 that replay the recorded fixtures in `test/e2e/fixtures/sentinel/`, a real directory standing in for
 the R2 binding, and a capture server for ntfy. It needs no Cloudflare credentials and no network.
-It covers the healthy run and what it records, a failing probe and a wrong health body, a missing,
-stale and unparseable manifest, the 70 % and 90 % thresholds, the flag write, its no-op when
+It covers the healthy run and what it records, a failing probe and a wrong health body, the 70 % and 90 % thresholds, the flag write, its no-op when
 unchanged and its clear, an unreadable GraphQL answer and a GraphQL error answer, the unconfigured
 path, a failing ntfy that is retried, unreadable state, and the cron/CPU budget.
 

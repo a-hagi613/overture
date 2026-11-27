@@ -20,9 +20,8 @@ to Fly), against names only.
 | `.github/workflows/ci.yml` | Adds a `container` job (builds the image, starts it, checks `/api/health`), a `security-and-restore` job (gitleaks over the history, the private-files guard, and the Litestream round-trip against a local file replica: replicate → restore → `integrity_check`, row counts, migrations, untouched `bg_jobs`), and the `ci-ok` aggregator every other job feeds |
 | `.github/workflows/deploy.yml` | Skips with a green notice while `FLY_API_TOKEN` is unset; after CI succeeds on `main`: checks the Fly secrets (the freehire key only when `REQUIRE_FREEHIRE_API_KEY` is on), runs the Cloudflare Email Sending guard over SSH (bounded to 45 s), deploys with `flyctl deploy --remote-only`, then polls the production health route; when any step fails it prints `flyctl status` and the last 120 log lines |
 | `.github/workflows/restore-drill.yml` | Weekly (Mondays 06:17 UTC, also `workflow_dispatch`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise restores from R2 into a throwaway Fly machine, checks the restored SQLite file read-only, destroys the machine |
-| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ALLOWED_SIGNUP_EMAILS` and `FREEHIRE_API_KEY`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `match-probe` (read-only: ranks the live catalog for five sample Targets with the real matcher and prints each count and top five titles; it reads no user's data and writes nothing), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
+| `.github/workflows/ops-live.yml` | `workflow_dispatch` only, one action per run: `check-secrets` (Fly secret names only), `onboard-email` (M2-02 script plus `--check`), `setup-vapid` (generates and sets the Web Push VAPID key pair, `rotate_vapid` replaces existing keys), `seed-catalog` (fetches the company seed, loads discovered boards and enqueues one catalog backfill on `overture-web`), `setup-stripe` (creates or reuses the two plans, the webhook and the portal, then sets the Fly secrets; `stripe_env` chooses the `sandbox` or `production` Stripe account, default `sandbox`), `sync-ops-secrets` (pushes the optional ops secrets and flags, including `ALLOWED_SIGNUP_EMAILS` and `FREEHIRE_API_KEY`, to `overture-web`), `live-diagnostics` (runtime names present/missing and integer SQLite counts), `vacuum-db` (dry-runs the application database, then compacts it only above the freelist threshold or with `force_vacuum`). Skips with a green notice while `FLY_API_TOKEN` is unset |
 | `.github/workflows/ops-admin-host.yml` | `workflow_dispatch` only, for the admin host: `status` (certificate table, Fly secret names only, app status), `add-cert` (idempotent certificate for `admin.tryoverture.com`, then the same report), `set-access-secrets` (pushes the Cloudflare Access values held as repository secrets to Fly, names only afterwards). Fails with a clear message while `FLY_API_TOKEN` is unset |
-| `.github/workflows/stapply-daily.yml` | Daily at 15:30 UTC (one hour after Stapply's 14:30 snapshot) and on `workflow_dispatch`; skips with a green notice until the R2 repository secrets or `CATALOG_REFRESH_SECRET` are configured. Builds `catalog.sqlite` with DuckDB from the 28 per-board `jobs.parquet` files, delta-syncs it against the previous R2 snapshot, tags it, vacuums and compresses it, then publishes `catalog/latest.sqlite.zst`, `catalog/latest.json` and `catalog/snapshots/<version>.sqlite.zst` to R2 or relays the signed refresh to `overture-web` |
 | `.github/workflows/vacuum-db.yml` | Weekly (Sundays 05:00 UTC, also `workflow_dispatch` with `dry_run` and `force`): skips with a green notice while `FLY_API_TOKEN` is unset; otherwise dry-runs `/data/app.sqlite`, and only when its freelist exceeds 50 MB (or `force` is set) restarts the one machine in maintenance mode, vacuums it, restarts the server and polls `/api/health` |
 | `scripts/check-restored-db.ts` | Restored-database checks, read-only: PRAGMA `integrity_check`, applied-migration count, per-table row counts, untouched `bg_jobs`, zero outbound requests |
 | `scripts/restore-drill.ts` | `DRILL_TARGET=local` (CI round-trip) or `DRILL_TARGET=fly` (throwaway machine drill); never starts the app server |
@@ -510,7 +509,6 @@ The same flag exists on the script as `--reconcile-prices`.
 ```sh
 gh workflow run ops-live.yml -f action=check-secrets -R a-hagi613/overture
 gh workflow run ops-live.yml -f action=live-diagnostics -R a-hagi613/overture
-gh workflow run ops-live.yml -f action=match-probe -R a-hagi613/overture
 ```
 
 `check-secrets` prints the sorted Fly secret names (never values), `flyctl status`, and the production health route.
@@ -519,12 +517,6 @@ name (never a value), then prints the non-secret runtime flags and config (`PUBL
 `DEMO_LOGIN_ENABLED`, `REQUIRE_EMAIL_SENDING`, `ANTHROPIC_MODEL`, `BROWSER_PROVIDER`), and finally integer row counts
 for `users`, `invites`, `applications`, `company_boards` and `postings`; it prints no secret value and no personal
 data.
-`match-probe` runs `scripts/match-probe.ts` on the machine: it opens both databases read-only and asks the same
-candidate ranking the Matches step uses for five sample Targets (a Registered Nurse in Toronto, a Backend Engineer in
-London, a Data Scientist in New York, an Account Executive in Toronto, a remote US Product Manager), then prints each
-match count and the top five titles, companies and places. Use it after a catalog rebuild or a matching change to see
-real matches without signing in.
-
 ### 4. Roll back
 
 - **A wrong price or webhook id:** re-run `setup-stripe`; the script prints the public ids it reused or created and sets
@@ -1134,8 +1126,6 @@ small batches: at most 500 rows per transaction, with the event loop yielded bet
 transaction would hold the write lock past the app's `busy_timeout` (5 s); the server would then log `SQLITE_BUSY`,
 retry the claim or poll, and keep serving reads, but the batch would still have stalled writes for seconds.
 
-- `scripts/retag-feed-workplace.ts` clears Lever and Ashby board and posting content hashes in batches of 500 and
-  never touches closed or Greenhouse rows. Re-running it is safe: the second run reports `postingsReset: 0`.
 - `scripts/import-v1-facts.ts` applies encrypted facts in batches of 500 and is idempotent (it updates the same rows
   and never overwrites a Fact whose source is `user` or `review`).
 - `scripts/load-discovered-boards.ts` inserts discovered boards in transactions of at most 500 boards and is
@@ -1303,138 +1293,11 @@ Fly's own `fly_instance_*` series.
 ATS failure spike. The sentinel sends `x-overture-ops-timestamp` and `x-overture-ops-signature` (HMAC-SHA256 over
 `METHOD\npath\ntimestamp`); a missing, expired or wrong signature fails closed.
 
-## The Workable feed pass (M2-25)
-
-`.github/workflows/workable-feed.yml` runs the off-box pass at 04:00 UTC and on `workflow_dispatch`; it never runs on a
-pull request or a push. Its first step checks that the repository secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
-`R2_SECRET_ACCESS_KEY`, `R2_BUCKET_FILES` and `R2_ENDPOINT` are set: while any is missing it writes a skip notice to
-the step summary and the run finishes green without fetching the feed, publishing a snapshot or pushing an alert, so a
-repository without R2 credentials does not turn `main` red every day. The script refuses a live URL unless
-`WORKABLE_LIVE_FETCH=1`, which the workflow sets. `WORKABLE_ALERT_NTFY_URL` is optional and only
-used to push a failure to the owner's phone. `WORKABLE_FEED_URL` is an optional repository variable; the default is
-`https://www.workable.com/boards/workable.xml`.
-
-The pass reads `workable-targets.json` from R2 (the app writes it at 05:00 UTC, values only) and writes
-`workable/YYYY-MM-DD.jsonl.gz` plus `workable/manifest.json`. It refuses to publish a snapshot whose row count dropped
-more than 20 % from the previous run; `workflow_dispatch` with `--allow-row-drop` is the deliberate override. The app
-ingests the manifest at 05:00 UTC in `catalog.workable`, behind the `ats`/`workable` kill switch, which stays on until
-the 20-form probe (#235). The alerts are `workable.feed` for a missing snapshot, one older than 26 hours, a row drop
-or a failed ingest, and the GitHub job itself fails loudly.
-
-## The Stapply seed refresh (Wave 3.5)
-
-`.github/workflows/stapply-seed.yml` runs weekly (Monday 05:23 UTC) and on `workflow_dispatch`; it never runs on a pull
-request or a push. It downloads the ats-scrapers `manifest.json` and `companies.parquet` through
-`scripts/refresh-stapply-seed.ts` and **stages** them, it never touches the production pins by itself. Three guards run
-before anything is written:
-
-- **Schema:** the manifest is parsed against a Zod schema (`version`, `generated_at`, `companies.parquet_sha256`,
-  `companies.rows`) and the parquet columns must be exactly `[ats, name, slug, url]` with the row count the manifest
-  declares.
-- **SHA-256:** the manifest's `companies.parquet_sha256` must equal the hash of the downloaded bytes (and the declared
-  `parquet_size_bytes`, when present, the byte length), so a truncated or swapped file is refused.
-- **Row-drop:** a snapshot more than 20 % smaller than the prior staged one is refused; `workflow_dispatch` with
-  `allow_row_drop` is the deliberate override after checking upstream.
-
-The prior staged snapshot is restored from the Actions cache and the new one is saved only when the run succeeds, so an
-upstream outage, a schema change, a checksum mismatch or a shrunken input leaves the last good snapshot in place. Each
-run uploads the staged `manifest.json`, `companies.parquet` and `stapply-refresh.json` summary as an artifact and writes
-the same summary to the step summary. Run it once with `workflow_dispatch` before relying on the schedule; nothing
-leaves the runner except the cache, the artifact and the summary. A staged snapshot is a candidate: review the
-checksums and row delta, re-pin `PINNED_MANIFEST_SHA256` and `PINNED_COMPANIES_PARQUET_SHA256` in
-`src/server/catalog/companies-parquet.ts`, then rerun `docs/research/m1-09-runbook.md` §1–2 to load it.
-`STAPPLY_MANIFEST_URL` and `STAPPLY_COMPANIES_URL` are optional repository variables; the defaults are the pinned
-`https://storage.stapply.ai/jobs/v1/…` URLs. `STAPPLY_ALERT_NTFY_URL` is optional and only pushes an aborted run to the
-owner's phone; without it the failing job and its step summary are the alert.
-
-## The daily Stapply catalog ETL (WS-3a)
-
-`.github/workflows/stapply-daily.yml` runs at **15:30 UTC** and on `workflow_dispatch`; it never runs on a pull request
-or a push. Its first step picks a publish target and skips with a green notice while neither is configured, so a fresh
-clone does not turn `main` red every day:
-
-- **R2 directly** when the four repository secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and
-  `R2_BUCKET_FILES` are set (`R2_ENDPOINT` is optional). The workflow then needs no Fly credential.
-- **Relay to `overture-web`** when `CATALOG_REFRESH_SECRET` and the existing `FLY_API_TOKEN` are set. The app archives
-  the snapshot to R2 with the R2 credentials it already holds, so no R2 secret is copied into the repository. The
-  shared secret exists because a Fly API token cannot sign a request the app can verify offline; set it once on both
-  sides with `fly secrets set CATALOG_REFRESH_SECRET=… -a overture-web` and
-  `gh secret set CATALOG_REFRESH_SECRET -R a-hagi613/overture`.
-
-The workflow never passes an AI key: its catalog build runs with `--skip-llm`, so a scheduled run spends no real money
-(#680). Role tagging in the ETL comes from the rules and the local ONNX embeddings only. The Haiku fallback stays
-available to a developer who runs `scripts/stapply-daily-etl.ts` by hand with `ANTHROPIC_API_KEY` and
-`--max-llm-rows` set; that is a manual act, not a scheduled one. Role labels for known title templates come from the
-committed seed `src/server/catalog/tag-data/role-labels.json` and cost nothing per run. `STAPPLY_ALERT_NTFY_URL` is
-optional and only pushes a failed run to the owner's phone. The run uploads `stapply-daily.json` (counters, per-board
-rows, tag sources, the manifest) as an artifact and writes it to the step summary.
-
-**What it does.** `scripts/stapply-daily-etl.ts` reads the 28 `<source_key>/jobs.parquet` files over HTTP with DuckDB,
-one board at a time (column projection; `raw` is never selected, `description` is read capped at 4,000 characters and
-stored as 2,000 characters of plain text for the scorer, and `all.parquet` is never read),
-streams the mapped rows into a temporary SQLite staging table, filters non-empty
-titles, `https://` apply links, unexpired deadlines and — on the first run — a `posted_at` horizon of the
-`freshness_days` input (default 7; `0` keeps every date), leaving out rows with no posting date unless
-`include_undated` is set, and collapses
-`(company_norm, requisition_id)` duplicates preferring a board with an apply adapter. It downloads
-`catalog/latest.sqlite.zst` and verifies it against `catalog/latest.json` first, so unchanged `content_hash` rows keep
-their `role`/`seniority`/`skills_json` tags; new rows are inserted, changed rows rewritten, missing listings closed at
-once, and closed rows older than 30 days deleted. Every open Posting's role tags are then rewritten in the role
-taxonomy (`taxonomy-tags.ts`: the seed label, else the retired-tag bridge) before the `/api/supply` rollup is rebuilt.
-It then runs `PRAGMA optimize`, `VACUUM` and
-`PRAGMA integrity_check`, zstd-compresses the file at level 12 (level 19 took over ten minutes on a 1.1 GB seed
-artifact for about 2 % smaller output), and computes the manifest's SHA-256 over the **uncompressed** SQLite bytes.
-
-**Published objects.** `catalog/snapshots/<version>.sqlite.zst` first, then `catalog/latest.sqlite.zst`, then
-`catalog/latest.json` last so a reader never sees a manifest without its snapshot, then keeps the newest seven
-snapshots and deletes older ones (the daily artifact is hundreds of megabytes). The version is the build's UTC time to
-the second (`2026-11-25T085314Z`); builds before issue #664 used the bare date, which sorts before every later build of
-that day, so a second build on the same day replaces the first instead of being answered `already_applied`. The manifest is exactly
-`{version, sha256, builtAt, rowCount, supportedCount}`. In R2 mode the run then sends the signed
-`POST /internal/catalog/refresh` when `CATALOG_REFRESH_SECRET` is set, so the app hot-swaps without waiting for a cold
-boot (summary `publish: "r2+refresh"`); without the secret it only uploads (`"r2"`). A run whose `rowCount` is more
-than 20 % below the previous manifest is refused before anything is uploaded; re-run `workflow_dispatch` with
-`allow_row_drop` after checking upstream.
-
-**The relay contract (`WS-8`, issue #576).** Both requests sign `<timestamp>\n<body>` with
-`CATALOG_REFRESH_SECRET` and send `x-overture-catalog-timestamp` (epoch ms) plus
-`x-overture-catalog-signature` (lowercase hex HMAC-SHA256). The app accepts a timestamp within five minutes of its
-clock and rejects any timestamp it has already accepted, so a captured request cannot be replayed.
-
-1. `PUT /internal/catalog/snapshot` with `content-type: application/zstd`, the compressed bytes as the body, and
-   `x-overture-catalog-version` and `x-overture-catalog-sha256` (the uncompressed hash). The body to sign is the
-   SHA-256 of the compressed bytes, because the request is large. The compressed artifact was 277 MB on the seed run
-   and roughly doubles once the catalog holds every listed posting, so the relay is a fallback: prefer the R2
-   repository secrets for production, and `WS-8` must raise its request-body limit for this route.
-2. `POST /internal/catalog/refresh` with the manifest as the JSON body. The app archives the snapshot to R2, verifies
-   the SHA-256 and `PRAGMA integrity_check`, and hot-swaps `catalog.sqlite` read-only.
-
-A 404 or 501 on either endpoint is reported as `relay_endpoint_missing` and does not fail the run (the endpoint ships
-with `WS-8`); a real HTTP error or a rejected checksum fails the job and alerts. The R2 path sends only the signed
-`POST /internal/catalog/refresh`; the app pulls from R2 itself.
-
-**First run and rollback.** Run it once with
-`gh workflow run stapply-daily.yml -f allow_row_drop=false -R a-hagi613/overture` and check the step
-summary: `seed: true`, `integrity: "ok"`, and `publish` set to `r2`, `r2+refresh`, or `relay`, not
-`relay_endpoint_missing`. The seed run keeps the last 30 days of postings (measured: 851,637 rows across the 28
-boards, 286,694 of them apply-supported, 277 MB compressed); from the second run on the catalog holds every posting
-the boards still list, about two million rows, so expect roughly twice that compressed size. Nothing in the app changes until `WS-8` consumes the manifest, so the only production effect
-of merging this workflow is the daily R2 object. To roll back, disable the workflow
-(`gh workflow disable stapply-daily.yml`); the last published snapshot stands, and the app's active catalog is never
-replaced by a snapshot that fails its checksum. There is no database migration to undo.
-
-Run it by hand with
-`gh workflow run stapply-daily.yml -f allow_row_drop=false -R a-hagi613/overture`, or locally against
-a staged fixture directory with
-`bun run scripts/stapply-daily-etl.ts --source-base-url <dir> --out-dir <dir> --as-of <iso> --skip-llm` (it writes a
-local object store and never touches R2). The DuckDB binding is the MIT `@duckdb/node-api` dev dependency; it is not in
-the production image because only this off-box job uses it.
-
 ## The sentinel Worker (#283)
 
 `workers/sentinel` is a cron Worker that watches Overture from outside Fly (ADR 0033). Every ten minutes it probes
-`https://tryoverture.com/api/health`, reads `workable/manifest.json` from the `overture-files` bucket, and reads
-month-to-date R2, Queues and Workers usage from the Cloudflare GraphQL Analytics API. It pushes to
+`https://tryoverture.com/api/health`, and reads month-to-date R2, Queues and Workers usage from the Cloudflare
+GraphQL Analytics API. It pushes to
 `ALERT_NTFY_URL` at 70 % of an allowance and at 90 % writes `ops/degraded.json`, which the app reads and logs: mail
 classification goes rules-only and the live-check R2 round trip is skipped. It never revokes an R2 token — that would
 stop Litestream.
@@ -1464,8 +1327,6 @@ What each push means and what to check first:
 |---|---|---|
 | `health` | `/api/health` failed or answered a body that is not `"status":"ok"` from outside Fly | the URL from the owner's machine, then `fly status -a overture-web` and `fly logs -a overture-web` (a failed Deploy run already prints both) |
 | `health.recovered` | the probe passes again | nothing; the app's own health alerts record the incident |
-| `workable` | `workable/manifest.json` is older than 26 h, missing or unparseable | the last `workable-feed` GitHub Action run, then `bunx wrangler r2 object get overture-files/workable/manifest.json --pipe` |
-| `workable.recovered` | the manifest is young again | nothing |
 | `usage.<metric>.warn` | one allowance passed 70 % | §3–§5 of `docs/research/cloudflare-spend-guard-runbook.md` |
 | `usage.degraded` | one or more allowances passed 90 %; `ops/degraded.json` is set and the app runs rules-only | the same runbook; the flag clears itself when usage drops below 90 % |
 | `usage.error` | the GraphQL analytics answer could not be read; the flag, if set, stands | `CLOUDFLARE_ANALYTICS_TOKEN` expiry and Cloudflare's status page |

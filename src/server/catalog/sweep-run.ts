@@ -111,6 +111,5 @@ export function summarizeRun(kind: SweepRunKind, reports: PollBoardReport[], dur
     closed: reports.reduce((total, report) => total + report.closed, 0),
     closedPostingIds: reports.flatMap((report) => report.closedPostingIds),
     durationMs: Math.round(durationMs),
-    workable: null,
   };
 }

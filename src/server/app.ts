@@ -66,7 +66,6 @@ import {
   mainHostAdminApiRefusal,
 } from "./host-routing.ts";
 import { createInboundRoutes } from "./routes/inbound.ts";
-import { createInternalCatalogRoutes } from "./routes/internal-catalog.ts";
 import { createInternalOpsHealthRoutes } from "./routes/internal-ops.ts";
 import { createMailRoutes } from "./routes/mail.ts";
 import { createWorkspaceSearchRoutes } from "./routes/workspace-search.ts";
@@ -80,7 +79,6 @@ import { createConfiguredBackupStore } from "./platform/object-store.ts";
 import { securityHeaders } from "./security-headers.ts";
 import { logError } from "./platform/log.ts";
 import { httpMetricsMiddleware } from "./platform/telemetry/http-metrics.ts";
-import type { CatalogHotSwap } from "./catalog/hot-swap.ts";
 import { API_ERRORS } from "../shared/api-errors.ts";
 
 export interface OpsHealthConfig {
@@ -93,9 +91,6 @@ export interface OpsHealthConfig {
 export interface AppDependencies {
   db: AppDatabase;
   catalogDb: CatalogDatabase;
-  catalogHotSwap?: CatalogHotSwap | undefined;
-  /** Where a relay upload stages the compressed snapshot; defaults to the OS temp dir. */
-  catalogStagingDir?: string | undefined;
   clock: AdjustableClock;
   backups: BackupMonitor;
   databasePath: string;
@@ -703,19 +698,6 @@ export function createApp(deps: AppDependencies) {
       secret: env.INBOUND_HMAC_SECRET,
     }),
   );
-
-  if (deps.catalogHotSwap !== undefined && env.CATALOG_REFRESH_SECRET !== undefined) {
-    app.route(
-      "/",
-      createInternalCatalogRoutes({
-        clock: deps.clock,
-        hotSwap: deps.catalogHotSwap,
-        objects: deps.objects,
-        secret: env.CATALOG_REFRESH_SECRET,
-        ...(deps.catalogStagingDir !== undefined && { stagingDir: deps.catalogStagingDir }),
-      }),
-    );
-  }
 
   if (deps.opsHealth !== undefined) {
     app.route(

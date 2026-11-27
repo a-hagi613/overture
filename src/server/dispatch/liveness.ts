@@ -68,7 +68,7 @@ async function fetchJson(url: string) {
 
 /**
  * Builds the per-ATS liveness checker. Workable answers `open` without a request: its daily snapshot is the
- * closure signal (`catalog/workable-ingest.ts`), and a form that 404s at send ends as a form change.
+ * closure signal (`catalog/poll-board.ts`), and a form that 404s at send ends as a form change.
  *
  * @param env The environment holding the feed base URLs.
  * @returns The liveness checker every dispatch tick uses.

@@ -5,7 +5,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -22,15 +25,33 @@
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 700,
       "title": "Users & Spend",
       "type": "row",
       "panels": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 1
+          },
           "id": 701,
           "targets": [
             {
@@ -43,15 +64,34 @@
           "title": "People",
           "type": "stat",
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
             "orientation": "horizontal",
             "textMode": "value_and_name"
           }
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 1
+          },
           "id": 702,
           "targets": [
             {
@@ -67,14 +107,30 @@
             "legend": {
               "displayMode": "table",
               "placement": "right",
-              "calcs": ["lastNotNull", "max"]
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
             }
           }
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 1
+          },
           "id": 703,
           "targets": [
             {
@@ -87,15 +143,34 @@
           "title": "Applications by status",
           "type": "bargauge",
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
             "orientation": "horizontal",
             "textMode": "value_and_name"
           }
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 9
+          },
           "id": 704,
           "targets": [
             {
@@ -117,14 +192,30 @@
             "legend": {
               "displayMode": "table",
               "placement": "right",
-              "calcs": ["lastNotNull", "max"]
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
             }
           }
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 9
+          },
           "id": 705,
           "targets": [
             {
@@ -137,15 +228,34 @@
           "title": "Spend in the last 24 hours (USD)",
           "type": "stat",
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
             "orientation": "horizontal",
             "textMode": "value_and_name"
           }
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 9 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 9
+          },
           "id": 706,
           "targets": [
             {
@@ -167,7 +277,10 @@
             "legend": {
               "displayMode": "table",
               "placement": "right",
-              "calcs": ["lastNotNull", "max"]
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
             }
           }
         }
@@ -175,15 +288,38 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
       "id": 100,
       "panels": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 18
+          },
           "id": 101,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -196,68 +332,29 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
-          "id": 102,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
-          "targets": [
-            {
-              "editorMode": "code",
-              "expr": "sum(increase(overture_catalog_postings_total[$__rate_interval]))",
-              "legendFormat": "postings applied",
-              "refId": "A"
-            }
-          ],
-          "title": "Catalog postings applied",
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
-          "id": 103,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
-          "targets": [
-            {
-              "editorMode": "code",
-              "expr": "histogram_quantile(0.95, sum by (le) (rate(overture_catalog_swap_duration_ms_bucket[$__rate_interval])))",
-              "legendFormat": "p95 swap duration",
-              "refId": "A"
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
             },
-            {
-              "editorMode": "code",
-              "expr": "sum(increase(overture_catalog_swap_failures_total[$__rate_interval]))",
-              "legendFormat": "swap failures",
-              "refId": "B"
-            }
-          ],
-          "title": "Catalog swap duration & failures",
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 26 },
-          "id": 104,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
-          "targets": [
-            {
-              "editorMode": "code",
-              "expr": "avg(rate(overture_catalog_swap_bytes_sum[$__rate_interval]))",
-              "legendFormat": "mean snapshot bytes / s",
-              "refId": "A"
-            }
-          ],
-          "title": "Catalog snapshot bytes",
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-          "gridPos": { "h": 7, "w": 16, "x": 8, "y": 26 },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 16,
+            "x": 8,
+            "y": 18
+          },
           "id": 105,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -275,16 +372,41 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
       "id": 200,
       "panels": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 34
+          },
           "id": 201,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -298,12 +420,32 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 34
+          },
           "id": 202,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -317,11 +459,29 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 42 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 42
+          },
           "id": 203,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -334,11 +494,29 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 42 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 42
+          },
           "id": 204,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -356,16 +534,41 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
       "id": 300,
       "panels": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 50
+          },
           "id": 301,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -379,12 +582,32 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 50
+          },
           "id": 302,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -398,12 +621,32 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
-          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 58 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 58
+          },
           "id": 303,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -422,16 +665,41 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 65 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 65
+      },
       "id": 400,
       "panels": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 66 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 66
+          },
           "id": 401,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -445,12 +713,32 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 66 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 66
+          },
           "id": 402,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -464,12 +752,32 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 74 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 74
+          },
           "id": 403,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -483,15 +791,33 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
-            "defaults": { "max": 1, "min": 0, "unit": "percentunit" },
+            "defaults": {
+              "max": 1,
+              "min": 0,
+              "unit": "percentunit"
+            },
             "overrides": []
           },
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 74 },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 74
+          },
           "id": 404,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
           },
           "targets": [
             {
@@ -510,19 +836,40 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 81 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 81
+      },
       "id": 500,
       "panels": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 82 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 82
+          },
           "id": 501,
           "options": {
             "legend": {
               "displayMode": "table",
               "placement": "right",
-              "calcs": ["lastNotNull", "max"]
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
             }
           },
           "targets": [
@@ -537,12 +884,32 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 82 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 82
+          },
           "id": 502,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -556,12 +923,32 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 82 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 82
+          },
           "id": 503,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ]
+            }
           },
           "targets": [
             {
@@ -587,18 +974,40 @@
     {
       "collapsed": false,
       "description": "Fly's own node-exporter-compatible fly_instance_* series. Enable the built-in Prometheus metrics for the app in fly.toml ([metrics]) and select the same datasource.",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 89 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 89
+      },
       "id": 600,
       "panels": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
-            "defaults": { "max": 1, "min": 0, "unit": "percentunit" },
+            "defaults": {
+              "max": 1,
+              "min": 0,
+              "unit": "percentunit"
+            },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 90 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 90
+          },
           "id": 601,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -611,14 +1020,31 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
-            "defaults": { "max": 1, "min": 0, "unit": "percentunit" },
+            "defaults": {
+              "max": 1,
+              "min": 0,
+              "unit": "percentunit"
+            },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 90 },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 90
+          },
           "id": 602,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -631,11 +1057,29 @@
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 90 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 90
+          },
           "id": 603,
-          "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
           "targets": [
             {
               "editorMode": "code",
@@ -660,7 +1104,11 @@
   ],
   "refresh": "1m",
   "schemaVersion": 39,
-  "tags": ["overture", "production", "ws-21"],
+  "tags": [
+    "overture",
+    "production",
+    "ws-21"
+  ],
   "templating": {
     "list": [
       {
@@ -679,7 +1127,10 @@
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "Overture production",

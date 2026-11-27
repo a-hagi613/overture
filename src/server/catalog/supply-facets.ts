@@ -35,9 +35,8 @@ function nonJobClause() {
 }
 
 /**
- * Rebuilds the `/api/supply` rollup from the open, apply-supported Postings (issue #631). It runs at the
- * end of an ETL/import pass, before the snapshot is sealed and hot-swapped, and is deterministic: the same
- * catalog always produces the same rows.
+ * Rebuilds the `/api/supply` rollup from the open, apply-supported Postings (issue #631). It runs after a
+ * catalog seed/ETL pass against the local file and is deterministic: the same catalog always produces the same rows.
  *
  * Two passes keep the unfiltered total truthful. The first writes one `*` row per `(ats, country, region,
  * workplace)` with `count(*)`, so a Posting with two role tags is still counted once. The second joins the

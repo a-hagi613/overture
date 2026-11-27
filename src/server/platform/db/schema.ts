@@ -882,10 +882,11 @@ export const postingUserState = sqliteTable(
 );
 
 /**
- * A Posting that keeps failing on the live form, kept in `app.sqlite` because the catalog is a read-only artifact the
- * app hot-swaps and never writes (issue #576). `posting_id` is a plain logical id into `catalog.sqlite`, exactly like
- * `posting_user_state`, so a swap never leaves a dangling foreign key. A row is created on the first failure so
- * `fail_count` can reach the reason's threshold; only a row at or over the threshold is excluded from matching.
+ * A Posting that keeps failing on the live form, kept in `app.sqlite` because the catalog is legacy read-only job
+ * data for Applications created before freehire (#700). `posting_id` is a plain logical id into `catalog.sqlite`,
+ * exactly like `posting_user_state`, so a prune never leaves a dangling foreign key. A row is created on the first
+ * failure so `fail_count` can reach the reason's threshold; only a row at or over the threshold is excluded from
+ * matching.
  */
 export const catalogPostingFlags = sqliteTable(
   "catalog_posting_flags",
