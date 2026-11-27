@@ -501,7 +501,9 @@ const anthropicBatches = createDurableBatches({
   provider: createAnthropicBatchProvider({
     baseUrl: env.ANTHROPIC_BASE_URL,
     apiKey: env.ANTHROPIC_API_KEY,
+    maxAttempts: env.ANTHROPIC_MAX_ATTEMPTS,
     model: env.ANTHROPIC_MODEL,
+    timeoutMs: env.ANTHROPIC_REQUEST_TIMEOUT_MS,
   }),
   pollIntervalMs: env.ANTHROPIC_BATCH_POLL_INTERVAL_MS,
   maxWaitMs: env.ANTHROPIC_BATCH_WAIT_MS,
@@ -511,7 +513,9 @@ const anthropicLlmPort = createAnthropicLlmPort(
   {
     baseUrl: env.ANTHROPIC_BASE_URL,
     apiKey: env.ANTHROPIC_API_KEY,
+    maxAttempts: env.ANTHROPIC_MAX_ATTEMPTS,
     model: env.ANTHROPIC_MODEL,
+    timeoutMs: env.ANTHROPIC_REQUEST_TIMEOUT_MS,
   },
   anthropicBatches,
 );
@@ -1207,7 +1211,9 @@ let shuttingDown = false;
 async function stopTelemetry() {
   try {
     await sdk.shutdown();
-  } catch {}
+  } catch (error) {
+    logError("telemetry.shutdown", error);
+  }
 }
 
 async function quietGrace(budgetMs: number) {

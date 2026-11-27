@@ -18,7 +18,7 @@ import {
 } from "../db/schema.ts";
 import { createMetrics } from "./metrics.ts";
 import { createPrometheusExporter, renderPrometheus } from "./prometheus.ts";
-import { sampleProductStats } from "./product-stats.ts";
+import { sampleProductStats, sampleProductStatsGuarded } from "./product-stats.ts";
 
 const NOW = Date.UTC(2026, 10, 25, 12, 0, 0);
 const HOUR = 60 * 60 * 1000;
@@ -215,4 +215,19 @@ test("a status that empties stops reporting its old count", () => {
   sampleProductStats(db, NOW, recorder);
 
   expect(recorder.productGaugeValues("productApplications")).not.toHaveProperty("stale_status");
+});
+
+test("a slow sample reports how long it blocked the event loop", () => {
+  const db = seed();
+  const recorder = createMetrics(new MeterProvider().getMeter("overture-test"));
+  const slowDurations: number[] = [];
+
+  sampleProductStatsGuarded(db, NOW, recorder, {
+    onSlow: (durationMs) => slowDurations.push(durationMs),
+    slowMs: 0,
+  });
+
+  expect(slowDurations.length).toBe(1);
+  expect(slowDurations[0]).toBeGreaterThanOrEqual(0);
+  expect(recorder.productGaugeValues("matchQueue")).toEqual({ pooled: 2, scored: 1 });
 });

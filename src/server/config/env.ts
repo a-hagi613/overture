@@ -353,6 +353,8 @@ const envSchema = z
     ANTHROPIC_MODEL: z.string().min(1).default(DEFAULT_ANTHROPIC_MODEL),
     ANTHROPIC_BATCH_POLL_INTERVAL_MS: z.coerce.number().int().min(10).default(10_000),
     ANTHROPIC_BATCH_WAIT_MS: z.coerce.number().int().min(1000).default(3_600_000),
+    ANTHROPIC_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(5).default(3),
+    ANTHROPIC_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60_000),
     FREEHIRE_API_KEY: z.string().optional(),
     FREEHIRE_BASE_URL: z.url().default("https://freehire.me"),
     FLY_APP_NAME: z.string().min(1).optional(),

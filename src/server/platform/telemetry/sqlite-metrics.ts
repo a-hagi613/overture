@@ -1,4 +1,4 @@
-import { defaultMetrics } from "./metrics.ts";
+import { defaultMetrics, recordMetricSafely } from "./metrics.ts";
 
 export type SqliteDatabaseLabel = "app" | "catalog";
 
@@ -21,7 +21,9 @@ export function measureSqliteQuery<Result>(
   record: (input: { db: SqliteDatabaseLabel; durationMs: number; op: string }) => void = (
     input,
   ) => {
-    defaultMetrics().recordSqliteQuery(input);
+    recordMetricSafely(() => {
+      defaultMetrics().recordSqliteQuery(input);
+    });
   },
 ) {
   const startedAt = performance.now();

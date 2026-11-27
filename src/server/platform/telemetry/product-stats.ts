@@ -21,6 +21,8 @@ import { defaultMetrics } from "./metrics.ts";
 
 export const PRODUCT_STATS_INTERVAL_MS = 60_000;
 
+export const SLOW_PRODUCT_STATS_MS = 250;
+
 const APPLICATION_STATUSES = [
   "preparing",
   "needs_review",
@@ -179,6 +181,56 @@ export function sampleProductStats(
   });
 }
 
+export interface ProductStatsGuardOptions {
+  /** Receives a sample's duration when it crossed the slow threshold. */
+  onSlow?: (durationMs: number) => void;
+  /** The duration above which a sample is reported as blocking; defaults to `SLOW_PRODUCT_STATS_MS`. */
+  slowMs?: number;
+}
+
+function reportSlowSample(durationMs: number) {
+  logError(
+    "metrics.product_stats",
+    new Error(
+      `the product stats sample blocked the event loop for ${String(durationMs)} ms; the aggregate queries need a cheaper shape`,
+    ),
+  );
+}
+
+/**
+ * Samples the product gauges and reports a sample that took too long.
+ *
+ * The gauge queries run synchronously on the request-serving event loop, so a sample that grows
+ * with the `llm_usage` or `ledger` table is invisible latency until it is logged. This wrapper
+ * times every sample and reports one past the threshold, where it would otherwise only show up as
+ * unexplained event-loop lag.
+ * @param db The application database.
+ * @param now The current instant.
+ * @param recorder The metrics recorder (tests pass their own).
+ * @param options The slow threshold and its sink.
+ * @returns Nothing.
+ */
+export function sampleProductStatsGuarded(
+  db: AppDatabase,
+  now: number,
+  recorder: MetricsRecorder = defaultMetrics(),
+  options: ProductStatsGuardOptions = {},
+) {
+  const slowMs = options.slowMs ?? SLOW_PRODUCT_STATS_MS;
+  const onSlow = options.onSlow ?? reportSlowSample;
+  const startedAt = performance.now();
+
+  try {
+    sampleProductStats(db, now, recorder);
+  } finally {
+    const durationMs = Math.round(performance.now() - startedAt);
+
+    if (durationMs >= slowMs) {
+      onSlow(durationMs);
+    }
+  }
+}
+
 /**
  * Samples the product gauges now and then every minute until stopped.
  * @param db The application database.
@@ -188,7 +240,7 @@ export function sampleProductStats(
 export function startProductStatsSampler(db: AppDatabase, clock: Clock) {
   const sample = () => {
     try {
-      sampleProductStats(db, clock.now());
+      sampleProductStatsGuarded(db, clock.now());
     } catch (error) {
       logError("metrics.product_stats", error);
     }
