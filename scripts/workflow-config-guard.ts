@@ -410,21 +410,7 @@ export const SYNC_OPS_SECRETS_STEP = "Sync the ops secrets and flags to overture
 
 const SYNC_STEP = SYNC_OPS_SECRETS_STEP;
 const SYNC_HEALTH_STEP = "Verify the production health route after the ops secrets sync";
-const SYNC_SECRET_NAMES = ["ALERT_NTFY_URL", "CATALOG_REFRESH_SECRET", "FREEHIRE_API_KEY"] as const;
-
-function workflowInputBlock(source: string, name: string) {
-  const marker = `\n      ${name}:`;
-  const start = source.indexOf(marker);
-
-  if (start === -1) {
-    return null;
-  }
-
-  const rest = source.slice(start + marker.length);
-  const end = rest.search(/^\s{6}[A-Za-z_][\w-]*:/mu);
-
-  return end === -1 ? rest : rest.slice(0, end);
-}
+const SYNC_SECRET_NAMES = ["ALERT_NTFY_URL", "FREEHIRE_API_KEY"] as const;
 
 /**
  * Checks the production recovery actions stay safe to run against the live machine. A catalog reset that removed
@@ -441,20 +427,6 @@ export function findRecoveryWorkflowProblems(input: RecoveryWorkflowInput) {
   for (const action of RECOVERY_ACTIONS) {
     if (!lines.some((line) => line.trim() === `- ${action}`)) {
       problems.push(`ops-live.yml does not offer the ${action} action`);
-    }
-  }
-
-  const hotSwapInput = workflowInputBlock(source, "enable_catalog_r2_hot_swap");
-
-  if (hotSwapInput === null) {
-    problems.push("ops-live.yml does not offer the enable_catalog_r2_hot_swap input");
-  } else {
-    if (!/type:\s*boolean/u.test(hotSwapInput)) {
-      problems.push("ops-live.yml enable_catalog_r2_hot_swap is not a boolean input");
-    }
-
-    if (!/default:\s*false/u.test(hotSwapInput)) {
-      problems.push("ops-live.yml enable_catalog_r2_hot_swap does not default to false");
     }
   }
 
@@ -569,16 +541,6 @@ export function findRecoveryWorkflowProblems(input: RecoveryWorkflowInput) {
         `ops-live.yml sync-ops-secrets does not read ${secret} from the repository secrets`,
       );
     }
-  }
-
-  if (!sync.includes(`ENABLE_CATALOG_R2_HOT_SWAP: \${{ inputs.enable_catalog_r2_hot_swap }}`)) {
-    problems.push("ops-live.yml sync-ops-secrets does not pass the hot-swap input through");
-  }
-
-  if (!sync.includes(`\${ENABLE_CATALOG_R2_HOT_SWAP:-false}" = "true"`)) {
-    problems.push(
-      "ops-live.yml sync-ops-secrets sets CATALOG_R2_HOT_SWAP without checking the input",
-    );
   }
 
   if (!sync.includes("No secrets or flags were configured to sync.")) {

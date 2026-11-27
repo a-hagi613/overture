@@ -86,3 +86,21 @@ chain instead of adding a second file to keep in step.
 `catalog.sqlite` and its `postings`-shaped tables stay untouched and read-only until #706 removes them; no new code
 writes that file. The retirement of the separate catalog database and its snapshot/hot-swap is #706's change, not
 this one.
+
+## Amendment (2026-11-27, issue #706)
+
+The Stapply publication path is gone: the off-box DuckDB ETL, the signed
+`/internal/catalog/{refresh,snapshot,classification-cache}` relay, the R2 snapshot
+hot-swap, its manifest reader and the classification cache were removed with their
+tests, workflows and scripts. `catalog.sqlite` is now opened locally on every boot
+with no alternative source.
+
+The **file itself stays, as a read-only legacy read model**, because live readers
+still answer from it for rows that predate freehire: the Matcher's stored-match
+fallback (`matching/matches-page.ts`, `matching/new-matches.ts`), the public
+`/api/supply` count and facet rollup, preparation and review for Applications
+created against a catalog Posting, dispatch liveness, the demo seed, and the admin
+storage/system reports. Every new Application is created from a freehire `jobs` row
+and carries its own display snapshot, so no new user data depends on
+`catalog.sqlite`. Removing those readers, and then the file, is a separate change
+once no catalog-backed Application remains.

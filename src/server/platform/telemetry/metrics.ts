@@ -15,10 +15,6 @@ export const METRIC_NAMES = {
   bgJobDuration: "overture_bg_job_duration_ms",
   bgQueueDepth: "overture_bg_queue_depth",
   billingEvents: "overture_billing_events_total",
-  catalogPostings: "overture_catalog_postings_total",
-  catalogSwapBytes: "overture_catalog_swap_bytes",
-  catalogSwapDuration: "overture_catalog_swap_duration_ms",
-  catalogSwapFailures: "overture_catalog_swap_failures_total",
   credits: "overture_credits",
   eventLoopLag: "overture_event_loop_lag_ms",
   formSelfHeal: "overture_form_self_heal_total",
@@ -185,10 +181,6 @@ export class MetricsRecorder {
   private readonly bgJobDuration: Histogram;
   private readonly bgQueueDepth: ObservableGauge;
   private readonly billingEvents: Counter;
-  private readonly catalogPostings: Counter;
-  private readonly catalogSwapBytes: Histogram;
-  private readonly catalogSwapDuration: Histogram;
-  private readonly catalogSwapFailures: Counter;
   private readonly eventLoopLag: Histogram;
   private readonly formSelfHeal: Counter;
   private readonly httpDuration: Histogram;
@@ -221,20 +213,6 @@ export class MetricsRecorder {
     });
     this.billingEvents = meter.createCounter(METRIC_NAMES.billingEvents, {
       description: "Stripe billing events, by event type and plan",
-    });
-    this.catalogPostings = meter.createCounter(METRIC_NAMES.catalogPostings, {
-      description: "Postings applied by a catalog hot swap",
-    });
-    this.catalogSwapBytes = meter.createHistogram(METRIC_NAMES.catalogSwapBytes, {
-      description: "Uncompressed catalog snapshot size per applied swap",
-      unit: "By",
-    });
-    this.catalogSwapDuration = meter.createHistogram(METRIC_NAMES.catalogSwapDuration, {
-      description: "Catalog hot-swap duration",
-      unit: "ms",
-    });
-    this.catalogSwapFailures = meter.createCounter(METRIC_NAMES.catalogSwapFailures, {
-      description: "Catalog hot swaps that could not be applied, by reason",
     });
     this.eventLoopLag = meter.createHistogram(METRIC_NAMES.eventLoopLag, {
       description: "Timer drift of the event loop sampler",
@@ -329,18 +307,6 @@ export class MetricsRecorder {
 
   recordSupplyQuery(durationMs: number) {
     this.supplyQueryDuration.record(durationMs);
-  }
-
-  recordCatalogSwap(input: { bytes: number; durationMs: number; postings: number }) {
-    const labels = sanitizeMetricAttributes({ outcome: "applied" });
-
-    this.catalogSwapDuration.record(input.durationMs, labels);
-    this.catalogSwapBytes.record(input.bytes, labels);
-    this.catalogPostings.add(input.postings, labels);
-  }
-
-  recordCatalogSwapFailure(reason: string) {
-    this.catalogSwapFailures.add(1, sanitizeMetricAttributes({ reason }));
   }
 
   recordApplyAttempt(input: { ats: string; mode: string; outcome: string; durationMs: number }) {

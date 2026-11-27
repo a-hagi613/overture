@@ -1,8 +1,8 @@
 const warned = new Set<string>();
 
 /**
- * SQLite reports a write against a read-only connection as `SQLITE_READONLY`; the R2 hot-swapped catalog is opened
- * read-only on purpose (issue #576), so a runtime cache write is best-effort rather than fatal.
+ * SQLite reports a write against a read-only connection as `SQLITE_READONLY`; a report or a backup copy may open the
+ * catalog read-only (issue #576), so a runtime cache write is best-effort rather than fatal.
  * @param error the caught value, already narrowed to an Error or null
  * @returns whether the write failed only because the catalog cannot be written
  */
@@ -31,7 +31,7 @@ export function bestEffortCatalogWrite(scope: string, run: () => void) {
     if (!warned.has(scope)) {
       warned.add(scope);
       process.stderr.write(
-        `overture catalog.read_only: skipped ${scope}: the catalog is a read-only R2 hot-swap\n`,
+        `overture catalog.read_only: skipped ${scope}: the catalog connection is read-only\n`,
       );
     }
 

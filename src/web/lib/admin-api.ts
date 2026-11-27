@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { taggingReportSchema } from "../../shared/tagging-report.ts";
 import { waitlistInviteResponseSchema, waitlistResponseSchema } from "../../shared/waitlist.ts";
 
 export const adminRefusalCodeSchema = z.enum(["access_required", "owner_required"]);
@@ -572,8 +571,6 @@ export const inviteCreateResponseSchema = z.object({ invite: inviteRowSchema });
 
 export const catalogResponseSchema = z.object({
   discoveredAt: z.number().nullable(),
-  manifestVersion: z.string().nullable().default(null),
-  tagging: taggingReportSchema.nullable().default(null),
   ats: z.array(
     z.object({
       ats: z.string(),

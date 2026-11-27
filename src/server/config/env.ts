@@ -189,8 +189,6 @@ const envSchema = z
     DATABASE_URL: z.string().min(1).default("data/overture.db"),
     DATABASE_PATH: z.string().min(1).optional(),
     CATALOG_DATABASE_PATH: z.string().min(1).optional(),
-    CATALOG_R2_HOT_SWAP: booleanFromString.default(false),
-    CATALOG_REFRESH_SECRET: z.string().min(1).optional(),
     STATIC_ROOT: z.string().min(1).default("dist"),
     ENABLE_TEST_ROUTES: booleanFromString.default(false),
     [DRY_SUBMIT_ENV]: z
@@ -211,7 +209,6 @@ const envSchema = z
     ASHBY_FEED_BASE_URL: z.string().min(1).optional(),
     ASHBY_JOBS_BASE_URL: z.string().min(1).optional(),
     PERSONIO_FEED_BASE_URL: z.string().min(1).optional(),
-    WORKABLE_FEED_URL: z.url().optional(),
     WORKABLE_FORM_BASE_URL: z.url().optional(),
     APP_ORIGIN: z.url().optional(),
     ADMIN_ORIGIN: z.url().default("https://admin.tryoverture.com"),

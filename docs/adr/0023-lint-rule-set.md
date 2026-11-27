@@ -73,14 +73,14 @@ Landmines alone leaves three ways around these rules, so the architecture rules 
   Bun Worker is an error. The narrow non-sweep paths that keep a single-row write on the main thread (dispatch closing
   a posting, preparation marking the question cache, tag import, the retag and seed scripts, the test routes) are
   listed in `.oxlintrc.json`; adding one needs a written reason here. A new sweep write goes into
-  `src/server/catalog/sweep-worker.ts` and its worker-only modules (`poll-board.ts`, `workable-ingest.ts`).
+  `src/server/catalog/sweep-worker.ts` and its worker-only module (`poll-board.ts`).
   `src/server/demo/seed.ts` is also listed there (#278): it writes fictional catalog rows for the demo account's
   sample Applications, never real Postings, and only when `DEMO_LOGIN_ENABLED=true` or the operator runs
   `bun run db:seed-demo`. `src/server/billing/pause.test.ts` is listed for the same reason: its one in-flight fixture
   writes a fictional company, board and posting so a reservation has a sending Application, never a real Posting.
   `src/server/catalog/taxonomy-tags.ts` is listed with `tag-store.ts` (#660): it rewrites role tags in the role
-  taxonomy and runs only inside callers that may already write the catalog (the tag store, the daily catalog build and
-  the test routes), so it adds no new writing path.
+  taxonomy and runs only inside callers that may already write the catalog (the tag store, the tag fallback and the
+  test routes), so it adds no new writing path.
   `src/server/dispatch/outcomes.test.ts` is listed for the same reason: its email-receipt fixture writes fictional
   companies, boards and postings so two Confirming Applications exist at one employer, never a real Posting.
   `src/server/matching/applications.test.ts` is listed for the same reason: its fixture writes one fictional company,

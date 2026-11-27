@@ -1,14 +1,12 @@
 import { catalogDatabasePath, databasePath, env } from "../config/env.ts";
 import { openCatalogDatabase, openDatabase } from "../platform/db/client.ts";
 import { createClock } from "../platform/ports/clock.ts";
-import { createConfiguredObjectStore } from "../platform/object-store.ts";
 import { installOutboundGuard } from "../platform/outbound-guard.ts";
 import { createAshbyFeed } from "./ashby-feed.ts";
 import { createGreenhouseFeed } from "./greenhouse-feed.ts";
 import { createLeverFeed } from "./lever-feed.ts";
 import { createPersonioFeed, PERSONIO_DEFAULT_BASE_URL } from "./personio-feed.ts";
 import { pollDueBoards, runBackfillPass, summarizeRun } from "./sweep-run.ts";
-import { runWorkableIngest } from "./workable-ingest.ts";
 import { sweepRunRequestSchema, sweepRunSummarySchema } from "./sweep-worker-protocol.ts";
 
 import type { BoardFeeds } from "./board-feed.ts";
@@ -26,7 +24,6 @@ if (env.NODE_ENV !== "production") {
 }
 
 const clock = createClock();
-const objects = createConfiguredObjectStore();
 
 const deps: SweepDeps = { db, catalogDb, clock };
 
@@ -43,25 +40,6 @@ function send(message: SweepWorkerResponse) {
 
 async function run(kind: SweepRunKind) {
   const started = performance.now();
-
-  if (kind === "workable") {
-    const report = await runWorkableIngest({ db, catalogDb, clock, objects });
-
-    return {
-      kind,
-      boards: 0,
-      polled: 0,
-      notModified: 0,
-      gone: 0,
-      errors: 0,
-      added: report.added,
-      updated: report.updated,
-      closed: report.closed,
-      closedPostingIds: report.closedPostingIds,
-      durationMs: Math.round(performance.now() - started),
-      workable: report,
-    };
-  }
 
   const reports =
     kind === "backfill" ? await runBackfillPass(deps, feeds) : await pollDueBoards(deps, feeds);

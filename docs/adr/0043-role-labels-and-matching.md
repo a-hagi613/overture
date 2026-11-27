@@ -106,9 +106,11 @@ different stack), not label errors. Labelling the week cost $6.59 with the Batch
 The 2026-11-26 rebuild (#678, #679) replaces this ADR's label and taxonomy design. Everything below is history.
 
 - **Roles are freehire's job categories (about 55) plus optional title words.** A job matches when its category is
-  picked **or** its title contains a picked word. The 29-category / 272-role taxonomy, its ESCO input, the committed
-  `role-labels.json` seed, the one-time Haiku labelling pass, `taxonomy-tags.ts`, the retired-tag bridge and the
-  hiring.cafe tag import are deleted with the old job source (#700, #706).
+  picked **or** its title contains a picked word (#684, #685). The ESCO/O*NET/ONNX classifier, its datasets, the
+  one-time Haiku labelling pass and the old runner scripts are deleted (#706). The 29-category / 272-role list
+  survives only as the boot-time migration of already-saved Targets (`profile/role-migration.ts`) and the legacy
+  catalog label bridge (`catalog/legacy-roles.ts`, `catalog/taxonomy-tags.ts`); both go with `catalog.sqlite`
+  (ADR 0036's 2026-11-27 amendment), not with the new matching path.
 - **Locations are freehire's own place lists**, stored as place ids on both sides, plus `Remote · <country>`,
   `Remote · <continent>` and `Remote · Worldwide`. A job's place ids and a user's place ids come from the same source,
   so a location match is exact (#683).

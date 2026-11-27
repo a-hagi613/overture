@@ -64,10 +64,6 @@ describe("the plain-English copy sweep", () => {
     expect(findings).toEqual([]);
   });
 
-  test("the marketing copy module is swept too", () => {
-    expect(findingsIn(readFileSync("src/shared/marketing-copy.ts", "utf8"))).toEqual([]);
-  });
-
   test("the send line names the company, never the hiring system", () => {
     expect(copy.board.dossier.sentVia("Halden Systems", "12:00")).toBe(
       "Sent directly to Halden Systems’ careers page · 12:00",

@@ -49,8 +49,6 @@ test("every dashboard metric name is exported over the private scrape", async ()
     recorder.recordEventLoopLag(3);
     recorder.recordSqliteQuery({ db: "app", durationMs: 1, op: "select" });
     recorder.recordSupplyQuery(2);
-    recorder.recordCatalogSwap({ bytes: 1024, durationMs: 9, postings: 12 });
-    recorder.recordCatalogSwapFailure("checksum_mismatch");
     recorder.recordApplyAttempt({
       ats: "greenhouse",
       durationMs: 40,

@@ -14,7 +14,6 @@ on:
           - seed-catalog
           - setup-stripe
           - live-diagnostics
-          - match-probe
           - vacuum-db
           - reset-catalog
           - sync-ops-secrets
@@ -43,11 +42,6 @@ on:
         default: sandbox
       force_vacuum:
         description: "Compact the application database even when its freelist is below the 50 MB threshold"
-        required: false
-        type: boolean
-        default: false
-      enable_catalog_r2_hot_swap:
-        description: "Set CATALOG_R2_HOT_SWAP=true on overture-web during sync-ops-secrets"
         required: false
         type: boolean
         default: false
@@ -435,21 +429,6 @@ jobs:
           set -e
           timeout 120s flyctl ssh console -a overture-web -C "bun run /app/scripts/live-diagnostics.ts"
 
-      - name: Rank live matches for five sample Targets on overture-web (read-only)
-        if: steps.guard.outputs.skip != 'true' && inputs.action == 'match-probe'
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          output="$(timeout 300s flyctl ssh console -a overture-web -C "gosu app bun run /app/scripts/match-probe.ts" 2>&1)"
-          printf '%s\n' "$output"
-          {
-            echo "### Match probe (read-only, no user data)"
-            echo '```'
-            printf '%s\n' "$output"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Check the database sizes before a vacuum on overture-web
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'vacuum-db'
         env:
@@ -595,10 +574,8 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           ALERT_NTFY_URL: ${{ secrets.ALERT_NTFY_URL }}
-          CATALOG_REFRESH_SECRET: ${{ secrets.CATALOG_REFRESH_SECRET }}
           ALLOWED_SIGNUP_EMAILS: ${{ secrets.ALLOWED_SIGNUP_EMAILS }}
           FREEHIRE_API_KEY: ${{ secrets.FREEHIRE_API_KEY }}
-          ENABLE_CATALOG_R2_HOT_SWAP: ${{ inputs.enable_catalog_r2_hot_swap }}
         run: |
           set -euo pipefail
           set_args=()
@@ -607,11 +584,6 @@ jobs:
             echo "::add-mask::$ALERT_NTFY_URL"
             set_args+=("ALERT_NTFY_URL=$ALERT_NTFY_URL")
             key_names+=("ALERT_NTFY_URL")
-          fi
-          if [ -n "${CATALOG_REFRESH_SECRET:-}" ]; then
-            echo "::add-mask::$CATALOG_REFRESH_SECRET"
-            set_args+=("CATALOG_REFRESH_SECRET=$CATALOG_REFRESH_SECRET")
-            key_names+=("CATALOG_REFRESH_SECRET")
           fi
           if [ -n "${ALLOWED_SIGNUP_EMAILS:-}" ]; then
             echo "::add-mask::$ALLOWED_SIGNUP_EMAILS"
@@ -624,10 +596,6 @@ jobs:
             echo "::add-mask::$FREEHIRE_API_KEY"
             set_args+=("FREEHIRE_API_KEY=$FREEHIRE_API_KEY")
             key_names+=("FREEHIRE_API_KEY")
-          fi
-          if [ "${ENABLE_CATALOG_R2_HOT_SWAP:-false}" = "true" ]; then
-            set_args+=("CATALOG_R2_HOT_SWAP=true")
-            key_names+=("CATALOG_R2_HOT_SWAP=true")
           fi
           if [ "${#set_args[@]}" -eq 0 ]; then
             echo "::error::No secrets or flags were configured to sync."

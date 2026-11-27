@@ -12,7 +12,6 @@ import { opsHealthHeaders } from "../../workers/sentinel/src/ops-health.ts";
 import { usageMetrics, usageResponseSchema } from "../../workers/sentinel/src/usage.ts";
 
 const MINUTE = 60_000;
-const HOUR = 3_600_000;
 const NOW = Date.UTC(2026, 10, 21, 15, 0, 0, 0);
 
 const recordedUsageSchema = z.object({
@@ -34,7 +33,6 @@ const stateSchema = z.object({
     .object({
       at: z.string(),
       health: z.string(),
-      manifest: z.string(),
       usage: z.string(),
       ops: z.string().nullish(),
       degraded: z.boolean(),
@@ -94,8 +92,6 @@ interface Harness {
   servers: Servers;
   bucket: SentinelBucket;
   env: Parameters<typeof runSentinel>[0];
-  writeManifest: (fetchedAt: number) => Promise<void>;
-  writeRawManifest: (body: string) => Promise<void>;
   lastRun: () => Promise<z.infer<typeof stateSchema>["lastRun"]>;
 }
 
@@ -206,24 +202,6 @@ async function startHarness() {
       CLOUDFLARE_ANALYTICS_TOKEN: "sentinel-test-token",
       CLOUDFLARE_GRAPHQL_URL: servers.graphqlUrl,
     },
-    writeManifest: async (fetchedAt: number) => {
-      await bucket.put(
-        "workable/manifest.json",
-        `${JSON.stringify({
-          version: 1,
-          snapshot: "workable/2026-11-21.jsonl.gz",
-          fetchedAt: new Date(fetchedAt).toISOString(),
-          sourceLastModified: new Date(fetchedAt).toISOString(),
-          feedJobs: 170_000,
-          distinctReferences: 5000,
-          duplicates: 400,
-          rows: 5000,
-          bytes: 1_000_000,
-          contentHash: "a".repeat(64),
-        })}\n`,
-      );
-    },
-    writeRawManifest: async (body: string) => bucket.put("workable/manifest.json", body),
     lastRun: async () => {
       const raw = await bucket.get("ops/sentinel-state.json");
 
@@ -296,15 +274,12 @@ async function usageWith(id: string, used: number) {
   return JSON.stringify(payload);
 }
 
-test("a healthy app, a fresh manifest and low usage alert nothing and record the run", async () => {
+test("a healthy app and low usage alert nothing and record the run", async () => {
   const harness = await startHarness();
-
-  await harness.writeManifest(NOW - HOUR);
 
   const result = await run(harness);
 
   expect(result.health).toBe("ok");
-  expect(result.manifest.state).toBe("fresh");
   expect(result.degraded).toBe(false);
   expect(result.flag).toBe("absent");
   expect(result.alerts).toHaveLength(0);
@@ -315,7 +290,6 @@ test("a healthy app, a fresh manifest and low usage alert nothing and record the
   expect(await harness.lastRun()).toEqual({
     at: new Date(NOW).toISOString(),
     health: "ok",
-    manifest: "fresh",
     usage: "ok",
     degraded: false,
     flag: "absent",
@@ -339,7 +313,7 @@ test("every action type in the recorded answer is classified, so none is silentl
   expect(used.get("workers.cpu")).toBe(0);
 });
 
-test("a failing health probe and a missing manifest alert once each, then recover", async () => {
+test("a failing health probe alerts once, then recovers", async () => {
   const harness = await startHarness();
 
   harness.servers.setHealth(503, "upstream unavailable");
@@ -347,25 +321,21 @@ test("a failing health probe and a missing manifest alert once each, then recove
   const first = await run(harness);
 
   expect(first.health).toBe("failing");
-  expect(first.manifest.state).toBe("missing");
-  expect(first.alerts).toEqual(expect.arrayContaining(["health", "workable"]));
-  expect(harness.servers.alerts).toHaveLength(2);
+  expect(first.alerts).toEqual(["health"]);
+  expect(harness.servers.alerts).toHaveLength(1);
   expect(harness.servers.alerts[0]?.body).toContain("HTTP 503");
 
   const second = await run(harness, NOW + 10 * MINUTE);
 
   expect(second.alerts).toHaveLength(0);
-  expect(harness.servers.alerts).toHaveLength(2);
+  expect(harness.servers.alerts).toHaveLength(1);
   expect((await harness.lastRun())?.health).toBe("failing");
 
   harness.servers.setHealth(200, await fixture("health-ok.json"));
-  await harness.writeManifest(NOW + 20 * MINUTE - HOUR);
 
   const recovered = await run(harness, NOW + 20 * MINUTE);
 
-  expect(recovered.alerts).toEqual(
-    expect.arrayContaining(["health.recovered", "workable.recovered"]),
-  );
+  expect(recovered.alerts).toEqual(["health.recovered"]);
   expect(harness.servers.alerts.map((alert) => alert.title)).toEqual(
     expect.arrayContaining(["Overture health recovered"]),
   );
@@ -376,7 +346,6 @@ test("a failing health probe and a missing manifest alert once each, then recove
 test("a health answer whose body is not ok is a failure", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   harness.servers.setHealth(200, '{"status":"degraded"}');
 
   const result = await run(harness);
@@ -387,52 +356,9 @@ test("a health answer whose body is not ok is a failure", async () => {
   await harness.servers.stop();
 });
 
-test("a snapshot older than 26 hours alerts with its age; a fresh one recovers", async () => {
-  const harness = await startHarness();
-
-  await harness.writeManifest(NOW - 26 * HOUR);
-
-  const boundary = await run(harness);
-
-  expect(boundary.manifest.state).toBe("fresh");
-  expect(harness.servers.alerts).toHaveLength(0);
-
-  await harness.writeManifest(NOW - 27 * HOUR);
-
-  const stale = await run(harness);
-
-  expect(stale.manifest.state).toBe("stale");
-  expect(stale.alerts).toContain("workable");
-  expect(harness.servers.alerts[0]?.body).toContain("27.0 h old (limit 26 h)");
-
-  await harness.writeManifest(NOW + 10 * MINUTE - HOUR);
-
-  const recovered = await run(harness, NOW + 10 * MINUTE);
-
-  expect(recovered.alerts).toContain("workable.recovered");
-  expect((await harness.lastRun())?.manifest).toBe("fresh");
-
-  await harness.servers.stop();
-});
-
-test("an unparseable manifest alerts instead of passing as fresh", async () => {
-  const harness = await startHarness();
-
-  await harness.writeRawManifest('{"snapshot":"workable/x.jsonl.gz"}\n');
-
-  const result = await run(harness);
-
-  expect(result.manifest.state).toBe("unreadable");
-  expect(result.alerts).toContain("workable");
-  expect(harness.servers.alerts[0]?.body).toContain("cannot be read");
-
-  await harness.servers.stop();
-});
-
 test("70% of an allowance pushes one ntfy warning and leaves the app normal", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   harness.servers.setGraphql(200, await usageWith("r2.class_a_operations", 750_000));
 
   const result = await run(harness);
@@ -453,7 +379,6 @@ test("70% of an allowance pushes one ntfy warning and leaves the app normal", as
 test("90% writes the degraded flag the app reads, once, and clears it on recovery", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   harness.servers.setGraphql(200, await usageWith("r2.class_a_operations", 950_000));
 
   const degraded = await run(harness);
@@ -496,7 +421,6 @@ test("90% writes the degraded flag the app reads, once, and clears it on recover
 test("an unreadable GraphQL answer alerts but never clears the degraded flag", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   harness.servers.setGraphql(200, await usageWith("r2.class_a_operations", 950_000));
   await run(harness);
   expect(await harness.bucket.get("ops/degraded.json")).not.toBeNull();
@@ -518,7 +442,6 @@ test("an unreadable GraphQL answer alerts but never clears the degraded flag", a
 test("a GraphQL answer with errors is a failure, not zero usage", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   harness.servers.setGraphql(200, '{"data":null,"errors":[{"message":"not authorized"}]}');
 
   const failed = await run(harness);
@@ -532,8 +455,6 @@ test("a GraphQL answer with errors is a failure, not zero usage", async () => {
 
 test("without Cloudflare credentials the usage check warns once a day instead of failing", async () => {
   const harness = await startHarness();
-
-  await harness.writeManifest(NOW - HOUR);
 
   const first = await runSentinel(
     {
@@ -554,7 +475,6 @@ test("without Cloudflare credentials the usage check warns once a day instead of
 test("a failing ntfy does not stop the run and is retried on the next one", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   harness.servers.setHealth(503, "upstream unavailable");
   harness.servers.setNtfy(503);
 
@@ -578,7 +498,6 @@ test("a failing ntfy does not stop the run and is retried on the next one", asyn
 test("a state object that cannot be parsed is recorded and does not stop the run", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   await harness.bucket.put("ops/sentinel-state.json", "not json\n");
 
   const result = await run(harness);
@@ -592,8 +511,6 @@ test("a state object that cannot be parsed is recorded and does not stop the run
 test("without an ops secret the sentinel keeps its old behaviour", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
-
   const result = await run(harness);
 
   expect(result).not.toHaveProperty("ops");
@@ -606,7 +523,6 @@ test("without an ops secret the sentinel keeps its old behaviour", async () => {
 test("a healthy signed ops answer alerts nothing and signs the request", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   harness.servers.setOps(200, opsBody());
 
   const result = await runWithOps(harness);
@@ -627,7 +543,6 @@ test("a healthy signed ops answer alerts nothing and signs the request", async (
 test("an over-ceiling resource alerts once with every breach, then recovers", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   harness.servers.setOps(
     200,
     opsBody({
@@ -665,7 +580,6 @@ test("an over-ceiling resource alerts once with every breach, then recovers", as
 test("an unreadable or failing ops endpoint alerts and is recorded", async () => {
   const harness = await startHarness();
 
-  await harness.writeManifest(NOW - HOUR);
   harness.servers.setOps(500, "not now");
 
   const result = await runWithOps(harness);

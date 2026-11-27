@@ -3945,23 +3945,6 @@ export const copy = {
     catalogSwitchState: "Kill switch",
     catalogSwitchUnset: "Never set",
     catalogNotDiscovered: "The catalog has not been discovered yet.",
-    catalogTaggingHeading: "Classification",
-    catalogTaggingLead:
-      "How the daily run classified the catalog, and what the Haiku fallback cost. Published with the active catalog.",
-    catalogTaggingEmpty: "No classification report is attached to the active catalog yet.",
-    catalogTaggingVersion: (version: string) => `Catalog ${version}`,
-    catalogTaggingTotal: "Postings read",
-    catalogTaggingDupes: "Cross-board duplicates removed",
-    catalogTaggingPairs: "Unique title and department pairs",
-    catalogTaggingCacheHits: "Classification cache hits",
-    catalogTaggingTier1: "Tier 1 · ESCO rules",
-    catalogTaggingTier2: "Tier 2 · embeddings",
-    catalogTaggingTier3Sent: "Tier 3 · Haiku batches sent",
-    catalogTaggingTier3Resolved: "Tier 3 · Haiku resolved",
-    catalogTaggingUntagged: "Still untagged",
-    catalogTaggingSpend: "Tier 3 Haiku spend",
-    catalogTaggingTokens: (input: number, output: number) =>
-      `${input.toLocaleString("en-US")} input · ${output.toLocaleString("en-US")} output tokens`,
     catalogProbeHeading: "Personio probe",
     catalogProbeLead:
       "Reads up to twenty open Personio forms over plain HTTP, without a browser and without submitting.",

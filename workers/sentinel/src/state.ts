@@ -7,7 +7,6 @@ export const SENTINEL_STATE_KEY = "ops/sentinel-state.json";
 const runRecordSchema = z.object({
   at: z.string().min(1),
   health: z.enum(["ok", "failing"]),
-  manifest: z.enum(["fresh", "stale", "missing", "unreadable"]),
   usage: z.enum(["ok", "unconfigured", "failed"]),
   ops: z.enum(["ok", "failing", "failed"]).optional(),
   degraded: z.boolean(),
@@ -21,7 +20,6 @@ export type SentinelRunRecord = z.infer<typeof runRecordSchema>;
 const stateSchema = z.object({
   version: z.literal(1),
   health: z.enum(["ok", "failing"]).nullable(),
-  manifest: z.enum(["ok", "failing"]).nullable(),
   ops: z.enum(["ok", "failing"]).nullish(),
   degradedSince: z.string().nullable(),
   lastAlerts: z.record(z.string(), z.string()),
@@ -34,7 +32,6 @@ export function emptyState() {
   return {
     version: 1,
     health: null,
-    manifest: null,
     ops: null,
     degradedSince: null,
     lastAlerts: {},

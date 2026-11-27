@@ -4,8 +4,7 @@ import type { RoleGroup } from "./tag-taxonomy.ts";
  * One Level-2 role from the baked ESCO dataset and the Level-1 category it rolls up to (WS-17a/WS-17b).
  *
  * This list is the compact projection the browser may load: 134 role names and their categories, roughly 8 KB of
- * source, instead of the 2,942-occupation synonym table the server's classifier reads (8.3 MB). The
- * `src/shared/esco-roles.test.ts` case keeps it byte-for-byte in step with that dataset.
+ * source, instead of the 2,942-occupation synonym table the retired classifier used (8.3 MB, deleted by #706).
  */
 export interface EscoRoleOption {
   readonly category: RoleGroup;

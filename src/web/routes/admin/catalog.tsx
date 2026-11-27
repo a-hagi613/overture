@@ -8,7 +8,6 @@ import { AdminStatusCard } from "./admin-status-card.tsx";
 import { CatalogLine } from "./catalog-line.tsx";
 import { AdminGateScreen } from "./gate-screen.tsx";
 import { AdminPageHeading } from "./page-heading.tsx";
-import { CatalogTaggingCard } from "./catalog-tagging-card.tsx";
 
 export function CatalogPage() {
   const { data, failed, refusal, refresh } = useAdminResource(loadCatalog, undefined, {
@@ -86,7 +85,6 @@ export function CatalogPage() {
           ))}
         </div>
       </section>
-      <CatalogTaggingCard manifestVersion={view.manifestVersion} tagging={view.tagging} />
       <section
         aria-labelledby="admin-personio-probe"
         className="mt-7 flex flex-col gap-4 rounded-lg border border-border bg-card px-6 py-5 shadow-sh"
