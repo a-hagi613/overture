@@ -56,7 +56,8 @@ reasons:
 | `reasons` | 2–3 strings, each at most 110 characters, each naming one concrete fact |
 
 A missing skill or technology is never a blocker; it lowers `skills`. The reply is validated by the same zod schema
-(ADR 0044): invalid → one retry → rejected, and the job stays unscored.
+(ADR 0044): invalid → one retry → rejected, and the job stays unscored. Anthropic structured outputs accept only
+`minItems` 0 or 1, so the 2–3 reason count is enforced by the zod schema and the prompt, not by the wire schema.
 
 ### 3. Store once
 

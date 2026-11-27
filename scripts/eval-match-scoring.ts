@@ -1,3 +1,6 @@
+// Manual Haiku 5.5 launch gate (issue #686). Fixture:
+// src/server/matching/fixtures/eval-686/king-kong-2026-11-27.json (King Kong stand-in, 33 jobs from the #685 pull).
+// It spends cents and is never imported by CI.
 import { readFileSync } from "node:fs";
 
 import { z } from "zod";
@@ -77,7 +80,12 @@ function portFor(model: string) {
   );
 }
 
-async function runOnce(llm: LlmPort, fixture: Fixture, job: FixtureJob) {
+interface ScoredCall {
+  costMicros: number;
+  reply: ReturnType<typeof parseScoreReply>;
+}
+
+async function askOnce(llm: LlmPort, fixture: Fixture, job: FixtureJob): Promise<ScoredCall> {
   const request = scoreRequestFor({
     candidate: { resume: fixture.resume, targets: fixture.targets },
     customId: `eval-${job.id}`,
@@ -97,10 +105,24 @@ async function runOnce(llm: LlmPort, fixture: Fixture, job: FixtureJob) {
     user: request.user,
   });
 
-  return parseScoreReply(call.text);
+  return { costMicros: call.costMicros, reply: parseScoreReply(call.text) };
+}
+
+/** An invalid reply gets one retry, exactly as `match-scoring.ts` scores a job; only two nulls are a rejection. */
+async function runOnce(llm: LlmPort, fixture: Fixture, job: FixtureJob): Promise<ScoredCall> {
+  const first = await askOnce(llm, fixture, job);
+
+  if (first.reply !== null) {
+    return first;
+  }
+
+  const retry = await askOnce(llm, fixture, job);
+
+  return { costMicros: first.costMicros + retry.costMicros, reply: retry.reply };
 }
 
 interface RepeatResult {
+  costMicros: number;
   rejected: number;
   reply: ReturnType<typeof parseScoreReply>;
   scores: number[];
@@ -114,14 +136,16 @@ const repeatsOf: (
   scores: number[],
 ) => Promise<RepeatResult> = async (llm, fixture, job, run, scores) => {
   if (run >= fixture.repeats) {
-    return { rejected: 0, reply: null, scores };
+    return { costMicros: 0, rejected: 0, reply: null, scores };
   }
 
-  const reply = await runOnce(llm, fixture, job);
+  const call = await runOnce(llm, fixture, job);
+  const reply = call.reply;
   const next = reply === null ? scores : [...scores, scoreOf(reply)];
   const rest = await repeatsOf(llm, fixture, job, run + 1, next);
 
   return {
+    costMicros: call.costMicros + rest.costMicros,
     rejected: (reply === null ? 1 : 0) + rest.rejected,
     reply: run === 0 ? reply : rest.reply,
     scores: rest.scores,
@@ -129,6 +153,7 @@ const repeatsOf: (
 };
 
 interface Collected {
+  costMicros: number;
   rejected: number;
   replies: Map<string, ReturnType<typeof parseScoreReply>>;
   samples: { jobId: string; scores: number[] }[];
@@ -141,11 +166,12 @@ const scoreJobAt: (
   samples: { jobId: string; scores: number[] }[],
   replies: Map<string, ReturnType<typeof parseScoreReply>>,
   rejected: number,
-) => Promise<Collected> = async (llm, fixture, index, samples, replies, rejected) => {
+  costMicros: number,
+) => Promise<Collected> = async (llm, fixture, index, samples, replies, rejected, costMicros) => {
   const job = fixture.jobs[index];
 
   if (job === undefined) {
-    return { rejected, replies, samples };
+    return { costMicros, rejected, replies, samples };
   }
 
   const result = await repeatsOf(llm, fixture, job, 0, []);
@@ -157,6 +183,7 @@ const scoreJobAt: (
     [...samples, { jobId: job.id, scores: result.scores }],
     result.reply === null ? replies : new Map(replies).set(job.id, result.reply),
     rejected + result.rejected,
+    costMicros + result.costMicros,
   );
 };
 
@@ -174,21 +201,27 @@ async function main() {
   const fixture = fixtureSchema.parse(JSON.parse(readFileSync(fixturePath, "utf8")));
   const model = argumentValue("--model") ?? env.ANTHROPIC_MODEL;
   const llm = portFor(model);
-  const scored = await scoreJobAt(llm, fixture, 0, [], new Map(), 0);
+  const scored = await scoreJobAt(llm, fixture, 0, [], new Map(), 0, 0);
   const difference = repeatDifference(scored.samples);
 
-  const wrongField = wrongFieldRate(
+  const visible = new Map<string, boolean>(
     fixture.jobs.map((job) => {
       const reply = scored.replies.get(job.id);
 
-      return {
-        expectedWrongField: job.expectedWrongField,
-        visible:
-          reply === null || reply === undefined
-            ? false
-            : reply.blockers.length === 0 && scoreOf(reply) >= 50,
-      };
+      return [
+        job.id,
+        reply === null || reply === undefined
+          ? false
+          : reply.blockers.length === 0 && scoreOf(reply) >= 50,
+      ] as const;
     }),
+  );
+
+  const wrongField = wrongFieldRate(
+    fixture.jobs.map((job) => ({
+      expectedWrongField: job.expectedWrongField,
+      visible: visible.get(job.id) === true,
+    })),
   );
 
   const candidates = fixture.jobs.flatMap((job) => {
@@ -201,11 +234,15 @@ async function main() {
     return [
       {
         blockers: reply.blockers,
+        company: job.company,
         companyKey: job.company.trim().toLowerCase(),
         exactRole: job.category !== null,
         id: job.id,
+        location: job.location,
         postedAt: job.postedAt,
+        reasons: reply.reasons,
         score: scoreOf(reply),
+        title: job.title,
       },
     ];
   });
@@ -220,9 +257,35 @@ async function main() {
         jobs: fixture.jobs.length,
         maxDifference: difference.max,
         model,
+        pairs: difference.pairs,
         rejected: scored.rejected,
-        topPicks: top.map((row) => ({ id: row.id, score: row.score })),
+        scoredJobs: scored.replies.size,
+        spendUsd: Number((scored.costMicros / 1_000_000).toFixed(4)),
+        topPicks: top.map((row) => ({
+          company: row.company,
+          id: row.id,
+          location: row.location,
+          reasons: row.reasons,
+          score: row.score,
+          title: row.title,
+        })),
+        unscoredJobs: fixture.jobs
+          .filter((job) => !scored.replies.has(job.id))
+          .map((job) => job.id),
         wrongFieldRate: Number((wrongField * 100).toFixed(2)),
+        wrongFieldDetails: fixture.jobs
+          .filter((job) => job.expectedWrongField)
+          .map((job) => {
+            const reply = scored.replies.get(job.id);
+
+            return {
+              blockers: reply?.blockers ?? [],
+              id: job.id,
+              score: reply === null || reply === undefined ? null : scoreOf(reply),
+              title: job.title,
+              visible: visible.get(job.id) === true,
+            };
+          }),
       },
       null,
       2,
