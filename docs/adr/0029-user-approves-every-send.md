@@ -66,7 +66,7 @@ link to the Ready page (see the amendment below). Opening the link never sends, 
 the user presses Send in the app. M2 adds push. There is no per-application email.
 
 **Limits.** The daily cap counts sends, not approvals. Approval never bypasses pacing, the company cooldown, the
-crowd limits or the caps; approved Applications are sent in approval order within the send window.
+crowd limits or the caps; approved Applications are sent in approval order, immediately, with the five-minute paid spacing of ADR 0046.
 
 **Amendment of 2026-11-21: one daily preparation run.** Preparation stops trickling through the day. One run per
 running user per local day, at a deterministic per-user slot between 05:00 and 07:30

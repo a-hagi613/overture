@@ -23,3 +23,7 @@ not a local fixture throws `LiveServiceRequestError` instead of leaving the mach
 - Reading Lever and Ashby forms only through a browser session (the first ruling): correct, but it spends a
   Browser Use session on every new form; a plain read is free and still leaves the browser only the Submit.
   Amended by #193.
+
+*Amendment of 2026-11-26 (#695, #706): the synthetic lab and its `/lab/*` challenge pages are removed with the daily
+live checks. The rule is unchanged: development reaches no real form, and tests replay fixtures through the same
+capture-and-pull path. The outbound guard and the fail-closed test interceptor are the enforcement.*

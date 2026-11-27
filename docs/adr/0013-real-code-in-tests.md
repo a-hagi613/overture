@@ -214,3 +214,7 @@ real mail loop spends money outside real user activity, which the owner ruled ou
 record of a real send. What remains is the fail-closed test interceptor and the fixture suite below, plus the evidence
 of a real send: the before/after Submit screenshots, the per-application timeline and the support lookup (ADR 0046,
 SPEC §16.5). `scripts/pull-forms.ts` still refreshes fixtures through a pull request when a form genuinely changes.
+
+The Stapply/ESCO/ONNX classifier, role-taxonomy and catalog-sweep test files named below are deleted with the retired
+job source (#700, #706); the freehire pull, filter-proof, place and matching tests replace them (SPEC §16.2). No test
+calls freehire, Anthropic or Browser Use: their responses are recorded fixtures and a fake `JobSource`.

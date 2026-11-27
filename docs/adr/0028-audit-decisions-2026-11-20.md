@@ -217,3 +217,9 @@ Gem, or restates its scope is the owner's call.
   a dead-letter queue and an alert, on a product the paid plan already covers.
 - **Put the whole message in the queue.** Rejected: a Queue message is capped at 128 KB, so oversized mail goes to R2
   and the queue carries a pointer.
+
+*Amendment of 2026-11-26 (#700, #693, #679): the feed and discovery decisions above are history. freehire is the only
+job source (ADR 0047), so there is no board discovery, no Stapply bucket, no feed poll and no tag import to depend on
+it; the place lists now come from freehire (ADR 0048). The forwarding address and its ATS-sender filter are replaced
+by the apply alias created at sign-up (ADR 0040), and every message to that alias is copied only to the person's
+verified login email (ADR 0040, SPEC §11).*

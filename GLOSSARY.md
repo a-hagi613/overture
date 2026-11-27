@@ -1,25 +1,32 @@
 # Overture
 
 A job-search agent that finds jobs for one person, prepares every application and sends it when you approve, and
-shows its work. These are the words for
-what it does, used exactly in code, copy, issues and commits.
+shows its work. These are the words for what it does, used exactly in code, copy, issues and commits.
 
 ## The search
 
 **Posting**:
-A job opening an employer publishes on an ATS.
+A job opening an employer publishes on an ATS, found through freehire and stored once in the shared `jobs` table.
 _Avoid_: job, listing, role (as the object)
 
 **Match score**:
-A 0–100 fit between a Posting and the user's resume and targets, with a one-line reason.
-_Avoid_: rating, fit score
+A 0–100 fit between a Posting and the user's resume and targets, with two or three short reasons. Bands are Strong
+85–100, Good 70–84 and Possible 50–69; a score under 50, or any blocker, hides the job.
+_Avoid_: rating, fit score, ranking points
 
 **Strong match**:
-A Posting whose Match score is 80 or above.
+A Posting whose Match score is 85 or above.
 
 **Targets**:
-What the user wants: roles, seniorities, workplaces, locations, employment types and a salary floor.
+What the user wants: roles (freehire job categories plus optional title words), places (freehire place ids) and
+employers to exclude. Roles and places are the only hard filters; nothing else is saved as a preference.
 _Avoid_: preferences, filters
+
+**Fresh-jobs pull**:
+A freehire search that brings in jobs opened since the last pull. Every user gets one when onboarding ends and when
+roles or places change; Weekly and Monthly users also get one every three hours, scored in Batch. The free trial gets
+no repeating pull.
+_Avoid_: sync, scrape, refresh
 
 ## Signing in
 
@@ -37,7 +44,7 @@ _Avoid_: open registration, self-serve join
 **Demo account**:
 The `role = demo` account (`test@email.com`) that the owner opens from the sign-in page with one click to see
 Overture as a long-time user would. It is seeded with fictional data, receives no mail, sends no Application, makes
-no ATS or Browser Use call and is left out of admin counts and the M1 provider report.
+no ATS or Browser Use call and is left out of admin counts.
 _Avoid_: sample account, test user, guest login
 
 ## Applying
@@ -52,8 +59,7 @@ _Avoid_: state, progress
 
 **Ready**:
 An Application Overture has fully prepared that waits for the user's Approval before anything is sent. Also the
-destination that lists them ("Ready to send") and the Board lane that holds an Application from Ready until it is
-confirmed sent.
+destination that lists them ("Ready to send") and the Tracker's Queue lane while they wait.
 _Avoid_: pending, draft, awaiting approval
 
 **Approval**:
@@ -63,17 +69,13 @@ changes its plan (a Fact or resume it used, an answered Review) returns it to Re
 _Avoid_: confirmation, sign-off, go-ahead, auto-apply (nothing is sent without one, ADR 0029)
 
 **Approved**:
-The Status after Approval and before sending: the Application waits for its time to send within the daily limits.
+The Status after Approval and before sending: the Application waits for its slot under the five-minute paid spacing
+and the daily cap.
 _Avoid_: scheduled, queued
-
-**Daily run**:
-The one preparation pass each running user gets per local day (a deterministic slot between 05:00 and 07:30 by
-default, or the stored `prep.run_local_time`). It matches, prepares and stops at the free Ready slots; it never sends.
-_Avoid_: match fill, hourly run, batch
 
 **Skip**:
 The user withdrawing a Ready or Approved Application instead of sending it. It is the ordinary withdrawal that leaves
-the Board and never adds the company to the Skip list.
+the Tracker and never adds the company to the excluded-employer list.
 _Avoid_: reject, dismiss
 
 **Confirming**:
@@ -95,22 +97,18 @@ _Avoid_: credit, allowance, quota
 The permanent record of exactly what one sent Application said: answers with their sources, the letter, the resume file and the consent.
 _Avoid_: receipt, log
 
-**Workable snapshot**:
-The gzipped JSONL of target-relevant Workable Postings that the daily off-box pass writes to R2, with a manifest of its fetched-at, source `Last-Modified`, row count and content hash. The app ingests it and never fetches Workable.
-_Avoid_: feed download, Workable cache
-
-## The Board
+## The Tracker
 
 **Stage**:
 Where an Application stands with the employer: Queued, Ready, Applied, Screening, Interviewing, Offer, Closed. The
-Stage is what is stored and what a move writes; the Board groups the seven into five Board lanes.
+Stage is what is stored and what a move writes; the Tracker groups the seven into three lanes.
 _Avoid_: column, phase, Hold
 
-**Board lane**:
-One of the five columns the Board view of Applications shows (ADR 0037; seven Stage columns before it), each
-grouping Stages: Queued, Ready, Applied, Interviews (the `waiting` lane: Screening, Interviewing and Offer) and Closed. A lane is a view:
-dropping a card on a lane writes one Stage, and only after the server accepts the move.
-_Avoid_: On hold, Hold, column (as the object)
+**Tracker lane**:
+One of the three columns the Tracker shows (ADR 0037): **Queue** (Queued and Ready), **Applied**, and **Interviews**
+(Screening, Interviewing and Offer). Closed, Cancelled and Not sent sit behind a filter, not in a column. A lane is a
+view: moving a card writes one Stage, and only after the server accepts the move.
+_Avoid_: Board lane, On hold, Hold, column (as the object)
 
 **Queued**:
 The first Stage: the Application is being prepared or waiting on a Review.
@@ -123,7 +121,8 @@ _Avoid_: follow-up, nudge
 ## What Overture asks
 
 **Review**:
-A factual question Overture will not guess at and needs the user to answer before some Applications can be sent. Answering it once unlocks every Application that asks it.
+A factual question Overture will not guess at and needs the user to answer before some Applications can be sent.
+Reviews are grouped by Application; answering a shared question once unlocks every Application that asks it.
 _Avoid_: Hold, review item, question (as the object)
 
 **Needs you**:
@@ -161,9 +160,9 @@ country-scoped: a Fact for one country never answers a question about another.
 **Question catalog**:
 Every application question Overture has seen, shared across users without their answers, each linked to the Fact that answers it.
 
-**Skip list**:
+**Excluded employers**:
 Companies Overture never applies to for this user, starting with the current employer.
-_Avoid_: blocklist, never-apply list
+_Avoid_: blocklist, never-apply list, Skip list
 
 ## My data
 
@@ -177,8 +176,9 @@ _Avoid_: download, data dump, archive
 
 **Plan**:
 What the user pays for: Week ($9.99, 50 Applications over 7 days) or Month ($29.99, 250 Applications over 30 days),
-both renewing until cancelled; the Free trial gives 3 once (ADR 0018). Unused Applications expire at the end of the
-period, and a failed Application is never charged. The prices and counts live in `src/shared/plans.ts`.
+both renewing until cancelled; the Free trial gives 3 once (ADR 0018). The plan is chosen at the end of onboarding
+(Free trial, Weekly or Monthly) and can change later in Stripe. Unused Applications expire at the end of the period,
+and a failed Application is never charged. The prices and counts live in `src/shared/plans.ts`.
 _Avoid_: tier, subscription tier, subscription level, package, level
 
 **Free trial**:
@@ -219,38 +219,33 @@ _Avoid_: audit, sync, settlement
 ## Mail
 
 **Inbox**:
-The read-only destination of threads of forwarded ATS mail, each linked to its Application. It has no reply; the user
-replies from their own mailbox (SPEC §11.2).
+The read-only destination of threads of mail sent to a user's apply alias, each linked to its Application. It has no
+reply; the user replies from their own mailbox (SPEC §11.2).
 
-**Forwarding address**:
-The private address Overture gives each user on `tryoverture.com` (`in-…@`) when their account is created. The user
-forwards only ATS mail to it; it is read-only in the app, never typed on an application form, where the user's real
-email goes (ADR 0028), and a retired local part is never reused.
+**Apply alias**:
+The readable address every account gets at creation (`<handle>@tryoverture.com`) and the only address an employer
+sees. The user's own verified login email stays private, and every message to the alias is stored in that person's
+Inbox and copied to that person's current verified login email. A retired local part is never reused.
+_Avoid_: forwarding address, job-search address, real email
 
 **Erasing**:
 Deleting an account after the signed-in user re-authenticates. The wrapped user key is destroyed first, so every
-remaining encrypted copy is unreadable, then the vendor browser profiles, the forwarding address, the stored objects
-and the personal rows go; admin audit rows stay. It completes within 24 hours and sends one confirmation email.
+remaining encrypted copy is unreadable, then the vendor browser profiles, the apply alias, the stored objects and the
+personal rows go; admin audit rows stay. It completes within 24 hours and sends one confirmation email.
 _Avoid_: wiping, purge, hard delete
 
 **Sending domain**:
-`tryoverture.com` onboarded to Cloudflare Email Sending so Overture can mail any recipient, not only the owner. It adds bounce MX, SPF and DKIM on `cf-bounce.tryoverture.com` and keeps the Email Routing records on the apex; the `mail.sending` live check and the deploy guard verify it once `REQUIRE_EMAIL_SENDING` is on (M2-02).
+`tryoverture.com` onboarded to Cloudflare Email Sending so Overture can mail any recipient, not only the owner. It adds bounce MX, SPF and DKIM on `cf-bounce.tryoverture.com` and keeps the Email Routing records on the apex; the deploy guard and the hourly mail-health guard verify it once `REQUIRE_EMAIL_SENDING` is on.
 
 **Invite**:
 A pre-approved email address that still joins with an admin grant of 300 applications over 30 days. Public sign-up
 does not need one, but an invite that exists is accepted on the first verified sign-up and its grant is unchanged
-for users who joined in M2. With public sign-up turned off, only the owner and live invites may join.
+for users who joined earlier. With public sign-up turned off, only the owner and live invites may join.
 _Avoid_: waitlist spot, access code
 
 **Code paste**:
-Typing a verification code into Overture when the forwarded email did not arrive within five minutes. The wait lasts ten minutes and the same application resumes.
+Typing a verification code into Overture when the emailed code did not arrive in time. The wait lasts ten minutes and the same application resumes.
 _Avoid_: manual code entry, OTP
-
-**Recap**:
-The one email and push after a user's Daily run that lists the new Ready Applications, the open Reviews and
-yesterday's sends and replies, with one link to Ready. It is never sent when the run produced nothing, and opening it
-never sends an Application.
-_Avoid_: Ready email, digest, notification
 
 ## The legal pages
 
@@ -286,21 +281,11 @@ clears the suspension and leaves running paused until the person starts it.
 _Avoid_: ban, block, lockout
 
 **Mail health**:
-The admin view of forwarded ATS mail per employer: Applications sent, messages in, authentication results and the
-reply rate over the last 7 or 30 days, with no message content. The reply-rate alert warns the owner when an
+The admin view of mail sent to apply aliases, per employer: Applications sent, messages in, authentication results and
+the reply rate over the last 7 or 30 days, with no message content. The reply-rate alert warns the owner when an
 employer's rate is under 5 percent after 10 sends, and when the domain-wide rate is under 5 percent after 20 sends;
 it never stops sends by itself.
 _Avoid_: inbox analytics, mail report
-
-**Live check**:
-The daily `live.check` job on `overture-web` that exercises a real form capture (Personio's by plain HTTP), real Haiku calls, the mail loop and R2, records pass/fail and timing, and alerts the owner on failure. It never submits an application or touches a user.
-_Avoid_: smoke test, canary, health probe
-
-**Provider report**:
-The admin view of send results per browser provider and ATS over the last 30 days — attempted Applications,
-completed Applications, completion rate, challenge and code rates, p50/p95 duration, proxy MB and cost per completed
-Application against the $0.03 gate — plus the synthetic lab's results per provider and lab page.
-_Avoid_: browser stats, vendor dashboard
 
 **Variable cost**:
 What one Application actually spent, kept on its row: the browser spend of the try that sent it, the browser spend of

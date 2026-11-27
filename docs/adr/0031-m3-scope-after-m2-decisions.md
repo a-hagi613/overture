@@ -30,3 +30,7 @@ forwarded ATS mail (ADR 0028), and the plans of ADR 0018.
 - **Open sign-up with free preparation.** Spend would be uncapped by payment; rejected for the card-verified trial gate.
 - **Keep invites alongside payment.** Adds a second gate for no benefit once billing exists; admin grants still cover
   friends.
+
+*Amendment of 2026-11-26 (#678, #679): the M3 scope above is history. Public sign-up, the three-plan onboarding choice
+(#709), immediate approved sends (ADR 0046) and the current landing replace the flow described here. SPEC §15 and §2
+are the current product; the plans themselves (trial 3, Week 50, Month 250) are unchanged.*
