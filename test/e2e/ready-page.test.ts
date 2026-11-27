@@ -85,8 +85,6 @@ test("Ready sends only on approval, and the two layers, Edit, Skip, Undo and sav
 
   const drawer = page.getByRole("dialog", { name: "Inspect prepared application" });
 
-  // The inspection sheet is a native modal dialog: truthful aria-modal, top-layer focus trap,
-  // Escape closes it, and focus returns to the row that opened it.
   expect(await drawer.evaluate((element) => element.tagName)).toBe("DIALOG");
   await expect(drawer).toHaveAttribute("aria-modal", "true");
   await page.keyboard.press("Escape");

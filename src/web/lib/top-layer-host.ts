@@ -70,7 +70,7 @@ export function registerTopLayerHost(element: HTMLElement, requestClose: () => v
  * @returns The number of sheets that were asked to close.
  */
 export function closeAllTopLayerHosts() {
-  const open = [...hosts].reverse();
+  const open = hosts.toReversed();
 
   for (const host of open) {
     host.requestClose();

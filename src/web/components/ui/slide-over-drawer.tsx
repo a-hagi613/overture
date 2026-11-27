@@ -1,7 +1,6 @@
-import { useId, useRef } from "react";
 import type { ReactNode } from "react";
 
-import { useModalSheet } from "../../lib/use-modal-sheet.ts";
+import { SlideOverDrawerPanel } from "./slide-over-drawer-panel.tsx";
 
 /**
  * Reusable right-hand slide-over drawer, rendered as a native modal `<dialog>`.
@@ -46,7 +45,7 @@ export function SlideOverDrawer({
   }
 
   return (
-    <DrawerPanel
+    <SlideOverDrawerPanel
       ariaLabel={ariaLabel}
       description={description}
       footer={footer}
@@ -57,62 +56,6 @@ export function SlideOverDrawer({
       title={title}
     >
       {children}
-    </DrawerPanel>
-  );
-}
-
-function DrawerPanel({
-  ariaLabel,
-  children,
-  description,
-  footer,
-  header,
-  onClose,
-  title,
-}: {
-  ariaLabel?: string | undefined;
-  children: ReactNode;
-  description?: string | undefined;
-  footer?: ReactNode | undefined;
-  header: ReactNode;
-  onClose: () => void;
-  title: string;
-}) {
-  const sheetRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const descriptionId = useId();
-
-  useModalSheet(sheetRef, onClose, { focusSelector: "[data-drawer-heading]" });
-
-  return (
-    <dialog
-      aria-describedby={description === undefined ? undefined : descriptionId}
-      aria-label={ariaLabel}
-      aria-labelledby={ariaLabel === undefined ? titleId : undefined}
-      aria-modal="true"
-      className="ov-drawer-in fixed inset-y-0 right-0 left-auto z-40 m-0 flex h-full max-h-none w-full max-w-xl flex-col overflow-hidden rounded-none border-0 border-l border-border bg-card p-0 text-foreground shadow-lift outline-none"
-      data-sheet-backdrop="lift"
-      ref={sheetRef}
-      tabIndex={-1}
-    >
-      <h2 className="sr-only" data-drawer-heading="" id={titleId} tabIndex={-1}>
-        {title}
-      </h2>
-      {description === undefined ? null : (
-        <p className="sr-only" id={descriptionId}>
-          {description}
-        </p>
-      )}
-      <div className="shrink-0 border-b border-border px-5 py-3.5">{header}</div>
-      <div
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
-        data-scroll-region
-      >
-        {children}
-      </div>
-      {footer === undefined ? null : (
-        <div className="shrink-0 border-t border-border bg-card px-5 py-3.5">{footer}</div>
-      )}
-    </dialog>
+    </SlideOverDrawerPanel>
   );
 }

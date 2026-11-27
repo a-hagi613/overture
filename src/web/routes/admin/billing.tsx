@@ -117,10 +117,9 @@ export function BillingPage() {
 
       <BillingReconcile reconciliation={data.reconciliation} />
 
-      <div
+      <section
         aria-label={copy.admin.billingFilterLabel}
         className="mt-5 inline-flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1"
-        role="group"
       >
         {BILLING_FILTER_ORDER.map((key) => {
           const selected = key === filter;
@@ -140,7 +139,7 @@ export function BillingPage() {
             </button>
           );
         })}
-      </div>
+      </section>
 
       <ul
         aria-label={copy.admin.navBilling}

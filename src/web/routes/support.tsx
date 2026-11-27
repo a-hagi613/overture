@@ -45,7 +45,7 @@ export function SupportPage() {
       setInvalid({ message: messageInvalid, subject: subjectInvalid });
       setError(sp.validationError);
       globalThis.document
-        .getElementById(subjectInvalid ? "support-subject" : "support-message")
+        .querySelector<HTMLElement>(subjectInvalid ? "#support-subject" : "#support-message")
         ?.focus();
 
       return;
