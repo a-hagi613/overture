@@ -184,7 +184,7 @@ built product; where a launch switch is still off, the section says so. The earl
 | Master key | envelope encryption | `MASTER_KEY_V1..V<n>` (each 32 bytes base64) and `MASTER_KEY_CURRENT=n`; the chain is contiguous and rotation re-wraps every user key (ADR 0039, `docs/DEPLOY.md`) | fixed test key |
 | Google + LinkedIn (OIDC) | OAuth sign-in providers | `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID` with `LINKEDIN_CLIENT_SECRET`; each pair optional, both or neither (a half-set pair stops boot); an unset pair leaves that provider unregistered and hidden | local OIDC identity server; discovery URLs overridable via `OAUTH_GOOGLE_DISCOVERY_URL`, `OAUTH_LINKEDIN_DISCOVERY_URL` |
 | Auth | better-auth sessions | `BETTER_AUTH_SECRET` (single secret) or `BETTER_AUTH_SECRETS` (`"2:<new>,1:<old>"`, current first) for non-destructive rotation, `AUTH_ALLOWED_HOSTS` | local test secret and loopback hosts |
-| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com`, `ALIAS_EMAIL_DOMAIN` (the apply alias every account gets at creation; defaults to `MAIL_DOMAIN`), `NOTIFY_MAIL_DOMAIN=notify.tryoverture.com` (outbound transactional mail), `OWNER_EMAIL`, `FREEHIRE_API_BASE_URL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `SUPPORT_EMAIL`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `ALERT_NTFY_URL` (optional) | |
+| App | | `APP_ORIGIN=https://tryoverture.com`, `ADMIN_ORIGIN`, `MAIL_DOMAIN=tryoverture.com`, `ALIAS_EMAIL_DOMAIN` (the apply alias every account gets at creation; defaults to `MAIL_DOMAIN`), `NOTIFY_MAIL_DOMAIN=notify.tryoverture.com` (outbound transactional mail), `OWNER_EMAIL`, `FREEHIRE_API_BASE_URL`, `DATABASE_PATH=/data/app.sqlite`, `MAIL_FROM`, `SUPPORT_EMAIL`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`, `TURNSTILE_HOSTNAMES`, `ALERT_NTFY_URL` (optional), `OVERTURE_DRY_SUBMIT` (local acceptance walk only: fills a real form, keeps the pre-Submit screenshot and stops before the click; refused in production) | |
 
 Inbound mail is buffered on the `overture-inbound-mail` Queue (100 retries, 14-day retention) and its dead-letter queue
 `overture-inbound-mail-dlq`; spilled messages live in the separate R2 bucket `overture-inbound-mail-spill` under
@@ -917,10 +917,11 @@ stateDiagram-v2
 - **Send all** (`POST /api/ready/send-all`) approves every ready card whose answers are all the user's, in the order
   shown, and is the path the **onboarding picks** use (#687): the free trial's three go **at once**, and Weekly or
   Monthly picks are sent **5 minutes apart** (ADR 0046). A card that carries newly drafted prose is held for
-  individual review instead of being approved by the batch. It is also the saved-answers path: a card that carries
-  newly drafted prose is refused with 422 `requires_individual_review` unless the user has opened it and approved it
-  one at a time through its row **Approve** action or the slide-over inspection drawer (`A`, `E`, `S` approve, edit,
-  and skip, and arrow keys step Prev/Next across rows); a refused card is reported while the rest proceed. Cards
+  individual review instead of being approved by the batch. It returns the approved,
+  held (`needsReview`) and refused lists: a card that carries newly drafted prose is held for individual review
+  unless the user has opened it and approved it one at a time through its row **Approve** action or the slide-over
+  inspection drawer (`A`, `E`, `S` approve, edit, and skip, and arrow keys step Prev/Next across rows), while the rest
+  proceed. Cards
   beyond today's remaining sends wait for the next free slot (5 minutes apart for a paid user, the daily cap of 10).
 - **Undo** (`POST /api/applications/:id/unapprove`) returns an `approved` Application to `ready` at the API level, clearing the approval and its slot, and is refused once `sending` has started (a conditional update on `status='approved'`). In the Ready UI, approvals require confirmation in a modal and enter **Scheduled to send** without an Undo button.
 - **Skip** is the existing withdraw (`POST /api/applications/:id/withdraw`), allowed in `ready` and `approved`:
@@ -1171,7 +1172,10 @@ matches fields to prepared answers by label, fills, uploads, and verifies before
 8. **Screenshot before and after Submit** (#695): one JPEG of the filled form immediately before the click and one of
    the confirmation state immediately after it, stored sealed in the user's account (`attempt_screenshots`, 30 days).
    A screenshot that fails never blocks the send.
-9. Click the final Submit; set `submit_clicked_at` per §9.4 from the application request's answer. Confirm success by the ATS confirmation signal
+9. Click the final Submit; set `submit_clicked_at` per §9.4 from the application request's answer. With
+   `OVERTURE_DRY_SUBMIT=1` (never in production) the flow stops just before the click: the pre-Submit screenshot is
+   kept, the attempt is `dry_submit`, no `submit_clicked_at` is written, the credit is released and the Application
+   returns to `ready`. Confirm success by the ATS confirmation signal
    (URL/heading/text per ATS). No signal within 30 s → `unconfirmed` (§9.4). A missing or changed field found
    **before** the click → `form_changed`.
 10. Close the browser; record `browser_ms`, `proxy_bytes`, `cost_micros` from the provider usage report. A session whose stop fails is read back with `GET`; usage that is still unsettled after 30 s is backfilled by the recovery sweep (§9.4).
@@ -1645,7 +1649,7 @@ band-first order, blockers hidden · 12. picking a job creates one application, 
 plan's pick limit · 13. preparation with factual, open-text, optional blank · 14. Review grouped by application, a
 shared question answered once, both applications moving to Ready · 15. approval: Send freezes the plan, a stale
 `planSha256` is refused, Undo before `sending`, Skip withdraws, Send all approves the picks, a mixed batch is 422
-`requires_individual_review`, Approve & Next with A/E/S, Edit an answer clears the approvals that used the Fact, a link
+a held card left for individual review while the rest proceed, Approve & Next with A/E/S, Edit an answer clears the approvals that used the Fact, a link
 never sends · 16. dispatch timing: an approved send is eligible at once, a second paid one for the same user waits
 5 minutes, the trial's three go at once, another user is never delayed, the daily cap of 10 · 17. dispatcher gates
 (cap, applications left, kill switch, one-in-flight, only `approved`, approval still current) · 18. submit success on the
@@ -1758,7 +1762,7 @@ Plus: route reachability for every page, interactive/layout guards (`interactive
 | `src/server/profile/targets.test.ts` | the live match count is cached per normalized filters and job revision, a same-connection or puller write invalidates it, the store is bounded, the count plan probes `job_places` by its primary key rather than scanning it, and 25 concurrent filter changes answer under 500ms p95 during job writes (#426) |
 | `src/server/profile/time-zone.test.ts` | an empty timezone change takes no write (#430) |
 | `src/server/profile/v1-import.test.ts` | the v1 answer-bank and learned-answer mapping |
-| `src/server/routes/ready.test.ts` | a corrupt or non-list `changes` value degrades to an empty card list rather than a 500; a saved-only batch approves, and a batch with newly written prose is 422 `requires_individual_review` (#590) |
+| `src/server/routes/ready.test.ts` | a corrupt or non-list `changes` value degrades to an empty card list rather than a 500; generated prose is detected while saved answers stay bulk-approvable; the dwell time bound is enforced on single and batch approval and never becomes a metric label (#590) |
 | `src/server/routes/supply.test.ts` | `/api/supply` answers a signed-out visitor with a public, cacheable aggregate, filters by role, location and remote, refuses an unknown role or a one-character place with `invalid_request`, and rate limits one client IP without touching another (#567) |
 | `src/shared/apply-alias.test.ts` | an apply handle is the first and last name in lowercase ASCII, never a reserved system local part or its first dot-label, and a new plan uses the alias or the sign-in email rather than the editable email Fact (#566) |
 | `src/shared/copy.test.ts` | no canvas annotation is a copy string or key |
