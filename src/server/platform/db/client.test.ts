@@ -67,12 +67,13 @@ describe("the application database connection", () => {
 describe("the container's checkpoint ownership", () => {
   test("opts into Litestream checkpoints only on the replicate path", () => {
     const entrypoint = readFileSync("scripts/docker-entrypoint.sh", "utf8");
-    const directRunAt = entrypoint.indexOf("exec bun run /app/src/server/main.ts");
+    const directRunAt = entrypoint.indexOf("exec bun --smol run /app/src/server/main.ts");
     const ownsAt = entrypoint.indexOf("LITESTREAM_OWNS_CHECKPOINTS=true");
     const replicateAt = entrypoint.indexOf("exec litestream replicate");
 
     expect(directRunAt).toBeGreaterThan(-1);
     expect(ownsAt).toBeGreaterThan(directRunAt);
     expect(replicateAt).toBeGreaterThan(ownsAt);
+    expect(entrypoint).toContain('-exec "bun --smol run /app/src/server/main.ts"');
   });
 });
