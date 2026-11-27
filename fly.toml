@@ -54,7 +54,7 @@ path = "/api/health"
 
 [[vm]]
 size = "shared-cpu-1x"
-memory = "512mb"
+memory = "1gb"
 
 [[mounts]]
 source = "data"

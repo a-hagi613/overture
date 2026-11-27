@@ -1,0 +1,71 @@
+name: Ops machine
+
+# Manual machine-size control for overture-web. The deploy guard runs a `bun` script over `flyctl ssh console`, and on a
+# memory-starved machine that shell never answers, which blocks every deploy. This gives a way back without a deploy:
+# set the machine memory, then the normal deploy path works again.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        required: true
+        type: choice
+        options:
+          - status
+          - memory
+      value:
+        description: "Memory in MB for the memory action"
+        required: false
+        default: "1024"
+        type: string
+
+concurrency:
+  group: ops-machine
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  machine:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      ACTION: ${{ inputs.action }}
+      VALUE: ${{ inputs.value }}
+      APP: overture-web
+    steps:
+      - name: Refuse without FLY_API_TOKEN
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::FLY_API_TOKEN is not set; nothing ran."
+            exit 1
+          fi
+      - name: Set up flyctl (superfly/flyctl-actions/setup-flyctl @ master @ 98172f7)
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Run the machine action
+        run: |
+          set -euo pipefail
+          case "$ACTION" in
+            status)
+              flyctl status -a "$APP"
+              flyctl machine list -a "$APP"
+              ;;
+            memory)
+              case "$VALUE" in
+                1024|2048) ;;
+                *)
+                  echo "::error::Refusing a memory value outside 1024 or 2048."
+                  exit 1
+                  ;;
+              esac
+              yes | flyctl scale memory "$VALUE" -a "$APP"
+              flyctl status -a "$APP"
+              ;;
+            *)
+              echo "::error::Unknown action $ACTION."
+              exit 1
+              ;;
+          esac
