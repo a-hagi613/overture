@@ -17,6 +17,8 @@ Bun.env.TURNSTILE_SECRET ??= "audit-test-secret";
 Bun.env.MASTER_KEY_V1 ??= Buffer.alloc(32, 7).toString("base64");
 
 const { formatAuditCursor, parseAuditCursor, queryAdminAudit } = await import("./index.ts");
+const { openReveal } = await import("./reveal.ts");
+const { createClock } = await import("../ports/clock.ts");
 
 const BASE_TIME = Date.UTC(2026, 10, 22, 12, 0, 0);
 
@@ -146,6 +148,38 @@ describe("queryAdminAudit", () => {
 
     expect(page2.entries.map((entry) => entry.id)).toStrictEqual(["row-2", "row-1"]);
     expect(page2.nextCursor).toBeNull();
+
+    sqlite.close();
+  });
+});
+
+describe("openReveal audit detail", () => {
+  test("records the real passkey assertion time, and null when the owner never asserted one", async () => {
+    const { db, sqlite } = migrated();
+    const clock = createClock();
+
+    await openReveal(db, clock, {
+      actorId: "owner-1",
+      targetUserId: "user-42",
+      reason: "Support request 118",
+      passkeyAssertedAt: null,
+    });
+
+    const never = db.select().from(adminAudit).all().at(-1);
+
+    expect(never?.action).toBe("reveal.open");
+    expect(JSON.parse(never?.detail ?? "{}")).toMatchObject({ passkeyAssertedAt: null });
+
+    await openReveal(db, clock, {
+      actorId: "owner-1",
+      targetUserId: "user-43",
+      reason: "Second reveal",
+      passkeyAssertedAt: BASE_TIME,
+    });
+
+    const asserted = db.select().from(adminAudit).all().at(-1);
+
+    expect(JSON.parse(asserted?.detail ?? "{}")).toMatchObject({ passkeyAssertedAt: BASE_TIME });
 
     sqlite.close();
   });

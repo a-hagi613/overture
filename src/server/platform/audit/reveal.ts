@@ -44,7 +44,8 @@ export interface RevealOpenInput {
   actorId: string;
   targetUserId: string;
   reason: string;
-  passkeyAssertedAt: number;
+  /** When the owner last asserted a passkey, or null when they never have. Never a fabricated time. */
+  passkeyAssertedAt: number | null;
 }
 
 function revealStateRows(db: Pick<AppDatabase, "select">, actorId: string) {
