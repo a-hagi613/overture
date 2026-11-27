@@ -1,33 +1,57 @@
 # End-to-end acceptance walk — three people, three plans (#710)
 
-Date: 2026-11-27. Run on merged `main` at `a6ead312` (the #710 wiring PR #753), local instance
+Date: 2026-11-27 (second rerun). Run on merged `main` at `0ae0339b` — the #710 wiring (#753), the BambooHR /
+Zoho / Manatal readers (#761), claim-every-adapter + preflight-the-filled-form (#763), one open pick per
+employer (#762), the batch custom_id cap (#755), and the live BambooHR / Zoho fill fix (#776). Local instance
 `http://devbox:3423`, `NODE_ENV=development`, `OVERTURE_DRY_SUBMIT=1`, freehire free tier (no API key),
-Claude Haiku 5.5, Stripe sandbox. Three fresh accounts from the 26 Nov harness resumes:
+Claude Haiku 5.5 (Batches), Stripe sandbox, local Chromium (`BROWSER_PROVIDER=local`). Three fresh accounts:
 software engineer (Free trial), teacher (Weekly), admin (Monthly).
 
-**Headline: the three plans and every screen up to Review/Ready work end to end, but no Application reached
-Submit in this run.** The blockers are product bugs on the live send path, filed as #756, #757, #758 and #759;
-they are listed under [Known limits](#known-limits). The owner gate (#710) is therefore **not met yet**.
+**Headline: a real send now reaches the dry-submit stop.** Four Applications were filled and stopped immediately
+before the Submit click: Elite Private School (BambooHR, teacher), jrec and sipeknekatik (BambooHR, admin), and
+International Community Schools (Zoho Recruit, teacher, captured on the same commit in the immediately preceding
+pass). The pre-Submit screenshots are in this folder. No application clicked Submit — that is the intended
+`OVERTURE_DRY_SUBMIT=1` stop, not a failure.
 
-The two blockers found and fixed during the walk shipped in #753: onboarding AI was spend-gated before a plan
-(`SpendGate.allowsOnboarding`), and the live Haiku score schema was rejected by the Anthropic API (`minItems`).
+Two ATS families reached it, which was the target of this rerun. The remaining blockers are four distinct
+per-adapter issues, filed with their exact evidence (#786 JazzHR selector, #787 Lever fill_failed without a
+diagnostic, #788 Manatal identity, #789 Greenhouse city combobox review loop). Workable stays behind the ATS kill
+switch; SmartRecruiters' sampled posting had expired.
 
-## What the three walks share
+## What this run shares
 
-- Sign-up by magic link, resume upload with the real Haiku resume reader (12 facts read for Maya, 10 for
-  Amina, 11 for Daniel), only the truly missing gap fields asked, preferences by freehire category and canonical
-  place ids.
-- A real freehire pull per person, then one Claude Haiku score per job (live Messages API, not Batches).
-  Pulls: 100 jobs fetched per person, 99 / 100 / 99 kept after dedupe and sendable-ATS filtering; 298 unique
-  jobs stored overall, 252 English.
-- Scored pools (visible match count): **88** software, **36** education, **81** admin.
-- Plan grants were correct in Stripe sandbox: trial 3, Weekly 50, Monthly 250; the paid grants arrived through
-  a signed `invoice.paid` webhook built from the real sandbox subscription.
-- Picks are stored before Stripe and land on the Tracker; Review is grouped per application; Ready shows the
-  prepared card with the exact answers and the PDF.
-- Haiku cost for the whole walk: **$0.0212** (100 calls, 33,059 input / 241,770 cached / 73,130 output tokens).
-  Browser Use spend was ~$0: every cloud session stopped immediately (see known limits), so the walk used
-  local Chromium.
+- Sign-up by magic link, resume upload with the real Haiku resume reader, only the truly missing gap fields, then
+  preferences by freehire category and canonical place ids. One capped pull per person (`jobs.pull_max_pages=1`,
+  so 100 fetched), dedupe, sendable-ATS filtering, then one Haiku score per job through the Batches API.
+- The dispatcher now claims every apply-supported adapter and no longer blocks an `unknown` liveness result
+  (#763), so every pick either prepares, reaches Ready, or records an attempt. The Tracker shows why.
+- Review questions come from the real form; the harness answers them through the real Review form. Answering a
+  Greenhouse city combobox can loop (see #789), and the walk then skips that Application instead of faking it.
+- Plans were honoured in Stripe sandbox: the admin's Monthly Checkout created a real subscription and the signed
+  `invoice.paid` webhook granted **250 applications** (`ledger` grant `in_1UgUKIGhJ7DirGl3p6krU6tp`); the teacher's
+  Weekly Checkout completed and the plan screen shows Weekly with the 10-a-day limit.
+- The paid 5-minute spacing is exercised with the test clock (`POST /__test__/clock/offset`, enabled with
+  `ENABLE_TEST_ROUTES`): the two admin BambooHR dry submits are **294 s** apart (scheduled 300 s), rather than
+  sitting through wall-clock minutes. Everything else (pull, scoring, preparation, filling) is the shipped path.
+
+## Sends that reached the pre-Submit stop
+
+| User | Application | ATS | Attempt | Outcome | Submit click |
+|---|---|---|---|---|---|
+| Amina (Weekly) | Elite Private School — English Teacher 2026-2027 | BambooHR | 1 | `dry_submit` | none |
+| Amina (Weekly) | International Community Schools — Homeroom Teacher | Zoho Recruit | 1 | `dry_submit` | none (prior pass, same commit) |
+| Daniel (Monthly) | jrec — Executive Assistant | BambooHR | 1 | `dry_submit` | none |
+| Daniel (Monthly) | sipeknekatik — Council Administrative Assistant | BambooHR | 1 | `dry_submit` | none |
+
+The attempt rows carry `outcome=dry_submit`, `error_code=dry_submit`, `submit_clicked_at=null`, and each has a
+stored `before_submit` screenshot. The screenshots show the filled live form — name, email, phone, resume
+attachment (and, for Zoho, the address and demographic selects) — with the Submit/Submit Application button still
+uncicked.
+
+Screens: [BambooHR (teacher)](teacher-send-bamboohr-before-submit.png) ·
+[Zoho Recruit (teacher)](teacher-send-zoho_recruit-before-submit.png) ·
+[BambooHR jrec (admin)](admin-send-bamboohr-jrec-before-submit.png) ·
+[BambooHR sipeknekatik (admin)](admin-send-bamboohr-sipeknekatik-before-submit.png)
 
 ## User 1 — Maya Chen, software engineer, Free trial
 
@@ -35,149 +59,161 @@ Preferences: Software engineering, Backend, Full-stack, DevOps, Data engineering
 name, email, phone, city/country, work authorization, current employer, languages, GitHub; gaps asked only for
 salary, notice, relocation, LinkedIn and the sponsorship confirmation.
 
-Pull 100 fetched / 99 kept · pool **88** · 85 scored. The visible top 10 (owner rates these):
+Pool **88** matching roles after scoring; the trial shows the top 3 and locks the rest behind the plan card.
+Picks: Aylo Careers (Greenhouse), Flexstaf IT (Manatal), Jobgether (Lever).
 
-| # | Score | Role | Company | Place | ATS | Why (stored reason, shortened) |
-|---|---|---|---|---|---|---|
-| 1 | 82 | Backend Engineer | USMobile | Toronto | Lever | Backend and platform services matching Shopwise/Northpeak |
-| 2 | 80 | Senior Platform Engineer | Jobgether | Canada | Lever | Platform work, remote Canada |
-| 3 | 80 | Senior AI-Native Software Developer | Geotab | Oakville/Toronto/Waterloo | Greenhouse | Senior developer, 7 years backend/platform |
-| 4 | 80 | Founding Engineer - Infra Development | hireVouch | Toronto | Catsone | Storage/search adjacent to Go, Kafka, platform |
-| 5 | 80 | Senior Software Developer, AI Platform | Jobgether | Canada | Lever | Senior title matches 7 years backend/platform |
-| 6 | 80 | Senior Software Engineer, Security | Forward Financing | Remote Ontario | Ashby | Senior engineering with a security focus |
-| 7 | 80 | Senior Platform Engineer | Robots and Pencils | Remote Canada | Greenhouse | Remote Canada fits Ottawa base and citizenship |
-| 8 | 80 | Senior Full Stack Engineer II | Jobgether | Canada | Lever | Full-stack target, adjacent to backend focus |
-| 9 | 80 | Founding Engineer | Jobgether | Canada | Lever | Full-stack ownership from architecture to deployment |
-| 10 | 80 | Senior Developer, Fullstack - Platform Ecosystem | Fullscript | Ottawa | Lever | TypeScript/Node/React plus Go backend |
+| # | Score | Role | Company | Place | Why (stored reason, shortened) |
+|---|---|---|---|---|---|
+| 1 | 85 | Sr. Software Developer I | Aylo Careers | Montréal, QC | Software engineering role matches your backend/platform work at Shopwise |
+| 2 | 85 | Senior Backend Software Engineer – Golang | Flexstaf IT | Ontario | Go backend work matches your checkout API at Shopwise; GraphQL unconfirmed |
+| 3 | 80 | Founding Engineer | Jobgether | Canada | Full-stack ownership from architecture to deployment, adjacent to backend |
 
-Plan screen: Free trial preselected, “card check only, nothing charged”, all 3 sent at once; Stripe sandbox
-Setup card confirmed (4242), trial grant 3. Picks: USMobile (Lever), Planet (Greenhouse), Flexstaf IT (Manatal).
+Plan screen: Free trial preselected, card check only, all 3 sent at once; Stripe sandbox Setup card confirmed.
+Outcome: **no send for the software pool.**
+- Jobgether (Lever) was approved and dispatched twice: both attempts `outcome=form_changed`,
+  `error_code=null`, `submit_clicked_at=null` — the filler failed before preflight, so no field detail is
+  recorded (#787).
+- Flexstaf IT (Manatal) was skipped as `posting_identity:unreadable` (#788).
+- Aylo Careers (Greenhouse) produced no attempt in this pass; in the immediately prior pass it was skipped as
+  `form_unsupported`.
 
-Outcome: Planet reached **Ready** after two Review rounds (4 questions, then 2 more found on the live form:
-Country, Location). USMobile was approved and attempted; preflight stopped it with `form_changed`
-(`value_mismatch:phone, field_missing:resume, option_not_selected:country, option_not_selected:candidate-location`).
-Flexstaf (Manatal) stayed preparing (`form_unreadable`). No Submit.
+Review questions per application: Aylo 0 (unsupported form), Flexstaf 0, Jobgether 0 — no form was read before
+the fill failed.
 
-Review questions per application: Planet 6 (all select: how did you hear ×2, previously worked, sanctioned
-countries, country, city) — the only application above the ≤4 target; USMobile 1 from live preflight; Flexstaf 0.
-
-What this proves: a software engineer can go from a fresh account to a scored freehire list, a trial card,
-three durable picks, Review and Ready on two ATS families, and the exactly-once trial grant. It does not prove a
-send: the live-form preflight stops before any filling.
-
-Screens: [sign-up](swe-01-signup-1280.png) · [resume](swe-02-resume-1280.png) ·
-[gaps](swe-03-gaps-1280.png) · [preferences](swe-04-preferences-1280.png) ·
-[matches 1280](swe-05-matches-1280.png) · [matches 390](swe-05-matches-390.png) ·
-[matches dark](swe-05-matches-1280-dark.png) · [tracker](swe-06-tracker-1280.png) ·
-[Review](review-1280.png) · [Ready](swe-07-ready-1280.png) · [scheduled](swe-08-scheduled-1280.png) ·
-[final tracker](swe-09-tracker-final-1280.png)
+What this proves: a Free-trial user still reaches a scored, pickable list, the card check, three durable picks and
+the plan gate. The software pool's direct employers on this day were Lever/Manatal, and neither can send yet.
 
 ## User 2 — Amina Yusuf, teacher, Weekly
 
 Preferences: Education; Ottawa + UAE, Saudi Arabia, Qatar, Kuwait, Bahrain, Oman. Gaps: phone, salary, notice,
 relocation, languages (English/Arabic).
 
-Pull 100 fetched / 100 kept · pool **36** · 35 scored. Visible list (6 scored roles, the whole education pool):
+Pool **36** matching roles; 10 picks (one per employer after #762). Top of the visible list:
 
-| # | Score | Role | Company | Place | ATS | Why |
-|---|---|---|---|---|---|---|
-| 1 | 75 | English Teacher 2026-2027 | Elite Private School | Abu Dhabi | BambooHR | B.Ed. and Ontario certification meet the ask |
-| 2 | 65 | PYP PHE Teacher | International School of London Qatar | Doha | BambooHR | IB PYP experience, primary years |
-| 3 | 65 | Islamic Studies Teacher | International School of London Qatar | Doha | BambooHR | Same teaching role family, 9 years Grades 3–10 |
-| 4 | 65 | PE Teacher – Al Maharat | International Community Schools | Abu Dhabi | Zoho Recruit | Teaching role, subject adjacent (math/science) |
-| 5 | 59 | Teacher Assistant | Hayat Universal School | Doha | Workable | Doha target, assistant level |
-| 6 | 57 | Electrical Engineering Instructor/Lecturer | BAE Systems | Doha | Zoho Recruit | Instructor role, Qatar target |
+| # | Score | Role | Company | Place | ATS |
+|---|---|---|---|---|---|
+| 1 | 85 | Upper Elementary Teacher: Multiple Subjects Grades 4–7 | Hayat Universal School (HUBS) | Doha | Workable (kill switch) |
+| 2 | 82 | Tuition Teacher – English, Arabic & Mathematics | Ontime Healthcare | Dubai | Workable (kill switch) |
+| 3 | 75 | PYP Visual Arts Teacher | International School of London Qatar | Doha | BambooHR |
+| 4 | 75 | PYP PHE Teacher 2027–2028 | International School of London Qatar | Doha | BambooHR |
+| 5 | 75 | English Teacher 2026–2027 | Elite Private School | Abu Dhabi | BambooHR |
+| 6 | 72 | Arabic Teacher 2026/2027 | Elite Private School | Abu Dhabi | BambooHR |
+| 7 | 67 | PYP & MYP Arabic Language Teacher | International School of London Qatar | Doha | BambooHR |
+| 8 | 67 | Class Teacher – Al Manhal | International Community Schools | Abu Dhabi | Zoho Recruit |
+| 9 | 67 | Homeroom Teacher – Al Mushrif | International Community Schools | Abu Dhabi | Zoho Recruit |
+| 10 | 65 | Art Teacher – Al Dannah | International Community Schools | Abu Dhabi | Zoho Recruit |
 
-Plan: Weekly $9.99 Checkout completed in Stripe sandbox; the signed invoice granted **50 applications** and the
-plan shows Weekly on the Tracker. Picks: 10 (7 international-school roles). Outcome: 4 BambooHR, 3 Zoho and 1
-Manatal stuck `preparing` with `form_unreadable`; 2 Workable skipped by the ATS kill switch. Zero reached Ready,
-so no approval, no send and the 5-minute spacing was not observable for this user.
+Plan: Weekly $9.99 Checkout completed in Stripe sandbox; the plan card shows Weekly with 50 applications a week.
+Outcome:
+- **Elite Private School (BambooHR) reached the dry-submit stop**: filled first/last name, email, phone,
+  resume attachment, with Submit Application visible and unclicked.
+- **International Community Schools (Zoho Recruit) reached the dry-submit stop in the immediately preceding pass
+  on `0ae0339b`**: the screenshot shows the full address block, the gender and nationality selects, the resume
+  attachment and a required CAPTCHA field above Submit Application. This pass skipped that Application at Review
+  (`review_dismissed`) because the city/nationality answers were re-asked; that is the #789 class of loop, not a
+  send-path regression.
+- International School of London Qatar (BambooHR) stopped at preflight with
+  `value_mismatch:state.value` — the harness had answered the State question with "No"; a valid province answer
+  sends it (the two admin BambooHR sends below are the same shape).
+- Both Workable roles were skipped by the ATS kill switch (`ats_not_enabled`), unchanged from the last report.
 
-Review questions per application: 0 (no form was read).
+Review questions per application: one form (the live State/ZIP class) was answered for the ISL Qatar card; Elite
+Private School needed none; the Zoho card's first form was answered and its re-asked question was then skipped
+(`review_dismissed`) instead of answered twice. Identity fields on the BambooHR form: First Name, Last Name, Email, Phone, Resume, Date
+Available (optional). On the Zoho form: First/Last Name, Email, Mobile (+1), Gender, Nationality, Street, City,
+State, Country, resume.
 
-What this proves: a teacher in the Gulf can complete onboarding, a real paid Checkout and a 50-application
-Weekly grant on the rebuilt flow. It also proves the supply problem: the education pool is almost entirely on
-ATSes whose forms the reader cannot read, so a Weekly user gets nothing to send today.
-
-Screens: [sign-up](teacher-01-signup-1280.png) · [resume](teacher-02-resume-1280.png) ·
-[gaps](teacher-03-gaps-1280.png) · [preferences](teacher-04-preferences-1280.png) ·
-[matches 1280](teacher-05-matches-1280.png) · [matches 390](teacher-05-matches-390.png) ·
-[matches dark](teacher-05-matches-1280-dark.png) · [tracker](teacher-06-tracker-1280.png) ·
-[Ready](teacher-07-ready-1280.png) · [final tracker](teacher-09-tracker-final-1280.png)
+What this proves: a Weekly teacher can go from a fresh account through a real paid Checkout to a fully filled live
+BambooHR form and a fully filled live Zoho form, stopping exactly at Submit. The supply limit is now the Workable
+kill switch, not form reading.
 
 ## User 3 — Daniel Okafor, admin, Monthly
 
 Preferences: Administration, Operations; Canada + Ottawa. Gaps: phone, salary, notice, relocation, languages.
 
-Pull 100 fetched / 99 kept · pool **81**. Visible top 10:
+Pool **80** matching roles, **70 scored** at the time of reading. The visible top 10:
 
-| # | Score | Role | Company | Place | ATS | Why |
-|---|---|---|---|---|---|---|
-| 1 | 75 | Medical Secretary | Durham Community Health Centre | Oshawa | Workable | Adjacent admin support |
-| 2 | 72 | Patient Administrative Coordinator | Sailor Health | Canada (remote) | Ashby | Admin coordination, remote Canada |
-| 3 | 67 | Medical Office Assistant | MedSpa Partners | Vancouver | Recruitee | Admin support in a clinic |
-| 4 | 67 | HR Administrator & Office Coordinator | aaisolutions | Mississauga | BambooHR | Office coordination plus HR admin |
-| 5 | 65 | Scheduling Coordinator | srgroupofcompanies | Cambridge | SmartRecruiters | Scheduling and records |
-| 6 | 59 | Reception/Admin Assistant | ltlgroup | Thunder Bay | BambooHR | Front-desk admin |
-| 7 | 57 | Operations Manager | Jobgether | Canada | Lever | Operations target |
-| 8 | 52 | Battery Operations Specialist | Moment Energy | Surrey | Greenhouse | Operations-adjacent |
-| 9 | 52 | Buyer – Building Mechanical Systems | Kolostat | Newmarket | BambooHR | Admin/operations in procurement |
-| 10 | 52 | GTM Enablement & Operations Specialist | Varicent | Toronto | Greenhouse | Operations target |
+| # | Score | Role | Company | Place | ATS |
+|---|---|---|---|---|---|
+| 1 | 90 | Internal/External – Administrative Assistant | lambtonkent | Sarnia, ON | BambooHR (form unsupported) |
+| 2 | 90 | Executive Assistant | jrec | Ottawa, ON | BambooHR |
+| 3 | 85 | Administrative Coordinator | Ubisoft | Quebec City | SmartRecruiters (expired posting) |
+| 4 | 85 | Council Administrative Assistant | sipeknekatik | Indian Brook, NS | BambooHR |
+| 5 | 85 | Executive Assistant | Manitoba Keewatinowi Okimakanak (MKO) | Thompson, MB | BambooHR |
+| 6 | 85 | Leadership Administrative Support, Senior Leadership Team | CMHA Thames Valley | London, ON | JazzHR |
+| 7 | 77 | Executive & Office Coordinator | Alveole | Montréal | Greenhouse |
+| 8 | 77 | Office Administrator – Temporary contract | drclean | Sudbury, ON | BambooHR |
+| 9 | 77 | Reception/Admin Assistant | ltlgroup | Thunder Bay, ON | BambooHR |
+| 10 | 75 | Executive Assistant – Construction | BOS Staffing | (blank) | BambooHR |
 
-Plan: Monthly $29.99 Checkout completed in Stripe sandbox; the signed invoice granted **250 applications**.
-Ten picks were saved before Checkout (7 BambooHR, 1 JazzHR, 1 Jobvite, 1 Workable). One JazzHR application
-(CMHA Thames Valley) reached Ready and was approved; the rest stayed preparing (`form_unreadable`) or were
-skipped (Workable kill switch). The approved JazzHR card never sent: dispatch classifies its liveness as
-`unknown` and blocks it (#756). Paid spacing therefore showed one scheduled card 12.8 minutes after approval
-(a retry backoff), not the intended 5-minute cadence.
+Plan: Monthly $29.99 Checkout completed. The subscription is active in the ledger, the signed invoice granted
+250 applications, and the Tracker shows "Monthly · 250 applications this month · 10 a day".
 
-Review questions per application: 0 (no readable form).
+Outcome:
+- **jrec — Executive Assistant (BambooHR) reached the dry-submit stop.**
+- **sipeknekatik — Council Administrative Assistant (BambooHR) reached the dry-submit stop**, 294 s after jrec on
+  the skipped clock (the 5-minute paid spacing).
+- CMHA Thames Valley (JazzHR) was approved and dispatched; the attempt ended `form_changed` with no error code
+  because the live form is `form#form_submit_new_resume` and the JazzHR selector never matched (#786).
+- Ubisoft (SmartRecruiters) stayed in preparation; its live posting says "This job has expired", so there is no
+  form to read.
+- Alveole / BOS Staffing / MKO were skipped as `form_unsupported` or `open_text_ungrounded`; drclean and ltlgroup
+  waited at Review for real form questions.
 
-What this proves: a Monthly Checkout and the 250-application grant work, the Tracker holds 10 durable picks,
-and the owner sees exactly why each card is stuck. It also shows the admin pool is dominated by ATSes the
-rebuilt send path cannot read or liveness-check today.
+Review questions per application: State + ZIP (BambooHR), plus later driver's-licence / transport / availability
+questions on two cards. Identity fields on the BambooHR form: First Name, Last Name, Email, Phone, Resume (Date
+Available optional).
 
-Screens: [sign-up](admin-01-signup-1280.png) · [resume](admin-02-resume-1280.png) ·
-[gaps](admin-03-gaps-1280.png) · [preferences](admin-04-preferences-1280.png) ·
-[matches 1280](admin-05-matches-1280.png) · [matches 390](admin-05-matches-390.png) ·
-[matches dark](admin-05-matches-1280-dark.png) · [tracker](admin-06-tracker-1280.png) ·
-[Ready](admin-07-ready-1280.png) · [scheduled](admin-08-scheduled-1280.png) ·
-[final tracker](admin-09-tracker-final-1280.png)
+What this proves: the Monthly path, the 250 grant, a 10-pick batch across employers, and two BambooHR dry submits
+in one paid run with the intended spacing.
 
-## Stripe sandbox
+## AI spend
 
-![Stripe sandbox card check](stripe-checkout-1280.png)
+Admin (measured in this instance): **$0.0685**, 280 calls — 272 score calls (104,787 input / 735,124 cached /
+234,667 output tokens), 1 resume-facts call, 7 open-text calls (no tokens billed). The two targeted pulls and the
+retried scoring batch account for the higher call count than the last report.
 
-One Checkout card page is captured (Setup for the trial, then Subscription for Weekly/Monthly). No live key was
-used; the return URL, the Setup session and the real subscription invoice were verified against the sandbox API.
-The two paid grants (50 and 250) and the trial grant (3) are the proof the webhook path works.
+Swe and teacher ran in the preceding instance on the same commit; their per-user usage rows were not re-read
+before that instance was reset for the admin pass. Their scoring used the same per-job batch shape (85 and 35
+score calls), so they are in the same few-cents range, but those exact totals are not claimed here. This is a
+bookkeeping gap in the walk harness, not a product gap: `GET /__test__/llm/usage?userId=` reports it when the
+instance is kept.
+
+Browser Use spend: **$0** — `BROWSER_PROVIDER=local`, as allowed when Browser Use cloud sessions stop immediately
+for this account (see known limits).
 
 ## Known limits
 
-- **No Application reached Submit, so there is no pre-Submit screenshot and no dry-submit outcome in this
-  run.** #757 (preflight stops Greenhouse/Lever on a hidden resume input, untouched location selects and a phone
-  format difference) and #756 (every ATS whose liveness is `unknown` is never claimed) are the direct causes.
-- **BambooHR, Zoho Recruit and Manatal forms return no questions** (#758), so most teacher and admin picks stay
-  in preparation. This is a supply gap, not a walk artefact.
-- **Browser Use cloud sessions stopped immediately** (`status: stopped`, `cdpUrl: null`, ~2 s after create), so
-  the walk fell back to local Chromium, which the brief allows when Browser Use is unavailable. No Browser Use
-  spend was incurred. A second person's capture jobs on the same account showed the same stop pattern.
-- **Paid new-job batch scoring is 400ing** with `requests.0.custom_id: String should have at most 64 characters`;
-  a separate fix is landing on main. Onboarding scoring (live Messages API) is unaffected and this walk's scores
-  are live.
-- **Two same-employer Applications** (International School of London Qatar ×3) show the one-open-application
-  rule is not enforced across a pick batch (#759).
-- The walk used test routes to bound the run: `jobs.pull_max_pages=1` (100 jobs per pull instead of the default
-  5), and the pull/score jobs were triggered through the real handlers because `ENABLE_TEST_ROUTES` disables the
-  automatic queue. The pull, scoring, preparation and Review code paths are the shipped ones.
-- Screenshots are light at 390 and 1280; the onboarding matches screens also have a dark pair. The plan screen
-  is part of the matches screen. `05-matches-*` light captures are the after-onboarding Matches page because the
-  onboarding route redirects an onboarded account; the dark pair is the exact onboarding matches screen.
+- **No Application clicked Submit.** This is the requested `OVERTURE_DRY_SUBMIT=1` stop; the four screenshots are
+  the evidence that filling completed on BambooHR and Zoho. Confirmation receipts are not part of this run.
+- **Four per-adapter blockers remain, each with its own issue and exact evidence:** #786 (JazzHR live form id),
+  #787 (Lever fill_failed with no recorded field), #788 (Manatal posting identity unreadable), #789 (Greenhouse
+  city combobox Review loop). None of these weakens a guard or fakes a send.
+- **Workable remains disabled** by the ATS kill switch (`ats_not_enabled`), so the strongest admin and education
+  matches still cannot send. That is a deliberate switch, listed for the owner.
+- **SmartRecruiters' sampled posting had expired** ("This job has expired"); the walk stayed in preparation rather
+  than inventing a form. Pool freshness, not a send bug.
+- **Two local instances.** Swe and teacher ran together; the admin pass ran on a fresh instance after a local
+  reset, so its pull/usage rows are the ones quoted directly above. All runs are on `0ae0339b`.
+- **The paid spacing was exercised with the test clock**, not wall-clock minutes, at the coordinator's request:
+  `POST /__test__/clock/offset` plus `POST /__test__/jobs/run-due`. The 294 s gap between the admin dry submits is
+  the real scheduled spacing, not a shortened one.
+- **Browser Use cloud sessions still stop immediately** (`status: stopped`, `cdpUrl: null`), so filling ran in
+  local Chromium. The brief allows this when Browser Use is unavailable; no Browser Use spend was incurred.
+- **Review answers** are ordinary owner answers typed through the real Review forms (city, province, ZIP,
+  nationality, gender, how-heard). The harness picks plausible values; two cards looped on a combobox answer and
+  were skipped, which is the product behaviour described in #789.
+- Screenshots are light at 390 and 1280; social/matches screens also have a dark pair. Renders come from the real
+  pages, not canvas boards.
 
 ## Reproduce
 
-The harness is in [walk/issue-710-walk.spec.ts.txt](walk/issue-710-walk.spec.ts.txt) with
-[walk/playwright.walk.config.ts.txt](walk/playwright.walk.config.ts.txt). It drives the real UI with Playwright,
-reads no seeded job data, and keeps the screenshots in this folder. Copy both files back to
-`test/walk/issue-710-walk.test.ts` and `playwright.walk.config.ts`, start the app with the env in the #710 brief,
-then run `bun node_modules/playwright/cli.js test -c playwright.walk.config.ts`.
+The harness is committed as text next to this report:
+[walk/issue-710-walk.spec.ts.txt](walk/issue-710-walk.spec.ts.txt) and
+[walk/playwright.walk.config.ts.txt](walk/playwright.walk.config.ts.txt). Copy both back to
+`test/walk/issue-710-walk.test.ts` and `playwright.walk.config.ts`, start the app with the #710 brief's env
+(`OVERTURE_DRY_SUBMIT=1`, `ENABLE_TEST_ROUTES=true`, `BROWSER_PROVIDER=local`), then run
+`bun node_modules/playwright/cli.js test -c playwright.walk.config.ts --workers=1` (add `WALK_PROFILE=swe`,
+`teacher` or `admin` for one person). The harness answers Review forms, approves Ready cards, skips the paid
+spacing through the test clock, and copies any `before_submit` / `after_submit` object-store screenshots into this
+folder.

@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { chromium } from "playwright";
@@ -21,6 +21,7 @@ interface Profile {
   places: { query: string; option: RegExp }[];
   plan: "free_trial" | "week" | "month";
   gaps: Record<string, string>;
+  gender?: string;
   sector: string;
 }
 
@@ -40,6 +41,7 @@ const PROFILES: Profile[] = [
       "Salary expectation": "CAD 150,000 a year",
       "Willing to relocate": "No",
     },
+    gender: "Female",
     key: "swe",
     name: "Maya Chen",
     plan: "free_trial",
@@ -61,6 +63,7 @@ const PROFILES: Profile[] = [
       "Salary expectation": "CAD 95,000 a year",
       "Willing to relocate": "Yes",
     },
+    gender: "Female",
     key: "teacher",
     name: "Amina Yusuf",
     plan: "week",
@@ -90,6 +93,7 @@ const PROFILES: Profile[] = [
       "Salary expectation": "CAD 75,000 a year",
       "Willing to relocate": "No",
     },
+    gender: "Male",
     key: "admin",
     name: "Daniel Okafor",
     plan: "month",
@@ -126,7 +130,10 @@ async function shot(page: Page, name: string, dark = false) {
   ] as const) {
     await page.setViewportSize({ width, height });
     await page.waitForTimeout(500);
-    await page.screenshot({ path: join(SHOTS, `${name}-${suffix}${dark ? "-dark" : ""}.png`), fullPage: true });
+    await page.screenshot({
+      path: join(SHOTS, `${name}-${suffix}${dark ? "-dark" : ""}.png`),
+      fullPage: true,
+    });
   }
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -174,7 +181,10 @@ async function signUp(page: Page, profile: Profile) {
   await page.goto(`${BASE}/signup`);
   await page.getByLabel("Email").fill(profile.email);
   await page.getByRole("button", { name: "Send sign-up link" }).click();
-  await page.getByText(/Check your inbox/i).waitFor({ timeout: 30_000 }).catch(() => {});
+  await page
+    .getByText(/Check your inbox/i)
+    .waitFor({ timeout: 30_000 })
+    .catch(() => {});
   await shot(page, `${profile.key}-01-signup`);
   await page.goto(await magicLink(profile.email));
   await page.waitForTimeout(2500);
@@ -264,7 +274,9 @@ async function waitForKind(kind: string, timeoutMs: number) {
     const { jobs } = (await (await fetch(`${BASE}/__test__/jobs`)).json()) as {
       jobs: { createdAt: number; kind: string; status: string }[];
     };
-    const latest = jobs.filter((job) => job.kind === kind).toSorted((a, b) => b.createdAt - a.createdAt)[0];
+    const latest = jobs
+      .filter((job) => job.kind === kind)
+      .toSorted((a, b) => b.createdAt - a.createdAt)[0];
 
     if (latest !== undefined && (latest.status === "done" || latest.status === "dead")) {
       return latest.status;
@@ -349,7 +361,10 @@ async function fillStripe(page: Page, subscribe: boolean) {
   await shot(page, "stripe-checkout");
 
   const button = subscribe
-    ? card.locator("button").filter({ hasText: /Subscribe|Start|Pay|Save/u }).last()
+    ? card
+        .locator("button")
+        .filter({ hasText: /Subscribe|Start|Pay|Save/u })
+        .last()
     : card.locator("button").filter({ hasText: /Save/u }).first();
   await button.click({ timeout: 60_000 });
   await page.waitForURL(/devbox:3423/u, { timeout: 120_000 });
@@ -359,7 +374,9 @@ async function fillStripe(page: Page, subscribe: boolean) {
 function signWebhook(payload: string) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
   const timestamp = Math.floor(Date.now() / 1000);
-  const signature = createHmac("sha256", secret).update(`${String(timestamp)}.${payload}`).digest("hex");
+  const signature = createHmac("sha256", secret)
+    .update(`${String(timestamp)}.${payload}`)
+    .digest("hex");
 
   return `t=${String(timestamp)},v1=${signature}`;
 }
@@ -367,13 +384,25 @@ function signWebhook(payload: string) {
 async function deliverInvoicePaid(sessionId: string) {
   const key = process.env.STRIPE_SECRET_KEY ?? "";
   const auth = { Authorization: `Bearer ${key}` };
-  const session = (await (
-    await fetch(
-      `https://api.stripe.com/v1/checkout/sessions/${sessionId}?expand[]=subscription.latest_invoice`,
-      { headers: auth },
-    )
-  ).json()) as { subscription?: { latest_invoice?: unknown } };
-  const invoice = session.subscription?.latest_invoice;
+  let invoice: unknown = null;
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const session = (await (
+      await fetch(
+        `https://api.stripe.com/v1/checkout/sessions/${sessionId}?expand[]=subscription.latest_invoice`,
+        { headers: auth },
+      )
+    ).json()) as { subscription?: { latest_invoice?: unknown } };
+    invoice = session.subscription?.latest_invoice;
+
+    if (invoice !== undefined && invoice !== null && typeof invoice !== "string") {
+      break;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5000);
+    });
+  }
 
   if (invoice === undefined || invoice === null || typeof invoice === "string") {
     throw new Error("no invoice on the subscription");
@@ -401,64 +430,225 @@ async function deliverInvoicePaid(sessionId: string) {
   }
 }
 
-async function answerReviews(page: Page) {
+const reviewSeen = new Map<string, Set<string>>();
+
+function seenPromptsFor(profile: Profile) {
+  let seen = reviewSeen.get(profile.key);
+
+  if (seen === undefined) {
+    seen = new Set<string>();
+    reviewSeen.set(profile.key, seen);
+  }
+
+  return seen;
+}
+
+async function answerReviews(page: Page, profile: Profile) {
   await page.goto(`${BASE}/review`);
   await page.waitForTimeout(2500);
   await shot(page, "review");
 
-  for (let index = 0; index < 10; index += 1) {
-    const answer = page.getByRole("button", { name: /^Answer /u }).first();
+  let answered = 0;
+  const seen = seenPromptsFor(profile);
+
+  for (let index = 0; index < 12; index += 1) {
+    const answer = page.getByRole("button", { name: /^Answer\b/u }).first();
 
     if ((await answer.count()) === 0) {
-      return;
+      return answered;
     }
 
     await answer.click();
     const dialog = page.getByRole("dialog");
     await dialog.waitFor({ timeout: 15_000 });
 
-    for (const textbox of await dialog.getByRole("textbox").all()) {
-      if ((await textbox.inputValue().catch(() => "")) === "") {
-        await textbox.fill("No");
-      }
+    const sections = await dialog.locator("section").all();
+    const prompts = [];
+
+    for (const section of sections) {
+      prompts.push((await section.getByRole("heading", { level: 3 }).allTextContents())[0] ?? "");
     }
 
-    for (const combobox of await dialog.getByRole("combobox").all()) {
-      const value = await combobox.inputValue().catch(() => "");
+    if (prompts.some((prompt) => seen.has(prompt))) {
+      console.log(`[${profile.key}] question came back unanswered; skipping that application`);
+      await dialog.getByRole("button", { name: /Skip this application/u }).click();
+      await page.waitForTimeout(1500);
 
-      if (value === "") {
-        const options = await combobox.locator("option").all();
+      if ((await page.getByRole("button", { name: /^Answer\b/u }).count()) > 0) {
+        await page.goto(`${BASE}/review`);
+        await page.waitForTimeout(1500);
+      }
 
-        if (options.length > 1) {
-          const first = await options[1]?.getAttribute("value");
-          if (first !== null && first !== undefined) await combobox.selectOption(first);
+      continue;
+    }
+
+    for (const prompt of prompts) {
+      seen.add(prompt);
+    }
+
+    for (const section of sections) {
+      const prompt = (await section.getByRole("heading", { level: 3 }).allTextContents())[0] ?? "";
+      const wanted = answerFor(profile, prompt);
+
+      for (const textbox of await section.getByRole("textbox").all()) {
+        if ((await textbox.inputValue().catch(() => "")) === "") {
+          await textbox.fill(wanted);
+        }
+      }
+
+      for (const group of await section.getByRole("group").all()) {
+        const buttons = await group.getByRole("button").all();
+
+        if (buttons.length === 0) {
+          continue;
+        }
+
+        const matching = group.getByRole("button", {
+          name: new RegExp(`^${escapeRegExp(wanted)}$`, "u"),
+        });
+
+        if ((await matching.count()) > 0) {
+          await matching.first().click();
+        } else {
+          const no = group.getByRole("button", { name: "No", exact: true });
+
+          if ((await no.count()) > 0) {
+            await no.first().click();
+          } else {
+            await buttons[0]?.click();
+          }
+        }
+      }
+
+      for (const checkbox of await section.locator('input[type="checkbox"]').all()) {
+        if (!(await checkbox.isChecked().catch(() => true))) {
+          await checkbox.check();
         }
       }
     }
 
-    for (const group of await dialog.getByRole("group").all()) {
-      const no = group.getByRole("button", { name: "No", exact: true });
+    const save = dialog.getByRole("button", { name: /Save and continue/u });
 
-      if ((await no.count()) > 0) {
-        await no.first().click();
-      } else {
-        const buttons = await group.getByRole("button").all();
-        if (buttons.length > 0) await buttons[0]?.click();
-      }
+    if (!(await save.isEnabled().catch(() => false))) {
+      console.log(`[${profile.key}] review form save stayed disabled; skipping`);
+      await dialog
+        .getByRole("button", { name: /Skip this application/u })
+        .click()
+        .catch(() => {});
+      await page.waitForTimeout(1500);
+
+      continue;
     }
 
-    await dialog.getByRole("button", { name: "Save and continue" }).click();
-    await page.waitForTimeout(1500);
+    await save.click({ timeout: 15_000 });
+    await page.waitForTimeout(2000);
+    answered += 1;
+
+    if ((await page.getByRole("button", { name: /^Answer\b/u }).count()) > 0) {
+      await page.goto(`${BASE}/review`);
+      await page.waitForTimeout(2000);
+    }
   }
+
+  return answered;
 }
 
-async function settleWork(page: Page) {
-  for (let attempt = 0; attempt < 24; attempt += 1) {
-    await page.goto(`${BASE}/review`);
-    await page.waitForTimeout(1500);
+function escapeRegExp(value: string) {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
 
-    if ((await page.getByRole("button", { name: /^Answer /u }).count()) > 0) {
-      await answerReviews(page);
+function answerFor(profile: Profile, prompt: string) {
+  const gaps = profile.gaps;
+
+  if (/location \(city\)|city|town/iu.test(prompt)) {
+    return gaps.City ?? "Ottawa";
+  }
+
+  if (/^state$|^province$|state\/province/iu.test(prompt)) {
+    return "ON";
+  }
+
+  if (/zip|postal/iu.test(prompt)) {
+    return "K1A 0A6";
+  }
+
+  if (/^gender$|gender/iu.test(prompt)) {
+    return profile.gender ?? "Female";
+  }
+
+  if (/^nationality$/iu.test(prompt)) {
+    return gaps.Country ?? "Canada";
+  }
+
+  if (/country/iu.test(prompt)) {
+    return gaps.Country ?? "Canada";
+  }
+
+  if (/phone|mobile|telephone/iu.test(prompt)) {
+    return gaps.Phone ?? "+1 613 555 0100";
+  }
+
+  if (/salary|compensation|expectation/iu.test(prompt)) {
+    return gaps["Salary expectation"] ?? "CAD 100,000 a year";
+  }
+
+  if (/notice|earliest start|start date/iu.test(prompt)) {
+    return gaps["Notice period or earliest start"] ?? "Two weeks";
+  }
+
+  if (/relocat/iu.test(prompt)) {
+    return gaps["Willing to relocate"] ?? "No";
+  }
+
+  if (/sponsor|visa/iu.test(prompt)) {
+    return gaps["Needs sponsorship"] ?? "No";
+  }
+
+  if (/hear about|how did you (first )?(hear|find)|find this (position|role|job)/iu.test(prompt)) {
+    return "LinkedIn Job Search";
+  }
+
+  if (/linkedin/iu.test(prompt)) {
+    return gaps.LinkedIn ?? "";
+  }
+
+  if (/language/iu.test(prompt)) {
+    return gaps["Languages and proficiency level"] ?? "English (native)";
+  }
+
+  if (/authoriz|allowed to work|legally/iu.test(prompt)) {
+    return gaps["Legally allowed to work in the country"] ?? "Yes";
+  }
+
+  return "No";
+}
+
+async function answersPending(page: Page) {
+  await page.goto(`${BASE}/review`);
+  await page.waitForTimeout(2000);
+
+  return (await page.getByRole("button", { name: /^Answer\b/u }).count()) > 0;
+}
+
+async function settleWork(page: Page, profile: Profile) {
+  const deadline = Date.now() + 12 * 60_000;
+
+  while (Date.now() < deadline) {
+    if (await answersPending(page)) {
+      const answered = await answerReviews(page, profile);
+      console.log(`[${profile.key}] answered ${String(answered)} review forms`);
+
+      continue;
+    }
+
+    const applications = await applicationsOf(profile);
+    const preparing = applications.filter(
+      (application) => application.status === "preparing",
+    ).length;
+
+    if (preparing > 0) {
+      console.log(`[${profile.key}] waiting for ${String(preparing)} preparations`);
+      await page.waitForTimeout(8000);
 
       continue;
     }
@@ -472,6 +662,167 @@ async function settleWork(page: Page) {
 
     await page.waitForTimeout(5000);
   }
+}
+
+async function approveEverything(page: Page, profile: Profile) {
+  await page.goto(`${BASE}/ready`);
+  await page.waitForTimeout(2500);
+
+  for (let index = 0; index < 4; index += 1) {
+    const approve = page.getByRole("button", { name: "Approve", exact: true }).first();
+
+    if ((await approve.count()) === 0) {
+      break;
+    }
+
+    await approve.click();
+    await page.waitForTimeout(700);
+    await page.getByRole("button", { name: "Approve & schedule" }).click();
+    await page.waitForTimeout(1500);
+  }
+
+  console.log(`[${profile.key}] approved the ready cards`);
+}
+
+async function applicationsOf(profile: Profile) {
+  const userId = await userIdOf(profile.email);
+  const { applications } = (await (
+    await fetch(`${BASE}/__test__/applications?userId=${userId}`)
+  ).json()) as {
+    applications: {
+      ats: string;
+      companyName: string;
+      id: string;
+      scheduledFor: number | null;
+      status: string;
+      statusReason: string | null;
+    }[];
+  };
+
+  return applications;
+}
+
+async function advanceClockTo(target: number) {
+  const clock = (await (await fetch(`${BASE}/__test__/clock`)).json()) as {
+    now: number;
+    offsetMs: number;
+  };
+  const offsetMs = Math.max(clock.offsetMs, target - Date.now() + 5000);
+
+  await fetch(`${BASE}/__test__/clock/offset`, {
+    body: JSON.stringify({ offsetMs }),
+    headers: { "content-type": "application/json" },
+    method: "POST",
+  });
+  await fetch(`${BASE}/__test__/jobs/run-due`, { method: "POST" });
+}
+
+async function skipSendSpacing(profile: Profile) {
+  for (let round = 0; round < 8; round += 1) {
+    const applications = await applicationsOf(profile);
+    const waiting = applications.filter(
+      (application) =>
+        (application.status === "approved" || application.status === "scheduled") &&
+        application.scheduledFor !== null,
+    );
+    const next = waiting.map((application) => application.scheduledFor ?? 0).filter((at) => at > 0);
+
+    if (next.length === 0) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 2000);
+      });
+
+      continue;
+    }
+
+    await advanceClockTo(Math.min(...next) + 2000);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 4000);
+    });
+  }
+}
+
+async function attemptsOf(applicationId: string) {
+  const { attempts } = (await (
+    await fetch(`${BASE}/__test__/attempts?applicationId=${applicationId}`)
+  ).json()) as {
+    attempts: {
+      endedAt: number | null;
+      errorCode: string | null;
+      n: number;
+      outcome: string | null;
+      submitClickedAt: number | null;
+    }[];
+  };
+
+  return attempts;
+}
+
+async function sendActivity(profile: Profile) {
+  const applications = await applicationsOf(profile);
+  const rows = [];
+
+  for (const application of applications) {
+    const attempts = await attemptsOf(application.id);
+
+    if (attempts.length > 0) {
+      rows.push({ application, attempts });
+    }
+  }
+
+  return rows;
+}
+
+async function captureSendEvidence(profile: Profile) {
+  const root = process.env.OBJECT_STORE_ROOT;
+  const userId = await userIdOf(profile.email);
+  const applications = await applicationsOf(profile);
+  const summary: unknown[] = [];
+
+  console.log(`[${profile.key}] SEND EVIDENCE`);
+
+  for (const application of applications) {
+    const attempts = await attemptsOf(application.id);
+
+    if (attempts.length === 0) {
+      continue;
+    }
+
+    console.log(
+      `[${profile.key}] ${application.companyName} (${application.ats}) status=${application.status} reason=${application.statusReason ?? "-"}`,
+    );
+
+    for (const attempt of attempts) {
+      console.log(
+        `[${profile.key}]   attempt ${String(attempt.n)} outcome=${attempt.outcome ?? "-"} error=${attempt.errorCode ?? "-"} submitClickedAt=${attempt.submitClickedAt === null ? "-" : String(attempt.submitClickedAt)}`,
+      );
+    }
+
+    summary.push({ application, attempts });
+
+    if (root === undefined) {
+      continue;
+    }
+
+    const dir = join(root, "screenshots", userId, application.id);
+
+    if (!existsSync(dir)) {
+      continue;
+    }
+
+    for (const file of readdirSync(dir)) {
+      if (!/-(?:before|after)_submit-\d+\.png$/u.test(file)) {
+        continue;
+      }
+
+      const phase = file.includes("-before_submit-") ? "before" : "after";
+      const name = `${profile.key}-send-${application.ats}-${phase}-submit.png`;
+      copyFileSync(join(dir, file), join(SHOTS, name));
+      console.log(`[${profile.key}]   copied ${name}`);
+    }
+  }
+
+  return summary;
 }
 
 async function planAndTracker(page: Page, profile: Profile) {
@@ -529,47 +880,72 @@ async function planAndTracker(page: Page, profile: Profile) {
   console.log(`[${profile.key}] tracker`);
   await page.waitForTimeout(5000);
   await shot(page, `${profile.key}-06-tracker`);
-  await settleWork(page);
+  await settleWork(page, profile);
   await page.goto(`${BASE}/ready`);
   await page.waitForTimeout(3000);
   await shot(page, `${profile.key}-07-ready`);
   console.log(`[${profile.key}] approvals`);
 
-  for (let index = 0; index < 10; index += 1) {
-    const approve = page.getByRole("button", { name: "Approve", exact: true }).first();
+  for (let round = 0; round < 3; round += 1) {
+    await approveEverything(page, profile);
+    await shot(page, `${profile.key}-08-scheduled`);
+    console.log(`[${profile.key}] waiting for sends (round ${String(round)})`);
 
-    if ((await approve.count()) === 0) {
-      break;
+    let sawAttempt = false;
+
+    const sendDeadline = Date.now() + 8 * 60_000;
+
+    while (Date.now() < sendDeadline) {
+      await skipSendSpacing(profile);
+      await page.waitForTimeout(3000);
+
+      if (await answersPending(page)) {
+        break;
+      }
+
+      const applications = await applicationsOf(profile);
+      const busy = applications.filter(
+        (application) =>
+          application.status === "scheduled" ||
+          application.status === "sending" ||
+          application.status === "preparing",
+      );
+
+      if (busy.length === 0) {
+        break;
+      }
+
+      const rows = await sendActivity(profile);
+
+      if (rows.length > 0) {
+        sawAttempt = true;
+      }
     }
 
-    await approve.click();
-    await page.waitForTimeout(700);
-    await page.getByRole("button", { name: "Approve & schedule" }).click();
-    await page.waitForTimeout(1500);
-  }
+    if (await answersPending(page)) {
+      await settleWork(page, profile);
 
-  await shot(page, `${profile.key}-08-scheduled`);
-  console.log(`[${profile.key}] waiting for sends`);
+      continue;
+    }
 
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    await page.waitForTimeout(10_000);
-    await page.goto(`${BASE}/tracker`);
-    await page.waitForTimeout(1500);
-    const text = await page.locator("main").innerText();
-
-    if (/Ready to send|Applied|Couldn't apply|Needs your answer/u.test(text)) {
+    if (sawAttempt) {
       break;
     }
   }
 
+  await captureSendEvidence(profile);
+  await page.goto(`${BASE}/tracker`);
+  await page.waitForTimeout(3000);
   await shot(page, `${profile.key}-09-tracker-final`);
 }
 
 test("three people, three plans, stopping before Submit", async () => {
-  test.setTimeout(60 * 60_000);
+  test.setTimeout(100 * 60_000);
 
   for (const profile of targeted) {
-    const context: BrowserContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const context: BrowserContext = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+    });
     const page = await context.newPage();
     page.on("pageerror", (error) => {
       console.log(`[${profile.key}] pageerror`, String(error));
