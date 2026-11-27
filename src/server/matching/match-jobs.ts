@@ -25,6 +25,10 @@ function enqueue(
   payload: MatchJobPayload,
   key: string,
 ) {
+  if (Bun.env.ENABLE_TEST_ROUTES === "true") {
+    return false;
+  }
+
   return enqueueJob(db, clock, kind, JSON.stringify(payload), {
     dedupeKey: key,
     maxAttempts: 2,
