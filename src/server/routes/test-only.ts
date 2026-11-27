@@ -1926,24 +1926,27 @@ export function createTestRoutes(
     db.insert(applicationEvents)
       .values(
         events.map((event) => {
+          const structured = event.reason !== null || event.attemptId !== null;
           const detail: Record<string, string> = {};
 
-          if (event.detail !== null) {
-            detail.message = event.detail;
-          }
+          if (structured) {
+            if (event.detail !== null) {
+              detail.message = event.detail;
+            }
 
-          if (event.reason !== null) {
-            detail.reason = event.reason;
-          }
+            if (event.reason !== null) {
+              detail.reason = event.reason;
+            }
 
-          if (event.attemptId !== null) {
-            detail.attemptId = event.attemptId;
+            if (event.attemptId !== null) {
+              detail.attemptId = event.attemptId;
+            }
           }
 
           return {
             at: event.at,
             applicationId,
-            detail: Object.keys(detail).length === 0 ? event.detail : JSON.stringify(detail),
+            detail: structured ? JSON.stringify(detail) : event.detail,
             fromValue: event.fromValue,
             id: crypto.randomUUID(),
             kind: event.kind,
