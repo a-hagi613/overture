@@ -10,6 +10,7 @@ import type { LlmBatchCall, LlmRequest } from "../ports/llm.ts";
 import { bgJobs } from "../db/schema.ts";
 import { enqueueJob } from "../jobs/queue.ts";
 import { logError, logInfo } from "../log.ts";
+import { LlmHttpError } from "./http.ts";
 import {
   applyLlmBatchResultsOnce,
   createLlmBatchRow,
@@ -95,6 +96,17 @@ async function delay(ms: number) {
 
 function describe(cause: unknown) {
   return cause instanceof Error ? cause.message : String(cause);
+}
+
+function isPermanentProviderFailure(cause: unknown) {
+  return (
+    cause instanceof LlmHttpError &&
+    cause.status !== null &&
+    cause.status >= 400 &&
+    cause.status < 500 &&
+    cause.status !== 408 &&
+    cause.status !== 429
+  );
 }
 
 function pollJobKey(recordId: string) {
@@ -239,6 +251,10 @@ export function createDurableBatches(options: DurableBatchOptions) {
       }
 
       const message = describe(error);
+
+      if (isPermanentProviderFailure(error)) {
+        return { kind: "failed", message: fail(record.id, message) };
+      }
 
       recordLlmBatchError(db, clock, record.id, message);
 

@@ -316,6 +316,8 @@
           "src/server/platform/llm/batch-store.test.ts",
           "src/server/platform/llm/budget.test.ts",
           "src/server/platform/llm/caps.test.ts",
+          "src/server/platform/llm/durable-batches.test.ts",
+          "src/server/platform/llm/http.test.ts",
           "src/server/platform/llm/models.test.ts",
           "src/server/platform/llm/schema-rejections.test.ts",
           "src/server/platform/llm/usage.test.ts",

@@ -4,12 +4,17 @@ import { Hono } from "hono";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { MeterProvider } from "@opentelemetry/sdk-metrics";
 
-import { createPrometheusExporter, renderPrometheus } from "./prometheus.ts";
+import {
+  createPrometheusExporter,
+  createPrometheusMetricsHandler,
+  renderPrometheus,
+} from "./prometheus.ts";
 import {
   createMetrics,
   isDeniedMetricAttribute,
   llmCostUsd,
   METRIC_NAMES,
+  recordMetricSafely,
   sanitizeMetricAttributes,
 } from "./metrics.ts";
 import {
@@ -133,6 +138,44 @@ test("LLM cost follows the rate card in models.ts", () => {
       outputTokens: 1_000_000,
     }),
   ).toBeCloseTo(0.05 + 0.25);
+});
+
+test("an unpriced model records its request instead of breaking the metric call", async () => {
+  const output = await scrape((recorder) => {
+    recorder.recordLlmCall({
+      cacheWriteTokens: 0,
+      cachedTokens: 0,
+      inputTokens: 10,
+      model: "claude-unpriced-9",
+      outputTokens: 5,
+      purpose: "score",
+      status: "ok",
+    });
+  });
+
+  expect(output).toContain('overture_llm_requests_total{model="claude-unpriced-9"');
+  expect(output).not.toContain("overture_llm_cost_usd_total{");
+});
+
+test("a metric record that throws never escapes into the request", () => {
+  expect(() =>
+    recordMetricSafely(() => {
+      throw new Error("the exporter is down");
+    }),
+  ).not.toThrow();
+});
+
+test("a failing scrape answers 503 without leaking the exporter error", async () => {
+  const handler = createPrometheusMetricsHandler({
+    serialize: () => {
+      throw new Error("exporter detail that must not reach a scraper");
+    },
+  });
+
+  const response = await handler(new Request("http://metrics.test/metrics"));
+
+  expect(response.status).toBe(503);
+  expect(await response.text()).toBe("metrics unavailable");
 });
 
 test("route labels use bounded templates, never raw ids or scanner paths", () => {

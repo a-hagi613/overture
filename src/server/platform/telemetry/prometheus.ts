@@ -1,5 +1,9 @@
 import { PrometheusExporter, PrometheusSerializer } from "@opentelemetry/exporter-prometheus";
 
+import { logError } from "../log.ts";
+
+const UNAVAILABLE_BODY = "metrics unavailable";
+
 /**
  * A `PrometheusExporter` that never opens its own HTTP listener. Overture serves the scrape from its
  * own private `Bun.serve` listener (`:9091`, IPv6 `::`) so the public app port stays free of
@@ -77,7 +81,18 @@ export function createPrometheusMetricsHandler(options: PrometheusMetricsHandler
       });
     }
 
-    const body = await serialize();
+    let body: string;
+
+    try {
+      body = await serialize();
+    } catch (error) {
+      logError("metrics.scrape", error);
+
+      return new Response(UNAVAILABLE_BODY, {
+        headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
+        status: 503,
+      });
+    }
 
     return new Response(request.method === "HEAD" ? null : body, {
       headers: {

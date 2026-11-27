@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler, Next } from "hono";
 import { routePath } from "hono/route";
 
-import { defaultMetrics } from "./metrics.ts";
+import { defaultMetrics, recordMetricSafely } from "./metrics.ts";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const NUMERIC_PATTERN = /^\d+$/u;
@@ -93,7 +93,9 @@ export function createHttpRequestMetrics(record: HttpMetricRecorder) {
 }
 
 const httpRequestMetrics = createHttpRequestMetrics((sample) => {
-  defaultMetrics().recordHttpRequest(sample);
+  recordMetricSafely(() => {
+    defaultMetrics().recordHttpRequest(sample);
+  });
 });
 
 /**

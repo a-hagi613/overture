@@ -1,6 +1,7 @@
 import { metrics as otelMetrics } from "@opentelemetry/api";
 import type { Attributes, Counter, Histogram, Meter, ObservableGauge } from "@opentelemetry/api";
 
+import { logError } from "../log.ts";
 import { OTEL_METRIC_ATTRIBUTE_DENYLIST } from "./otel.ts";
 import { batchPricesFor } from "../llm/models.ts";
 
@@ -60,6 +61,28 @@ export const METRIC_ATTRIBUTE_NAMES = [
 ] as const;
 
 export type MetricAttributes = Readonly<Record<string, string | number>>;
+
+let metricRecordFailureLogged = false;
+
+/**
+ * Runs one metric record so it can never break the request or job that produced it. A telemetry
+ * failure is reported once per process: repeating it on every request would turn a broken exporter
+ * into a second outage, and one line is enough for the owner to act on.
+ * @param run The record to emit.
+ * @returns Nothing.
+ */
+export function recordMetricSafely(run: () => void) {
+  try {
+    run();
+  } catch (error) {
+    if (metricRecordFailureLogged) {
+      return;
+    }
+
+    metricRecordFailureLogged = true;
+    logError("metrics.record", error);
+  }
+}
 
 /**
  * The product gauges the stats sampler fills from the database every minute: people, applications,
@@ -169,6 +192,22 @@ export function llmCostUsd(
     1_000_000;
 
   return micros / 1_000_000;
+}
+
+function llmCostUsdOrZero(
+  model: string,
+  tokens: {
+    inputTokens: number;
+    cachedTokens: number;
+    cacheWriteTokens: number;
+    outputTokens: number;
+  },
+) {
+  try {
+    return llmCostUsd(model, tokens);
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -368,7 +407,7 @@ export class MetricsRecorder {
 
     const usd =
       input.costMicros === undefined
-        ? llmCostUsd(input.model, input)
+        ? llmCostUsdOrZero(input.model, input)
         : input.costMicros / 1_000_000;
 
     if (usd > 0) {
