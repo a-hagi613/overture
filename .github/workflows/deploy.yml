@@ -13,6 +13,12 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      # A re-deploy of a commit that already deployed successfully (for example after a Fly incident) is deliberate.
+      force:
+        description: Deploy even when this commit already has a successful Deploy run
+        type: boolean
+        default: false
 
 concurrency:
   # One deploy at a time, and a queued deploy is never cancelled: the two entry points above, plus several merges in one
@@ -28,14 +34,57 @@ jobs:
   deploy:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    # `actions: read` reads this workflow's own runs for the exactly-once guard below; the deploy itself still only
+    # needs `contents: read`.
+    permissions:
+      actions: read
+      contents: read
     outputs:
       skip: ${{ steps.guard.outputs.skip }}
     steps:
-      - name: Skip unless FLY_API_TOKEN is set (docs/DEPLOY.md, one-time step 6)
+      - name: Skip when this commit already has a Deploy run, or while FLY_API_TOKEN is unset
         id: guard
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          FORCE: ${{ inputs.force || 'false' }}
         run: |
+          set -euo pipefail
+          # Exactly once: two entry points (a CI success and a dispatch from auto-merge) plus a superseded waiter can ask
+          # for the same commit twice. The deploy-main group serializes the runs, so the second one starts after the
+          # first finishes and sees it here. A failed or cancelled Deploy is retried; `-f force=true` skips this guard.
+          if [ "${FORCE:-false}" != "true" ]; then
+            # This run is in the list too, and it is in progress, so it must not count as its own predecessor.
+            prior="$(gh run list --workflow deploy.yml --branch main --limit 30 \
+              --json databaseId,headSha,status,conclusion \
+              --jq '.[] | "\(.databaseId) \(.headSha) \(.status) \(.conclusion // "-")"')"
+            covered=false
+            while read -r id sha status conclusion; do
+              if [ -z "$id" ] || [ "$id" = "$RUN_ID" ]; then
+                continue
+              fi
+              if [ "$sha" = "$HEAD_SHA" ]; then
+                if [ "$status" != "completed" ] || [ "$conclusion" = "success" ]; then
+                  covered=true
+                fi
+              fi
+            done <<< "$prior"
+            if [ "$covered" = "true" ]; then
+              echo "::notice::Deploy already has a queued, running or successful run for ${HEAD_SHA}; not deploying it twice."
+              {
+                echo "### Deploy skipped"
+                echo ""
+                echo "\`${HEAD_SHA}\` already has a queued, running or successful Deploy run. Run the workflow with"
+                echo "\`force\` to deploy this commit again deliberately."
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
           if [ -z "$FLY_API_TOKEN" ]; then
             echo "::notice::FLY_API_TOKEN is not set yet (docs/DEPLOY.md one-time step 6); skipping deploy."
             {

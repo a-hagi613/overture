@@ -1,5 +1,15 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
@@ -30,6 +40,8 @@ import {
   MARKETING_SYNC_STEP,
   AUTO_MERGE_DISPATCH_STEP,
   DEPLOY_CHECKOUT_REF,
+  DEPLOY_GUARD_STEP,
+  readStepScript,
   readBunVersions,
   readWorkflowStep,
 } from "./workflow-config-guard.ts";
@@ -1643,4 +1655,123 @@ test("a dispatch that also deploys a person's merge is reported", () => {
       problem.includes("does not leave a person's merge"),
     ),
   ).toBe(true);
+});
+
+const DEPLOY_GUARD_GH_STUB = `#!/usr/bin/env bash
+if [ "$1" = "run" ] && [ "$2" = "list" ]; then
+  printf '%s' "$FIXTURE_PRIOR_RUNS"
+  exit 0
+fi
+echo "stub gh: unsupported $*" >&2
+exit 64
+`;
+
+const deployGuardSandboxes: string[] = [];
+
+interface DeployGuardInput {
+  readonly priorRuns?: string;
+  readonly flyToken?: string;
+  readonly force?: string;
+  readonly headSha?: string;
+}
+
+function runDeployGuard(input: DeployGuardInput = {}) {
+  const root = mkdtempSync(join(tmpdir(), "deploy-guard-"));
+  const bin = join(root, "bin");
+  const outputPath = join(root, "output");
+  const summaryPath = join(root, "summary.md");
+
+  deployGuardSandboxes.push(root);
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(join(bin, "gh"), DEPLOY_GUARD_GH_STUB);
+  chmodSync(join(bin, "gh"), 0o755);
+  writeFileSync(outputPath, "");
+  writeFileSync(summaryPath, "");
+
+  const script =
+    readStepScript(
+      readWorkflowStep(readFileSync(".github/workflows/deploy.yml", "utf8"), DEPLOY_GUARD_STEP) ??
+        "",
+    ) || "";
+
+  const result = Bun.spawnSync(["bash", "-c", script], {
+    cwd: root,
+    env: {
+      ...Bun.env,
+      FLY_API_TOKEN: input.flyToken ?? "fixture-token",
+      FORCE: input.force ?? "false",
+      FIXTURE_PRIOR_RUNS: input.priorRuns ?? "",
+      GH_REPO: "example/repo",
+      GH_TOKEN: "fixture-token",
+      GITHUB_OUTPUT: outputPath,
+      GITHUB_STEP_SUMMARY: summaryPath,
+      HEAD_SHA: input.headSha ?? "abc1234",
+      RUN_ID: "999",
+      PATH: `${bin}:${Bun.env["PATH"] ?? ""}`,
+    },
+    stderr: "pipe",
+    stdout: "pipe",
+  });
+
+  return {
+    output: `${result.stdout.toString()}${result.stderr.toString()}`,
+    skip: /skip=true/u.test(readFileSync(outputPath, "utf8")),
+    status: result.exitCode,
+  };
+}
+
+afterEach(() => {
+  for (const directory of deployGuardSandboxes.splice(0)) {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("a commit that already deployed successfully is not deployed again", () => {
+  const { output, skip, status } = runDeployGuard({
+    priorRuns: "1 abc1234 completed success\n",
+  });
+
+  expect(status).toBe(0);
+  expect(skip).toBe(true);
+  expect(output).toContain("already has a queued, running or successful run for abc1234");
+});
+
+test("a commit whose deploy is still queued is not deployed again", () => {
+  const { skip } = runDeployGuard({ priorRuns: "1 abc1234 in_progress -\n" });
+
+  expect(skip).toBe(true);
+});
+
+test("a commit whose deploy failed is deployed again", () => {
+  const { skip } = runDeployGuard({ priorRuns: "1 abc1234 completed failure\n" });
+
+  expect(skip).toBe(false);
+});
+
+test("another commit's Deploy run does not skip this one", () => {
+  const { skip } = runDeployGuard({ priorRuns: "1 def5678 completed success\n" });
+
+  expect(skip).toBe(false);
+});
+
+test("force re-deploys a commit that already deployed", () => {
+  const { skip } = runDeployGuard({
+    force: "true",
+    priorRuns: "1 abc1234 completed success\n",
+  });
+
+  expect(skip).toBe(false);
+});
+
+test("the running deploy does not count as its own predecessor", () => {
+  const { skip } = runDeployGuard({ priorRuns: "999 abc1234 in_progress -\n" });
+
+  expect(skip).toBe(false);
+});
+
+test("the FLY_API_TOKEN guard still skips a deploy when the secret is unset", () => {
+  const { output, skip } = runDeployGuard({ flyToken: "" });
+
+  expect(skip).toBe(true);
+  expect(output).toContain("FLY_API_TOKEN is not set yet");
 });
