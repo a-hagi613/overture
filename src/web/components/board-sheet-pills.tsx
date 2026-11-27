@@ -19,30 +19,6 @@ function stageBadgeVariant(stage: string | null) {
   return "secondary" as const;
 }
 
-function noteBadgeVariant(tone: string) {
-  switch (tone) {
-    case "accent": {
-      return "signal" as const;
-    }
-
-    case "need": {
-      return "need" as const;
-    }
-
-    case "ok": {
-      return "ok" as const;
-    }
-
-    case "ink": {
-      return "default" as const;
-    }
-
-    default: {
-      return "outline" as const;
-    }
-  }
-}
-
 export function BoardSheetPills({ detail }: { detail: ApplicationDetail }) {
   const stage = stageLabel(detail.application.stage);
   const isSent = detail.application.sentAt !== null || detail.dossier !== null;
@@ -67,9 +43,6 @@ export function BoardSheetPills({ detail }: { detail: ApplicationDetail }) {
       {showStageBadge ? (
         <Badge variant={stageBadgeVariant(detail.application.stage)}>{stage}</Badge>
       ) : null}
-      {detail.note === null ? null : (
-        <Badge variant={noteBadgeVariant(detail.note.tone)}>{detail.note.label}</Badge>
-      )}
     </div>
   );
 }
