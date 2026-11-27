@@ -6,6 +6,7 @@ import type { Clock } from "../platform/ports/clock.ts";
 import type { LlmOutputSchema, LlmPort, LlmRequest } from "../platform/ports/llm.ts";
 import type { PersonalCrypto } from "../profile/personal-crypto.ts";
 import type { RankedCandidate } from "./candidates.ts";
+import type { PostingDisplay } from "./applications.ts";
 
 import {
   applications,
@@ -28,9 +29,15 @@ import { enqueueApplicationPrepare } from "../pipeline/prepare-jobs.ts";
 import { getSettingNumber } from "../platform/settings/index.ts";
 import { createLanguagesService } from "../profile/languages.ts";
 import { createTargetsService } from "../profile/targets.ts";
-import { activeApplicationCompanies, applicationFor, createApplication } from "./applications.ts";
+import {
+  activeApplicationCompanies,
+  applicationFor,
+  createApplication,
+  createClosedApplication,
+} from "./applications.ts";
 import { createCandidateService } from "./candidates.ts";
 import { descriptionSummary, postingRoleName, scoreTagsLine, targetsLine } from "./judge-input.ts";
+import { pickStatusOfApplication } from "../../shared/onboarding.ts";
 
 export const SCORE_PURPOSE = "score";
 
@@ -749,6 +756,73 @@ export function createMatchingService(deps: MatchDeps) {
     return applicationId;
   }
 
+  async function preparePick(userId: string, pick: { display: PostingDisplay; postingId: string }) {
+    const existing = applicationFor(db, userId, pick.postingId);
+
+    if (existing !== undefined) {
+      const status = pickStatusOfApplication(existing.status, existing.statusReason);
+
+      return {
+        applicationId: existing.id,
+        postingId: pick.postingId,
+        reason: null,
+        status: status === "picked" ? ("preparing" as const) : status,
+      };
+    }
+
+    const refused = await candidates.check(userId, pick.postingId);
+
+    if (refused === "closed" || refused === "apply_unsupported") {
+      const closedId = createClosedApplication(db, clock.now(), {
+        display: pick.display,
+        postingId: pick.postingId,
+        reason: refused === "closed" ? "posting_closed" : "apply_unsupported",
+        userId,
+      });
+
+      return {
+        applicationId: closedId,
+        postingId: pick.postingId,
+        reason: refused === "closed" ? ("posting_closed" as const) : ("apply_unsupported" as const),
+        status: refused === "closed" ? ("closed" as const) : ("failed" as const),
+      };
+    }
+
+    const applicationId = createApplication(
+      { db, catalogDb },
+      clock.now(),
+      { origin: "manual", postingId: pick.postingId, score: null, userId },
+      pick.display,
+    );
+
+    if (applicationId === null) {
+      return {
+        applicationId: applicationFor(db, userId, pick.postingId)?.id ?? null,
+        postingId: pick.postingId,
+        reason: "posting_closed" as const,
+        status: "closed" as const,
+      };
+    }
+
+    enqueueApplicationPrepare(db, clock, applicationId);
+
+    return {
+      applicationId,
+      postingId: pick.postingId,
+      reason: null,
+      status: "preparing" as const,
+    };
+  }
+
+  async function preparePicks(
+    userId: string,
+    picks: readonly { display: PostingDisplay; postingId: string }[],
+  ) {
+    const results = await Promise.all(picks.map(async (pick) => preparePick(userId, pick)));
+
+    return new Map(results.map((result) => [result.postingId, result]));
+  }
+
   async function prepareFrom(
     userId: string,
     postingIds: readonly string[],
@@ -771,7 +845,7 @@ export function createMatchingService(deps: MatchDeps) {
     return prepareFrom(userId, postingIds, 0, []);
   }
 
-  return { applyManually, fill, prepareChosen, preview, scoreOnOpen, upNext };
+  return { applyManually, fill, prepareChosen, preparePicks, preview, scoreOnOpen, upNext };
 }
 
 export type MatchingService = ReturnType<typeof createMatchingService>;

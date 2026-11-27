@@ -423,6 +423,83 @@ export function createReadyRoutes(deps: {
     };
   }
 
+  routes.post("/ready/send-all", async (context) => {
+    const user = await readSessionUser(auth, context.req.raw.headers);
+
+    if (user === null) {
+      return context.json({ error: "sign_in_required" }, 401);
+    }
+
+    const userId = user.id;
+
+    const rows = db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(and(eq(applications.userId, userId), eq(applications.status, "ready")))
+      .orderBy(asc(applications.readyAt), asc(applications.createdAt))
+      .all();
+
+    const base = clock.now();
+    const approved: { approvedAt: number; id: string; planSha256: string }[] = [];
+    const needsReview: string[] = [];
+    const refused: { error: string; id: string }[] = [];
+
+    async function approveFrom(index: number) {
+      const row = rows[index];
+
+      if (row === undefined) {
+        return;
+      }
+
+      const plan = await preparation.sendPlanFor(row.id);
+
+      if (plan === null) {
+        refused.push({ error: "not_ready", id: row.id });
+      } else if (generatedProseOf(plan)) {
+        needsReview.push(row.id);
+      } else {
+        const result = await approveOne({
+          applicationId: row.id,
+          approvedAt: base + approved.length,
+          planSha256: sendPlanSha256(plan),
+          userId,
+        });
+
+        if ("error" in result) {
+          refused.push({ error: result.error, id: row.id });
+        } else {
+          approved.push({
+            approvedAt: result.approvedAt,
+            id: row.id,
+            planSha256: result.planSha256,
+          });
+        }
+      }
+
+      await approveFrom(index + 1);
+    }
+
+    await approveFrom(0);
+
+    if (approved.length > 0) {
+      enqueuePlannerDay(db, clock, userId);
+      publishEvent(
+        db,
+        clock,
+        "home.updated",
+        JSON.stringify({ approved: approved.length }),
+        userId,
+      );
+    }
+
+    return context.json({
+      approved,
+      needsReview,
+      refused,
+      remaining: rows.length - approved.length,
+    });
+  });
+
   routes.post("/applications/:id/approve", validJson(approveBody), async (context) => {
     const user = await readSessionUser(auth, context.req.raw.headers);
 

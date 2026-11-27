@@ -285,6 +285,7 @@
           "src/server/matching/role-targets.test.ts",
           "src/server/matching/score-schema.test.ts",
           "src/server/notify/batches.test.ts",
+          "src/server/onboarding/picks.test.ts",
           "src/server/notify/code-wait-email.test.ts",
           "src/server/pipeline/answer-plan.test.ts",
           "src/server/pipeline/application-answers.test.ts",

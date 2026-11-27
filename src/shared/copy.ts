@@ -2235,6 +2235,12 @@ export const copy = {
     approveSavedOnly: (count: number) =>
       `Approve ${String(count)} saved-only ${plural(count, "application", "applications")}`,
     batchGuardNote: "Applications with drafted answers require individual review before approval.",
+    sendAll: "Send all",
+    sendAllAria: (count: number) =>
+      `Send all ${String(count)} ready ${plural(count, "application", "applications")}`,
+    sendAllBusy: "Sending…",
+    sendAllNote:
+      "Sends every prepared application whose answers are all yours. Drafted text is held for review.",
     approve: "Approve",
     approveNext: "Approve & Next",
     approveLast: "Approve",
@@ -2363,6 +2369,11 @@ export const copy = {
         "That card has newly written text. Approve it one card at a time so you can read it.",
       refused: (count: number) =>
         `${String(count)} ${plural(count, "card", "cards")} could not be approved.`,
+      sendAllDone: (approved: number) =>
+        `${String(approved)} ${plural(approved, "application", "applications")} scheduled to send.`,
+      sendAllNeedsReview: (count: number) =>
+        `${String(count)} ${plural(count, "application", "applications")} kept for review: newly written text needs your eyes.`,
+      sendAllNone: "Nothing was ready to send.",
       failed: "That did not go through. Try again.",
     },
     scheduledTitle: "Scheduled to send",
@@ -3007,6 +3018,13 @@ export const copy = {
         "This card has already been used for a free trial. Choose a plan to continue, or use another card.",
       choosePlan: "Choose a plan",
       anotherCard: "Use another card",
+      pendingTitle: "Your card is still confirming",
+      pendingBody:
+        "Stripe has not finished confirming the card yet. Your picks are safe; this settles on its own in a moment.",
+      retryPending: "Check again",
+      planActive: "Your plan is active. Your picks are on the Tracker.",
+      picksKeptNote: "Your picks are saved. Refresh in a moment to see them on the Tracker.",
+      settleFailed: "We could not finish setting up your picks. They are safe; try again.",
       loadFailed: "Could not complete the confirmation. Try again in a moment.",
     },
     signOut: "Sign out",

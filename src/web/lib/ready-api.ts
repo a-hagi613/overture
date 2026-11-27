@@ -145,6 +145,21 @@ async function approveAll(input: {
   return body;
 }
 
+const sendAllSchema = z.object({
+  approved: z.array(z.object({ approvedAt: z.number(), id: z.string(), planSha256: z.string() })),
+  needsReview: z.array(z.string()),
+  refused: z.array(z.object({ error: z.string(), id: z.string() })),
+  remaining: z.number(),
+});
+
+export type SendAllResult = z.infer<typeof sendAllSchema>;
+
+async function sendAll() {
+  return sendAllSchema.parse(
+    await jsonFrom(await fetch("/api/ready/send-all", { method: "POST" })),
+  );
+}
+
 async function unapprove(id: string) {
   return jsonFrom(
     await fetch(`/api/applications/${encodeURIComponent(id)}/unapprove`, { method: "POST" }),
@@ -203,6 +218,15 @@ export function useApproveAll() {
 
   return useMutation({
     mutationFn: approveAll,
+    onSuccess: invalidate,
+  });
+}
+
+export function useSendAll() {
+  const invalidate = useInvalidateReady();
+
+  return useMutation({
+    mutationFn: sendAll,
     onSuccess: invalidate,
   });
 }

@@ -111,7 +111,7 @@ test("a signed event is processed once, a replay and bad signatures change nothi
     expect(checkoutParams.get("client_reference_id")).toBe(ownerId);
     expect(checkoutParams.get("metadata[user_id]")).toBe(ownerId);
     expect(checkoutParams.get("customer_email")).toBe(authTestIdentity.ownerEmail);
-    expect(checkoutParams.get("success_url")).toBe(`${APP_ORIGIN}/profile/billing?billing=success`);
+    expect(checkoutParams.get("success_url")).toBe(`${APP_ORIGIN}/tracker?billing=success`);
     expect(checkoutParams.get("cancel_url")).toBe(
       `${APP_ORIGIN}/profile/billing?billing=cancelled`,
     );

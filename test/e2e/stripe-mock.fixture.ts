@@ -49,6 +49,11 @@ export interface StripeMock {
    * the given fingerprint, the shape Stripe returns after a card check succeeds.
    */
   stubVerifiedSetupSession: (session: { id: string; userId: string; fingerprint: string }) => void;
+  /**
+   * Answers GET /v1/checkout/sessions/<id> with a Setup session Stripe has not finished confirming, the shape a
+   * delayed webhook or a return ahead of Stripe sees.
+   */
+  stubIncompleteSetupSession: (session: { id: string; userId: string }) => void;
   /** Replaces what the list endpoints answer; null forwards to stripe-mock again. */
   seed: (lists: StripeMockLists | null) => void;
   stop: () => Promise<void>;
@@ -124,7 +129,8 @@ export async function startStripeMock() {
 
   const stripeMockUrl = await waitForListening(child);
   const requests: StripeMockRequest[] = [];
-  const setupStubs = new Map<string, { userId: string; fingerprint: string }>();
+  const setupStubs = new Map<string, { fingerprint: string; userId: string }>();
+  const incompleteStubs = new Map<string, { userId: string }>();
 
   let seeded: StripeMockLists | null = null;
 
@@ -185,6 +191,19 @@ export async function startStripeMock() {
         });
       }
 
+      const incomplete = sessionId === undefined ? undefined : incompleteStubs.get(sessionId);
+
+      if (request.method === "GET" && incomplete !== undefined) {
+        return Response.json({
+          client_reference_id: incomplete.userId,
+          customer: null,
+          id: sessionId,
+          mode: "setup",
+          setup_intent: { payment_method: null, status: "requires_payment_method" },
+          status: "open",
+        });
+      }
+
       const upstream = await fetch(`${stripeMockUrl}${url.pathname}${url.search}`, {
         body,
         headers: {
@@ -209,6 +228,9 @@ export async function startStripeMock() {
     },
     stubVerifiedSetupSession: ({ id, userId, fingerprint }) => {
       setupStubs.set(id, { fingerprint, userId });
+    },
+    stubIncompleteSetupSession: ({ id, userId }) => {
+      incompleteStubs.set(id, { userId });
     },
     seed: (lists) => {
       seeded = lists;

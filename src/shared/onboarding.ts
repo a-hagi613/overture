@@ -13,17 +13,143 @@ export const ONBOARDING_STEP_COUNT = 5;
 /** How many openings a person previews and picks before the trial card (SPEC, M3). */
 export const ONBOARDING_MATCH_PICK_LIMIT = 3;
 
+/** The largest pick list any plan offers, so storage is not tied to one plan (#709). */
+export const ONBOARDING_MAX_PICKS = 10;
+
+/** The plans onboarding can choose between; the pick limit comes from the plan. */
+export const ONBOARDING_PLAN_KINDS = ["free_trial", "week", "month"] as const;
+
+export type OnboardingPlanKind = (typeof ONBOARDING_PLAN_KINDS)[number];
+
+/**
+ * The pick limit one plan allows: the free trial 3, a paid plan the daily cap of 10.
+ * @param planKind The chosen plan, or null before a plan is chosen.
+ * @returns The number of picks the plan allows.
+ */
+export function onboardingPickLimitFor(planKind: OnboardingPlanKind | null) {
+  return planKind === null || planKind === "free_trial"
+    ? ONBOARDING_MATCH_PICK_LIMIT
+    : ONBOARDING_MAX_PICKS;
+}
+
+/** One pick's status, from chosen through preparation to a closed or failed posting. */
+export const ONBOARDING_PICK_STATUSES = [
+  "picked",
+  "preparing",
+  "needs_answer",
+  "prepared",
+  "closed",
+  "failed",
+] as const;
+
+export type OnboardingPickStatus = (typeof ONBOARDING_PICK_STATUSES)[number];
+
+/** The durable batch's own lifecycle, resumed across refresh, two tabs and Stripe returns. */
+export const ONBOARDING_BATCH_STATUSES = [
+  "picking",
+  "awaiting_card",
+  "preparing",
+  "prepared",
+  "failed",
+] as const;
+
+export type OnboardingBatchStatus = (typeof ONBOARDING_BATCH_STATUSES)[number];
+
+/** The reasons a pick can end without a sendable Application. */
+export const ONBOARDING_PICK_FAILURE_REASONS = [
+  "posting_closed",
+  "apply_unsupported",
+  "language",
+  "company_excluded",
+  "already_applied",
+  "prepare_failed",
+] as const;
+
+export type OnboardingPickFailureReason = (typeof ONBOARDING_PICK_FAILURE_REASONS)[number];
+
+const PICK_STATUS_BY_APPLICATION_STATUS = new Map<string, OnboardingPickStatus>([
+  ["approved", "prepared"],
+  ["confirming", "prepared"],
+  ["needs_review", "needs_answer"],
+  ["preparing", "preparing"],
+  ["ready", "prepared"],
+  ["sending", "prepared"],
+  ["sent", "prepared"],
+  ["skipped", "closed"],
+  ["withdrawn", "closed"],
+]);
+
+/**
+ * Map one Application's status onto its pick: preparation runs through preparing, a question surfaces as
+ * `needs_answer`, a finished plan is `prepared`, and a closed or failed Application keeps that outcome.
+ * @param status The Application's status.
+ * @param reason The Application's stored status reason, when it has one.
+ * @returns The pick status.
+ */
+export function pickStatusOfApplication(status: string, reason: string | null) {
+  if (status === "failed") {
+    return reason === "posting_closed" ? "closed" : "failed";
+  }
+
+  return PICK_STATUS_BY_APPLICATION_STATUS.get(status) ?? "picked";
+}
+
 export const onboardingTimezoneInputSchema = z.object({ timezone: timezoneSchema });
 
 export const onboardingMatchSelectionInputSchema = z.object({
-  postingIds: z.array(z.string().trim().min(1)).max(ONBOARDING_MATCH_PICK_LIMIT),
+  postingIds: z.array(z.string().trim().min(1)).max(ONBOARDING_MAX_PICKS),
 });
 
 export const onboardingPrepareInputSchema = onboardingMatchSelectionInputSchema;
 
+/** A Stripe return can carry the Checkout or Setup session that was just confirmed. */
+export const onboardingSettleInputSchema = z.object({
+  sessionId: z.string().trim().min(1).max(255).optional(),
+});
+
 export const onboardingCurrentEmployerInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
 });
+
+/** One durable pick as the Tracker, Ready and onboarding screens read it. */
+export interface OnboardingPickView {
+  applicationId: string | null;
+  applyUrl: string | null;
+  company: string;
+  location: string | null;
+  postingId: string;
+  reason: OnboardingPickFailureReason | null;
+  status: OnboardingPickStatus;
+  title: string;
+}
+
+/** The durable batch plus its picks; the same view on every refresh and tab. */
+export interface OnboardingPicksView {
+  batchStatus: OnboardingBatchStatus;
+  pickLimit: number;
+  picks: OnboardingPickView[];
+  selected: string[];
+}
+
+/** The outcome of settling a Stripe return, so the client can show one message per case. */
+export const ONBOARDING_SETTLE_OUTCOMES = [
+  "prepared",
+  "pending",
+  "already_trialed",
+  "already_used",
+  "card_not_verified",
+  "trial_required",
+  "no_picks",
+] as const;
+
+export type OnboardingSettleOutcome = (typeof ONBOARDING_SETTLE_OUTCOMES)[number];
+
+export interface OnboardingSettleView {
+  outcome: OnboardingSettleOutcome;
+  picks: OnboardingPicksView;
+  prepared: number;
+  applicationsLeft: number;
+}
 
 export interface OnboardingMatchView {
   id: string;

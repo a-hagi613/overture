@@ -196,7 +196,7 @@ export function OnboardingMatchesPage() {
           queryClient.invalidateQueries({ queryKey: ["board"] }),
         ]);
 
-        await navigate("/ready", { replace: true });
+        await navigate("/tracker", { replace: true });
 
         return;
       }
@@ -211,7 +211,14 @@ export function OnboardingMatchesPage() {
 
       if (outcome !== "redirect") {
         completingRef.current = false;
-        setTrialState(outcome);
+
+        if (outcome === "declined") {
+          setTrialState("declined");
+        } else if (outcome === "pending") {
+          setTrialState("pending");
+        } else {
+          setTrialState("used");
+        }
       }
     },
   });
@@ -383,7 +390,7 @@ export function OnboardingMatchesPage() {
           }
         }}
         onVerify={() => {
-          if (trialState === "verify") {
+          if (trialState === "verify" || trialState === "pending") {
             verify.mutate(picks);
           } else {
             restart.mutate();

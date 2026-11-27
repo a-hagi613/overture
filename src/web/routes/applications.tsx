@@ -1,5 +1,6 @@
 import { Navigate, useSearchParams } from "react-router";
 
+import { useOnboardingSettle } from "../components/onboarding-settle.ts";
 import { useMediaQuery } from "../lib/media-query.ts";
 import { BoardPage } from "./board.tsx";
 
@@ -24,6 +25,8 @@ function viewFrom(value: string | null) {
  */
 export function ApplicationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useOnboardingSettle();
   const desktop = useMediaQuery("(min-width: 1024px)");
   const rawView = searchParams.get("view");
 
