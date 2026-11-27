@@ -92,7 +92,7 @@ export async function classifyWithLlm(
   }
 
   const request = emailClassifyRequest({
-    customId: `email-classify-${input.messageId}`,
+    customId: "email-classify-0",
     subject: input.subject,
     text: input.text,
   });

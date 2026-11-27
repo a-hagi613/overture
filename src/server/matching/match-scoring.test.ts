@@ -464,6 +464,47 @@ describe("batch scoring", () => {
     expect(llm.batchCalls).toHaveLength(0);
   });
 
+  test("keeps every custom_id within the provider's 64 character limit for long job ids", async () => {
+    const { db } = fresh();
+    const firstId = `greenhouse-${"a".repeat(90)}`;
+    const secondId = `lever-${"b".repeat(90)}`;
+
+    addJob(db, firstId, { title: "Senior Backend Engineer" });
+    addJob(db, secondId, { title: "Staff Platform Engineer" });
+    db.insert(grants)
+      .values({
+        createdAt: NOW,
+        expiresAt: NOW + 30 * 86_400_000,
+        id: "grant-1",
+        quantity: 50,
+        source: "period",
+        startsAt: NOW - 1,
+        userId: "user-1",
+      })
+      .run();
+
+    const llm = new FakeLlm({
+      batch: true,
+      replies: (request) =>
+        request.user.includes("Senior Backend Engineer")
+          ? reply
+          : { ...reply, role_fit: 15, skills: 10 },
+    });
+
+    const result = await serviceFor(db, llm).scoreNewJobs("user-1");
+    const requests = llm.batchCalls.flat();
+
+    expect(requests).toHaveLength(2);
+    expect(requests.every((request) => request.customId.length <= 64)).toBe(true);
+    expect(new Set(requests.map((request) => request.customId)).size).toBe(2);
+    expect(result.scored).toBe(2);
+
+    const stored = readStoredMatches(db, "user-1");
+
+    expect(stored.find((row) => row.id === firstId)?.score).toBe(100);
+    expect(stored.find((row) => row.id === secondId)?.score).toBe(55);
+  });
+
   test("caps the paid new jobs at 50 a day", async () => {
     const { db } = fresh();
 

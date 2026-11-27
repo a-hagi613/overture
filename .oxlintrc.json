@@ -254,6 +254,7 @@
           "src/server/export/archive.test.ts",
           "src/server/fixtures/sanitise.test.ts",
           "src/server/host-routing.test.ts",
+          "src/server/inbox/classify-llm.test.ts",
           "src/server/inbox/copies.test.ts",
           "src/server/inbox/ingest.test.ts",
           "src/server/inbox/linked-mail.test.ts",
