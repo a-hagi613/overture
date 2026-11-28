@@ -93,7 +93,7 @@ export function startOrigin() {
 
 /**
  * Wires the deployed shape of the landing into one origin: `/` answers from `dist-marketing/index.html` with the
- * Worker's security headers, and every other path (the `/assets/*` bundle, `/api/supply`, the manifest, previews) goes
+ * Worker's security headers, and every other path (the `/assets/*` bundle, the manifest, previews) goes
  * to the app exactly as Cloudflare's route for `tryoverture.com/` forwards it. Serving the marketing HTML against the
  * app's own bundle is what the production 404 broke: a page from a second build referenced a `main-*.js` the origin
  * never had, so React never hydrated.

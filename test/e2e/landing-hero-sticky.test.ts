@@ -68,7 +68,7 @@ test.describe("landing sticky header and hero", () => {
     await page.goto(`${appServerUrl}/`);
 
     const gaps = await page.evaluate(() => {
-      const anchors = ["how-it-works", "live-jobs", "pricing", "faq"];
+      const anchors = ["how-it-works", "pricing", "faq"];
 
       return anchors.map((anchor) => {
         const section = document.querySelector(`#${anchor}`);

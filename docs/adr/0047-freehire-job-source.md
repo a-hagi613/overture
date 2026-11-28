@@ -75,8 +75,8 @@ The pull proof found two ways an unwanted row reached a pool, so both are now de
   one the person reads.
 - **Non-jobs never match.** Talent pools, open/general/speculative applications, "join our talent", recruiting
   adverts and test/placeholder rows are recognised by whole-title phrases in `src/shared/non-job.ts`. The freehire
-  reader, the matching pool, the retired catalog's match count, the public supply count and the old candidate pool
-  all apply the same list, so a count and a pool can never disagree about what is a job. A real title such as "Test Engineer" is not
+  reader, the matching pool, the retired catalog's match count and the old candidate pool all apply the same list,
+  so a count and a pool can never disagree about what is a job. A real title such as "Test Engineer" is not
   caught by the word "test".
 - **The proof is a committed harness.** `bun run scripts/filter-proof.ts` replays a recorded freehire pull
   (`src/server/jobs/fixtures/filter-proof/`) through the production store and reader for the 12 graded fields, King

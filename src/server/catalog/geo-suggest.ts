@@ -1,4 +1,3 @@
-import type { LocationSuggestion } from "../../shared/supply.ts";
 import {
   cityPlaceId,
   countryPlaceId,
@@ -32,17 +31,6 @@ interface IndexedPlace {
   readonly searchKeys: readonly string[];
   readonly weight: number;
 }
-
-const DEFAULT_SUGGESTIONS: readonly LocationSuggestion[] = [
-  { kind: "country", label: "United States", meta: "Country", value: "United States" },
-  { kind: "country", label: "Canada", meta: "Country", value: "Canada" },
-  { kind: "country", label: "United Kingdom", meta: "Country", value: "United Kingdom" },
-  { kind: "continent", label: "Europe", meta: "Continent", value: "Europe" },
-  { kind: "continent", label: "North America", meta: "Continent", value: "North America" },
-  { kind: "city", label: "New York", meta: "New York, United States", value: "New York" },
-  { kind: "city", label: "Toronto", meta: "Ontario, Canada", value: "Toronto" },
-  { kind: "city", label: "London", meta: "England, United Kingdom", value: "London" },
-];
 
 const DEFAULT_PLACES: readonly PlaceSuggestion[] = [
   {
@@ -380,66 +368,6 @@ function rankedPlaces(entries: readonly IndexedPlace[], normalized: string) {
   }
 
   return ranked.toSorted((left, right) => right.score - left.score);
-}
-
-/**
- * Suggests global places (continents, countries, metro areas, regions, and cities) from the
- * local geographic catalog for interactive typeahead pickers.
- * @param rawQuery The visitor's search input.
- * @param limit Maximum suggestions to return.
- * @returns Ranked place suggestions ready for Combobox items.
- */
-export function suggestLocations(rawQuery: string, limit = 10) {
-  const normalized = normalizePlaceName(rawQuery);
-
-  if (normalized.length < 2) {
-    return DEFAULT_SUGGESTIONS.slice(0, limit);
-  }
-
-  const seen = new Set<string>();
-  const suggestions: LocationSuggestion[] = [];
-
-  for (const entry of rankedPlaces(placeIndex(), normalized)) {
-    const dedupeKey = `${entry.place.kind}:${entry.place.normName}`;
-
-    if (seen.has(dedupeKey)) {
-      continue;
-    }
-
-    seen.add(dedupeKey);
-    suggestions.push({
-      kind: legacyKindOf(entry.place),
-      label: entry.place.label,
-      meta: entry.place.meta,
-      value: entry.place.value,
-    });
-
-    if (suggestions.length >= limit) {
-      break;
-    }
-  }
-
-  return suggestions;
-}
-
-function legacyKindOf(entry: IndexedPlace) {
-  if (entry.kind === "continent") {
-    return "continent";
-  }
-
-  if (entry.kind === "region") {
-    return "region";
-  }
-
-  if (entry.kind === "country") {
-    return "country";
-  }
-
-  if (entry.kind === "metro") {
-    return "metro";
-  }
-
-  return "city";
 }
 
 function placeKindOf(entry: IndexedPlace) {

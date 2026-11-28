@@ -29,7 +29,6 @@ export const METRIC_NAMES = {
   productApplications: "overture_applications",
   spendUsd: "overture_spend_usd",
   sqliteQueryDuration: "overture_sqlite_query_duration_ms",
-  supplyQueryDuration: "overture_supply_query_duration_ms",
   tagCoverageRatio: "overture_tag_coverage_ratio",
   users: "overture_users",
 } as const;
@@ -212,7 +211,7 @@ function llmCostUsdOrZero(
 
 /**
  * The low-cardinality instrument set. Every method sanitizes its labels, and the labels themselves
- * are bounded templates (`/api/supply`, an ATS name, a plan name), never a user id or a raw URL.
+ * are bounded templates (`/api/health`, an ATS name, a plan name), never a user id or a raw URL.
  */
 export class MetricsRecorder {
   private readonly applyDuration: Histogram;
@@ -229,7 +228,6 @@ export class MetricsRecorder {
   private readonly llmTokens: Counter;
   private readonly mailEvents: Counter;
   private readonly sqliteQueryDuration: Histogram;
-  private readonly supplyQueryDuration: Histogram;
   private readonly tagCoverage: ObservableGauge;
   private readonly productGauges = new Map<ProductGauge, Map<string, number>>();
   private readonly queueDepthByKind = new Map<string, number>();
@@ -282,10 +280,6 @@ export class MetricsRecorder {
     });
     this.sqliteQueryDuration = meter.createHistogram(METRIC_NAMES.sqliteQueryDuration, {
       description: "SQLite statement duration, by database and operation",
-      unit: "ms",
-    });
-    this.supplyQueryDuration = meter.createHistogram(METRIC_NAMES.supplyQueryDuration, {
-      description: "Public supply count query duration",
       unit: "ms",
     });
     this.tagCoverage = meter.createObservableGauge(METRIC_NAMES.tagCoverageRatio, {
@@ -342,10 +336,6 @@ export class MetricsRecorder {
       input.durationMs,
       sanitizeMetricAttributes({ db: input.db, op: input.op }),
     );
-  }
-
-  recordSupplyQuery(durationMs: number) {
-    this.supplyQueryDuration.record(durationMs);
   }
 
   recordApplyAttempt(input: { ats: string; mode: string; outcome: string; durationMs: number }) {

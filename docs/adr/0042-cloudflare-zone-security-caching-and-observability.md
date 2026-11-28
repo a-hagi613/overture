@@ -78,7 +78,7 @@ The `tryoverture.com` Cloudflare zone enforces the following configuration acros
 ## Consequences
 
 - Automated `.env`, `.php`, `.git`, and WordPress vulnerability scans are dropped at the Cloudflare edge (`HTTP 403`)
-  without touching the Fly origin, while `/api/health` (`HTTP 200`), `/api/supply`, and webhook endpoints stay reachable.
+  without touching the Fly origin, while `/api/health` (`HTTP 200`) and webhook endpoints stay reachable.
 - Static assets under `/assets/*`, `/videos/*`, and `/icons/*` benefit from Smart Tiered Cache and free edge caching while API responses and service
   worker updates remain uncached.
 - Keeping Free Bot Fight Mode **OFF** prevents self-inflicted monitoring outages (`403` on `/api/health` alerts).

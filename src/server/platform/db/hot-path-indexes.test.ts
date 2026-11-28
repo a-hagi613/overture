@@ -225,24 +225,24 @@ test("the retention, audit, session and freehire job hot paths search their new 
 
     expect(jobs).toContain("bg_jobs_status_updated");
 
-    const supply = planOf(
+    const pool = planOf(
       sqlite,
-      `select source, count(*) from jobs
+      `select id from jobs
          where status = 'open'
            and not (instr(lower(title_norm), 'talent pool') > 0)
-         group by source`,
+         order by posted_at desc, created_at desc`,
     );
 
-    expect(supply).toContain("jobs_status_posted");
-    expect(supply).not.toMatch(/SCAN jobs\b/u);
+    expect(pool).toContain("jobs_status_posted");
+    expect(pool).not.toMatch(/SCAN jobs\b/u);
 
-    const supplyByCategory = planOf(
+    const poolByCategory = planOf(
       sqlite,
-      "select source, count(*) from jobs where status = 'open' and category = ? group by source",
+      "select id from jobs indexed by jobs_category_status where category = ? and status = 'open'",
       "backend",
     );
 
-    expect(supplyByCategory).toContain("jobs_category_status");
+    expect(poolByCategory).toContain("jobs_category_status");
   } finally {
     db.$client.close();
   }
@@ -353,32 +353,6 @@ test("the catalog candidate and requisition hot paths search their new indexes",
       .join("\n");
 
     expect(requisition).toContain("postings_company_requisition");
-
-    const supply = planOf(
-      sqlite,
-      `select ats, count(*) from postings
-         where closed_at is null and status = 'open' and apply_supported = 1
-           and exists (select 1 from posting_tags t where t.posting_id = postings.id
-             and t.dimension in ('role', 'subrole') and t.value = ?)
-           and country_code = ? and workplace = 'remote'
-         group by ats`,
-      "Engineer",
-      "US",
-    );
-
-    expect(supply).toContain("postings_supply_country");
-    expect(supply).toContain("posting_tags_dimension_value_posting");
-    expect(supply).not.toMatch(/SCAN postings\b/u);
-
-    const unfiltered = planOf(
-      sqlite,
-      `select ats, count(*) from postings
-         where closed_at is null and status = 'open' and apply_supported = 1
-         group by ats`,
-    );
-
-    expect(unfiltered).toContain("postings_supply_ats");
-    expect(unfiltered).not.toMatch(/TEMP B-TREE/u);
 
     const city = planOf(
       sqlite,

@@ -465,41 +465,6 @@
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ms"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 0,
-            "y": 42
-          },
-          "id": 203,
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom"
-            }
-          },
-          "targets": [
-            {
-              "editorMode": "code",
-              "expr": "histogram_quantile(0.95, sum by (le) (rate(overture_supply_query_duration_ms_bucket[$__rate_interval])))",
-              "legendFormat": "supply query p95",
-              "refId": "A"
-            }
-          ],
-          "title": "Public supply query p95",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "fieldConfig": {
-            "defaults": {
               "unit": "percentunit"
             },
             "overrides": []

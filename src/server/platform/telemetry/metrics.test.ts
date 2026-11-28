@@ -48,12 +48,11 @@ test("every dashboard metric name is exported over the private scrape", async ()
     recorder.recordHttpRequest({
       durationMs: 4,
       method: "GET",
-      route: "/api/supply",
+      route: "/api/health",
       statusClass: "2xx",
     });
     recorder.recordEventLoopLag(3);
     recorder.recordSqliteQuery({ db: "app", durationMs: 1, op: "select" });
-    recorder.recordSupplyQuery(2);
     recorder.recordApplyAttempt({
       ats: "greenhouse",
       durationMs: 40,
@@ -88,7 +87,7 @@ test("every dashboard metric name is exported over the private scrape", async ()
   }
 
   expect(output).toContain("# HELP overture_http_requests_total");
-  expect(output).toContain('route="/api/supply"');
+  expect(output).toContain('route="/api/health"');
   expect(output).toContain('status_class="2xx"');
   expect(output).toContain('kind="catalog.sweep"');
   expect(output).toContain('tier="rules"');
@@ -99,7 +98,7 @@ test("a denied identifier never reaches the scrape", async () => {
     recorder.recordHttpRequest({
       durationMs: 1,
       method: "GET",
-      route: "/api/supply",
+      route: "/api/health",
       statusClass: "2xx",
     });
     recorder.recordBillingEvent({ event: "invoice.paid", plan: "month" });
@@ -117,10 +116,10 @@ test("the sanitizer drops identifiers and keeps bounded labels", () => {
       user_id: "user_1",
       job_id: "job_1",
       email: "someone@example.com",
-      route: "/api/supply",
+      route: "/api/health",
       status_class: "2xx",
     }),
-  ).toEqual({ route: "/api/supply", status_class: "2xx" });
+  ).toEqual({ route: "/api/health", status_class: "2xx" });
 
   for (const key of ["user_id", "job_id", "http.url", "email", "USER_ID", "Job.Id"]) {
     expect(isDeniedMetricAttribute(key)).toBe(true);
@@ -185,9 +184,9 @@ test("route labels use bounded templates, never raw ids or scanner paths", () =>
   expect(
     normalizeRouteTemplate("/api/applications/2f1c8d3e-aaaa-4bbb-8ccc-1234567890ab/ready"),
   ).toBe("/api/applications/:id/ready");
-  expect(normalizeRouteTemplate("/api/supply")).toBe("/api/supply");
+  expect(normalizeRouteTemplate("/api/health")).toBe("/api/health");
 
-  expect(routeLabel("/api/supply", 200)).toBe("/api/supply");
+  expect(routeLabel("/api/health", 200)).toBe("/api/health");
   expect(routeLabel("/api/applications/:id/ready", 200)).toBe("/api/applications/:id/ready");
   expect(routeLabel(undefined, 404)).toBe("_unmatched");
   expect(routeLabel("", 404)).toBe("_unmatched");
@@ -207,7 +206,7 @@ test("random scanner 404 paths collapse to the bounded _unmatched series", async
     "*",
     createHttpRequestMetrics((sample) => samples.push(sample)),
   );
-  app.get("/api/supply", (context) => context.json({ ok: true }));
+  app.get("/api/health", (context) => context.json({ ok: true }));
   app.all("*", (context) => context.text("Not found", 404));
 
   const responses = await Promise.all(
@@ -220,7 +219,7 @@ test("random scanner 404 paths collapse to the bounded _unmatched series", async
     expect(response.status).toBe(404);
   }
 
-  const matched = await app.request("https://overture.test/api/supply");
+  const matched = await app.request("https://overture.test/api/health");
 
   expect(matched.status).toBe(200);
   expect(samples.map((sample) => sample.route)).toEqual([
@@ -228,7 +227,7 @@ test("random scanner 404 paths collapse to the bounded _unmatched series", async
     "_unmatched",
     "_unmatched",
     "_unmatched",
-    "/api/supply",
+    "/api/health",
   ]);
   expect(
     samples.every((sample) => sample.statusClass === "4xx" || sample.statusClass === "2xx"),

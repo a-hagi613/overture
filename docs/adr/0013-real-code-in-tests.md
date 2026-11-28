@@ -145,7 +145,9 @@ through the real drizzle query logger and grows the row count to prove the count
 (`src/server/profile/targets.test.ts`: a cached count equals a fresh handle across filters that differ only in order,
 case or duplicates, a same-connection write and a sweep-worker connection's WAL write both invalidate it, the store
 stays bounded, the count query probes `posting_tags` by its primary key rather than scanning it, and 25 interleaved
-filter changes stay under 500ms p95 while catalog writes run, #426), the unit-test
+filter changes stay under 500ms p95 while catalog writes run, #426), the search route's role filters
+(`src/server/routes/api.test.ts`: `category` and `granularRole` still parse a freehire category id, a role-taxonomy
+id or name and a retired label after the public supply schema is gone, and an unknown value is refused), the unit-test
 allowlist (`lint-config-guard.test.ts`: every path the allowlist names exists, and every unit test file in `src/` or
 `scripts/` is named, so a deleted test cannot leave a stale entry), the apply-alias generator (`src/shared/apply-alias.test.ts`: a handle is the first and last name in
 lowercase ASCII, never a reserved system local part or its first dot-label, and a new plan uses the alias or the

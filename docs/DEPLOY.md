@@ -363,7 +363,7 @@ The Worker must serve the HTML of the release that is **already live on Fly**, b
 release's `/assets/*` bundle. A second `bun run build` is not equivalent: `.dockerignore` gives the Docker build
 context a smaller file set for Tailwind to scan, so the same commit hashed `/assets/main-*.js` differently inside the
 image than on a full checkout. The Worker then referenced a `main-*.js` that only existed in its own build, the origin
-answered 404, and the landing never hydrated (blank live supply count, frozen hero counter). `src/web/styles.css`
+answered 404, and the landing never hydrated (frozen hero counter). `src/web/styles.css`
 pins Tailwind's scan to `src/` and `index.html` so the two contexts now agree, and the deploy no longer rebuilds the
 page at all.
 
@@ -454,8 +454,8 @@ dry-run` builds the same Worker without deploying, and CI runs it after `bun run
   `src/web/route-table.tsx` and every API/webhook/asset prefix matches no Worker route, that the config is
   assets-only, and that the landing serves from `dist-marketing` while a stand-in origin answers 503.
   `bun node_modules/playwright/cli.js test test/e2e/marketing-hydration.test.ts --workers=1` serves the built
-  `dist-marketing/index.html` at `/` against the app's own `/assets/*` and `/api/supply` (after `bun run build`), and
-  fails on a missing asset, any console error or any `>= 400` response, or a live count that never leaves `—`.
+  `dist-marketing/index.html` at `/` against the app's own `/assets/*` (after `bun run build`), and fails on a missing
+  asset, any console error or any `>= 400` response, or a hero counter that never ticks.
 
 A route pattern without a wildcard matches the entire URL, query string included. The root is matched exactly (`tryoverture.com/`): a landing URL with a query string (`/?utm_source=…`) matches no
 Worker route and goes to Fly. That keeps arbitrary paths away from the Worker at the cost of falling back to the
