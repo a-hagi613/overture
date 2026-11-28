@@ -15,9 +15,14 @@ on:
           - setup-stripe
           - live-diagnostics
           - pull-error
+          - invite
           - vacuum-db
           - reset-catalog
           - sync-ops-secrets
+      invite_email:
+        description: "Address to invite (for the invite action)"
+        required: false
+        type: string
       rotate_webhook:
         description: "Replace the Stripe webhook endpoint and rotate its signing secret"
         required: false
@@ -596,6 +601,28 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
+
+      - name: Invite an address to sign in
+        if: steps.guard.outputs.skip != 'true' && inputs.action == 'invite'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          INVITE_EMAIL: ${{ inputs.invite_email }}
+        run: |
+          set -uo pipefail
+          case "${INVITE_EMAIL:-}" in
+            *@*.*) ;;
+            *)
+              echo "::error::Set invite_email to a full address."
+              exit 1
+              ;;
+          esac
+          status=0
+          output="$(timeout 120s flyctl ssh console -a overture-web -C "bun run /app/scripts/ops-invite.ts '${INVITE_EMAIL}'" 2>&1)" || status=$?
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ]; then
+            echo "::error::The invite script exited $status."
+            exit 1
+          fi
 
       - name: Sync the ops secrets and flags to overture-web
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'sync-ops-secrets'
