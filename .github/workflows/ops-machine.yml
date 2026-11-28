@@ -16,10 +16,17 @@ on:
           - zero
           - one
           - logs
+          - plan
+          - clone
+          - destroy-machine
       value:
-        description: "Memory in MB for the memory action"
+        description: "Memory in MB for memory, the volume name for clone, or the machine id for destroy-machine"
         required: false
         default: "1024"
+        type: string
+      confirm:
+        description: "Repeat the machine id to allow destroy-machine"
+        required: false
         type: string
 
 concurrency:
@@ -36,6 +43,7 @@ jobs:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       ACTION: ${{ inputs.action }}
       VALUE: ${{ inputs.value }}
+      CONFIRM: ${{ inputs.confirm }}
       APP: overture-web
     steps:
       - name: Refuse without FLY_API_TOKEN
@@ -55,6 +63,30 @@ jobs:
             status)
               flyctl status -a "$APP"
               flyctl machine list -a "$APP"
+              ;;
+            clone)
+              source="$(flyctl machine list -a "$APP" --json | jq -r '.[0].id')"
+              volume="$(flyctl volumes list -a "$APP" --json | jq -r --arg name "$VALUE" '.[] | select(.name == $name) | .id')"
+              if [ -z "$volume" ]; then
+                echo "::error::No volume named $VALUE."
+                exit 1
+              fi
+              flyctl machine clone "$source" -a "$APP" --attach-volume "${volume}:/data" --name "${VALUE}-app"
+              flyctl machine list -a "$APP"
+              ;;
+            destroy-machine)
+              if [ "$CONFIRM" != "$VALUE" ]; then
+                echo "::error::Set confirm to the machine id to allow destroy-machine."
+                exit 1
+              fi
+              flyctl machine destroy "$VALUE" -a "$APP" --yes
+              flyctl machine list -a "$APP"
+              ;;
+            plan)
+              flyctl orgs list --json | jq -r 'keys[]' | while read -r slug; do
+                echo "== org ${slug}"
+                flyctl orgs show "$slug" --json
+              done
               ;;
             logs)
               flyctl logs -a "$APP" --no-tail | tail -n 400

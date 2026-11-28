@@ -478,6 +478,26 @@ jobs:
             bun run scripts/vacuum-fly.ts compact
           fi
 
+      - name: Wake the app before an SSH action
+        if: >-
+          steps.guard.outputs.skip != 'true' && (
+            inputs.action == 'pull-error' || inputs.action == 'invite' ||
+            inputs.action == 'reset-catalog' || inputs.action == 'vacuum-db' ||
+            inputs.action == 'live-diagnostics' || inputs.action == 'match-probe' ||
+            inputs.action == 'lab-run'
+          )
+        run: |
+          set -uo pipefail
+          # Auto-stop keeps the app inside Fly's free allowance, so an SSH action may meet a stopped machine.
+          for attempt in $(seq 1 24); do
+            if curl -fsS -m 5 https://tryoverture.com/api/health >/dev/null; then
+              echo "overture-web answered on attempt $attempt."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::warning::overture-web did not wake within 120s; continuing anyway."
+
       - name: Show the overture-web status, volume and processes before a catalog reset
         if: steps.guard.outputs.skip != 'true' && inputs.action == 'reset-catalog'
         env:
