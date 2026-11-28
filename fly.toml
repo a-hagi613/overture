@@ -59,6 +59,6 @@ size = "shared-cpu-1x"
 memory = "1gb"
 
 [[mounts]]
-source = "data"
+source = "data2"
 destination = "/data"
-initial_size = "10gb"
+initial_size = "2gb"
