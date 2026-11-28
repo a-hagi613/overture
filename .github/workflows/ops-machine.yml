@@ -79,7 +79,7 @@ jobs:
                 echo "::error::Set confirm to the machine id to allow destroy-machine."
                 exit 1
               fi
-              flyctl machine destroy "$VALUE" -a "$APP" --yes
+              flyctl machine destroy "$VALUE" -a "$APP" --force
               flyctl machine list -a "$APP"
               ;;
             plan)
