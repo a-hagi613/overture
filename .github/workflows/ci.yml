@@ -37,7 +37,7 @@ jobs:
         with:
           bun-version: 1.4.5
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache
@@ -83,7 +83,7 @@ jobs:
         with:
           bun-version: 1.4.5
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache
@@ -112,7 +112,7 @@ jobs:
         with:
           bun-version: 1.4.5
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache
@@ -207,7 +207,7 @@ jobs:
           path: .
       - name: Cache the Bun binary
         id: bun-bin-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.bun/bin
           key: ${{ runner.os }}-e2e-bun-bin-1.4.5
@@ -224,7 +224,7 @@ jobs:
           echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
           "$HOME/.bun/bin/bun" --version
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache
