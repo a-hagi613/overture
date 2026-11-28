@@ -32,6 +32,9 @@ REQUIRE_EMAIL_SENDING = "true"
 METRICS_ENABLED = "true"
 METRICS_PORT = "9091"
 METRICS_HOST = "::"
+# Bun sizes its JavaScriptCore heap from the cgroup; cap it below the 512 MB machine so a pull/score burst GCs
+# instead of the kernel killing the process.
+BUN_JSC_forceRAMSize = "402653184"
 # Pulls route through the Cloudflare Worker because freehire's edge challenges Fly's egress.
 FREEHIRE_BASE_URL = "https://overture-freehire-proxy.abdullahi-hagi98.workers.dev"
 
@@ -49,7 +52,7 @@ processes = ["app"]
 
 [[vm]]
 size = "shared-cpu-1x"
-memory = "1gb"
+memory = "512mb"
 
 [[mounts]]
 source = "data2"
