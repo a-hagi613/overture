@@ -8,7 +8,6 @@ import { LandingHeroCopy } from "../components/landing/landing-hero-copy.tsx";
 import { LandingHeroStack } from "../components/landing/landing-hero-stack.tsx";
 import { LandingHowItWorks } from "../components/landing/landing-how-it-works.tsx";
 import { LandingPricingSection } from "../components/landing/landing-pricing-section.tsx";
-import { LandingSupplyPreview } from "../components/landing/landing-supply-preview.tsx";
 import { dsContainer } from "../components/ui/ds.ts";
 
 /**
@@ -39,7 +38,6 @@ export function LandingPage() {
 
         <LandingHowItWorks />
         <LandingDashboardPreview />
-        <LandingSupplyPreview />
         <LandingPricingSection />
         <LandingFaqSection />
         <LandingClosingSection />

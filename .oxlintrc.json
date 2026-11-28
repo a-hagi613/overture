@@ -174,8 +174,7 @@
           "src/web/components/google-mark.tsx",
           "src/web/components/linkedin-mark.tsx",
           "src/web/components/landing/company-brands.tsx",
-          "src/web/components/landing/company-brands-data.ts",
-          "src/web/components/landing/ats-logos.tsx"
+          "src/web/components/landing/company-brands-data.ts"
         ],
         "enforceStrictPaths": ["src/web/"]
       }
@@ -372,12 +371,12 @@
           "src/server/profile/targets.test.ts",
           "src/server/profile/time-zone.test.ts",
           "src/server/profile/v1-import.test.ts",
+          "src/server/routes/api.test.ts",
           "src/server/routes/internal-ops.test.ts",
           "src/server/routes/me.test.ts",
           "src/server/routes/places.test.ts",
           "src/server/routes/posting-detail-freehire.test.ts",
           "src/server/routes/ready.test.ts",
-          "src/server/routes/supply.test.ts",
           "src/server/routes/waitlist.test.ts",
           "src/server/safe-filename.test.ts",
           "src/server/storage/database-sizes.test.ts",

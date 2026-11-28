@@ -10,19 +10,36 @@ import { readSession } from "../auth/session.ts";
 import { consumeRateLimit } from "../platform/rate-limit.ts";
 import { createSseStream } from "../platform/sse/stream.ts";
 import { postedWithinMs, searchPostings } from "../platform/search/search.ts";
-import { EMPLOYMENT_TYPES, SENIORITIES, WORKPLACES } from "../../shared/tag-taxonomy.ts";
-import { supplyQuerySchema } from "../../shared/supply.ts";
+import {
+  EMPLOYMENT_TYPES,
+  ROLE_GROUPS,
+  SENIORITIES,
+  WORKPLACES,
+} from "../../shared/tag-taxonomy.ts";
+import { isFreehireCategory } from "../../shared/freehire-categories.ts";
+import { isEscoRole } from "../../shared/esco-roles.ts";
+import { isRoleTaxonomyValue } from "../../shared/role-taxonomy.ts";
 import { API_ERRORS } from "../../shared/api-errors.ts";
+
+const roleFilterValue = (accepts: (value: string) => boolean, message: string) =>
+  z.string().trim().min(1).max(80).refine(accepts, { message }).optional();
+
+const isCategoryValue = (value: string) =>
+  isFreehireCategory(value) ||
+  ROLE_GROUPS.some((group) => group === value) ||
+  isRoleTaxonomyValue(value);
+
+const isRoleValue = (value: string) => isEscoRole(value) || isRoleTaxonomyValue(value);
 
 export const searchQuerySchema = z.object({
   q: z.string().min(1).max(200),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   /** The original Level-1 filter; a granular role name here still matches legacy catalogs. */
   role: z.string().min(1).max(60).optional(),
-  /** The explicit category alias (WS-17b): a role-taxonomy id or name, or a retired category name. */
-  category: supplyQuerySchema.shape.category,
+  /** The explicit category alias (WS-17b): a freehire category id, a role-taxonomy id or name, or a retired category name. */
+  category: roleFilterValue(isCategoryValue, "unknown role category"),
   /** A role or subcategory; when present it is the role filter and the category is only a hint. */
-  granularRole: supplyQuerySchema.shape.granularRole,
+  granularRole: roleFilterValue(isRoleValue, "unknown granular role"),
   seniority: z.enum(SENIORITIES).optional(),
   workplace: z.enum(WORKPLACES).optional(),
   location: z.string().min(1).max(120).optional(),

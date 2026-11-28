@@ -212,9 +212,9 @@ export const postingTags = sqliteTable(
 
 /**
  * The retired `/api/supply` rollup (issues #631, #742). One row per `(role, country, region, workplace, ats)`
- * over open apply-supported catalog Postings. `/api/supply` now counts the freehire `jobs` rows in `app.sqlite` and
- * no longer reads this table; the fixed columns stay in the legacy catalog schema so an older `catalog.sqlite` still
- * opens and verifies unchanged while the file remains on disk.
+ * over open apply-supported catalog Postings. The public supply preview and its endpoint are removed, so nothing
+ * rebuilds or reads this table; the fixed columns stay in the legacy catalog schema so an older `catalog.sqlite`
+ * still opens and verifies unchanged while the file remains on disk.
  *
  * `role` is the role or subrole tag value, or the `*` sentinel for the any-role total. A Posting with two
  * role tags therefore appears under each tag and exactly once under `*`, so the unfiltered total never

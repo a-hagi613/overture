@@ -41,7 +41,7 @@ test("the app shell, the prerendered page and the marketing page name the same b
   }
 });
 
-test("the prerendered landing hydrates cleanly, shows a live count and ticks the hero counter", async ({
+test("the prerendered landing hydrates cleanly and ticks the hero counter", async ({
   appServer,
   page,
 }) => {
@@ -50,7 +50,6 @@ test("the prerendered landing hydrates cleanly, shows a live count and ticks the
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   const failedResponses: string[] = [];
-  const supplyStatuses: number[] = [];
 
   page.on("console", (message) => {
     if (message.type() === "error") {
@@ -61,12 +60,6 @@ test("the prerendered landing hydrates cleanly, shows a live count and ticks the
     pageErrors.push(error.message);
   });
   page.on("response", (response) => {
-    const url = new URL(response.url());
-
-    if (url.pathname === "/api/supply") {
-      supplyStatuses.push(response.status());
-    }
-
     if (response.status() >= 400) {
       failedResponses.push(`${String(response.status())} ${response.url()}`);
     }
@@ -74,12 +67,6 @@ test("the prerendered landing hydrates cleanly, shows a live count and ticks the
 
   try {
     await page.goto(`${site.base}/`, { waitUntil: "networkidle" });
-
-    const supplyCount = page.getByTestId("supply-count");
-
-    await expect(supplyCount).toHaveText(/^[\d,]+$/u);
-    expect(supplyStatuses).toContain(200);
-    await expect(page.getByTestId("supply-status")).toBeVisible();
 
     const heroCounter = page.getByTestId("hero-counter-value");
     const firstCount = (await heroCounter.textContent())?.trim() ?? "";

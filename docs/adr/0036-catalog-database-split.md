@@ -12,7 +12,7 @@ This amends ADR 0002 with a second database file on the same Fly volume:
   `question_variants`. Litestream replicates this file to R2 continuously, and the weekly restore drill restores it.
 - `/data/catalog.sqlite` (`CATALOG_DATABASE_PATH`, defaults to `catalog.sqlite` beside the application file,
   `synchronous=NORMAL`, migrated from `drizzle-catalog/`) holds the public job catalog: `companies`, `company_boards`,
-  `postings`, `posting_tags`, `posting_questions`, the `supply_facets` `/api/supply` rollup and the `postings_fts`
+  `postings`, `posting_tags`, `posting_questions`, the retired `supply_facets` rollup and the `postings_fts`
   index with its triggers. It is **excluded from `litestream.yml`**.
 
 ## Why
@@ -43,10 +43,11 @@ interval streams far more to R2 than the user data that actually needs a backup,
   row). Each phase writes at most 20 chunks of 500 rows per run so no single write lock is held long, and the next
   run continues. A Posting any unsent Application still points at is left for the next sweep to reconcile, and nothing
   in `app.sqlite` is written: an Application keeps its own snapshot.
-- **The `/api/supply` rollup is derived, never authoritative.** `supply_facets` is rebuilt from the open
-  apply-supported Postings at the end of an ETL/snapshot pass before the file is sealed, and the active snapshot is
-  read-only. A snapshot that predates the rollup simply falls back to the live indexed count, so an old file still
-  answers the landing correctly until the next run replaces it.
+- **The `/api/supply` rollup was derived, never authoritative (retired).** `supply_facets` used to be rebuilt from
+  the open apply-supported Postings at the end of an ETL/snapshot pass before the file was sealed, and the active
+  snapshot is read-only. A snapshot that predates the rollup fell back to the live indexed count. The landing preview
+  and the endpoint were removed, so nothing rebuilds or reads the rollup; the table stays in an older file only so it
+  still opens.
 
 `scripts/verify-db.ts` verifies both files in one run: `app.sqlite` is WAL, `synchronous=FULL`, STRICT, still contains
 no catalog table and no catalog foreign key; `catalog.sqlite` is WAL, `synchronous=NORMAL`, STRICT, has every catalog
@@ -97,26 +98,29 @@ with no alternative source.
 
 The **file itself stays, as a read-only legacy read model**, because live readers
 still answer from it for rows that predate freehire: the Matcher's stored-match
-fallback (`matching/matches-page.ts`, `matching/new-matches.ts`), the public
-`/api/supply` count and facet rollup, preparation and review for Applications
-created against a catalog Posting, dispatch liveness, the demo seed, and the admin
+fallback (`matching/matches-page.ts`, `matching/new-matches.ts`), preparation and
+review for Applications created against a catalog Posting, dispatch liveness, the
+demo seed, and the admin
 storage/system reports. Every new Application is created from a freehire `jobs` row
 and carries its own display snapshot, so no new user data depends on
 `catalog.sqlite`. Removing those readers, and then the file, is a separate change
 once no catalog-backed Application remains.
 
-## Amendment (2026-11-27, issue #742)
+## Amendment (2026-11-27, issues #742 and the live-jobs removal)
 
-`/api/supply` now counts the open, apply-supported freehire `jobs` and `job_places`
+`/api/supply` counted the open, apply-supported freehire `jobs` and `job_places`
 rows in `app.sqlite` (ADR 0047), with the reader's non-job exclusion, freehire
 category, canonical place ids and `remote` flag, grouped by ATS `system`. The
-`catalog.sqlite` count and its `supply_facets` rollup are retired: the count helper
-and rollup builder are removed, nothing rebuilds or reads the rollup, and the
-`supply_facets` table stays in the legacy file only so an older `catalog.sqlite`
-still opens and passes `bun run db:verify` unchanged. The legacy file still answers
-the stored-match fallback, preparation/review/dispatch for catalog-backed
-Applications, the demo seed and the admin reports; the public count is one fewer
-reader that depends on it.
+`catalog.sqlite` count and its `supply_facets` rollup were retired first: the count
+helper and rollup builder were removed, nothing rebuilds or reads the rollup, and
+the `supply_facets` table stays in the legacy file only so an older `catalog.sqlite`
+still opens and passes `bun run db:verify` unchanged. The landing preview and the
+public `/api/supply` endpoint were then removed, because jobs are pulled per user
+on demand and a global "open jobs" count is misleading; `src/server/jobs/supply.ts`,
+`src/shared/supply.ts`, `src/server/routes/supply.ts` and `src/web/lib/supply-api.ts`
+are gone. The legacy file still answers the stored-match fallback,
+preparation/review/dispatch for catalog-backed Applications, the demo seed and the
+admin reports.
 
 ## Amendment (2026-11-27, issue #710)
 

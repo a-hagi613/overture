@@ -227,8 +227,8 @@ function groupCondition(
 }
 
 /**
- * The SQL condition a free-text place becomes, shared by the supply count, the candidate target count and
- * the catalog search so a country, region, city, radius or metro means the same thing everywhere. Coarse
+ * The SQL condition a free-text place becomes, shared by the candidate target count and the catalog search
+ * so a country, region, city, radius or metro means the same thing everywhere. Coarse
  * levels read `posting_locations` B-tree indexes; a city with a radius or a metro box reads the tiny
  * `geo_places_rtree`; a row with no derived location falls back to its own columns.
  * @param db The catalog database that holds the geo tables.

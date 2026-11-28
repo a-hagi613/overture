@@ -203,7 +203,6 @@
     "test/e2e/wave2-ats.test.ts": 21.3,
     "test/e2e/onboarding-post-approval.test.ts": 5,
     "test/e2e/ready-approval-guardrail.test.ts": 19.7,
-    "test/e2e/landing-supply.test.ts": 12.3,
     "test/e2e/batch4-ats.test.ts": 106.6,
     "test/e2e/ats-batch1.test.ts": 60.6,
     "test/e2e/waitlist.test.ts": 15.9,

@@ -4,7 +4,7 @@ import { join } from "node:path";
 /**
  * The marketing Worker serves `dist-marketing/index.html`, which hydrates with the `/assets/*` bundle of the app
  * release that wrote it. When that HTML comes from a different build than the origin serving its assets, the
- * `main-*.js` reference 404s and React never hydrates: the live supply count stays `—`, the hero counter freezes and
+ * `main-*.js` reference 404s and React never hydrates: the hero counter freezes and
  * the landing's motion never starts (the production incident this script exists to prevent). The deploy workflow runs
  * it against `https://overture-web.fly.dev` before the Worker ships and against `https://tryoverture.com/` after, so a
  * mismatch fails the deploy instead of a visitor's page.

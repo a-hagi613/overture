@@ -10,7 +10,6 @@ import { LANDING_COPY } from "./landing-copy.ts";
 
 const NAV_LINKS = [
   { href: "#how-it-works", label: LANDING_COPY.nav.howItWorks },
-  { href: "#live-jobs", label: LANDING_COPY.nav.liveJobs },
   { href: "#pricing", label: LANDING_COPY.nav.pricing },
   { href: "#faq", label: LANDING_COPY.nav.faq },
 ] as const;
