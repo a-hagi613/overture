@@ -16,6 +16,7 @@ on:
           - zero
           - one
           - logs
+          - plan
       value:
         description: "Memory in MB for the memory action"
         required: false
@@ -55,6 +56,12 @@ jobs:
             status)
               flyctl status -a "$APP"
               flyctl machine list -a "$APP"
+              ;;
+            plan)
+              flyctl orgs list --json | jq -r 'keys[]' | while read -r slug; do
+                echo "== org ${slug}"
+                flyctl orgs show "$slug" --json
+              done
               ;;
             logs)
               flyctl logs -a "$APP" --no-tail | tail -n 400
